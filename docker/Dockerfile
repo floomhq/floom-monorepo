@@ -1,12 +1,44 @@
-# Floom Chat — production Docker image.
-# Uses pre-built artifacts from the host (apps/server/dist, apps/web/dist).
+# Floom — multi-stage production Docker image.
+# Stage 1 (builder): install all deps + build TypeScript + Vite.
+# Stage 2 (runtime): copy only production deps + compiled artifacts.
+#
 # Build with: docker build -t floom-chat:latest -f docker/Dockerfile .
 # The build context must be the repo root.
 
+# ── stage 1: builder ────────────────────────────────────────────────────────
+FROM node:20-slim AS builder
+WORKDIR /app
+
+RUN npm install -g pnpm@9.0.0
+
+# Copy package manifests first (for layer caching)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/server/package.json ./apps/server/
+COPY apps/web/package.json ./apps/web/
+COPY packages/detect/package.json ./packages/detect/
+COPY packages/manifest/package.json ./packages/manifest/
+COPY packages/runtime/package.json ./packages/runtime/
+COPY packages/cli/package.json ./packages/cli/
+COPY turbo.json tsconfig.base.json ./
+
+# Install ALL deps (devDependencies needed for build)
+RUN pnpm install --frozen-lockfile
+
+# Copy all source
+COPY apps ./apps
+COPY packages ./packages
+
+# Build server (TypeScript → dist/)
+RUN cd apps/server && pnpm run build
+
+# Build web (Vite → dist/) — non-fatal if it fails
+RUN cd apps/web && (pnpm run build || (echo "[docker] web build failed — creating empty dist" && mkdir -p dist && echo '<!doctype html><html><body>Backend only</body></html>' > dist/index.html))
+
+# ── stage 2: runtime ────────────────────────────────────────────────────────
 FROM node:20-slim AS runtime
 WORKDIR /app
 
-# System deps: ca-certs + curl (healthcheck)
+# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
@@ -14,10 +46,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV NODE_ENV=production
 ENV DATA_DIR=/data
-ENV PORT=3000
+ENV PORT=3051
+# PORT can be overridden at runtime (e.g. docker run -e PORT=3000 ...)
 
-# Install pnpm
-RUN npm install -g pnpm@9.0.0 2>&1 | tail -3
+RUN npm install -g pnpm@9.0.0
 
 # Copy package manifests
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -28,20 +60,22 @@ COPY packages/manifest/package.json ./packages/manifest/
 COPY packages/runtime/package.json ./packages/runtime/
 COPY packages/cli/package.json ./packages/cli/
 
-# Install only production server dependencies.
-RUN pnpm install --filter @floom/server --prod --ignore-scripts 2>&1 | grep -v "^[[:space:]]*WARN\|^[[:space:]]*notice" || true
+# Install only production server dependencies
+RUN pnpm install --filter @floom/server --prod
 
-# Rebuild better-sqlite3 native module against the container's Node ABI.
-RUN cd apps/server && npm rebuild better-sqlite3 2>&1 | tail -5 || true
+# Rebuild better-sqlite3 native module against the container's Node ABI
+RUN cd apps/server && pnpm rebuild better-sqlite3 2>&1 | tail -5 || true
 
-# Copy pre-built server and web artifacts.
-COPY apps/server/dist ./apps/server/dist
-COPY apps/web/dist ./apps/web/dist
+# Copy compiled artifacts from builder
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+COPY --from=builder /app/apps/web/dist ./apps/web/dist
 
 WORKDIR /app/apps/server
 
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+VOLUME ["/data"]
+
+EXPOSE 3051
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -fsS http://localhost:${PORT}/api/health || exit 1
 
 CMD ["node", "dist/index.js"]

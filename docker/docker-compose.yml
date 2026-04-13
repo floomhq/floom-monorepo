@@ -1,0 +1,37 @@
+version: "3.9"
+
+# Floom self-hosted — local reference compose file.
+# Usage:
+#   1. Copy apps.yaml.example to apps.yaml and edit it.
+#   2. docker compose -f docker/docker-compose.yml up -d
+#   3. Open http://localhost:3051
+
+services:
+  floom:
+    image: ghcr.io/floomhq/floom-monorepo:latest
+    ports:
+      - "3051:3051"
+    volumes:
+      # Persist SQLite data across restarts
+      - floom_data:/data
+      # Mount your apps.yaml config (optional)
+      - ./apps.yaml:/app/config/apps.yaml:ro
+    environment:
+      PORT: "3051"
+      DATA_DIR: "/data"
+      # Point to your apps config (optional — remove if not using OpenAPI ingest)
+      FLOOM_APPS_CONFIG: "/app/config/apps.yaml"
+      # Secrets for your apps (add as many as needed)
+      # OPENAI_API_KEY: "sk-..."
+      # STRIPE_SECRET_KEY: "sk_..."
+      # PLAUSIBLE_API_KEY: "..."
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3051/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  floom_data:
