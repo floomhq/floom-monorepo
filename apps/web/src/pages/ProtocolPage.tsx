@@ -1,0 +1,526 @@
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { TopBar } from '../components/TopBar';
+// Import the protocol markdown at build time via Vite ?raw
+import protocolMd from '@spec/protocol.md?raw';
+
+// ── Minimal Markdown renderer ──────────────────────────────────────────────
+// Handles: headings, code blocks (with copy), inline code, bold, paragraphs,
+// ordered/unordered lists, horizontal rules. No external deps.
+
+interface TocItem {
+  id: string;
+  text: string;
+  level: number;
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+}
+
+function extractToc(md: string): TocItem[] {
+  const lines = md.split('\n');
+  const toc: TocItem[] = [];
+  for (const line of lines) {
+    const m = line.match(/^(#{1,3})\s+(.+)/);
+    if (m) {
+      const level = m[1].length;
+      const text = m[2].replace(/`/g, '');
+      toc.push({ id: slugify(text), text, level });
+    }
+  }
+  return toc;
+}
+
+function CopyCodeButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        navigator.clipboard.writeText(code).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+      style={{
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        fontSize: 11,
+        padding: '3px 10px',
+        background: 'rgba(255,255,255,0.1)',
+        border: '1px solid rgba(255,255,255,0.15)',
+        borderRadius: 6,
+        color: copied ? '#7bffc0' : 'rgba(255,255,255,0.6)',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        transition: 'color 0.15s',
+      }}
+    >
+      {copied ? 'Copied!' : 'Copy'}
+    </button>
+  );
+}
+
+interface RenderedBlock {
+  type: 'heading' | 'code' | 'paragraph' | 'ul' | 'ol' | 'hr';
+  level?: number;
+  id?: string;
+  text?: string;
+  lang?: string;
+  code?: string;
+  items?: string[];
+}
+
+function parseMd(md: string): RenderedBlock[] {
+  const lines = md.split('\n');
+  const blocks: RenderedBlock[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Heading
+    const hm = line.match(/^(#{1,3})\s+(.+)/);
+    if (hm) {
+      const text = hm[2];
+      blocks.push({
+        type: 'heading',
+        level: hm[1].length,
+        id: slugify(text.replace(/`/g, '')),
+        text,
+      });
+      i++;
+      continue;
+    }
+
+    // Code block
+    if (line.startsWith('```')) {
+      const lang = line.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing ```
+      blocks.push({ type: 'code', lang, code: codeLines.join('\n') });
+      continue;
+    }
+
+    // HR
+    if (/^---+$/.test(line.trim())) {
+      blocks.push({ type: 'hr' });
+      i++;
+      continue;
+    }
+
+    // Unordered list
+    if (/^[\-\*] /.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[\-\*] /.test(lines[i])) {
+        items.push(lines[i].replace(/^[\-\*] /, ''));
+        i++;
+      }
+      blocks.push({ type: 'ul', items });
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\. /.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\. /.test(lines[i])) {
+        items.push(lines[i].replace(/^\d+\. /, ''));
+        i++;
+      }
+      blocks.push({ type: 'ol', items });
+      continue;
+    }
+
+    // Paragraph (skip blank lines)
+    if (line.trim()) {
+      const paraLines: string[] = [];
+      while (i < lines.length && lines[i].trim() && !lines[i].startsWith('#') && !lines[i].startsWith('```') && !/^[\-\*] /.test(lines[i]) && !/^\d+\. /.test(lines[i]) && !/^---/.test(lines[i])) {
+        paraLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: 'paragraph', text: paraLines.join(' ') });
+      continue;
+    }
+
+    i++;
+  }
+
+  return blocks;
+}
+
+function inlineHtml(text: string): string {
+  // Bold
+  let s = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Inline code
+  s = s.replace(/`([^`]+)`/g, '<code style="font-family:JetBrains Mono,monospace;font-size:0.88em;background:var(--bg);border:1px solid var(--line);padding:2px 6px;border-radius:4px">$1</code>');
+  // Links
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer" style="color:var(--accent);text-decoration:underline">$1</a>');
+  return s;
+}
+
+function BlockView({ block }: { block: RenderedBlock }) {
+  if (block.type === 'hr') {
+    return <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '28px 0' }} />;
+  }
+
+  if (block.type === 'heading') {
+    const Tag = `h${block.level ?? 2}` as 'h1' | 'h2' | 'h3';
+    const sizes: Record<number, number> = { 1: 32, 2: 22, 3: 16 };
+    const size = sizes[block.level ?? 2] ?? 18;
+    return (
+      <Tag
+        id={block.id}
+        style={{
+          fontSize: size,
+          fontWeight: 700,
+          color: 'var(--ink)',
+          margin: `${block.level === 1 ? '0 0 16px' : '32px 0 12px'}`,
+          lineHeight: 1.25,
+          scrollMarginTop: 72,
+        }}
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: inlineHtml(block.text ?? '') }}
+      />
+    );
+  }
+
+  if (block.type === 'code') {
+    const code = block.code ?? '';
+    return (
+      <div style={{ position: 'relative', margin: '16px 0' }}>
+        <pre
+          style={{
+            background: 'var(--terminal-bg, #0e0e0c)',
+            color: 'var(--terminal-ink, #d4d4c8)',
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 12,
+            padding: '20px 16px',
+            borderRadius: 10,
+            overflowX: 'auto',
+            lineHeight: 1.6,
+            margin: 0,
+            whiteSpace: 'pre',
+          }}
+        >
+          {code}
+        </pre>
+        <CopyCodeButton code={code} />
+      </div>
+    );
+  }
+
+  if (block.type === 'paragraph') {
+    return (
+      <p
+        style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--ink)', margin: '12px 0' }}
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: inlineHtml(block.text ?? '') }}
+      />
+    );
+  }
+
+  if (block.type === 'ul') {
+    return (
+      <ul style={{ margin: '10px 0', paddingLeft: 22 }}>
+        {(block.items ?? []).map((item, idx) => (
+          <li
+            key={idx}
+            style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--ink)', marginBottom: 4 }}
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: inlineHtml(item) }}
+          />
+        ))}
+      </ul>
+    );
+  }
+
+  if (block.type === 'ol') {
+    return (
+      <ol style={{ margin: '10px 0', paddingLeft: 22 }}>
+        {(block.items ?? []).map((item, idx) => (
+          <li
+            key={idx}
+            style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--ink)', marginBottom: 4 }}
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: inlineHtml(item) }}
+          />
+        ))}
+      </ol>
+    );
+  }
+
+  return null;
+}
+
+// ── ProtocolPage ───────────────────────────────────────────────────────────
+
+export function ProtocolPage() {
+  const toc = useRef<TocItem[]>(extractToc(protocolMd));
+  const blocks = useRef<RenderedBlock[]>(parseMd(protocolMd));
+  const [tocOpen, setTocOpen] = useState(false);
+
+  useEffect(() => {
+    document.title = 'The Floom Protocol';
+    return () => {
+      document.title = 'Floom — infra for agentic work';
+    };
+  }, []);
+
+  const handleSignIn = () => {};
+
+  return (
+    <div className="page-root" data-testid="protocol-page">
+      <TopBar onSignIn={handleSignIn} />
+
+      <main
+        style={{
+          maxWidth: 1080,
+          margin: '0 auto',
+          padding: '48px 24px 80px',
+          display: 'grid',
+          gridTemplateColumns: '220px 1fr',
+          gap: 48,
+          alignItems: 'start',
+        }}
+      >
+        {/* Left: Table of Contents (desktop) */}
+        <aside
+          style={{
+            position: 'sticky',
+            top: 72,
+            display: 'block',
+          }}
+          className="protocol-toc"
+        >
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: 'var(--muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: 12,
+            }}
+          >
+            Contents
+          </p>
+          <nav>
+            {toc.current.map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                style={{
+                  display: 'block',
+                  fontSize: 13,
+                  color: 'var(--muted)',
+                  textDecoration: 'none',
+                  padding: '4px 0',
+                  paddingLeft: item.level === 1 ? 0 : item.level === 2 ? 0 : 12,
+                  fontWeight: item.level === 1 ? 600 : 400,
+                  transition: 'color 0.1s',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'var(--ink)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'var(--muted)';
+                }}
+              >
+                {item.text}
+              </a>
+            ))}
+          </nav>
+        </aside>
+
+        {/* Right: Content */}
+        <article>
+          {/* Mobile TOC toggle */}
+          <button
+            type="button"
+            className="protocol-toc-toggle"
+            onClick={() => setTocOpen((v) => !v)}
+            style={{
+              display: 'none',
+              marginBottom: 20,
+              padding: '8px 14px',
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderRadius: 8,
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              color: 'var(--ink)',
+            }}
+          >
+            {tocOpen ? 'Hide contents' : 'Show contents'}
+          </button>
+
+          {tocOpen && (
+            <div
+              style={{
+                display: 'none',
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
+                borderRadius: 10,
+                padding: '16px 20px',
+                marginBottom: 24,
+              }}
+              className="protocol-toc-mobile"
+            >
+              {toc.current.map((item) => (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  onClick={() => setTocOpen(false)}
+                  style={{
+                    display: 'block',
+                    fontSize: 13,
+                    color: 'var(--muted)',
+                    textDecoration: 'none',
+                    padding: '4px 0',
+                    paddingLeft: item.level === 3 ? 12 : 0,
+                    fontWeight: item.level === 1 ? 600 : 400,
+                  }}
+                >
+                  {item.text}
+                </a>
+              ))}
+            </div>
+          )}
+
+          {/* Rendered markdown */}
+          {blocks.current.map((block, idx) => (
+            <BlockView key={idx} block={block} />
+          ))}
+
+          {/* Footer links */}
+          <div
+            style={{
+              marginTop: 48,
+              padding: '24px',
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderRadius: 12,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 12,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600 }}>
+                The protocol is open. MIT licensed.
+              </p>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
+                Self-host, fork, or contribute. Runtime packages in the monorepo.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <a
+                href="https://github.com/floomhq/floom-monorepo"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 16px',
+                  background: 'var(--ink)',
+                  color: '#fff',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <use href="#icon-github" />
+                </svg>
+                View on GitHub
+              </a>
+              <Link
+                to="/apps"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '8px 16px',
+                  background: 'var(--card)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  color: 'var(--ink)',
+                }}
+              >
+                Browse apps
+              </Link>
+            </div>
+          </div>
+
+          {/* Example manifests */}
+          <div style={{ marginTop: 32 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+              Example manifests
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {['flyfast', 'blast-radius', 'opendraft', 'bouncer', 'openanalytics'].map((slug) => (
+                <a
+                  key={slug}
+                  href={`https://github.com/floomhq/floom-monorepo/tree/main/examples/${slug}/floom.yaml`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    fontSize: 12,
+                    fontFamily: 'JetBrains Mono, monospace',
+                    color: 'var(--accent)',
+                    textDecoration: 'none',
+                    padding: '4px 10px',
+                    border: '1px solid var(--line)',
+                    borderRadius: 6,
+                    background: 'var(--bg)',
+                  }}
+                >
+                  {slug}/floom.yaml
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Install stub */}
+          <div
+            style={{
+              marginTop: 32,
+              padding: '16px 20px',
+              background: 'var(--terminal-bg, #0e0e0c)',
+              color: 'var(--terminal-ink, #d4d4c8)',
+              borderRadius: 10,
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 12,
+              lineHeight: 1.8,
+            }}
+          >
+            <span style={{ color: '#7bffc0' }}># Coming soon to npm</span>
+            {'\n'}
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>$</span> npm install -g @floom/cli
+            {'\n'}
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>$</span> floom deploy owner/repo
+          </div>
+        </article>
+      </main>
+    </div>
+  );
+}
