@@ -329,7 +329,7 @@ function InputsView({
             type="button"
             className="btn-primary"
             data-testid="floom-app-run-btn"
-            style={{ height: 40, padding: '0 24px', fontSize: 15 }}
+            style={{ height: 44, minHeight: 44, padding: '0 24px', fontSize: 15 }}
             onClick={onRun}
           >
             Run
