@@ -179,3 +179,66 @@ body {
     display: none !important;
   }
 }
+
+/* ── Protocol page responsive TOC ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .protocol-toc {
+    display: none !important;
+  }
+  .protocol-toc-toggle {
+    display: block !important;
+  }
+  .protocol-toc-mobile {
+    display: block !important;
+  }
+  /* Single-column on mobile */
+  main[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── FloomApp standalone spacing ─────────────────────────────────────────── */
+.floom-app-standalone .app-expanded-card {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ── Creator hero sections ───────────────────────────────────────────────── */
+.hero-section {
+  padding: 64px 0;
+  border-bottom: 1px solid var(--line);
+}
+.hero-section:last-child {
+  border-bottom: none;
+}
+.surface-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+}
+.surface-card {
+  padding: 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.surface-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 6px;
+}
+.surface-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.surface-card-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
