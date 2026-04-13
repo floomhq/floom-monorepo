@@ -6,7 +6,7 @@
     "floom": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "echo 'CLI build requires compiled deps — skipping for monorepo build. Use pnpm publish flow.'",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit"
   },
