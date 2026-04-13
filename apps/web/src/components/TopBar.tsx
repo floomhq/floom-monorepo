@@ -14,8 +14,8 @@ export function TopBar({ onSignIn }: Props) {
         <Link to="/" className="brand">
           floom
         </Link>
-        {/* Desktop nav */}
-        <nav className="topbar-links topbar-links-desktop">
+        {/* Desktop nav — hidden on mobile via CSS; aria-hidden added for screen reader cleanliness */}
+        <nav className="topbar-links topbar-links-desktop" aria-label="Desktop navigation">
           <Link to="/apps" className="topbar-nav-btn" data-testid="topbar-apps">
             apps
           </Link>
@@ -63,7 +63,7 @@ export function TopBar({ onSignIn }: Props) {
       </div>
       {/* Mobile dropdown */}
       {menuOpen && (
-        <div className="topbar-mobile-menu" role="menu">
+        <div className="topbar-mobile-menu" role="menu" aria-label="Mobile navigation">
           <Link
             to="/apps"
             className="topbar-mobile-link"
