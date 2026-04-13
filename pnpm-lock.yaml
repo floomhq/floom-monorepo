@@ -35,6 +35,9 @@ importers:
       nanoid:
         specifier: 5.0.9
         version: 5.0.9
+      yaml:
+        specifier: 2.5.1
+        version: 2.5.1
       zod:
         specifier: ^3.25.76
         version: 3.25.76

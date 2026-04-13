@@ -1,4 +1,4 @@
-// Inline SVG sprite — every icon in one hidden <svg>, used via <use href="#id"/>.
+// Inline SVG sprite: every icon in one hidden <svg>, used via <use href="#id"/>.
 // Ported verbatim from the wireframes' icons.js.
 export function IconSprite() {
   return (
@@ -43,7 +43,7 @@ export function IconSprite() {
         />
       </symbol>
 
-      {/* App glyphs — Lucide style */}
+      {/* App glyphs, Lucide style */}
       <symbol id="app-flyfast" viewBox="0 0 24 24">
         <path
           fill="none"

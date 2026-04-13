@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
 // Import the protocol markdown at build time via Vite ?raw
-import protocolMd from '@spec/protocol.md?raw';
+import protocolMd from '../assets/protocol.md?raw';
 
 // ── Minimal Markdown renderer ──────────────────────────────────────────────
 // Handles: headings, code blocks (with copy), inline code, bold, paragraphs,
@@ -512,11 +512,9 @@ export function ProtocolPage() {
     };
   }, []);
 
-  const handleSignIn = () => {};
-
   return (
     <div className="page-root" data-testid="protocol-page">
-      <TopBar onSignIn={handleSignIn} />
+      <TopBar />
 
       <main
         style={{
@@ -740,7 +738,7 @@ export function ProtocolPage() {
             </div>
           </div>
 
-          {/* Install stub */}
+          {/* Self-host one-liner */}
           <div
             style={{
               marginTop: 32,
@@ -753,11 +751,9 @@ export function ProtocolPage() {
               lineHeight: 1.8,
             }}
           >
-            <span style={{ color: '#7bffc0' }}># Coming soon to npm</span>
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}># Self-host Floom</span>
             {'\n'}
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}>$</span> npm install -g @floom/cli
-            {'\n'}
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}>$</span> floom deploy owner/repo
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>$</span> docker run -p 3051:3051 ghcr.io/floomhq/floom-monorepo:latest
           </div>
         </article>
       </main>

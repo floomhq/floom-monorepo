@@ -1,60 +1,34 @@
 interface LogoProps {
   size?: number;
   className?: string;
+  withWordmark?: boolean;
 }
 
-/**
- * Floom mark: two horizontal flow bars stacked in a rounded square,
- * suggesting pipelines / layers / composition.
- * Monochrome, scales cleanly at 20-64px.
- */
-export function FloomMark({ size = 32, className }: LogoProps) {
+export function Logo({ size = 20, className = '', withWordmark = false }: LogoProps) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      aria-hidden="true"
-    >
-      <rect width="32" height="32" rx="8" fill="currentColor" />
-      <rect x="7" y="10" width="14" height="3" rx="1.5" fill="white" />
-      <rect x="7" y="16" width="18" height="3" rx="1.5" fill="white" />
-      <rect x="7" y="22" width="10" height="3" rx="1.5" fill="white" />
-    </svg>
-  );
-}
-
-/**
- * Full wordmark: mark + "floom" text in tight tracking.
- */
-export function FloomWordmark({ size = 32, className }: LogoProps) {
-  const textSize = Math.round(size * 0.56);
-  return (
-    <span
-      className={className}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: Math.round(size * 0.3),
-        textDecoration: 'none',
-        color: 'inherit',
-      }}
-    >
-      <FloomMark size={size} />
-      <span
-        style={{
-          fontSize: textSize,
-          fontWeight: 700,
-          letterSpacing: '-0.03em',
-          lineHeight: 1,
-          fontFamily: 'inherit',
-        }}
+    <span className={`inline-flex items-center gap-2 ${className}`}>
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 48 48"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-label="Floom"
       >
-        floom
-      </span>
+        <path
+          d="M10 6 Q4 6 4 12 L4 36 Q4 42 10 42 L28 42 L44 24 L28 6 Z"
+          fill="currentColor"
+        />
+      </svg>
+      {withWordmark && <span className="font-semibold">floom</span>}
     </span>
   );
+}
+
+// Keep backward-compat exports used in other files
+export function FloomMark({ size = 32, className }: { size?: number; className?: string }) {
+  return <Logo size={size} className={className} />;
+}
+
+export function FloomWordmark({ size = 32, className }: { size?: number; className?: string }) {
+  return <Logo size={size} className={className} withWordmark />;
 }

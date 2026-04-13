@@ -58,7 +58,7 @@ function OutputRenderer({ outputs }: { outputs: unknown }) {
     );
   }
 
-  // Special-case FlyFast results — flight cards.
+  // Special-case FlyFast results: flight cards.
   const o = outputs as Record<string, unknown>;
   if (Array.isArray(o.flights)) {
     return (

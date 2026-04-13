@@ -26,17 +26,17 @@ export function AboutPage() {
           </p>
           <ul style={{ color: 'var(--muted)', lineHeight: 1.8 }}>
             <li>
-              <strong>Chat UI</strong> — this site. A prompt box that picks the right app and runs
+              <strong>Chat UI</strong>: this site. A prompt box that picks the right app and runs
               it.
             </li>
             <li>
-              <strong>MCP server</strong> — an MCP-compliant HTTP+SSE endpoint any agent can call.
+              <strong>MCP server</strong>: an MCP-compliant HTTP+SSE endpoint any agent can call.
             </li>
             <li>
-              <strong>HTTP API</strong> — a REST endpoint any HTTP client can call.
+              <strong>HTTP API</strong>: a REST endpoint any HTTP client can call.
             </li>
             <li>
-              <strong>CLI tool</strong> — <code>floom run {'{slug}'} --input=value</code> via the
+              <strong>CLI tool</strong>: <code>floom run {'{slug}'} --input=value</code> via the
               Floom CLI (roadmap).
             </li>
           </ul>
