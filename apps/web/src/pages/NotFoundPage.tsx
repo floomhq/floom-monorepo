@@ -10,14 +10,17 @@ export function NotFoundPage() {
           404 <span className="headline-dim">· not found</span>
         </h1>
         <p className="subhead" style={{ margin: '0 auto 32px' }}>
-          This path isn't wired to anything. Head back to the chat or browse public apps.
+          This path isn't wired to anything. Head back home or browse public apps.
         </p>
         <div className="pills" style={{ justifyContent: 'center' }}>
           <Link to="/" className="pill" style={{ textDecoration: 'none' }}>
-            Back to chat
+            Back to home
           </Link>
-          <Link to="/" className="pill" style={{ textDecoration: 'none' }}>
-            Public apps
+          <Link to="/apps" className="pill" style={{ textDecoration: 'none' }}>
+            Browse apps
+          </Link>
+          <Link to="/chat" className="pill" style={{ textDecoration: 'none' }}>
+            Open chat
           </Link>
         </div>
       </main>

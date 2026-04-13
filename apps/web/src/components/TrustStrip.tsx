@@ -38,7 +38,7 @@ export function TrustStrip() {
       >
         Built in Hamburg by Federico De Ponte and contributors.{' '}
         <a
-          href="https://github.com/floomhq/floom"
+          href="https://github.com/floomhq/floom-monorepo"
           target="_blank"
           rel="noreferrer"
           style={{ color: 'inherit', textDecoration: 'underline' }}
