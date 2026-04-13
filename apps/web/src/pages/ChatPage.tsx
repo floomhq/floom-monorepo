@@ -215,8 +215,7 @@ function EmptyHero({
         Infra for<span className="headline-dim"> agentic work.</span>
       </h1>
       <p className="subhead">
-        One manifest. Every agent surface. Any CLI, MCP server, or Python library becomes a
-        chat, a tool call, and an HTTP endpoint in 10 seconds.
+        OpenAPI in. Production product out. MCP server, CLI, HTTP API, and chat UI — auto-generated from any OpenAPI spec.
       </p>
 
       <PromptBox autoFocus onSubmit={onSubmit} />
