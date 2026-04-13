@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
@@ -269,6 +269,235 @@ function BlockView({ block }: { block: RenderedBlock }) {
   return null;
 }
 
+// ── Flow Diagram ───────────────────────────────────────────────────────────
+
+function FlowDiagram() {
+  return (
+    <div className="protocol-flow-diagram" style={{ marginBottom: 36 }}>
+      <p style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        How it works
+      </p>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0,
+          flexWrap: 'nowrap',
+          overflowX: 'auto',
+          paddingBottom: 4,
+        }}
+      >
+        {/* Input box */}
+        <div style={{
+          background: 'var(--bg)',
+          border: '1px solid var(--line)',
+          borderRadius: 8,
+          padding: '10px 16px',
+          textAlign: 'center',
+          flexShrink: 0,
+        }}>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Input</p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace' }}>OpenAPI spec</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted)', fontFamily: 'JetBrains Mono, monospace' }}>+ floom.yaml</p>
+        </div>
+
+        <Arrow />
+
+        {/* Floom core */}
+        <div style={{
+          background: 'var(--accent)',
+          borderRadius: 8,
+          padding: '10px 20px',
+          textAlign: 'center',
+          flexShrink: 0,
+        }}>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>Floom</p>
+          <p style={{ margin: '2px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>runtime</p>
+        </div>
+
+        <Arrow />
+
+        {/* Outputs */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+          {[
+            { label: 'MCP server', mono: true },
+            { label: 'CLI', mono: true },
+            { label: 'HTTP API', mono: true },
+            { label: 'Chat UI', mono: false },
+          ].map(({ label, mono }) => (
+            <div key={label} style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--line)',
+              borderRadius: 6,
+              padding: '5px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--ink)',
+              fontFamily: mono ? 'JetBrains Mono, monospace' : 'inherit',
+              whiteSpace: 'nowrap',
+            }}>
+              {label}
+            </div>
+          ))}
+        </div>
+
+        <Arrow />
+
+        {/* Plumbing */}
+        <div style={{
+          background: 'var(--bg)',
+          border: '1px solid var(--line)',
+          borderRadius: 8,
+          padding: '10px 16px',
+          flexShrink: 0,
+        }}>
+          <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Plumbing</p>
+          {['Secrets vault', 'Rate limits', 'Streaming', 'Run history'].map((item) => (
+            <p key={item} style={{ margin: '2px 0', fontSize: 11, color: 'var(--muted)' }}>{item}</p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Arrow() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px', color: 'var(--muted)', flexShrink: 0 }}>
+      <svg width={20} height={12} viewBox="0 0 20 12" fill="none">
+        <line x1="0" y1="6" x2="14" y2="6" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M10 2 L16 6 L10 10" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+}
+
+// ── ProxiedVsHosted ────────────────────────────────────────────────────────
+
+const PROXIED_YAML = `name: stripe
+type: proxied
+openapi_spec_url: https://docs.stripe.com/api/openapi.json
+base_url: https://api.stripe.com
+auth: bearer
+secrets: [STRIPE_SECRET_KEY]`;
+
+const HOSTED_YAML = `name: flyfast
+type: hosted
+runtime: python3.12
+openapi_spec: ./openapi.yaml
+build: pip install .
+run: uvicorn flyfast.server:app --port 8000`;
+
+function ProxiedVsHosted() {
+  const [copiedLeft, setCopiedLeft] = React.useState(false);
+  const [copiedRight, setCopiedRight] = React.useState(false);
+
+  const copy = (text: string, setter: (v: boolean) => void) => {
+    try { navigator.clipboard.writeText(text).catch(() => {}); } catch { /* ignore */ }
+    setter(true);
+    setTimeout(() => setter(false), 2000);
+  };
+
+  return (
+    <div style={{ marginBottom: 36 }}>
+      <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        Two deployment modes
+      </p>
+      <div className="protocol-comparison-2col">
+        {/* Proxied */}
+        <div style={{
+          background: 'var(--card)',
+          border: '1px solid var(--line)',
+          borderRadius: 10,
+          overflow: 'hidden',
+        }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Proxied mode</span>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted)' }}>Wrap any existing API</p>
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</span>
+          </div>
+          <div style={{ position: 'relative' }}>
+            <pre style={{
+              background: 'var(--terminal-bg, #0e0e0c)',
+              color: 'var(--terminal-ink, #d4d4c8)',
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 11.5,
+              padding: '16px',
+              margin: 0,
+              lineHeight: 1.8,
+              overflowX: 'auto',
+            }}>
+              {PROXIED_YAML}
+            </pre>
+            <button
+              type="button"
+              onClick={() => copy(PROXIED_YAML, setCopiedLeft)}
+              style={{
+                position: 'absolute', top: 8, right: 8,
+                fontSize: 10, padding: '2px 8px',
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 4,
+                color: copiedLeft ? '#7bffc0' : 'rgba(255,255,255,0.5)',
+                cursor: 'pointer', fontFamily: 'inherit', transition: 'color 0.15s',
+              }}
+            >
+              {copiedLeft ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
+        {/* Hosted */}
+        <div style={{
+          background: 'var(--card)',
+          border: '1px solid var(--line)',
+          borderRadius: 10,
+          overflow: 'hidden',
+        }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Hosted mode</span>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted)' }}>Floom builds and runs your app</p>
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</span>
+          </div>
+          <div style={{ position: 'relative' }}>
+            <pre style={{
+              background: 'var(--terminal-bg, #0e0e0c)',
+              color: 'var(--terminal-ink, #d4d4c8)',
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 11.5,
+              padding: '16px',
+              margin: 0,
+              lineHeight: 1.8,
+              overflowX: 'auto',
+            }}>
+              {HOSTED_YAML}
+            </pre>
+            <button
+              type="button"
+              onClick={() => copy(HOSTED_YAML, setCopiedRight)}
+              style={{
+                position: 'absolute', top: 8, right: 8,
+                fontSize: 10, padding: '2px 8px',
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 4,
+                color: copiedRight ? '#7bffc0' : 'rgba(255,255,255,0.5)',
+                cursor: 'pointer', fontFamily: 'inherit', transition: 'color 0.15s',
+              }}
+            >
+              {copiedRight ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ProtocolPage ───────────────────────────────────────────────────────────
 
 export function ProtocolPage() {
@@ -279,7 +508,7 @@ export function ProtocolPage() {
   useEffect(() => {
     document.title = 'The Floom Protocol';
     return () => {
-      document.title = 'Floom — infra for agentic work';
+      document.title = 'Floom: infra for agentic work';
     };
   }, []);
 
@@ -404,6 +633,12 @@ export function ProtocolPage() {
               ))}
             </div>
           )}
+
+          {/* Flow diagram */}
+          <FlowDiagram />
+
+          {/* Proxied vs Hosted side-by-side */}
+          <ProxiedVsHosted />
 
           {/* Rendered markdown */}
           {blocks.current.map((block, idx) => (
