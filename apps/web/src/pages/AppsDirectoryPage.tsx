@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
 import { AppIcon } from '../components/AppIcon';
@@ -27,7 +27,6 @@ export function AppsDirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
-  const navigate = useNavigate();
 
   useEffect(() => {
     document.title = 'Public apps | Floom';
@@ -83,13 +82,9 @@ export function AppsDirectoryPage() {
     return filtered.filter((a) => !FEATURED_SLUGS.includes(a.slug));
   }, [filtered, isFiltering]);
 
-  const handleSignIn = () => {
-    navigate('/apps');
-  };
-
   return (
     <div className="page-root" data-testid="apps-directory">
-      <TopBar onSignIn={handleSignIn} />
+      <TopBar />
 
       <main className="main" style={{ paddingTop: 48, paddingBottom: 80 }}>
         {/* Hero */}
