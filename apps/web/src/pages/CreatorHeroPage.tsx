@@ -80,7 +80,9 @@ export function CreatorHeroPage() {
   const [demoApp, setDemoApp] = useState<AppDetail>(FLYFAST_STUB);
   const navigate = useNavigate();
   const [specInput, setSpecInput] = useState('');
-  const [specModalOpen, setSpecModalOpen] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistStep, setWaitlistStep] = useState<'idle' | 'email' | 'submitted'>('idle');
+  const [waitlistError, setWaitlistError] = useState('');
   const [yamlCopied, setYamlCopied] = useState(false);
   const specRef = useRef<HTMLInputElement>(null);
 
@@ -102,7 +104,28 @@ export function CreatorHeroPage() {
   const handleDeploy = (e: React.FormEvent) => {
     e.preventDefault();
     if (!specInput.trim()) return;
-    setSpecModalOpen(true);
+    setWaitlistStep('email');
+    setWaitlistError('');
+  };
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = waitlistEmail.trim();
+    if (!email || !email.includes('@')) {
+      setWaitlistError('Please enter a valid email.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/deploy-waitlist', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, spec_url: specInput }),
+      });
+      if (!res.ok) throw new Error('server error');
+      setWaitlistStep('submitted');
+    } catch {
+      setWaitlistError('Something went wrong. Try again.');
+    }
   };
 
   return (
@@ -125,29 +148,72 @@ export function CreatorHeroPage() {
           OpenAPI in. Production product out. MCP server, CLI, HTTP API, and chat UI — auto-generated. Secrets, rate limits, streaming, access control, payments — built in.
         </p>
 
-        <form
-          onSubmit={handleDeploy}
-          style={{ display: 'flex', gap: 10, maxWidth: 520, marginTop: 28, flexWrap: 'wrap' }}
-        >
-          <input
-            ref={specRef}
-            type="url"
-            className="input-field"
-            placeholder="https://docs.stripe.com/api/openapi.json"
-            value={specInput}
-            onChange={(e) => setSpecInput(e.target.value)}
-            style={{ flex: 1, minWidth: 200 }}
-            data-testid="spec-input"
-          />
-          <button
-            type="submit"
-            className="btn-primary"
-            style={{ height: 40, padding: '0 22px', fontSize: 14 }}
-            data-testid="deploy-btn"
+        {waitlistStep === 'submitted' ? (
+          <div
+            data-testid="waitlist-success"
+            style={{ marginTop: 28, padding: '14px 18px', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, maxWidth: 520 }}
           >
-            Deploy from OpenAPI spec
-          </button>
-        </form>
+            <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
+              You're on the list.
+            </p>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
+              Real deploys ship in v1.1. We'll email you at: <strong>{waitlistEmail}</strong>
+            </p>
+          </div>
+        ) : waitlistStep === 'email' ? (
+          <form
+            onSubmit={handleWaitlistSubmit}
+            data-testid="waitlist-email-form"
+            style={{ display: 'flex', gap: 10, maxWidth: 520, marginTop: 28, flexWrap: 'wrap' }}
+          >
+            <input
+              type="email"
+              required
+              className="input-field"
+              placeholder="your@email.com"
+              value={waitlistEmail}
+              onChange={(e) => { setWaitlistEmail(e.target.value); setWaitlistError(''); }}
+              style={{ flex: 1, minWidth: 200 }}
+              data-testid="waitlist-email-input"
+              autoFocus
+            />
+            <button
+              type="submit"
+              className="btn-primary"
+              style={{ height: 40, padding: '0 22px', fontSize: 14 }}
+              data-testid="waitlist-notify-btn"
+            >
+              Notify me
+            </button>
+            {waitlistError && (
+              <p style={{ width: '100%', margin: '4px 0 0', fontSize: 12, color: '#ef4444' }}>{waitlistError}</p>
+            )}
+          </form>
+        ) : (
+          <form
+            onSubmit={handleDeploy}
+            style={{ display: 'flex', gap: 10, maxWidth: 520, marginTop: 28, flexWrap: 'wrap' }}
+          >
+            <input
+              ref={specRef}
+              type="url"
+              className="input-field"
+              placeholder="https://docs.stripe.com/api/openapi.json"
+              value={specInput}
+              onChange={(e) => setSpecInput(e.target.value)}
+              style={{ flex: 1, minWidth: 200 }}
+              data-testid="spec-input"
+            />
+            <button
+              type="submit"
+              className="btn-primary"
+              style={{ height: 40, padding: '0 22px', fontSize: 14 }}
+              data-testid="deploy-btn"
+            >
+              Deploy from OpenAPI spec
+            </button>
+          </form>
+        )}
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 16 }}>
           <Link
@@ -239,11 +305,15 @@ export function CreatorHeroPage() {
           </pre>
           <button
             type="button"
+            data-testid="yaml-copy-btn"
             onClick={() => {
-              navigator.clipboard.writeText(OPENAPI_YAML).then(() => {
-                setYamlCopied(true);
-                setTimeout(() => setYamlCopied(false), 1500);
-              });
+              try {
+                navigator.clipboard.writeText(OPENAPI_YAML).catch(() => {});
+              } catch {
+                // ignore
+              }
+              setYamlCopied(true);
+              setTimeout(() => setYamlCopied(false), 2000);
             }}
             style={{
               position: 'absolute',
@@ -372,6 +442,64 @@ export function CreatorHeroPage() {
         </div>
       </section>
 
+      {/* ── Self-host section ────────────────────────────────────── */}
+      <section
+        data-testid="self-host-section"
+        style={{
+          maxWidth: 900,
+          margin: '0 auto',
+          padding: '56px 24px',
+          borderBottom: '1px solid var(--line)',
+        }}
+      >
+        <p className="label-mono" style={{ marginBottom: 8 }}>Open source</p>
+        <h2 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 12px', color: 'var(--ink)' }}>
+          Open source. Self-host anywhere.
+        </h2>
+        <p style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--ink)', maxWidth: 600, marginBottom: 24 }}>
+          Floom is MIT licensed. Floom.dev is just our hosted flagship — like Vercel.com vs Next.js.
+          Same runtime on cloud and self-host. Your domain, your auth, your data. Forks welcome.
+        </p>
+
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '0 0 8px' }}>
+          Self-host the full stack with one command:
+        </p>
+        <div style={{ position: 'relative', maxWidth: 560, marginBottom: 24 }}>
+          <pre style={{ background: 'var(--terminal-bg, #0e0e0c)', color: 'var(--terminal-ink, #d4d4c8)', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, padding: '16px', borderRadius: 10, overflowX: 'auto', lineHeight: 1.6, margin: 0 }}>
+            {'docker run -p 3000:3000 -e OPENAI_API_KEY=... ghcr.io/floomhq/floom:latest'}
+          </pre>
+        </div>
+
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '0 0 8px' }}>
+          Or embed the runtime as a library:
+        </p>
+        <div style={{ position: 'relative', maxWidth: 560, marginBottom: 24 }}>
+          <pre style={{ background: 'var(--terminal-bg, #0e0e0c)', color: 'var(--terminal-ink, #d4d4c8)', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, padding: '16px', borderRadius: 10, overflowX: 'auto', lineHeight: 1.6, margin: 0 }}>
+            {'npm install @floom/runtime'}
+          </pre>
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <a
+            href="https://github.com/floomhq/floom-monorepo"
+            target="_blank"
+            rel="noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: 'var(--card)', border: '1px solid var(--line)', color: 'var(--ink)', borderRadius: 8, fontSize: 14, fontWeight: 500, textDecoration: 'none' }}
+          >
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <use href="#icon-github" />
+            </svg>
+            View the source
+          </a>
+          <Link
+            to="/protocol"
+            style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', background: 'none', color: 'var(--muted)', borderRadius: 8, fontSize: 14, fontWeight: 500, textDecoration: 'none' }}
+          >
+            Read the protocol →
+          </Link>
+        </div>
+      </section>
+
       {/* ── Works for what's real ─────────────────────────────── */}
       <section
         style={{
@@ -495,10 +623,6 @@ export function CreatorHeroPage() {
         </nav>
       </footer>
 
-      {/* Deploy coming soon modal */}
-      {specModalOpen && (
-        <DeployModal spec={specInput} onClose={() => setSpecModalOpen(false)} />
-      )}
     </div>
   );
 }
@@ -576,104 +700,3 @@ function SurfaceCard({
   );
 }
 
-function DeployModal({ spec, onClose }: { spec: string; onClose: () => void }) {
-  const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitted(true);
-  };
-
-  return (
-    <>
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.4)',
-          zIndex: 100,
-        }}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
-        role="dialog"
-        aria-label="Deploy coming soon"
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 101,
-          background: 'var(--card)',
-          border: '1px solid var(--line)',
-          borderRadius: 16,
-          padding: '32px',
-          maxWidth: 440,
-          width: '90vw',
-        }}
-      >
-        <p
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: 'var(--accent)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.07em',
-            margin: '0 0 8px',
-          }}
-        >
-          Coming soon
-        </p>
-        <h2 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 8px', color: 'var(--ink)' }}>
-          Real deploy coming soon.
-        </h2>
-        <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 20px', lineHeight: 1.6 }}>
-          We got your spec:{' '}
-          <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{spec}</code>. Drop your email and we'll notify you the moment deploy goes live.
-        </p>
-
-        {submitted ? (
-          <p style={{ fontSize: 14, color: 'var(--success)', fontWeight: 600 }}>
-            You're on the list.
-          </p>
-        ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="email"
-              required
-              className="input-field"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button type="submit" className="btn-primary" style={{ height: 40, padding: '0 18px', fontSize: 14 }}>
-              Notify me
-            </button>
-          </form>
-        )}
-
-        <button
-          type="button"
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: 16,
-            right: 16,
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--muted)',
-            fontSize: 18,
-            fontFamily: 'inherit',
-          }}
-          aria-label="Close"
-        >
-          ×
-        </button>
-      </div>
-    </>
-  );
-}

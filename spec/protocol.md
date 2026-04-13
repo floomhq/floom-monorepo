@@ -52,6 +52,35 @@ Every Floom app gets:
 - Run history + audit log
 - (Coming soon) Access control, staging environments, version control, per-app databases, OAuth, payment / billing
 
+## Self-hosting
+
+Floom is MIT licensed. Floom.dev is the hosted flagship, but you can run the full stack yourself.
+
+**Via Docker** (one command):
+```bash
+docker run -p 3000:3000 \
+  -e OPENAI_API_KEY=... \
+  ghcr.io/floomhq/floom:latest
+```
+
+**Via npm** (embed the runtime in your own Node server):
+```bash
+npm install @floom/runtime
+```
+
+```typescript
+import { runApp } from '@floom/runtime';
+
+const result = await runApp({
+  manifest,
+  inputs,
+  secrets,
+  onStream: (chunk) => console.log(chunk),
+});
+```
+
+**Same runtime on cloud and self-host.** v1 runs Docker everywhere. v1.1 adds Cloud Run scale-to-zero on floom.dev (invisible to creators, manifest format unchanged).
+
 ## Why OpenAPI?
 
 OpenAPI is the industry-standard contract for describing an API. Every serious SaaS publishes one. Every code-generator tool reads one. Floom meeting creators at the OpenAPI layer means:

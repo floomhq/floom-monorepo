@@ -13,6 +13,7 @@ import { pickRouter } from './routes/pick.js';
 import { threadRouter } from './routes/thread.js';
 import { runRouter } from './routes/run.js';
 import { mcpRouter } from './routes/mcp.js';
+import { deployWaitlistRouter } from './routes/deploy-waitlist.js';
 import { seedFromFile } from './services/seed.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
 
@@ -31,6 +32,7 @@ app.route('/api/pick', pickRouter);
 app.route('/api/thread', threadRouter);
 app.route('/api/run', runRouter);
 app.route('/mcp', mcpRouter);
+app.route('/api/deploy-waitlist', deployWaitlistRouter);
 
 // Static web — serve the built Vite bundle from apps/web/dist when it exists.
 // In dev, the web app is served on its own port by `vite` and this block is
