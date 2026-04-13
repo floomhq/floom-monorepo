@@ -56,10 +56,12 @@ export function PromptBox({
       />
       <button
         type="button"
-        className="prompt-box-run"
+        className={`prompt-box-run${!value.trim() || disabled ? ' prompt-box-run-disabled' : ''}`}
         aria-label="Run"
         onClick={handleSubmit}
-        disabled={disabled}
+        disabled={!value.trim() || disabled}
+        aria-disabled={!value.trim() || disabled}
+        style={!value.trim() || disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
       >
         Run
         <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

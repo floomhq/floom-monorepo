@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { AppIcon } from '../../AppIcon';
 import type { HubApp } from '../../../lib/types';
 
@@ -21,12 +22,12 @@ export function PublicAppsResponse({ apps, onPickApp }: Props) {
       </p>
       <div className="trending-grid">
         {apps.map((app) => (
-          <button
+          <Link
             key={app.slug}
-            type="button"
+            to={`/p/${app.slug}`}
             className="app-tile"
             onClick={() => onPickApp(app)}
-            style={{ textAlign: 'left', width: '100%' }}
+            style={{ textAlign: 'left', width: '100%', textDecoration: 'none', display: 'block' }}
           >
             <div className="app-tile-icon">
               <AppIcon slug={app.slug} size={24} />
@@ -36,7 +37,7 @@ export function PublicAppsResponse({ apps, onPickApp }: Props) {
             <div className="app-tile-runs">
               {app.actions.length} action{app.actions.length === 1 ? '' : 's'}
             </div>
-          </button>
+          </Link>
         ))}
       </div>
     </div>

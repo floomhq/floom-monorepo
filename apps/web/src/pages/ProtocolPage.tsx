@@ -43,11 +43,15 @@ function CopyCodeButton({ code }: { code: string }) {
   return (
     <button
       type="button"
+      data-testid="copy-btn"
       onClick={() => {
-        navigator.clipboard.writeText(code).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        });
+        try {
+          navigator.clipboard.writeText(code).catch(() => {});
+        } catch {
+          // ignore
+        }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
       }}
       style={{
         position: 'absolute',
