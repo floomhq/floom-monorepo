@@ -77,10 +77,27 @@ interface OpenApiPath {
   delete?: OpenApiOperation;
 }
 
+interface OpenApiServerVariable {
+  default: string;
+  enum?: string[];
+  description?: string;
+}
+
+interface OpenApiServer {
+  url: string;
+  description?: string;
+  variables?: Record<string, OpenApiServerVariable>;
+}
+
 interface OpenApiSpec {
   openapi?: string;
+  swagger?: string; // Swagger 2.0
+  host?: string; // Swagger 2.0
+  basePath?: string; // Swagger 2.0
+  schemes?: string[]; // Swagger 2.0
   info?: OpenApiInfo;
   paths?: Record<string, OpenApiPath>;
+  servers?: OpenApiServer[];
 }
 
 // ---------- helpers ----------
@@ -198,6 +215,57 @@ function operationToAction(
     outputs,
     description: op.summary || op.description || `${method.toUpperCase()} ${path}`,
   };
+}
+
+/**
+ * Resolve the effective base URL for a spec. Priority:
+ *   1. appSpec.base_url (explicit override in apps.yaml) — wins if set
+ *   2. spec.servers[0].url (OpenAPI 3.x) with variable substitution
+ *   3. Swagger 2.0 host + basePath + schemes[0]
+ *   4. null if nothing found
+ *
+ * Variable substitution uses {var} placeholders from spec.servers[0].variables.
+ * If a placeholder has no default, it is left as-is (and will cause a runtime
+ * failure with a clear message — better than silently rewriting it).
+ */
+export function resolveBaseUrl(
+  spec: OpenApiSpec,
+  appSpec: OpenApiAppSpec,
+): string | null {
+  // 1. Explicit override wins.
+  if (appSpec.base_url) {
+    return appSpec.base_url;
+  }
+
+  // 2. OpenAPI 3.x servers[]
+  if (Array.isArray(spec.servers) && spec.servers.length > 0) {
+    const server = spec.servers[0];
+    let url = server.url;
+    if (server.variables) {
+      // Replace {varName} with its default value.
+      for (const [name, variable] of Object.entries(server.variables)) {
+        const value = variable.default ?? '';
+        url = url.replace(new RegExp(`\\{${name}\\}`, 'g'), value);
+      }
+    }
+    // Handle server-relative URLs (starts with /): these are relative to
+    // the spec's fetch URL, which we don't track here. Caller should pass
+    // base_url explicitly in that case.
+    if (url.startsWith('/') || !url.startsWith('http')) {
+      return null;
+    }
+    return url;
+  }
+
+  // 3. Swagger 2.0 host + basePath
+  if (spec.host) {
+    const scheme =
+      (Array.isArray(spec.schemes) && spec.schemes[0]) || 'https';
+    const basePath = spec.basePath || '';
+    return `${scheme}://${spec.host}${basePath}`;
+  }
+
+  return null;
 }
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
@@ -348,6 +416,19 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
       const manifest = specToManifest(spec, appSpec, secretNames);
       const specCached = JSON.stringify(spec);
 
+      // Resolve the effective base URL. appSpec.base_url wins, otherwise
+      // we read spec.servers[] (OpenAPI 3.x) or spec.host + basePath (Swagger 2).
+      const resolvedBaseUrl = resolveBaseUrl(spec, appSpec);
+      if (!resolvedBaseUrl) {
+        console.warn(
+          `[openapi-ingest] ${appSpec.slug}: no base_url resolved (neither apps.yaml override nor spec.servers[]). Runtime calls will fail.`,
+        );
+      } else if (!appSpec.base_url) {
+        console.log(
+          `[openapi-ingest] ${appSpec.slug}: auto-resolved base_url = ${resolvedBaseUrl} (from spec.servers[])`,
+        );
+      }
+
       const existing = existsBySlug.get(appSpec.slug) as { id: string } | undefined;
 
       if (existing) {
@@ -356,7 +437,7 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
           appSpec.description || manifest.description,
           JSON.stringify(manifest),
           appSpec.category || null,
-          appSpec.base_url || null,
+          resolvedBaseUrl || null,
           appSpec.auth || null,
           appSpec.openapi_spec_url || null,
           specCached,
@@ -378,7 +459,7 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
           `proxied:${appSpec.slug}`,
           appSpec.category || null,
           appSpec.icon || null,
-          appSpec.base_url || null,
+          resolvedBaseUrl || null,
           appSpec.auth || null,
           appSpec.openapi_spec_url || null,
           specCached,
