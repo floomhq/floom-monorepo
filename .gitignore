@@ -7,5 +7,7 @@ dist
 *.log
 .DS_Store
 coverage
-data/*.db
-data/*.sqlite
+data/
+apps/server/data/
+# Phase 2 workplans + stress test report (local-only)
+WORKPLAN-*.md
