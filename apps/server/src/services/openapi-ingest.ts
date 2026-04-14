@@ -329,10 +329,39 @@ function operationToAction(
 
   const inputs: InputSpec[] = [];
 
-  // Path + query parameters
+  // Path, query, header, cookie parameters.
+  // Header/cookie inputs are namespaced so they don't collide with body
+  // field names (e.g. an `Authorization` header vs an `authorization` body
+  // field). The proxied-runner reads the name prefix to route them to the
+  // right transport.
   for (const param of op.parameters || []) {
     if (param.in === 'path' || param.in === 'query') {
       inputs.push(openApiParamToInput(param));
+    } else if (param.in === 'header') {
+      // Skip standard headers that are handled automatically.
+      const headerName = param.name.toLowerCase();
+      if (
+        headerName === 'content-type' ||
+        headerName === 'accept' ||
+        headerName === 'authorization'
+      ) {
+        continue;
+      }
+      const input = openApiParamToInput(param);
+      inputs.push({
+        ...input,
+        name: `header_${param.name.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+        label: `${formatLabel(param.name)} (header)`,
+        description: `${input.description || ''} [HTTP header]`.trim(),
+      });
+    } else if (param.in === 'cookie') {
+      const input = openApiParamToInput(param);
+      inputs.push({
+        ...input,
+        name: `cookie_${param.name.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+        label: `${formatLabel(param.name)} (cookie)`,
+        description: `${input.description || ''} [HTTP cookie]`.trim(),
+      });
     }
   }
 

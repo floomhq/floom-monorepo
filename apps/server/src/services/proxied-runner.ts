@@ -2,6 +2,13 @@
 // Used when app.app_type === 'proxied' (i.e. app registered via OpenAPI spec URL).
 import type { AppRecord, NormalizedManifest, ActionSpec } from '../types.js';
 
+// Inputs whose names start with these prefixes route to HTTP headers / cookies
+// instead of to path / query / body. The prefixes are added by openapi-ingest's
+// operationToAction so that e.g. an `Authorization` header input doesn't
+// collide with a body field called `authorization`.
+const HEADER_PREFIX = 'header_';
+const COOKIE_PREFIX = 'cookie_';
+
 export interface ProxiedRunInput {
   app: AppRecord;
   manifest: NormalizedManifest;
@@ -18,6 +25,17 @@ export interface ProxiedRunResult {
   logs: string;
 }
 
+export class MissingSecretsError extends Error {
+  required: string[];
+  help?: string;
+  constructor(required: string[], help?: string) {
+    super(`Missing required secrets: ${required.join(', ')}`);
+    this.name = 'MissingSecretsError';
+    this.required = required;
+    this.help = help;
+  }
+}
+
 // ---------- helpers ----------
 
 /**
@@ -27,7 +45,14 @@ export interface ProxiedRunResult {
 interface OperationInfo {
   method: string;
   path: string;
-  paramNames: { name: string; in: 'path' | 'query' | 'body' }[];
+  paramNames: {
+    name: string;
+    in: 'path' | 'query' | 'header' | 'cookie' | 'body';
+  }[];
+  requestBody?: {
+    content?: Record<string, unknown>;
+    required?: boolean;
+  };
 }
 
 function findOperation(
@@ -43,7 +68,7 @@ function findOperation(
         | {
             operationId?: string;
             parameters?: Array<{ name: string; in: string }>;
-            requestBody?: unknown;
+            requestBody?: { content?: Record<string, unknown>; required?: boolean };
           }
         | undefined;
       if (!op) continue;
@@ -57,15 +82,23 @@ function findOperation(
 
       const paramNames: OperationInfo['paramNames'] = [];
       for (const param of op.parameters || []) {
-        if (param.in === 'path' || param.in === 'query') {
-          paramNames.push({ name: param.name, in: param.in as 'path' | 'query' });
+        if (
+          param.in === 'path' ||
+          param.in === 'query' ||
+          param.in === 'header' ||
+          param.in === 'cookie'
+        ) {
+          paramNames.push({
+            name: param.name,
+            in: param.in as 'path' | 'query' | 'header' | 'cookie',
+          });
         }
       }
       if (op.requestBody) {
         paramNames.push({ name: 'body', in: 'body' });
       }
 
-      return { method, path, paramNames };
+      return { method, path, paramNames, requestBody: op.requestBody };
     }
   }
   return null;
@@ -161,12 +194,28 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
       }
     }
 
+    // Validate required secrets BEFORE making the request so the caller
+    // (web UI / MCP / HTTP) can surface a clear missing_secrets error.
+    const requiredSecrets = manifest.secrets_needed || [];
+    const missing = requiredSecrets.filter((name) => !secrets[name]);
+    if (missing.length > 0) {
+      throw new MissingSecretsError(
+        missing,
+        `This action needs ${missing.join(
+          ', ',
+        )}. Set via docker -e, apps.yaml, or _auth meta param (MCP).`,
+      );
+    }
+
     const opInfo = findOperation(spec, action);
     logs.push(`[proxied] ${app.slug}/${action} → ${opInfo ? `${opInfo.method.toUpperCase()} ${opInfo.path}` : 'POST /'}`);
 
     let method = 'GET';
     let url: string;
-    let body: string | undefined;
+    const extraHeaders: Record<string, string> = {};
+    const cookieParts: string[] = [];
+    let body: string | FormData | undefined;
+    let bodyContentType: string | undefined = 'application/json';
 
     if (opInfo) {
       const pathParamNames = opInfo.paramNames
@@ -179,27 +228,84 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
       method = opInfo.method.toUpperCase();
       url = buildUrl(app.base_url, opInfo.path, inputs, pathParamNames, queryParamNames);
 
+      // Extract header_* and cookie_* inputs → HTTP headers / Cookie header.
+      for (const [k, v] of Object.entries(inputs)) {
+        if (v === undefined || v === null || v === '') continue;
+        if (k.startsWith(HEADER_PREFIX)) {
+          const headerName = k.slice(HEADER_PREFIX.length).replace(/_/g, '-');
+          extraHeaders[headerName] = String(v);
+        } else if (k.startsWith(COOKIE_PREFIX)) {
+          const cookieName = k.slice(COOKIE_PREFIX.length);
+          cookieParts.push(
+            `${cookieName}=${encodeURIComponent(String(v))}`,
+          );
+        }
+      }
+
       // Build body for POST/PUT/PATCH
       if (['POST', 'PUT', 'PATCH'].includes(method)) {
-        const bodyInput = inputs['body'];
-        if (typeof bodyInput === 'string') {
-          // Freeform body — try to parse as JSON, else send as-is
-          try {
-            body = JSON.stringify(JSON.parse(bodyInput));
-          } catch {
-            body = bodyInput;
+        // Detect multipart from the cached spec's requestBody.content
+        const content = opInfo.requestBody?.content;
+        const isMultipart =
+          !!content &&
+          typeof content === 'object' &&
+          'multipart/form-data' in content &&
+          !('application/json' in content);
+
+        const paramSet = new Set([...pathParamNames, ...queryParamNames]);
+        const bodyFieldInputs: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(inputs)) {
+          if (
+            !paramSet.has(k) &&
+            !k.startsWith(HEADER_PREFIX) &&
+            !k.startsWith(COOKIE_PREFIX) &&
+            v !== undefined &&
+            v !== null &&
+            v !== ''
+          ) {
+            bodyFieldInputs[k] = v;
           }
-        } else {
-          // Collect body-intended fields (all non-path, non-query inputs)
-          const nonParamInputs: Record<string, unknown> = {};
-          const paramSet = new Set([...pathParamNames, ...queryParamNames]);
-          for (const [k, v] of Object.entries(inputs)) {
-            if (!paramSet.has(k) && v !== undefined && v !== null && v !== '') {
-              nonParamInputs[k] = v;
+        }
+
+        if (isMultipart) {
+          // Multipart form body. File fields are expected to arrive as either
+          // a Buffer/Blob or a base64-encoded data URL. We pass everything
+          // else through as form fields.
+          const form = new FormData();
+          for (const [k, v] of Object.entries(bodyFieldInputs)) {
+            if (k === 'body') continue; // generic textarea fallback, skip
+            if (v instanceof Blob) {
+              form.append(k, v);
+            } else if (
+              typeof v === 'string' &&
+              v.startsWith('data:') &&
+              v.includes('base64,')
+            ) {
+              // data URL: data:image/png;base64,AAAA...
+              const [meta, b64] = v.split('base64,');
+              const mime = meta.slice(5).replace(/;$/, '') || 'application/octet-stream';
+              const bin = Buffer.from(b64, 'base64');
+              form.append(k, new Blob([bin], { type: mime }), k);
+            } else {
+              form.append(k, String(v));
             }
           }
-          if (Object.keys(nonParamInputs).length > 0) {
-            body = JSON.stringify(nonParamInputs);
+          body = form;
+          // Let fetch set the Content-Type with boundary automatically.
+          bodyContentType = undefined;
+        } else {
+          const bodyInput = inputs['body'];
+          if (typeof bodyInput === 'string' && Object.keys(bodyFieldInputs).length === 1) {
+            // Pure freeform textarea body — try to parse as JSON.
+            try {
+              body = JSON.stringify(JSON.parse(bodyInput));
+            } catch {
+              body = bodyInput;
+              bodyContentType = 'text/plain';
+            }
+          } else if (Object.keys(bodyFieldInputs).length > 0) {
+            body = JSON.stringify(bodyFieldInputs);
+            bodyContentType = 'application/json';
           }
         }
       }
@@ -215,18 +321,24 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
 
     const authHeaders = buildAuthHeaders(app.auth_type, secrets);
     const requestHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
       Accept: 'application/json',
       ...authHeaders,
+      ...extraHeaders,
     };
+    if (bodyContentType && !(body instanceof FormData)) {
+      requestHeaders['Content-Type'] = bodyContentType;
+    }
+    if (cookieParts.length > 0) {
+      requestHeaders['Cookie'] = cookieParts.join('; ');
+    }
 
     const fetchInit: RequestInit = {
       method,
       headers: requestHeaders,
       signal: AbortSignal.timeout(30_000),
     };
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-      fetchInit.body = body;
+    if (body !== undefined && ['POST', 'PUT', 'PATCH'].includes(method)) {
+      fetchInit.body = body as BodyInit;
     }
 
     const res = await fetch(url, fetchInit);
@@ -262,6 +374,20 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
     const e = err as Error;
     const duration_ms = Date.now() - start;
     logs.push(`[proxied] error: ${e.message}`);
+    // Special-case missing_secrets so callers can surface a structured error.
+    if (e instanceof MissingSecretsError) {
+      return {
+        status: 'error',
+        outputs: {
+          error: 'missing_secrets',
+          required: e.required,
+          help: e.help,
+        },
+        error: e.message,
+        duration_ms,
+        logs: logs.join('\n'),
+      };
+    }
     return {
       status: 'error',
       outputs: null,
