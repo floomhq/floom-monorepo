@@ -71,18 +71,40 @@ function findOperation(
   return null;
 }
 
-function buildUrl(
+export function buildUrl(
   baseUrl: string,
   path: string,
   inputs: Record<string, unknown>,
   pathParams: string[],
   queryParams: string[],
 ): string {
+  // Substitute path parameters (e.g. /pet/{petId})
   let resolvedPath = path;
   for (const name of pathParams) {
-    resolvedPath = resolvedPath.replace(`{${name}}`, encodeURIComponent(String(inputs[name] ?? '')));
+    resolvedPath = resolvedPath.replace(
+      `{${name}}`,
+      encodeURIComponent(String(inputs[name] ?? '')),
+    );
   }
-  const url = new URL(resolvedPath, baseUrl.endsWith('/') ? baseUrl : baseUrl + '/');
+
+  // Preserve the base URL's path prefix. `new URL(rel, base)` resolves against
+  // `base`, but a rel starting with `/` REPLACES the base pathname. So
+  //   new URL('/pet/findByStatus', 'https://petstore3.swagger.io/api/v3')
+  //   → 'https://petstore3.swagger.io/pet/findByStatus'  (wrong, /api/v3 gone)
+  // We concatenate the base pathname + relative path explicitly, then
+  // construct a URL against the origin so the searchParams helpers work.
+  const base = new URL(baseUrl);
+  const basePath = base.pathname.replace(/\/+$/, ''); // strip trailing slashes
+  const relPath = resolvedPath.startsWith('/')
+    ? resolvedPath
+    : '/' + resolvedPath;
+  const joinedPath = (basePath + relPath).replace(/\/{2,}/g, '/');
+
+  const url = new URL(joinedPath, base.origin);
+  // Preserve any query params already on the base URL (rare, but valid).
+  for (const [k, v] of base.searchParams.entries()) {
+    url.searchParams.set(k, v);
+  }
   for (const name of queryParams) {
     if (inputs[name] !== undefined && inputs[name] !== null && inputs[name] !== '') {
       url.searchParams.set(name, String(inputs[name]));
