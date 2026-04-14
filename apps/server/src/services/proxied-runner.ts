@@ -1,6 +1,12 @@
 // Proxied runner: forward HTTP requests to an external API with secret injection.
 // Used when app.app_type === 'proxied' (i.e. app registered via OpenAPI spec URL).
-import type { AppRecord, NormalizedManifest, ActionSpec } from '../types.js';
+import type {
+  AppRecord,
+  AuthConfig,
+  AuthType,
+  NormalizedManifest,
+  ActionSpec,
+} from '../types.js';
 
 // Inputs whose names start with these prefixes route to HTTP headers / cookies
 // instead of to path / query / body. The prefixes are added by openapi-ingest's
@@ -146,23 +152,126 @@ export function buildUrl(
   return url.toString();
 }
 
-function buildAuthHeaders(
-  authType: string | null,
+// ---------- OAuth2 token cache ----------
+// Client-credentials tokens are cached in-memory for the life of the process.
+// Keyed by "<token_url>::<client_id>". Each entry has { token, expires_at }.
+const oauth2TokenCache = new Map<string, { token: string; expires_at: number }>();
+
+async function fetchOAuth2ClientCredentialsToken(
+  tokenUrl: string,
+  clientId: string,
+  clientSecret: string,
+  scopes?: string,
+): Promise<string> {
+  const cacheKey = `${tokenUrl}::${clientId}`;
+  const cached = oauth2TokenCache.get(cacheKey);
+  // Reuse cached token if at least 60s left before expiry.
+  if (cached && cached.expires_at > Date.now() + 60_000) {
+    return cached.token;
+  }
+
+  const form = new URLSearchParams();
+  form.set('grant_type', 'client_credentials');
+  form.set('client_id', clientId);
+  form.set('client_secret', clientSecret);
+  if (scopes) form.set('scope', scopes);
+
+  const res = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+    },
+    body: form.toString(),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `OAuth2 token endpoint returned HTTP ${res.status}: ${await res.text()}`,
+    );
+  }
+  const json = (await res.json()) as {
+    access_token?: string;
+    expires_in?: number;
+  };
+  if (!json.access_token) {
+    throw new Error(
+      `OAuth2 token endpoint response missing access_token: ${JSON.stringify(json)}`,
+    );
+  }
+  const expires_at = Date.now() + (json.expires_in ?? 3600) * 1000;
+  oauth2TokenCache.set(cacheKey, { token: json.access_token, expires_at });
+  return json.access_token;
+}
+
+async function buildAuthHeaders(
+  authType: AuthType | null,
   secrets: Record<string, string>,
-): Record<string, string> {
+  authConfig: AuthConfig | null,
+): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
+
   if (authType === 'bearer') {
-    // Find first secret value that looks like an API key
-    const tokenValue = Object.values(secrets).find((v) => v && v.length > 0);
+    // Prefer an explicit *_TOKEN / *_API_KEY / *_BEARER secret; otherwise
+    // fall back to the first non-empty secret value.
+    const preferred = Object.entries(secrets).find(
+      ([k, v]) =>
+        !!v &&
+        (k.toLowerCase().includes('token') ||
+          k.toLowerCase().includes('api_key') ||
+          k.toLowerCase().includes('bearer')),
+    );
+    const tokenValue = preferred
+      ? preferred[1]
+      : Object.values(secrets).find((v) => v && v.length > 0);
     if (tokenValue) {
       headers['Authorization'] = `Bearer ${tokenValue}`;
     }
   } else if (authType === 'apikey') {
     const keyValue = Object.values(secrets).find((v) => v && v.length > 0);
+    const headerName = authConfig?.apikey_header || 'X-API-Key';
     if (keyValue) {
-      headers['X-API-Key'] = keyValue;
+      headers[headerName] = keyValue;
     }
+  } else if (authType === 'basic') {
+    // Expect FLOOM_BASIC_USER + FLOOM_BASIC_PASSWORD (or any pair where
+    // secret names contain 'user' and 'pass').
+    const userEntry = Object.entries(secrets).find(
+      ([k, v]) => !!v && /user/i.test(k),
+    );
+    const passEntry = Object.entries(secrets).find(
+      ([k, v]) => !!v && /pass/i.test(k),
+    );
+    if (userEntry && passEntry) {
+      const token = Buffer.from(`${userEntry[1]}:${passEntry[1]}`).toString('base64');
+      headers['Authorization'] = `Basic ${token}`;
+    }
+  } else if (authType === 'oauth2_client_credentials') {
+    if (!authConfig?.oauth2_token_url) {
+      throw new Error(
+        'oauth2_client_credentials auth requires oauth2_token_url in apps.yaml',
+      );
+    }
+    const clientIdEntry = Object.entries(secrets).find(
+      ([k, v]) => !!v && /client_id|clientid/i.test(k),
+    );
+    const clientSecretEntry = Object.entries(secrets).find(
+      ([k, v]) => !!v && /client_secret|clientsecret/i.test(k),
+    );
+    if (!clientIdEntry || !clientSecretEntry) {
+      throw new Error(
+        'oauth2_client_credentials auth requires two secrets: one whose name contains "client_id" and one "client_secret"',
+      );
+    }
+    const token = await fetchOAuth2ClientCredentialsToken(
+      authConfig.oauth2_token_url,
+      clientIdEntry[1],
+      clientSecretEntry[1],
+      authConfig.oauth2_scopes,
+    );
+    headers['Authorization'] = `Bearer ${token}`;
   }
+
   return headers;
 }
 
@@ -319,7 +428,17 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
 
     logs.push(`[proxied] ${method} ${url}`);
 
-    const authHeaders = buildAuthHeaders(app.auth_type, secrets);
+    // Parse the auth_config blob (apikey_header, oauth2 config, etc.).
+    let authConfig: AuthConfig | null = null;
+    if (app.auth_config) {
+      try {
+        authConfig = JSON.parse(app.auth_config) as AuthConfig;
+      } catch {
+        logs.push('[warn] Could not parse auth_config; using defaults');
+      }
+    }
+
+    const authHeaders = await buildAuthHeaders(app.auth_type, secrets, authConfig);
     const requestHeaders: Record<string, string> = {
       Accept: 'application/json',
       ...authHeaders,

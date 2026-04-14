@@ -60,6 +60,22 @@ export interface NormalizedManifest {
   apt_packages?: string[];
 }
 
+export type AuthType =
+  | 'bearer'
+  | 'apikey'
+  | 'basic'
+  | 'oauth2_client_credentials'
+  | 'none';
+
+export interface AuthConfig {
+  /** For auth: apikey — which HTTP header name carries the key. */
+  apikey_header?: string;
+  /** For auth: oauth2_client_credentials — token endpoint URL. */
+  oauth2_token_url?: string;
+  /** For auth: oauth2_client_credentials — space-separated scopes. */
+  oauth2_scopes?: string;
+}
+
 export interface AppRecord {
   id: string;
   slug: string;
@@ -75,9 +91,11 @@ export interface AppRecord {
   // proxied-mode fields (nullable for docker apps)
   app_type: 'docker' | 'proxied';
   base_url: string | null;
-  auth_type: 'bearer' | 'apikey' | 'none' | null;
+  auth_type: AuthType | null;
+  auth_config: string | null; // JSON-stringified AuthConfig
   openapi_spec_url: string | null;
   openapi_spec_cached: string | null; // JSON-stringified OpenAPI spec
+  visibility: 'public' | 'auth-required';
   created_at: string;
   updated_at: string;
 }

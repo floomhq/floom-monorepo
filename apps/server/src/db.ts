@@ -53,6 +53,15 @@ if (!appCols.includes('openapi_spec_url')) {
 if (!appCols.includes('openapi_spec_cached')) {
   db.exec(`ALTER TABLE apps ADD COLUMN openapi_spec_cached TEXT`);
 }
+// auth_config carries auth-type-specific config as a JSON blob
+// (apikey_header, oauth2_token_url, oauth2_scopes, etc.). Nullable.
+if (!appCols.includes('auth_config')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN auth_config TEXT`);
+}
+// Per-app visibility: 'public' (default) or 'auth-required'.
+if (!appCols.includes('visibility')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'`);
+}
 
 // ---------- runs (one per app invocation, optionally bound to a chat turn) ----------
 db.exec(`

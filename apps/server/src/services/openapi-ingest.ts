@@ -19,12 +19,33 @@ interface OpenApiAppSpec {
   openapi_spec_url?: string;
   openapi_spec?: string;
   base_url?: string;
-  auth?: 'bearer' | 'apikey' | 'none';
+  auth?: 'bearer' | 'apikey' | 'basic' | 'oauth2_client_credentials' | 'none';
+  /**
+   * For auth: apikey — which HTTP header name carries the key.
+   * Default: X-API-Key.
+   */
+  apikey_header?: string;
+  /**
+   * For auth: oauth2_client_credentials — the token endpoint URL.
+   * Required when auth === 'oauth2_client_credentials'.
+   */
+  oauth2_token_url?: string;
+  /**
+   * For auth: oauth2_client_credentials — space-separated scopes.
+   */
+  oauth2_scopes?: string;
   secrets?: string[];
   display_name?: string;
   description?: string;
   category?: string;
   icon?: string;
+  /**
+   * Per-app visibility. Defaults to public.
+   *  - public: anyone can run the app
+   *  - auth-required: caller must present a valid bearer token matching
+   *    FLOOM_AUTH_TOKEN env var (see apps/server/src/routes/*.ts)
+   */
+  visibility?: 'public' | 'auth-required';
 }
 
 interface AppsConfig {
@@ -648,11 +669,11 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
 
   const existsBySlug = db.prepare('SELECT id FROM apps WHERE slug = ?');
   const insertApp = db.prepare(
-    `INSERT INTO apps (id, slug, name, description, manifest, status, docker_image, code_path, category, author, icon, app_type, base_url, auth_type, openapi_spec_url, openapi_spec_cached)
-     VALUES (?, ?, ?, ?, ?, 'active', NULL, ?, ?, NULL, ?, 'proxied', ?, ?, ?, ?)`,
+    `INSERT INTO apps (id, slug, name, description, manifest, status, docker_image, code_path, category, author, icon, app_type, base_url, auth_type, auth_config, openapi_spec_url, openapi_spec_cached, visibility)
+     VALUES (?, ?, ?, ?, ?, 'active', NULL, ?, ?, NULL, ?, 'proxied', ?, ?, ?, ?, ?, ?)`,
   );
   const updateApp = db.prepare(
-    `UPDATE apps SET name=?, description=?, manifest=?, category=?, app_type='proxied', base_url=?, auth_type=?, openapi_spec_url=?, openapi_spec_cached=?, updated_at=datetime('now') WHERE slug=?`,
+    `UPDATE apps SET name=?, description=?, manifest=?, category=?, app_type='proxied', base_url=?, auth_type=?, auth_config=?, openapi_spec_url=?, openapi_spec_cached=?, visibility=?, updated_at=datetime('now') WHERE slug=?`,
   );
   const insertSecret = db.prepare(
     `INSERT OR IGNORE INTO secrets (id, name, value, app_id) VALUES (?, ?, ?, ?)`,
@@ -713,6 +734,16 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
 
       const existing = existsBySlug.get(appSpec.slug) as { id: string } | undefined;
 
+      // Build auth_config blob from the apps.yaml entry.
+      const authConfig: Record<string, string> = {};
+      if (appSpec.apikey_header) authConfig.apikey_header = appSpec.apikey_header;
+      if (appSpec.oauth2_token_url)
+        authConfig.oauth2_token_url = appSpec.oauth2_token_url;
+      if (appSpec.oauth2_scopes) authConfig.oauth2_scopes = appSpec.oauth2_scopes;
+      const authConfigJson =
+        Object.keys(authConfig).length > 0 ? JSON.stringify(authConfig) : null;
+      const visibility = appSpec.visibility || 'public';
+
       if (existing) {
         updateApp.run(
           manifest.name,
@@ -721,8 +752,10 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
           appSpec.category || null,
           resolvedBaseUrl || null,
           appSpec.auth || null,
+          authConfigJson,
           appSpec.openapi_spec_url || null,
           specCached,
+          visibility,
           appSpec.slug,
         );
         // Insert placeholder secrets if not already present (so the UI shows them)
@@ -743,8 +776,10 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
           appSpec.icon || null,
           resolvedBaseUrl || null,
           appSpec.auth || null,
+          authConfigJson,
           appSpec.openapi_spec_url || null,
           specCached,
+          visibility,
         );
         // Insert placeholder secrets
         for (const name of secretNames) {
