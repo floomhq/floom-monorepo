@@ -1,16 +1,32 @@
 // Trimmed port of the marketplace runner. Loads secrets, dispatches a
 // container run, streams output to the log bus, and updates the run record.
-import { db } from '../db.js';
+import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { runAppContainer } from './docker.js';
 import { runProxied } from './proxied-runner.js';
 import { getOrCreateStream } from '../lib/log-stream.js';
+import * as userSecrets from './user_secrets.js';
 import type {
   AppRecord,
   ErrorType,
   NormalizedManifest,
   RunRecord,
   RunStatus,
+  SessionContext,
 } from '../types.js';
+
+/**
+ * Default tenant context used when a dispatchRun caller (legacy route, test)
+ * does not pass one. In OSS mode this always resolves to the synthetic local
+ * workspace + user, so no caller has to branch on "is multi-tenant on yet".
+ */
+function defaultContext(device_id?: string): SessionContext {
+  return {
+    workspace_id: DEFAULT_WORKSPACE_ID,
+    user_id: DEFAULT_USER_ID,
+    device_id: device_id || DEFAULT_USER_ID,
+    is_authenticated: false,
+  };
+}
 
 interface UpdateRunArgs {
   status?: RunStatus;
@@ -102,9 +118,19 @@ function extractUserLogs(stdout: string): string {
  * Fire-and-forget: dispatch a run in the background. Updates the run row as
  * it progresses and feeds the log stream with output chunks.
  *
+ * Precedence (lowest → highest):
+ *   1. Global admin secrets (secrets table, app_id IS NULL)
+ *   2. Per-app admin secrets (secrets table, app_id = this app)
+ *   3. Per-user persisted secrets (user_secrets table, W2.1)
+ *   4. Per-call MCP _auth override (perCallSecrets)
+ *
  * `perCallSecrets` (optional) is an override passed by the MCP layer via the
  * Floom MCP _auth extension. These values are merged into the per-run secrets
  * for this invocation only; they are never persisted to the secrets table.
+ *
+ * `ctx` (optional) is the tenant context. When omitted we fall back to the
+ * synthetic 'local' workspace+user, which is correct for OSS solo mode and
+ * any pre-W2.1 call site that hasn't been migrated yet.
  */
 export function dispatchRun(
   app: AppRecord,
@@ -113,6 +139,7 @@ export function dispatchRun(
   action: string,
   inputs: Record<string, unknown>,
   perCallSecrets?: Record<string, string>,
+  ctx?: SessionContext,
 ): void {
   // Load secrets: merge global (app_id IS NULL) + per-app (app_id = this app).
   const globalRows = db
@@ -125,6 +152,29 @@ export function dispatchRun(
   const mergedSecrets: Record<string, string> = {};
   for (const row of globalRows) mergedSecrets[row.name] = row.value;
   for (const row of appRows) mergedSecrets[row.name] = row.value;
+
+  // W2.1: load per-user persisted secrets for the names the manifest declares.
+  // These override admin-level secrets (so a user can bring their own OpenAI
+  // key even if the operator set a workspace-wide default) but are themselves
+  // overridden by per-call MCP _auth.
+  const runtimeCtx = ctx || defaultContext();
+  const needs = manifest.secrets_needed || [];
+  if (needs.length > 0) {
+    try {
+      const userLevel = userSecrets.loadForRun(runtimeCtx, needs);
+      for (const [k, v] of Object.entries(userLevel)) {
+        if (v && v.length > 0) mergedSecrets[k] = v;
+      }
+    } catch (err) {
+      // Silent on purpose: a missing FLOOM_MASTER_KEY or a crypto error
+      // should not block runs that only use admin-level secrets. The
+      // operator will see the error at first /api/secrets POST instead.
+      console.warn(
+        `[runner] failed to load per-user secrets for ${app.slug}: ${(err as Error).message}`,
+      );
+    }
+  }
+
   // Per-call secrets (from MCP _auth meta param) win over persisted secrets.
   if (perCallSecrets) {
     for (const [k, v] of Object.entries(perCallSecrets)) {
