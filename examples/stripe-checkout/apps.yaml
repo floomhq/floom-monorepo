@@ -1,0 +1,40 @@
+# Stripe Checkout — demo app for W3.3 Stripe Connect partner ramp.
+#
+# Demonstrates the full per-user secret stack:
+#   1. Maria onboards her Stripe account via POST /api/stripe/connect/onboard
+#      (W3.3 Floom Connect platform). She gets back a Stripe Express
+#      account_id + a hosted onboarding URL.
+#   2. Maria saves her test-mode `STRIPE_SECRET_KEY` via POST /api/secrets
+#      (W2.1 user_secrets table, encrypted under the workspace DEK).
+#   3. Maria runs `create_checkout` from the Floom UI. The runner pulls her
+#      key from user_secrets, builds an `Authorization: Bearer sk_test_...`
+#      header, and proxies POST http://localhost:4120/create_checkout.
+#   4. The sidecar hits Stripe's REST API and returns a hosted-checkout URL.
+#   5. Floom renders it via the default JSON renderer with a clickable link.
+#
+# Yash hits the exact same operation via MCP `_auth.STRIPE_SECRET_KEY` with
+# his own key, no signup required.
+#
+# Start the upstream first:
+#   node examples/stripe-checkout/server.mjs
+#
+# Then boot Floom pointing at this file:
+#   FLOOM_APPS_CONFIG=examples/stripe-checkout/apps.yaml \
+#     STRIPE_SECRET_KEY=sk_test_... \
+#     STRIPE_WEBHOOK_SECRET=whsec_... \
+#     DATA_DIR=/tmp/floom-stripe-demo \
+#     node apps/server/dist/index.js
+
+apps:
+  - slug: stripe-checkout
+    type: proxied
+    openapi_spec_url: http://localhost:4120/openapi.json
+    display_name: Stripe Checkout
+    description: "Open a Stripe Checkout Session, list payments, and refund — all using your own Stripe Connect key. Test mode out of the box."
+    category: payments
+    auth: bearer
+    secrets:
+      - STRIPE_SECRET_KEY
+    timeout_ms: 15000
+    retries: 0
+    visibility: public

@@ -624,8 +624,71 @@ All four are gated by the same auth middleware as the rest of `/api/*`. In OSS s
 
 Full per-call reference: `docs/connections.md`.
 
+## Creator monetization (Stripe Connect, v0.4.0-alpha.2+)
+
+Floom ships a Stripe Connect partner app at `/api/stripe/*` so creators on a
+self-hosted Floom can monetize their apps via Stripe Express accounts. Floom
+takes a 5% application fee, the rest auto-payouts to the creator's bank.
+
+**Quick setup:**
+
+```bash
+# 1. Sign up for Stripe Connect (one-time, ~10 min)
+#    https://dashboard.stripe.com/connect — create a Connect platform application
+#    in test mode. Copy the platform secret key (sk_test_...).
+#
+# 2. Add to .env
+echo 'STRIPE_SECRET_KEY=sk_test_...' >> .env
+echo 'STRIPE_WEBHOOK_SECRET=whsec_...' >> .env
+echo 'STRIPE_CONNECT_ONBOARDING_RETURN_URL=https://your-floom.example.com/billing/return' >> .env
+echo 'STRIPE_CONNECT_ONBOARDING_REFRESH_URL=https://your-floom.example.com/billing/refresh' >> .env
+
+# 3. Restart the container
+docker restart floom
+
+# 4. Register your webhook in the Stripe dashboard
+#    Dashboard → Developers → Webhooks → Add endpoint
+#    URL: https://your-floom.example.com/api/stripe/webhook
+#    Events: account.updated, payment_intent.succeeded, charge.refunded,
+#            invoice.paid, payout.created, payout.paid, payout.failed
+
+# 5. Onboard your first creator
+curl -X POST https://your-floom.example.com/api/stripe/connect/onboard \
+  -H 'content-type: application/json' \
+  -d '{"country":"DE","email":"creator@example.com"}'
+# → returns {account_id, onboarding_url, expires_at, account}
+#   open onboarding_url to finish KYC
+```
+
+**Endpoints:**
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/stripe/connect/onboard` | Create an Express account + return hosted onboarding URL. Idempotent. |
+| GET | `/api/stripe/connect/status` | Get the caller's current account state (poll Stripe live with `?refresh=true`). |
+| POST | `/api/stripe/payments` | Create a direct charge with `application_fee_amount = floor(amount * 0.05)`. |
+| POST | `/api/stripe/refunds` | Refund a payment intent. Within 30d, the 5% fee is refunded too. |
+| POST | `/api/stripe/subscriptions` | Create a subscription with `application_fee_percent = 5`. |
+| POST | `/api/stripe/webhook` | Stripe webhook receiver. Raw body, signature verified, dedupes by event id. |
+
+**Self-host vs Cloud:** A self-hosted Floom acts as its own Stripe Connect
+platform — the operator (you) signs up for Connect once, every creator on
+your instance becomes a connected Express account on **your** platform. No
+creator ever sees a Stripe API key. On Floom Cloud, the platform is owned
+by Floom Inc. and creators onboard against Floom's platform key.
+
+**Demo app:** `examples/stripe-checkout/` is a 3-operation Floom app
+(`create_checkout`, `list_payments`, `refund_payment`) that demonstrates
+the per-user secret stack — each user brings their own Stripe key via the
+W2.1 user_secrets table, and the runner injects it as
+`Authorization: Bearer sk_test_...`. Read `examples/stripe-checkout/README.md`
+for the full walkthrough.
+
+**Full reference:** `docs/monetization.md`.
+
 ## Version info
 
+- **v0.4.0-alpha.2** (April 2026): **Stripe Connect partner app (W3.3)** — `/api/stripe/*` routes for creator monetization. Express account onboarding (idempotent, hosted onboarding URL), direct charges with 5% `application_fee_amount`, refunds with 30-day fee window, subscriptions with `application_fee_percent=5`, webhook receiver with signature verify + event_id dedupe ledger. Two new tables (`stripe_accounts`, `stripe_webhook_events`), `user_version=6`. Auth boundary scoped by `(workspace_id, owner_id)` where `owner_id = is_authenticated ? user_id : "device:" + device_id` (W2.1 device fallback pattern). 163 new unit + integration tests. `examples/stripe-checkout/` demo app shipping a 3-operation creator surface that pulls per-user Stripe keys from `user_secrets`. See "Creator monetization" section above and `docs/monetization.md` for the full reference.
 - **v0.3.2** (April 2026): **Composio OAuth integration** — `/api/connections` routes, `connections` table (per-user per-provider OAuth state with device_id fallback pattern), `users.composio_user_id` column, extended `rekeyDevice` transaction (now 4-table atomic), thin wrapper service at `services/composio.ts` around `@composio/core` 0.6.10 (initiate / finish / list / revoke / executeAction). 135 new unit + integration tests. See "Connect a tool" section above.
 - **v0.3.1** (April 2026): **Multi-tenant schema foundation** — 5 new tables (`workspaces`, `users`, `workspace_members`, `app_memory`, `user_secrets`) + `workspace_id`/`user_id`/`device_id` columns on `apps`/`runs`/`chat_threads`. Per-user app memory gated by manifest `memory_keys`. AES-256-GCM envelope-encrypted secrets vault. Session cookie (`floom_device`) with atomic rekey transaction for the upcoming W3.1 auth migration. New endpoints: `/api/memory/:app_slug`, `/api/secrets`. Single-codepath multi-tenant (OSS solo mode = synthetic `workspace_id='local'`). **Custom renderers** — creators can ship a `renderer.tsx` alongside their OpenAPI spec; Floom compiles it via esbuild and serves at `/renderer/:slug/bundle.js` with an ErrorBoundary fallback to the default shape renderer. Ships 10 default output components (text/markdown/code/table/object/image/pdf/audio/stream/error) + 13 default input components.
 - **v0.3.0** (April 2026): Async job queue primitive. `async: true` in `apps.yaml` wraps long-running apps (OpenPaper, research agents) in POST /jobs → GET /jobs/:id → webhook pattern. Background worker polls, claims, dispatches, enforces `timeout_ms`, retries N times, delivers webhooks with 5xx backoff. MCP `tools/call` on async apps returns immediately with a job-started payload.
