@@ -12,10 +12,12 @@
   },
   "dependencies": {
     "@apidevtools/json-schema-ref-parser": "15.3.5",
+    "@better-auth/api-key": "1.6.3",
     "@composio/core": "0.6.10",
     "@floom/renderer": "workspace:*",
     "@hono/node-server": "1.13.7",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-auth": "1.6.3",
     "better-sqlite3": "11.5.0",
     "dockerode": "4.0.2",
     "esbuild": "0.24.2",

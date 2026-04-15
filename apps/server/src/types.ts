@@ -243,13 +243,67 @@ export interface WorkspaceMemberRecord {
  * Request-scoped tenant context. Every route handler builds this in middleware
  * (via `resolveUserContext`) and passes it to services. In OSS mode this is
  * always `{ workspace_id: 'local', user_id: 'local', device_id }`; in Cloud
- * (post-W3.1) it's the logged-in user's real ids.
+ * (W3.1+) it's the logged-in user's real ids — `auth_user_id` and
+ * `auth_session_id` carry the Better Auth identifiers when the request is
+ * authenticated.
  */
 export interface SessionContext {
   workspace_id: string;
   user_id: string;
   device_id: string;
   is_authenticated: boolean;
+  /** Better Auth user id (cloud mode). Same as user_id when present. */
+  auth_user_id?: string;
+  /** Better Auth session id (cloud mode). */
+  auth_session_id?: string;
+  /** User email (cloud mode), surfaced to the UI by /api/session/me. */
+  email?: string;
+}
+
+// =====================================================================
+// W3.1: workspaces + members API types
+// =====================================================================
+
+export type WorkspaceRole = 'admin' | 'editor' | 'viewer';
+
+export interface WorkspaceInviteRecord {
+  id: string;
+  workspace_id: string;
+  email: string;
+  role: WorkspaceRole;
+  invited_by_user_id: string;
+  token: string;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+}
+
+/**
+ * Public "me" payload returned by /api/session/me. Same shape in OSS and
+ * cloud — in OSS the user is the synthetic local user and there is exactly
+ * one workspace named "Local".
+ */
+export interface SessionMePayload {
+  user: {
+    id: string;
+    email: string | null;
+    name: string | null;
+    is_local: boolean;
+  };
+  active_workspace: {
+    id: string;
+    slug: string;
+    name: string;
+    role: WorkspaceRole;
+  };
+  workspaces: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    role: WorkspaceRole;
+  }>;
+  cloud_mode: boolean;
 }
 
 export interface AppMemoryRecord {

@@ -86,7 +86,7 @@ function serialize(rec: ConnectionRecord): Record<string, unknown> {
  * `connection_id`.
  */
 connectionsRouter.post('/initiate', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   let body: unknown;
   try {
     body = await c.req.json();
@@ -141,7 +141,7 @@ connectionsRouter.post('/initiate', async (c) => {
  * closes, or polls GET /api/connections until the row shows up `active`.
  */
 connectionsRouter.post('/finish', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   let body: unknown;
   try {
     body = await c.req.json();
@@ -197,8 +197,8 @@ connectionsRouter.post('/finish', async (c) => {
  * Device-scoped callers see only their device rows; logged-in users
  * see only their user rows. Nothing cross-tenant is ever returned.
  */
-connectionsRouter.get('/', (c) => {
-  const ctx = resolveUserContext(c);
+connectionsRouter.get('/', async (c) => {
+  const ctx = await resolveUserContext(c);
   const rawStatus = c.req.query('status');
   const parsed = ListQuery.safeParse({ status: rawStatus || undefined });
   if (!parsed.success) {
@@ -234,7 +234,7 @@ connectionsRouter.get('/', (c) => {
  * if the row doesn't exist we return 404.
  */
 connectionsRouter.delete('/:provider', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   const provider = c.req.param('provider') || '';
   if (!/^[a-z0-9_-]{1,64}$/.test(provider)) {
     return c.json(

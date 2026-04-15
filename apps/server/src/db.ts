@@ -428,11 +428,67 @@ if (!userCols.includes('composio_user_id')) {
   db.exec(`ALTER TABLE users ADD COLUMN composio_user_id TEXT`);
 }
 
+// =====================================================================
+// ---------- W3.1: workspace invites + active-workspace state ----------
+// =====================================================================
+// Better Auth (cloud mode) owns the user / session / account / verification
+// tables it needs for OAuth + magic link + email+password. Floom keeps its
+// own users / workspaces / workspace_members tables (unchanged from W2.1)
+// and stays the source of truth for tenant scoping. The two coexist by
+// using a separate table prefix (Better Auth's defaults: `user`,
+// `session`, `account`, etc., singular; Floom's are plural). On first
+// authenticated request the Better Auth user is mirrored into Floom's
+// `users` table by `services/session.ts`, then re-keyed.
+//
+// W3.1 adds two pieces of state on top of W2.1's schema:
+//
+//   1. `workspace_invites` — pending email invitations to a workspace.
+//      Created by POST /api/workspaces/:id/members/invite, accepted by
+//      POST /api/workspaces/:id/members/accept-invite with the token.
+//   2. `user_active_workspace` — which workspace a given user is "looking
+//      at" right now. Switched by POST /api/session/switch-workspace.
+//      A user always has exactly zero or one row here.
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS workspace_invites (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'editor',
+    invited_by_user_id TEXT NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK (status IN ('pending', 'accepted', 'revoked', 'expired')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL,
+    accepted_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_invites_workspace
+    ON workspace_invites(workspace_id);
+  CREATE INDEX IF NOT EXISTS idx_invites_email
+    ON workspace_invites(email);
+  CREATE INDEX IF NOT EXISTS idx_invites_token
+    ON workspace_invites(token);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_active_workspace (
+    user_id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// users.email lookup: needed so the invite-accept flow can resolve a
+// pending invite to the right user when they sign up. Index on lowercased
+// email (we already have `email` on the column from W2.1).
+db.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+
 // Bump user_version so operators can see at a glance which schema
 // revision their DB is on. v0.3.0 was at user_version=3; W2.1 lands v4;
-// W2.3 lands v5.
+// W2.3 lands v5; W3.1 lands v6.
 const currentUserVersion = (db.prepare(`PRAGMA user_version`).get() as { user_version: number })
   .user_version;
-if (currentUserVersion < 5) {
-  db.pragma('user_version = 5');
+if (currentUserVersion < 6) {
+  db.pragma('user_version = 6');
 }

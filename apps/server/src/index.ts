@@ -18,10 +18,12 @@ import { rendererRouter } from './routes/renderer.js';
 import { deployWaitlistRouter } from './routes/deploy-waitlist.js';
 import { memoryRouter, secretsRouter } from './routes/memory.js';
 import { connectionsRouter } from './routes/connections.js';
+import { workspacesRouter, sessionRouter } from './routes/workspaces.js';
 import { seedFromFile } from './services/seed.js';
 import { ingestOpenApiApps } from './services/openapi-ingest.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
 import { globalAuthMiddleware } from './lib/auth.js';
+import { getAuth, isCloudMode } from './lib/better-auth.js';
 import { startJobWorker } from './services/worker.js';
 
 const PORT = Number(process.env.PORT || 3051);

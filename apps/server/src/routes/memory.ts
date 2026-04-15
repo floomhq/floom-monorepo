@@ -31,8 +31,8 @@ const MemorySetBody = z.object({
  * GET /api/memory/:app_slug — list all memory keys for this user on this app.
  * Returns `{ entries: Record<string, any> }`.
  */
-memoryRouter.get('/:app_slug', (c) => {
-  const ctx = resolveUserContext(c);
+memoryRouter.get('/:app_slug', async (c) => {
+  const ctx = await resolveUserContext(c);
   const slug = c.req.param('app_slug') || '';
   try {
     const entries = appMemory.list(ctx, slug);
@@ -49,7 +49,7 @@ memoryRouter.get('/:app_slug', (c) => {
  * POST /api/memory/:app_slug — upsert a single memory key.
  */
 memoryRouter.post('/:app_slug', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   const slug = c.req.param('app_slug') || '';
   let body: unknown;
   try {
@@ -92,8 +92,8 @@ memoryRouter.post('/:app_slug', async (c) => {
 /**
  * DELETE /api/memory/:app_slug/:key — remove a single key.
  */
-memoryRouter.delete('/:app_slug/:key', (c) => {
-  const ctx = resolveUserContext(c);
+memoryRouter.delete('/:app_slug/:key', async (c) => {
+  const ctx = await resolveUserContext(c);
   const slug = c.req.param('app_slug') || '';
   const key = c.req.param('key') || '';
   try {
@@ -121,8 +121,8 @@ const SecretSetBody = z.object({
 /**
  * GET /api/secrets — list masked secret keys (never returns plaintext).
  */
-secretsRouter.get('/', (c) => {
-  const ctx = resolveUserContext(c);
+secretsRouter.get('/', async (c) => {
+  const ctx = await resolveUserContext(c);
   try {
     const entries = userSecrets.listMasked(ctx);
     return c.json({ entries });
@@ -139,7 +139,7 @@ secretsRouter.get('/', (c) => {
  * The `value` field is NEVER echoed back.
  */
 secretsRouter.post('/', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   let body: unknown;
   try {
     body = await c.req.json();
@@ -177,8 +177,8 @@ secretsRouter.post('/', async (c) => {
 /**
  * DELETE /api/secrets/:key — remove a secret. Returns `{ ok, removed }`.
  */
-secretsRouter.delete('/:key', (c) => {
-  const ctx = resolveUserContext(c);
+secretsRouter.delete('/:key', async (c) => {
+  const ctx = await resolveUserContext(c);
   const key = c.req.param('key') || '';
   try {
     const removed = userSecrets.del(ctx, key);
