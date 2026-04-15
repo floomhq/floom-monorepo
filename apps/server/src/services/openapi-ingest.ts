@@ -8,10 +8,12 @@ import { parse as parseYaml } from 'yaml';
 // @ts-expect-error — json-schema-merge-allof has no types on npm
 import mergeAllOf from 'json-schema-merge-allof';
 import $RefParser from '@apidevtools/json-schema-ref-parser';
-// Import from the contract subpath so we don't pull JSX into the server tsc.
-// The renderer package's main entry pulls .tsx files; the contract entry is
-// pure TypeScript and safe for any non-JSX tsconfig to consume.
-import { parseRendererManifest, type RendererManifest } from '@floom/renderer/contract';
+// Runtime helper lives in a server-local copy (src/lib/renderer-manifest.ts)
+// so the compiled production image does not need to resolve
+// `@floom/renderer/contract` at runtime (it ships .ts source only). Types
+// still come from the shared contract — erased at compile time.
+import { parseRendererManifest } from '../lib/renderer-manifest.js';
+import type { RendererManifest } from '@floom/renderer/contract';
 import { db } from '../db.js';
 import { newAppId, newSecretId } from '../lib/ids.js';
 import { bundleRendererFromManifest } from './renderer-bundler.js';

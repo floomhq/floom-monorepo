@@ -19,6 +19,7 @@ COPY packages/detect/package.json ./packages/detect/
 COPY packages/manifest/package.json ./packages/manifest/
 COPY packages/runtime/package.json ./packages/runtime/
 COPY packages/cli/package.json ./packages/cli/
+COPY packages/renderer/package.json ./packages/renderer/
 COPY turbo.json tsconfig.base.json ./
 
 # Install ALL deps (devDependencies needed for build)
@@ -59,8 +60,13 @@ COPY packages/detect/package.json ./packages/detect/
 COPY packages/manifest/package.json ./packages/manifest/
 COPY packages/runtime/package.json ./packages/runtime/
 COPY packages/cli/package.json ./packages/cli/
+COPY packages/renderer/package.json ./packages/renderer/
 
-# Install only production server dependencies
+# Install only production server dependencies.
+# @floom/renderer is a workspace:* dep but the server only needs its *types*
+# at runtime (erased at compile time) + esbuild reads the source directly for
+# the bundler service. pnpm will symlink the workspace package — the source
+# is copied below from the builder stage.
 RUN pnpm install --filter @floom/server --prod
 
 # Rebuild better-sqlite3 native module against the container's Node ABI
@@ -69,6 +75,10 @@ RUN cd apps/server && pnpm rebuild better-sqlite3 2>&1 | tail -5 || true
 # Copy compiled artifacts from builder
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
+
+# Copy @floom/renderer source — esbuild needs it at runtime for the renderer
+# bundler service (creator custom renderers are bundled on ingest).
+COPY --from=builder /app/packages/renderer/src ./packages/renderer/src
 
 WORKDIR /app/apps/server
 
