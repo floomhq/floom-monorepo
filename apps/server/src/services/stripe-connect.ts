@@ -407,18 +407,33 @@ function rowToWebhookEvent(
 }
 
 /**
- * Look up the caller's Stripe account row, scoped to (workspace, user).
- * Returns null if the caller has not onboarded yet.
+ * Compute the effective owner id for the caller. Authenticated callers
+ * (W3.1+) are scoped by `user_id`; anonymous OSS callers are scoped by
+ * `device:<device_id>` so two browsers never collide on the synthetic
+ * `local` user. Cloud auth flips ownership via `rekeyDevice` (W2.3
+ * pattern) so existing rows survive the device → user transition.
+ */
+export function getCallerOwnerId(ctx: SessionContext): string {
+  if (ctx.is_authenticated) return ctx.user_id;
+  return `device:${ctx.device_id}`;
+}
+
+/**
+ * Look up the caller's Stripe account row, scoped to (workspace, owner).
+ * Returns null if the caller has not onboarded yet. The schema column is
+ * still named `user_id` for stability; in OSS mode it stores
+ * `device:<device_id>` instead of a real user id.
  */
 export function getCallerAccount(
   ctx: SessionContext,
 ): StripeAccountRecord | null {
+  const ownerId = getCallerOwnerId(ctx);
   const row = db
     .prepare(
       `SELECT * FROM stripe_accounts
          WHERE workspace_id = ? AND user_id = ?`,
     )
-    .get(ctx.workspace_id, ctx.user_id) as Record<string, unknown> | undefined;
+    .get(ctx.workspace_id, ownerId) as Record<string, unknown> | undefined;
   if (!row) return null;
   return rowToAccount(row);
 }
@@ -473,6 +488,7 @@ export async function createExpressAccount(
   const client = await getStripeClient();
 
   // Reuse existing Stripe account id if the caller already has one.
+  const ownerId = getCallerOwnerId(ctx);
   const existing = getCallerAccount(ctx);
   let stripeAccountId: string;
 
@@ -507,7 +523,7 @@ export async function createExpressAccount(
     ).run(
       id,
       ctx.workspace_id,
-      ctx.user_id,
+      ownerId,
       stripeAccountId,
       account_type,
       country,
