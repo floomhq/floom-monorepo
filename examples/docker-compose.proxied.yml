@@ -1,0 +1,72 @@
+# docker-compose for the 5 proxied-mode example apps + Floom server.
+#
+# Run from the monorepo root:
+#   docker compose -f examples/docker-compose.proxied.yml up --build
+#
+# Floom will boot on http://localhost:3051, ingest the 5 sidecar OpenAPI specs,
+# and expose all 5 apps at /api/<slug>/run. No /var/run/docker.sock required.
+
+version: "3.9"
+
+services:
+  blast-radius:
+    build:
+      context: ./blast-radius
+    ports:
+      - "4113:4113"
+    environment:
+      PORT: "4113"
+
+  claude-wrapped:
+    build:
+      context: ./claude-wrapped
+    ports:
+      - "4111:4111"
+    environment:
+      PORT: "4111"
+
+  dep-check:
+    build:
+      context: ./dep-check
+    ports:
+      - "4114:4114"
+    environment:
+      PORT: "4114"
+
+  hook-stats:
+    build:
+      context: ./hook-stats
+    ports:
+      - "4110:4110"
+    environment:
+      PORT: "4110"
+
+  session-recall:
+    build:
+      context: ./session-recall
+    ports:
+      - "4112:4112"
+    environment:
+      PORT: "4112"
+
+  floom:
+    image: ghcr.io/floomhq/floom-monorepo:v0.3.0
+    depends_on:
+      - blast-radius
+      - claude-wrapped
+      - dep-check
+      - hook-stats
+      - session-recall
+    ports:
+      - "3051:3051"
+    volumes:
+      - floom_data:/data
+      - ./apps-proxied.compose.yaml:/app/config/apps.yaml:ro
+    environment:
+      PORT: "3051"
+      DATA_DIR: "/data"
+      FLOOM_APPS_CONFIG: "/app/config/apps.yaml"
+    restart: unless-stopped
+
+volumes:
+  floom_data:
