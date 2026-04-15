@@ -57,6 +57,8 @@ Open `http://localhost:3051` in your browser or point an MCP client at `http://l
 | `FLOOM_JOB_POLL_MS` | `1000` | Interval in ms at which the background worker polls the async job queue. Lower = faster pickup, more CPU |
 | `FLOOM_DISABLE_JOB_WORKER` | — | When set to `true`, the background worker does not start. Used by tests that drive the worker deterministically |
 | `OPENAI_API_KEY` | — | Optional. Enables embedding-based app search. Without it, search falls back to keyword matching |
+| `COMPOSIO_API_KEY` | — | Optional. API key from [composio.dev](https://composio.dev) (free tier: 20K calls/mo). Enables the `/build` Connect-a-tool ramp via `/api/connections`. Without it, connection routes return `400 code=composio_config_missing`. See docs/connections.md |
+| `COMPOSIO_AUTH_CONFIG_<PROVIDER>` | — | Per-toolkit Composio auth config id (e.g. `COMPOSIO_AUTH_CONFIG_GMAIL=ac_xxx`). One per provider you want surfaced on `/build`. Create each in the Composio dashboard with the Floom callback URL |
 
 Any other env var matching a name in an app's `secrets` list (e.g. `RESEND_API_KEY`) is picked up as a server-side secret for that app.
 
@@ -577,8 +579,54 @@ FLOOM_APPS_CONFIG=./examples/flyfast/apps.yaml pnpm --filter @floom/server dev
 curl http://localhost:3051/renderer/flyfast/meta
 ```
 
+## Connect a tool (Composio OAuth, v0.3.2+)
+
+Floom's `/build` page has a "Connect a tool" tile grid (Gmail, Notion, Stripe, Slack, Sheets, Airtable, Shopify, HubSpot, Calendar, Linear, Figma, GitHub). Each tile kicks off a Composio-backed OAuth flow so a self-hosting operator (or, in Cloud, an end user) can grant Floom scoped access to the upstream provider and have every app on Floom reuse those credentials.
+
+**Composio** is a closed-source, cloud-only OAuth broker ([composio.dev](https://composio.dev)) with a 982-toolkit catalog, per-user connection keying, and automatic token refresh. Floom talks to it via the MIT-licensed `@composio/core` SDK pinned at `0.6.10`. Docs: `docs/connections.md`.
+
+### Setup
+
+1. **Create a free Composio account** at [composio.dev](https://composio.dev). Free tier is 20,000 tool calls per month.
+2. **Copy your API key** from the dashboard and set it as an env var:
+   ```
+   COMPOSIO_API_KEY=cmp_xxx
+   ```
+3. **Create an auth_config per toolkit** you want to surface. In the Composio dashboard, create an OAuth auth config for each provider (Gmail, Notion, Stripe, ...) and set the callback URL to:
+   ```
+   https://<your-floom-host>/api/connections/callback
+   ```
+4. **Set the auth_config ids on Floom** as env vars (one per toolkit):
+   ```
+   COMPOSIO_AUTH_CONFIG_GMAIL=ac_xxx
+   COMPOSIO_AUTH_CONFIG_NOTION=ac_xxx
+   COMPOSIO_AUTH_CONFIG_STRIPE=ac_xxx
+   # ... one per provider you want to surface
+   ```
+5. **Restart Floom**. Connections appear at `/api/connections` immediately.
+
+Providers without a `COMPOSIO_AUTH_CONFIG_*` env var return `400 code=composio_config_missing` when a user tries to connect, so only the providers you explicitly configure become clickable.
+
+### Device-id fallback
+
+v0.3.2 ships before W3.1 multi-user auth. Until Better Auth lands, every visitor is keyed by an anonymous `floom_device` cookie (HttpOnly, SameSite=Lax, 10-year TTL). Connections are owned by `device:<uuid>` in Composio's keyspace. On first login after W3.1, `rekeyDevice` atomically flips every device-owned row to `user:<id>` (same transaction that re-keys `app_memory`, `runs`, `chat_threads`), and persists the legacy Composio user id on `users.composio_user_id` so Composio itself never needs a rename API call.
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/connections/initiate` | Body `{provider, callback_url?}` → returns `{auth_url, connection_id, provider, expires_at}` |
+| POST | `/api/connections/finish` | Body `{connection_id}` → polls Composio, persists row, returns `{connection}` |
+| GET | `/api/connections` | Optional `?status=active` → returns `{connections: [...]}` |
+| DELETE | `/api/connections/:provider` | Revokes upstream + flips local row to `revoked` |
+
+All four are gated by the same auth middleware as the rest of `/api/*`. In OSS solo mode (no `FLOOM_AUTH_TOKEN` set) they're open; with a token set, every call needs a `Bearer` header.
+
+Full per-call reference: `docs/connections.md`.
+
 ## Version info
 
+- **v0.3.2** (April 2026): **Composio OAuth integration** — `/api/connections` routes, `connections` table (per-user per-provider OAuth state with device_id fallback pattern), `users.composio_user_id` column, extended `rekeyDevice` transaction (now 4-table atomic), thin wrapper service at `services/composio.ts` around `@composio/core` 0.6.10 (initiate / finish / list / revoke / executeAction). 135 new unit + integration tests. See "Connect a tool" section above.
 - **v0.3.1** (April 2026): **Multi-tenant schema foundation** — 5 new tables (`workspaces`, `users`, `workspace_members`, `app_memory`, `user_secrets`) + `workspace_id`/`user_id`/`device_id` columns on `apps`/`runs`/`chat_threads`. Per-user app memory gated by manifest `memory_keys`. AES-256-GCM envelope-encrypted secrets vault. Session cookie (`floom_device`) with atomic rekey transaction for the upcoming W3.1 auth migration. New endpoints: `/api/memory/:app_slug`, `/api/secrets`. Single-codepath multi-tenant (OSS solo mode = synthetic `workspace_id='local'`). **Custom renderers** — creators can ship a `renderer.tsx` alongside their OpenAPI spec; Floom compiles it via esbuild and serves at `/renderer/:slug/bundle.js` with an ErrorBoundary fallback to the default shape renderer. Ships 10 default output components (text/markdown/code/table/object/image/pdf/audio/stream/error) + 13 default input components.
 - **v0.3.0** (April 2026): Async job queue primitive. `async: true` in `apps.yaml` wraps long-running apps (OpenPaper, research agents) in POST /jobs → GET /jobs/:id → webhook pattern. Background worker polls, claims, dispatches, enforces `timeout_ms`, retries N times, delivers webhooks with 5xx backoff. MCP `tools/call` on async apps returns immediately with a job-started payload.
 - **v0.2.0** (April 2026): OpenAPI ingest rewrite. $ref resolution, allOf/oneOf/anyOf flattening, spec.servers[] auto-detection, header/cookie/multipart support, OAuth2 client credentials, basic auth, FLOOM_AUTH_TOKEN gate, per-user MCP secrets via _auth extension, FLOOM_SEED_APPS opt-in for hosted apps, fixed base_url path-stripping, fixed SPA wildcard swallowing /openapi.json.
