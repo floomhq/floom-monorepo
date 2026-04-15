@@ -32,7 +32,7 @@ const DetectBody = z.object({
 const IngestBody = z.object({
   openapi_url: z.string().url().max(2048),
   name: z.string().min(1).max(120).optional(),
-  description: z.string().max(500).optional(),
+  description: z.string().max(5000).optional(),
   slug: z
     .string()
     .min(1)
