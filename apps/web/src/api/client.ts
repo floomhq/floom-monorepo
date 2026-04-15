@@ -269,6 +269,41 @@ export function signOut(): Promise<unknown> {
   return request('/auth/sign-out', { method: 'POST', body: JSON.stringify({}) });
 }
 
+// W4-minimal gap close: wire /me/settings to the real Better Auth endpoints
+// that ship in 1.6.3. `updateUser` supports name + image; `changePassword`
+// verifies the current password server-side; `deleteUser` requires the
+// current password to prevent hostile session takeovers.
+export function updateAuthUser(body: {
+  name?: string;
+  image?: string | null;
+}): Promise<{ status: boolean }> {
+  return request('/auth/update-user', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function changeAuthPassword(body: {
+  currentPassword: string;
+  newPassword: string;
+  revokeOtherSessions?: boolean;
+}): Promise<{ token: string | null; user: { id: string; email: string; name: string } }> {
+  return request('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteAuthUser(body: {
+  password?: string;
+  callbackURL?: string;
+}): Promise<{ success: boolean; message: string }> {
+  return request('/auth/delete-user', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 // Social sign-in: Better Auth expects a redirect-mode GET, but the UI
 // fires window.location. We expose the URL here for callers to read.
 export function socialSignInUrl(provider: 'github' | 'google', callbackURL = '/me'): string {

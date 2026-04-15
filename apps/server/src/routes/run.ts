@@ -82,7 +82,12 @@ runRouter.post('/', async (c) => {
     ctx.device_id,
   );
 
-  dispatchRun(row, manifest, runId, actionName, validated);
+  // W4-minimal gap close: pass the resolved session context so the runner
+  // can look up per-user secrets (user_secrets table). Without this, the
+  // runner falls back to the synthetic 'local' workspace and every
+  // authenticated user's /api/secrets POST is effectively invisible to
+  // their own runs.
+  dispatchRun(row, manifest, runId, actionName, validated, undefined, ctx);
 
   return c.json({ run_id: runId, status: 'pending' });
 });
@@ -290,7 +295,12 @@ slugRunRouter.post('/', async (c) => {
     ctx.device_id,
   );
 
-  dispatchRun(row, manifest, runId, actionName, validated);
+  // W4-minimal gap close: pass the resolved session context so the runner
+  // can look up per-user secrets (user_secrets table). Without this, the
+  // runner falls back to the synthetic 'local' workspace and every
+  // authenticated user's /api/secrets POST is effectively invisible to
+  // their own runs.
+  dispatchRun(row, manifest, runId, actionName, validated, undefined, ctx);
 
   return c.json({ run_id: runId, status: 'pending' });
 });

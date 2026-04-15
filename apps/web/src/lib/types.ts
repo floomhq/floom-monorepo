@@ -142,6 +142,7 @@ export interface SessionMePayload {
     id: string;
     email: string | null;
     name: string | null;
+    image: string | null;
     is_local: boolean;
   };
   active_workspace: SessionWorkspace;

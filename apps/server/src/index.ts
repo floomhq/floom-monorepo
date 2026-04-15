@@ -27,7 +27,7 @@ import { ingestOpenApiApps } from './services/openapi-ingest.js';
 import { startFastApps } from './services/fast-apps-sidecar.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
 import { globalAuthMiddleware } from './lib/auth.js';
-import { getAuth, isCloudMode } from './lib/better-auth.js';
+import { getAuth, isCloudMode, runAuthMigrations } from './lib/better-auth.js';
 import { startJobWorker } from './services/worker.js';
 
 const PORT = Number(process.env.PORT || 3051);
@@ -112,9 +112,9 @@ app.get('/openapi.json', (c) =>
     openapi: '3.0.0',
     info: {
       title: 'Floom self-host API',
-      version: '0.4.0-minimal.4',
+      version: '0.4.0-minimal.5',
       description:
-        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug. v0.3.1 adds per-user app memory (/api/memory) and an encrypted secrets vault (/api/secrets). v0.3.2 adds Composio-backed OAuth connections (/api/connections). v0.4.0-alpha.2 adds the Stripe Connect partner-app surface (/api/stripe/*) with Express onboarding, direct charges with a 5% application fee, refunds, subscriptions, and webhook receiver. v0.4.0-alpha.3 (W3.1) adds workspaces + members + invites (/api/workspaces) and the session API (/api/session) wired to Better Auth in cloud mode. v0.4.0-minimal (W4-minimal) adds /api/me/runs, /api/hub/ingest, /api/apps/:slug/reviews, and /api/feedback for the end-to-end product UI. v0.4.0-minimal.2 adds seven deterministic fast utility apps (uuid, password, hash, base64, json-format, jwt-decode, word-count) bundled as a proxied Node sidecar, and the data-driven store sort (featured DESC, avg_run_ms ASC).',
+        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug. v0.3.1 adds per-user app memory (/api/memory) and an encrypted secrets vault (/api/secrets). v0.3.2 adds Composio-backed OAuth connections (/api/connections). v0.4.0-alpha.2 adds the Stripe Connect partner-app surface (/api/stripe/*) with Express onboarding, direct charges with a 5% application fee, refunds, subscriptions, and webhook receiver. v0.4.0-alpha.3 (W3.1) adds workspaces + members + invites (/api/workspaces) and the session API (/api/session) wired to Better Auth in cloud mode. v0.4.0-minimal (W4-minimal) adds /api/me/runs, /api/hub/ingest, /api/apps/:slug/reviews, and /api/feedback for the end-to-end product UI. v0.4.0-minimal.2 adds seven deterministic fast utility apps (uuid, password, hash, base64, json-format, jwt-decode, word-count) bundled as a proxied Node sidecar, and the data-driven store sort (featured DESC, avg_run_ms ASC). v0.4.0-minimal.5 (W4M gap close) wires /auth/update-user + /auth/change-password + /auth/delete-user into /me/settings, runs Better Auth migrations on boot in cloud mode, and passes the resolved session context into dispatchRun so per-user secrets resolve for authenticated runs.',
     },
     paths: {
       '/api/health': {
@@ -545,6 +545,23 @@ if (webDist) {
 
 // Boot sequence: seed then start embeddings backfill in the background.
 async function boot(): Promise<void> {
+  // W4-minimal gap close: run Better Auth migrations on boot when
+  // FLOOM_CLOUD_MODE is enabled. Creates `user`, `session`, `account`,
+  // `verification` tables plus organization + api-key tables on first
+  // boot. Idempotent — subsequent boots are a no-op once tables exist.
+  // Runs before seeding so any auth-dependent seed data has schemas to
+  // write into. Blocks boot on failure — fail fast if the migration
+  // step can't commit, rather than serving requests against a
+  // half-initialized auth DB.
+  if (isCloudMode()) {
+    try {
+      await runAuthMigrations();
+    } catch (err) {
+      console.error('[auth] migration failed — refusing to boot in cloud mode:', err);
+      process.exit(1);
+    }
+  }
+
   try {
     seedFromFile();
   } catch (err) {
@@ -565,12 +582,6 @@ async function boot(): Promise<void> {
       });
   }
 
-  // Fast Apps sidecar: fork examples/fast-apps/server.mjs and ingest its
-  // seven deterministic utility apps. Opt-out via FLOOM_FAST_APPS=false.
-  startFastApps().catch((err) => {
-    console.error('[fast-apps] boot failed:', err);
-  });
-
   // Don't block boot on the network call.
   backfillAppEmbeddings().catch((err) => {
     console.error('[embeddings] backfill failed:', err);
@@ -582,6 +593,15 @@ async function boot(): Promise<void> {
   if (process.env.FLOOM_DISABLE_JOB_WORKER !== 'true') {
     startJobWorker();
   }
+
+  // Fast Apps sidecar: fork examples/fast-apps/server.mjs and ingest its
+  // seven deterministic utility apps. Opt-out via FLOOM_FAST_APPS=false.
+  // Merged from wave/W4M-fast-apps (0.4.0-minimal.2) into wave/W4M-test-fixes
+  // so the published image has both gap-close auth migrations AND the fast-
+  // apps sidecar.
+  startFastApps().catch((err) => {
+    console.error('[fast-apps] boot failed:', err);
+  });
 
   serve({ fetch: app.fetch, port: PORT }, (info) => {
     console.log(`[server] listening on http://localhost:${info.port}`);
