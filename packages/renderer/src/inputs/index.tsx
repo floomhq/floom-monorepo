@@ -1,7 +1,7 @@
-// 13 default input components. Each implements a minimal controlled interface
-// matching Floom's InputSpec shape. For production, creators should prefer
-// rjsf for full schema-driven forms; these defaults exist for fast paths and
-// for custom renderers that want to mix them in.
+// Floom's default input components. 13 field types covering the common surface
+// for consumer-grade schema-driven forms: text, textarea, date, url, enum,
+// number, boolean, array, four file upload variants (CSV, image, audio, any),
+// and nested object. Extend with your own widgets via the custom renderer API.
 //
 // Contract: every input component takes { spec, value, onChange, error? }
 // where spec is a Floom InputSpec-like object.
