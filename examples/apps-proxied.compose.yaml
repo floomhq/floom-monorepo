@@ -1,0 +1,39 @@
+# apps.yaml for use INSIDE docker-compose. Service names (not localhost) are
+# resolved via Docker's internal DNS. This is the file mounted into the
+# `floom` service in docker-compose.proxied.yml.
+
+apps:
+  - slug: blast-radius
+    type: proxied
+    openapi_spec_url: http://blast-radius:4113/openapi.json
+    display_name: Blast Radius
+    description: "Find all files affected by your changes. Clone a public git repo and report files touched by a branch diff."
+    category: developer-tools
+
+  - slug: claude-wrapped
+    type: proxied
+    openapi_spec_url: http://claude-wrapped:4111/openapi.json
+    display_name: Claude Wrapped
+    description: "Spotify Wrapped for Claude Code. Visualize your AI coding stats from session transcripts."
+    category: productivity
+
+  - slug: dep-check
+    type: proxied
+    openapi_spec_url: http://dep-check:4114/openapi.json
+    display_name: Dep Check
+    description: "Find dead imports in your project. Clone a public git repo and list imports that reference files no longer there."
+    category: developer-tools
+
+  - slug: hook-stats
+    type: proxied
+    openapi_spec_url: http://hook-stats:4110/openapi.json
+    display_name: Hook Stats
+    description: "Analyze your Claude Code bash-commands.log. Top commands, git stats, per-day activity."
+    category: productivity
+
+  - slug: session-recall
+    type: proxied
+    openapi_spec_url: http://session-recall:4112/openapi.json
+    display_name: Session Recall
+    description: "Search and analyze Claude Code session transcripts. Keyword search, recent messages, and retry-loop report."
+    category: productivity
