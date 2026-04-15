@@ -15,6 +15,7 @@ import { runRouter, slugRunRouter } from './routes/run.js';
 import { jobsRouter } from './routes/jobs.js';
 import { mcpRouter } from './routes/mcp.js';
 import { deployWaitlistRouter } from './routes/deploy-waitlist.js';
+import { memoryRouter, secretsRouter } from './routes/memory.js';
 import { seedFromFile } from './services/seed.js';
 import { ingestOpenApiApps } from './services/openapi-ingest.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
@@ -51,6 +52,9 @@ app.route('/api/:slug/run', slugRunRouter);
 // Async job queue: POST/GET /api/:slug/jobs[/:job_id][/cancel]
 app.route('/api/:slug/jobs', jobsRouter);
 app.route('/api/deploy-waitlist', deployWaitlistRouter);
+// W2.1: per-user state
+app.route('/api/memory', memoryRouter);
+app.route('/api/secrets', secretsRouter);
 
 // Tiny, hand-written OpenAPI 3 document describing Floom's own admin API.
 // Returned at /openapi.json so users hitting http://host/openapi.json get
@@ -60,9 +64,9 @@ app.get('/openapi.json', (c) =>
     openapi: '3.0.0',
     info: {
       title: 'Floom self-host API',
-      version: '0.3.0',
+      version: '0.3.1',
       description:
-        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug.',
+        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug. v0.3.1 adds per-user app memory (/api/memory) and an encrypted secrets vault (/api/secrets).',
     },
     paths: {
       '/api/health': {
@@ -75,6 +79,35 @@ app.get('/openapi.json', (c) =>
         get: {
           summary: 'List all registered apps',
           responses: { '200': { description: 'JSON array of app records' } },
+        },
+      },
+      '/api/memory/{app_slug}': {
+        get: {
+          summary: 'List per-user memory keys for an app',
+          parameters: [
+            { name: 'app_slug', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: { '200': { description: 'JSON {entries: {...}}' } },
+        },
+        post: {
+          summary: 'Upsert a per-user memory key (must be declared in manifest.memory_keys)',
+          parameters: [
+            { name: 'app_slug', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: '{ok: true}' },
+            '403': { description: 'Key not in manifest.memory_keys' },
+          },
+        },
+      },
+      '/api/secrets': {
+        get: {
+          summary: 'List masked per-user secrets (never returns plaintext)',
+          responses: { '200': { description: 'JSON {entries: [{key, updated_at}]}' } },
+        },
+        post: {
+          summary: 'Upsert an encrypted per-user secret',
+          responses: { '200': { description: '{ok: true}' } },
         },
       },
       '/api/{slug}/run': {

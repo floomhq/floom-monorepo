@@ -13,6 +13,15 @@ export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+/**
+ * Synthetic defaults used in OSS solo mode and as the migration target for
+ * pre-existing rows. Every tenant-scoped query must include
+ * `workspace_id = ?`; these constants keep the solo-mode codepath the same
+ * as the multi-tenant codepath (P.4 research, section 4).
+ */
+export const DEFAULT_WORKSPACE_ID = 'local';
+export const DEFAULT_USER_ID = 'local';
+
 // ---------- apps (a flat, slug-addressed set of runnable apps) ----------
 db.exec(`
   CREATE TABLE IF NOT EXISTS apps (
@@ -181,3 +190,195 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `);
+
+// =====================================================================
+// ---------- W2.1: multi-tenant schema foundation ----------
+// =====================================================================
+// P.4 research delivered the full design. We ship the schema in v0.3.1
+// with synthetic `workspace_id='local'` + `user_id='local'` defaults so
+// OSS solo mode is a special case of multi-tenant (one codepath, no
+// feature flag). Cloud (W3.1) adds real workspaces + real user_ids on top
+// of the exact same schema.
+// ---------------------------------------------------------------------
+
+// ---------- workspaces (tenant container) ----------
+// `wrapped_dek` is the per-workspace 32-byte data encryption key wrapped
+// with the server-wide master KEK from FLOOM_MASTER_KEY env. Stored as a
+// hex string ("nonce:ciphertext:authTag") to stay sqlite-portable and so
+// the secrets service can rewrap without BLOB handling.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    plan TEXT NOT NULL DEFAULT 'oss',
+    wrapped_dek TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_workspaces_slug ON workspaces(slug);
+`);
+
+// ---------- users (global identity, shared across workspaces) ----------
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+    email TEXT,
+    name TEXT,
+    auth_provider TEXT NOT NULL DEFAULT 'local',
+    auth_subject TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_users_workspace ON users(workspace_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_users_auth
+    ON users(auth_provider, auth_subject)
+    WHERE auth_subject IS NOT NULL;
+`);
+
+// ---------- workspace_members (user <-> workspace <-> role) ----------
+db.exec(`
+  CREATE TABLE IF NOT EXISTS workspace_members (
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'admin',
+    joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (workspace_id, user_id)
+  );
+`);
+
+// ---------- app_memory: per-(workspace, app, user) JSON blob store ----------
+// Creator declares `memory_keys: [...]` in their manifest. Floom gates
+// get/set to declared keys only. Values are stored as JSON strings.
+// device_id is nullable; it's populated for anonymous sessions so the
+// rekey transaction can find the rows when a user logs in.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS app_memory (
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    app_slug TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    device_id TEXT,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (workspace_id, app_slug, user_id, key)
+  );
+  CREATE INDEX IF NOT EXISTS idx_app_memory_device
+    ON app_memory(device_id)
+    WHERE device_id IS NOT NULL;
+  CREATE INDEX IF NOT EXISTS idx_app_memory_user
+    ON app_memory(workspace_id, user_id);
+`);
+
+// ---------- user_secrets: AES-256-GCM envelope-encrypted per-user vault ----------
+// ciphertext/nonce/auth_tag are stored as hex-encoded strings. Decryption
+// pulls the wrapped DEK for the workspace, unwraps with FLOOM_MASTER_KEY,
+// then AES-GCM-decrypts in memory. Per P.4 section 3.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_secrets (
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    ciphertext TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+    auth_tag TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (workspace_id, user_id, key)
+  );
+`);
+
+// ---------- alter existing tables to add multi-tenant columns ----------
+// Idempotent column-add migrations (same pattern as app_type + is_async
+// above). Every alter uses DEFAULT 'local' so pre-existing v0.2/v0.3 rows
+// are automatically scoped to the synthetic default workspace and user
+// on first boot after upgrade.
+
+// apps: workspace_id + memory_keys (JSON array of allowed keys)
+if (!appCols.includes('workspace_id')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'local'`);
+}
+if (!appCols.includes('memory_keys')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN memory_keys TEXT`);
+}
+db.exec(`CREATE INDEX IF NOT EXISTS idx_apps_workspace ON apps(workspace_id)`);
+
+// runs: workspace_id + user_id + device_id
+const runCols = (db.prepare(`PRAGMA table_info(runs)`).all() as { name: string }[]).map(
+  (r) => r.name,
+);
+if (!runCols.includes('workspace_id')) {
+  db.exec(`ALTER TABLE runs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'local'`);
+}
+if (!runCols.includes('user_id')) {
+  db.exec(`ALTER TABLE runs ADD COLUMN user_id TEXT`);
+}
+if (!runCols.includes('device_id')) {
+  db.exec(`ALTER TABLE runs ADD COLUMN device_id TEXT`);
+}
+db.exec(
+  `CREATE INDEX IF NOT EXISTS idx_runs_workspace_user ON runs(workspace_id, user_id)`,
+);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_runs_device ON runs(device_id) WHERE device_id IS NOT NULL`);
+
+// chat_threads: workspace_id + user_id + device_id
+const threadCols = (db
+  .prepare(`PRAGMA table_info(chat_threads)`)
+  .all() as { name: string }[]).map((r) => r.name);
+if (!threadCols.includes('workspace_id')) {
+  db.exec(`ALTER TABLE chat_threads ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'local'`);
+}
+if (!threadCols.includes('user_id')) {
+  db.exec(`ALTER TABLE chat_threads ADD COLUMN user_id TEXT`);
+}
+if (!threadCols.includes('device_id')) {
+  db.exec(`ALTER TABLE chat_threads ADD COLUMN device_id TEXT`);
+}
+db.exec(
+  `CREATE INDEX IF NOT EXISTS idx_threads_workspace_user ON chat_threads(workspace_id, user_id)`,
+);
+db.exec(
+  `CREATE INDEX IF NOT EXISTS idx_threads_device ON chat_threads(device_id) WHERE device_id IS NOT NULL`,
+);
+
+// ---------- bootstrap: ensure the synthetic 'local' workspace exists ----------
+// Idempotent. Runs on every boot so the row is always present even after
+// a DB restore. The wrapped_dek column is left NULL here — user_secrets
+// lazily generates and persists the DEK the first time a secret is set
+// for this workspace, because doing it at boot would require reading
+// FLOOM_MASTER_KEY before the env is fully loaded in tests.
+const existingLocal = db
+  .prepare(`SELECT id FROM workspaces WHERE id = ?`)
+  .get(DEFAULT_WORKSPACE_ID) as { id: string } | undefined;
+if (!existingLocal) {
+  db.prepare(
+    `INSERT INTO workspaces (id, slug, name, plan) VALUES (?, ?, ?, 'oss')`,
+  ).run(DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_ID, 'Local');
+}
+const existingLocalUser = db
+  .prepare(`SELECT id FROM users WHERE id = ?`)
+  .get(DEFAULT_USER_ID) as { id: string } | undefined;
+if (!existingLocalUser) {
+  db.prepare(
+    `INSERT INTO users (id, workspace_id, email, name, auth_provider)
+     VALUES (?, ?, NULL, 'Local User', 'local')`,
+  ).run(DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID);
+}
+const existingLocalMember = db
+  .prepare(
+    `SELECT 1 as n FROM workspace_members WHERE workspace_id = ? AND user_id = ?`,
+  )
+  .get(DEFAULT_WORKSPACE_ID, DEFAULT_USER_ID) as { n: number } | undefined;
+if (!existingLocalMember) {
+  db.prepare(
+    `INSERT INTO workspace_members (workspace_id, user_id, role)
+     VALUES (?, ?, 'admin')`,
+  ).run(DEFAULT_WORKSPACE_ID, DEFAULT_USER_ID);
+}
+
+// Bump user_version so operators can see at a glance which schema
+// revision their DB is on. v0.3.0 was at user_version=3; W2.1 lands v4.
+const currentUserVersion = (db.prepare(`PRAGMA user_version`).get() as { user_version: number })
+  .user_version;
+if (currentUserVersion < 4) {
+  db.pragma('user_version = 4');
+}
