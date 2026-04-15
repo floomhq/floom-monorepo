@@ -20,6 +20,7 @@
 // W3.1 ships with: magic link, GitHub OAuth, Google OAuth, email+password,
 // API keys, organizations.
 import { betterAuth } from 'better-auth';
+import { getMigrations } from 'better-auth/db/migration';
 import { magicLink, organization } from 'better-auth/plugins';
 import { apiKey } from '@better-auth/api-key';
 import { db } from '../db.js';
@@ -54,8 +55,9 @@ export function isCloudMode(): boolean {
 let cachedAuth: FloomAuth | null | undefined;
 
 /**
- * Build the Better Auth instance from env. Returns null when cloud mode is
- * disabled. Idempotent — the second call returns the cached instance.
+ * Build the Better Auth options object from env. Shared by `getAuth()` (which
+ * wraps it in `betterAuth(...)`) and `runAuthMigrations()` (which passes it
+ * straight to `getMigrations(...)`). Idempotent and side-effect-free.
  *
  * Required env vars in cloud mode:
  *   - BETTER_AUTH_SECRET (32+ bytes hex/base64, used for cookie signing)
@@ -66,13 +68,11 @@ let cachedAuth: FloomAuth | null | undefined;
  *   - GOOGLE_OAUTH_CLIENT_ID + GOOGLE_OAUTH_CLIENT_SECRET
  *   - FLOOM_MAGIC_LINK_EMAIL_FROM (defaults to noreply@floom.dev)
  */
-export function getAuth(): FloomAuth | null {
-  if (cachedAuth !== undefined) return cachedAuth;
-  if (!isCloudMode()) {
-    cachedAuth = null;
-    return null;
-  }
-
+// Typed as `Parameters<typeof betterAuth>[0]` so the return type is always
+// structurally assignable to what `betterAuth(...)` expects. Kept local so
+// callers don't import Better Auth's generic BetterAuthOptions.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildAuthOptions(): any {
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret || secret.length < 16) {
     throw new Error(
@@ -104,7 +104,7 @@ export function getAuth(): FloomAuth | null {
   const magicLinkFrom =
     process.env.FLOOM_MAGIC_LINK_EMAIL_FROM || 'noreply@floom.dev';
 
-  const built = betterAuth({
+  return {
     appName: 'Floom',
     secret,
     baseURL,
@@ -112,8 +112,8 @@ export function getAuth(): FloomAuth | null {
     // `basePath` here matches the mount point in apps/server/src/index.ts.
     basePath: '/auth',
     // Pass the existing better-sqlite3 instance directly; Better Auth's
-    // adapter detects the SqliteDatabase shape and creates its tables on
-    // first boot in cloud mode.
+    // Kysely adapter detects the SqliteDatabase shape. Tables are created
+    // on boot by `runAuthMigrations()`, not lazily on first query.
     database: db,
     emailAndPassword: {
       enabled: true,
@@ -174,12 +174,64 @@ export function getAuth(): FloomAuth | null {
         rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 100 },
       }),
     ],
-  });
+    user: {
+      // W4-minimal gap close: enable the POST /auth/delete-user endpoint so
+      // /me/settings can delete an account without operator intervention.
+      // `password` kwarg on the body verifies the caller owns the credentials.
+      deleteUser: { enabled: true },
+    },
+  };
+}
+
+/**
+ * Build the Better Auth instance from env. Returns null when cloud mode is
+ * disabled. Idempotent — the second call returns the cached instance.
+ */
+export function getAuth(): FloomAuth | null {
+  if (cachedAuth !== undefined) return cachedAuth;
+  if (!isCloudMode()) {
+    cachedAuth = null;
+    return null;
+  }
+  const built = betterAuth(buildAuthOptions());
   // Cast through `unknown` to widen the deeply-generic Better Auth return
   // type to the structural FloomAuth interface above. The shape is verified
   // by the integration test that round-trips a getSession call.
   cachedAuth = built as unknown as FloomAuth;
   return cachedAuth;
+}
+
+/**
+ * Idempotent boot-time migration runner. In cloud mode, resolves the Better
+ * Auth schema from the same options `getAuth()` uses, and creates any
+ * missing tables (`user`, `session`, `account`, `verification`, organization
+ * tables, api-key tables, ...). Safe to call on every boot — Better Auth's
+ * `getMigrations` diffs the current table state against the target schema
+ * and only emits CREATE TABLE / ALTER TABLE statements for missing rows.
+ *
+ * In OSS mode this is a no-op.
+ *
+ * Throws on migration failure so the server fails fast instead of booting
+ * with a half-initialized auth DB.
+ */
+export async function runAuthMigrations(): Promise<{
+  applied: number;
+  tables: string[];
+}> {
+  if (!isCloudMode()) return { applied: 0, tables: [] };
+  const options = buildAuthOptions();
+  const { toBeCreated, toBeAdded, runMigrations } = await getMigrations(options);
+  const newTables = toBeCreated.map((t: { table: string }) => t.table);
+  const changedTables = toBeAdded.map((t: { table: string }) => t.table);
+  const total = newTables.length + changedTables.length;
+  if (total === 0) return { applied: 0, tables: [] };
+  await runMigrations();
+  // eslint-disable-next-line no-console
+  console.log(
+    `[auth] migrations applied: ${newTables.length} new table(s) [${newTables.join(', ') || '-'}], ` +
+      `${changedTables.length} altered table(s) [${changedTables.join(', ') || '-'}]`,
+  );
+  return { applied: total, tables: [...newTables, ...changedTables] };
 }
 
 /**

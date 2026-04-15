@@ -197,22 +197,38 @@ export function TopBar(_props: Props = {}) {
                     fontFamily: 'inherit',
                   }}
                 >
-                  <span
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: '50%',
-                      background: 'var(--accent)',
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 11,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {userInitial}
-                  </span>
+                  {user?.image ? (
+                    <img
+                      src={user.image}
+                      alt=""
+                      width={24}
+                      height={24}
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                  ) : (
+                    <span
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 700,
+                      }}
+                      data-testid="topbar-user-avatar-initial"
+                    >
+                      {userInitial}
+                    </span>
+                  )}
                   <span style={{ fontSize: 13, color: 'var(--ink)' }}>{userLabel}</span>
                 </button>
                 {dropOpen && (

@@ -636,11 +636,33 @@ export function me(ctx: SessionContext, cloud_mode: boolean): SessionMePayload {
   const userRow = db
     .prepare('SELECT id, email, name FROM users WHERE id = ?')
     .get(ctx.user_id) as { id: string; email: string | null; name: string | null } | undefined;
+  // W4-minimal gap close: in cloud mode, Better Auth's `user` table is the
+  // source of truth for display name + avatar image. Profile updates flow
+  // through /auth/update-user which writes to that table, not the Floom
+  // `users` table. We do a lazy read-through here so /api/session/me
+  // reflects the latest values without dual-writing on every mutation.
+  // In OSS mode the Better Auth table may not exist; guard with a
+  // try/catch so the query failure is a silent no-op.
+  let betterAuthUser:
+    | { name: string | null; image: string | null; email: string | null }
+    | undefined;
+  if (cloud_mode && ctx.user_id !== DEFAULT_USER_ID) {
+    try {
+      betterAuthUser = db
+        .prepare('SELECT name, image, email FROM user WHERE id = ?')
+        .get(ctx.user_id) as
+        | { name: string | null; image: string | null; email: string | null }
+        | undefined;
+    } catch {
+      betterAuthUser = undefined;
+    }
+  }
   return {
     user: {
       id: ctx.user_id,
-      email: userRow?.email || ctx.email || null,
-      name: userRow?.name || null,
+      email: betterAuthUser?.email || userRow?.email || ctx.email || null,
+      name: betterAuthUser?.name || userRow?.name || null,
+      image: betterAuthUser?.image || null,
       is_local: ctx.user_id === DEFAULT_USER_ID,
     },
     active_workspace: {

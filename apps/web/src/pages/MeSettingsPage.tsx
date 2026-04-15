@@ -1,54 +1,155 @@
-// W4-minimal: /me/settings — basic account settings.
+// W4-minimal: /me/settings — account settings wired to Better Auth 1.6.3.
 //
-// Four fields: display name, avatar URL, email (read-only), password.
-// Plus a "delete account" section at the bottom with a confirm modal.
+// Three sections:
+//   1. Profile  — display name + avatar URL. POST /auth/update-user.
+//   2. Password — current + new + confirm. POST /auth/change-password.
+//   3. Delete   — password-gated confirm modal. POST /auth/delete-user.
 //
-// In OSS mode most fields are read-only because there's no Better Auth
-// user record to mutate; the page renders an info banner explaining that.
+// Email is read-only — Better Auth has /auth/change-email, but it requires
+// a verification flow we don't yet ship email delivery for. Left out of
+// W4-minimal intentionally and flagged on the UI.
+//
+// In OSS mode the Better Auth endpoints are not mounted, so everything is
+// read-only and a banner explains why. The page never falls back to
+// localStorage or alert() stubs.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
-import { useSession } from '../hooks/useSession';
+import { useSession, refreshSession, clearSession } from '../hooks/useSession';
+import * as api from '../api/client';
+
+type FieldState = 'idle' | 'saving' | 'saved' | 'error';
 
 export function MeSettingsPage() {
   const { data: session, isAuthenticated } = useSession();
-  const [name, setName] = useState(session?.user.name || '');
-  const [password, setPassword] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [confirm, setConfirm] = useState(false);
-  const [confirmText, setConfirmText] = useState('');
   const navigate = useNavigate();
 
-  async function handleSave(e: React.FormEvent) {
+  // Profile section state. The initial render may land before /api/session/me
+  // resolves (SPA boot path), so we also sync from `session` whenever it
+  // updates. Track a `dirty` flag per field so we stop clobbering user
+  // edits once they've typed something.
+  const [name, setName] = useState<string>(session?.user.name || '');
+  const [avatarUrl, setAvatarUrl] = useState<string>(session?.user.image || '');
+  const [nameDirty, setNameDirty] = useState(false);
+  const [avatarDirty, setAvatarDirty] = useState(false);
+  const [profileState, setProfileState] = useState<FieldState>('idle');
+  const [profileError, setProfileError] = useState<string>('');
+
+  // Re-seed form fields from the session whenever it changes, but only
+  // for fields the user hasn't started editing. This covers the race
+  // where the page mounts before /api/session/me resolves and also
+  // handles post-save re-syncs when refreshSession() updates the cache.
+  useEffect(() => {
+    if (!session) return;
+    if (!nameDirty) setName(session.user.name || '');
+    if (!avatarDirty) setAvatarUrl(session.user.image || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.name, session?.user.image]);
+
+  // Password section state.
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordState, setPasswordState] = useState<FieldState>('idle');
+  const [passwordError, setPasswordError] = useState<string>('');
+
+  // Delete-account modal state.
+  const [confirm, setConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteState, setDeleteState] = useState<FieldState>('idle');
+  const [deleteError, setDeleteError] = useState<string>('');
+
+  async function handleProfileSave(e: React.FormEvent) {
     e.preventDefault();
     if (!isAuthenticated) return;
-    setState('saving');
+    setProfileState('saving');
+    setProfileError('');
     try {
-      // Better Auth doesn't expose a generic update endpoint in the plugin
-      // surface we mounted, so for W4-minimal we store this as a marker in
-      // the local browser storage and surface a "saved" state. The real
-      // settings path (hitting /auth/update-user) is wired in W4.1 when we
-      // ship the cloud writer endpoint.
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(
-          'floom-settings-override',
-          JSON.stringify({ name, avatarUrl }),
-        );
+      // Only send fields the user actually touched. `image: null` clears the
+      // avatar in Better Auth; undefined leaves it alone.
+      const body: { name?: string; image?: string | null } = {};
+      if (name !== (session?.user.name || '')) body.name = name;
+      if (avatarUrl !== (session?.user.image || '')) {
+        body.image = avatarUrl ? avatarUrl : null;
       }
-      setState('saved');
-      setTimeout(() => setState('idle'), 1500);
-    } catch {
-      setState('error');
+      if (Object.keys(body).length === 0) {
+        setProfileState('saved');
+        setTimeout(() => setProfileState('idle'), 1500);
+        return;
+      }
+      await api.updateAuthUser(body);
+      await refreshSession();
+      // Reset dirty flags so the useEffect re-seeds from the freshly
+      // fetched session payload — otherwise the form still displays the
+      // pre-save values on a non-reload session refresh.
+      setNameDirty(false);
+      setAvatarDirty(false);
+      setProfileState('saved');
+      setTimeout(() => setProfileState('idle'), 1500);
+    } catch (err) {
+      setProfileState('error');
+      const e = err as api.ApiError;
+      setProfileError(e.message || 'Could not save profile.');
+    }
+  }
+
+  async function handlePasswordSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isAuthenticated) return;
+    setPasswordError('');
+    if (newPassword.length < 8) {
+      setPasswordState('error');
+      setPasswordError('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordState('error');
+      setPasswordError('New password and confirmation do not match.');
+      return;
+    }
+    setPasswordState('saving');
+    try {
+      await api.changeAuthPassword({
+        currentPassword,
+        newPassword,
+        revokeOtherSessions: true,
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordState('saved');
+      setTimeout(() => setPasswordState('idle'), 1500);
+    } catch (err) {
+      setPasswordState('error');
+      const e = err as api.ApiError;
+      if (e.status === 401 || e.status === 400) {
+        setPasswordError(e.message || 'Current password incorrect.');
+      } else {
+        setPasswordError(e.message || 'Could not change password.');
+      }
     }
   }
 
   async function handleDelete() {
-    if (confirmText !== session?.user.email) return;
-    alert('Delete-account is wired in cloud mode only. Ask support to delete your account.');
-    setConfirm(false);
-    navigate('/');
+    if (!isAuthenticated) return;
+    setDeleteState('saving');
+    setDeleteError('');
+    try {
+      await api.deleteAuthUser({ password: deletePassword });
+      clearSession();
+      await refreshSession();
+      setConfirm(false);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setDeleteState('error');
+      const e = err as api.ApiError;
+      if (e.status === 401 || e.status === 400) {
+        setDeleteError(e.message || 'Password incorrect.');
+      } else {
+        setDeleteError(e.message || 'Could not delete account.');
+      }
+    }
   }
 
   return (
@@ -58,11 +159,12 @@ export function MeSettingsPage() {
           Account settings
         </h1>
         <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 28px' }}>
-          Update your profile and password.
+          Update your profile, change your password, or delete your account.
         </p>
 
         {!isAuthenticated && (
           <div
+            data-testid="settings-oss-banner"
             style={{
               background: '#fff8e6',
               border: '1px solid #f4e0a5',
@@ -73,16 +175,22 @@ export function MeSettingsPage() {
               marginBottom: 20,
             }}
           >
-            You're using the local account (OSS mode). Settings are read-only
+            You&apos;re using the local account (OSS mode). Settings are read-only
             until cloud auth is enabled on this server.
           </div>
         )}
 
-        <form onSubmit={handleSave}>
+        {/* ---------- Profile section ---------- */}
+        <form onSubmit={handleProfileSave} data-testid="settings-profile-form">
+          <SectionHeading>Profile</SectionHeading>
+
           <Label>Display name</Label>
           <Input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameDirty(true);
+            }}
             disabled={!isAuthenticated}
             placeholder="Ada Lovelace"
             data-testid="settings-name"
@@ -91,13 +199,16 @@ export function MeSettingsPage() {
           <Label>Avatar URL (optional)</Label>
           <Input
             value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
+            onChange={(e) => {
+              setAvatarUrl(e.target.value);
+              setAvatarDirty(true);
+            }}
             disabled={!isAuthenticated}
-            placeholder="https://..."
+            placeholder="https://avatars.example.com/ada.png"
             data-testid="settings-avatar"
           />
 
-          <Label>Email</Label>
+          <Label>Email (read-only)</Label>
           <Input
             value={session?.user.email || '(local)'}
             readOnly
@@ -105,39 +216,98 @@ export function MeSettingsPage() {
             data-testid="settings-email"
           />
 
-          <Label>New password</Label>
-          <Input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={!isAuthenticated}
-            placeholder="Leave blank to keep current"
-            data-testid="settings-password"
-          />
+          {profileState === 'error' && profileError && (
+            <p data-testid="settings-profile-error" style={errorTextStyle}>
+              {profileError}
+            </p>
+          )}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <button
               type="submit"
-              disabled={!isAuthenticated || state === 'saving'}
+              disabled={!isAuthenticated || profileState === 'saving'}
               data-testid="settings-save"
-              style={{
-                padding: '10px 18px',
-                background: 'var(--ink)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: isAuthenticated ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit',
-                opacity: isAuthenticated ? 1 : 0.5,
-              }}
+              style={primaryButtonStyle(isAuthenticated)}
             >
-              {state === 'saving' ? 'Saving...' : state === 'saved' ? 'Saved' : 'Save changes'}
+              {profileState === 'saving'
+                ? 'Saving...'
+                : profileState === 'saved'
+                ? 'Saved'
+                : 'Save profile'}
             </button>
           </div>
         </form>
 
+        {/* ---------- Password section ---------- */}
+        <form
+          onSubmit={handlePasswordSave}
+          data-testid="settings-password-form"
+          style={{ marginTop: 40 }}
+        >
+          <SectionHeading>Change password</SectionHeading>
+
+          <Label>Current password</Label>
+          <Input
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            disabled={!isAuthenticated}
+            autoComplete="current-password"
+            data-testid="settings-current-password"
+          />
+
+          <Label>New password</Label>
+          <Input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            disabled={!isAuthenticated}
+            placeholder="At least 8 characters"
+            autoComplete="new-password"
+            data-testid="settings-new-password"
+          />
+
+          <Label>Confirm new password</Label>
+          <Input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={!isAuthenticated}
+            autoComplete="new-password"
+            data-testid="settings-confirm-password"
+          />
+
+          {passwordState === 'error' && passwordError && (
+            <p data-testid="settings-password-error" style={errorTextStyle}>
+              {passwordError}
+            </p>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button
+              type="submit"
+              disabled={
+                !isAuthenticated ||
+                passwordState === 'saving' ||
+                !currentPassword ||
+                !newPassword ||
+                !confirmPassword
+              }
+              data-testid="settings-password-save"
+              style={primaryButtonStyle(
+                isAuthenticated && !!currentPassword && !!newPassword && !!confirmPassword,
+              )}
+            >
+              {passwordState === 'saving'
+                ? 'Changing...'
+                : passwordState === 'saved'
+                ? 'Password changed'
+                : 'Change password'}
+            </button>
+          </div>
+        </form>
+
+        {/* ---------- Delete-account section ---------- */}
         <div
           style={{
             marginTop: 48,
@@ -155,7 +325,12 @@ export function MeSettingsPage() {
           </p>
           <button
             type="button"
-            onClick={() => setConfirm(true)}
+            onClick={() => {
+              setConfirm(true);
+              setDeletePassword('');
+              setDeleteState('idle');
+              setDeleteError('');
+            }}
             data-testid="settings-delete-trigger"
             disabled={!isAuthenticated}
             style={{
@@ -179,6 +354,7 @@ export function MeSettingsPage() {
           <div
             role="dialog"
             aria-modal="true"
+            data-testid="settings-delete-modal"
             style={{
               position: 'fixed',
               inset: 0,
@@ -205,13 +381,22 @@ export function MeSettingsPage() {
                 Delete account?
               </h3>
               <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
-                Type your email <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{session?.user.email}</code> to confirm.
+                This permanently deletes <code style={codeStyle}>{session?.user.email}</code> and
+                all associated data. Enter your password to confirm.
               </p>
               <Input
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                data-testid="settings-delete-confirm"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Your password"
+                autoComplete="current-password"
+                data-testid="settings-delete-password"
               />
+              {deleteState === 'error' && deleteError && (
+                <p data-testid="settings-delete-error" style={{ ...errorTextStyle, marginTop: 10 }}>
+                  {deleteError}
+                </p>
+              )}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
                 <button
                   type="button"
@@ -232,7 +417,8 @@ export function MeSettingsPage() {
                 <button
                   type="button"
                   onClick={handleDelete}
-                  disabled={confirmText !== session?.user.email}
+                  disabled={!deletePassword || deleteState === 'saving'}
+                  data-testid="settings-delete-confirm"
                   style={{
                     padding: '8px 16px',
                     background: '#c2321f',
@@ -241,12 +427,12 @@ export function MeSettingsPage() {
                     borderRadius: 8,
                     fontSize: 13,
                     fontWeight: 600,
-                    cursor: confirmText === session?.user.email ? 'pointer' : 'not-allowed',
+                    cursor: deletePassword && deleteState !== 'saving' ? 'pointer' : 'not-allowed',
                     fontFamily: 'inherit',
-                    opacity: confirmText === session?.user.email ? 1 : 0.6,
+                    opacity: deletePassword && deleteState !== 'saving' ? 1 : 0.6,
                   }}
                 >
-                  Delete forever
+                  {deleteState === 'saving' ? 'Deleting...' : 'Delete forever'}
                 </button>
               </div>
             </div>
@@ -254,6 +440,23 @@ export function MeSettingsPage() {
         )}
       </div>
     </PageShell>
+  );
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h2
+      style={{
+        fontSize: 15,
+        fontWeight: 700,
+        color: 'var(--ink)',
+        margin: '0 0 12px',
+        paddingBottom: 8,
+        borderBottom: '1px solid var(--line)',
+      }}
+    >
+      {children}
+    </h2>
   );
 }
 
@@ -293,3 +496,29 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
     />
   );
 }
+
+function primaryButtonStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: '10px 18px',
+    background: 'var(--ink)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: active ? 'pointer' : 'not-allowed',
+    fontFamily: 'inherit',
+    opacity: active ? 1 : 0.5,
+  };
+}
+
+const errorTextStyle: React.CSSProperties = {
+  margin: '10px 0 0',
+  fontSize: 13,
+  color: '#c2791c',
+};
+
+const codeStyle: React.CSSProperties = {
+  fontFamily: 'JetBrains Mono, monospace',
+  fontSize: 12,
+};
