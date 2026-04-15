@@ -1,6 +1,6 @@
 # Floom
 
-**Infra for agentic work.**
+**The production layer for AI apps that do real work.** Vibe-coding speed, production-grade safety.
 
 One manifest, four surfaces. Any CLI, MCP server, or Python library becomes an MCP tool, an HTTP endpoint, a CLI command, and a web form in 10 seconds.
 
