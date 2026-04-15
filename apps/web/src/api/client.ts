@@ -10,7 +10,6 @@ import type {
   MeRunDetail,
   ReviewSummary,
   Review,
-  ConnectionRecord,
   DetectedApp,
   CreatorApp,
   CreatorRun,
@@ -230,12 +229,9 @@ export function getSessionMe(): Promise<SessionMePayload> {
   return request<SessionMePayload>('/api/session/me');
 }
 
-export function switchWorkspace(workspace_id: string): Promise<{ ok: true }> {
-  return request('/api/session/switch-workspace', {
-    method: 'POST',
-    body: JSON.stringify({ workspace_id }),
-  });
-}
+// Workspace switching UI is deferred — see docs/DEFERRED-UI.md and
+// feature/ui-workspace-switcher. The backend /api/session/switch-workspace
+// route stays live; the client wrapper is restored on that branch.
 
 // Better Auth endpoints are mounted at /auth/* in cloud mode. The UI calls
 // them directly; in OSS mode these 404, and the UI falls back to a
@@ -339,25 +335,10 @@ export function postReview(
   });
 }
 
-// ---------- W4-minimal: connections ----------
-
-export function listConnections(): Promise<{ connections: ConnectionRecord[] }> {
-  return request('/api/connections');
-}
-
-export function initiateConnection(
-  provider: string,
-  callback_url?: string,
-): Promise<{ auth_url: string; connection_id: string; provider: string; expires_at: string }> {
-  return request('/api/connections/initiate', {
-    method: 'POST',
-    body: JSON.stringify({ provider, callback_url }),
-  });
-}
-
-export function revokeConnectionApi(provider: string): Promise<{ ok: boolean }> {
-  return request(`/api/connections/${provider}`, { method: 'DELETE' });
-}
+// Connections (Composio OAuth to 150+ tools) UI is deferred — see
+// docs/DEFERRED-UI.md and feature/ui-composio-connections. The backend
+// /api/connections routes stay live; the client wrappers are restored on
+// that branch.
 
 // ---------- W4-minimal: hub publish + creator ----------
 
