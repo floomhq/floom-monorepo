@@ -96,9 +96,9 @@ app.get('/openapi.json', (c) =>
     openapi: '3.0.0',
     info: {
       title: 'Floom self-host API',
-      version: '0.3.2',
+      version: '0.4.0-alpha.1',
       description:
-        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug. v0.3.1 adds per-user app memory (/api/memory) and an encrypted secrets vault (/api/secrets). v0.3.2 adds Composio-backed OAuth connections (/api/connections).',
+        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug. v0.3.1 adds per-user app memory (/api/memory) and an encrypted secrets vault (/api/secrets). v0.3.2 adds Composio-backed OAuth connections (/api/connections). v0.4.0-alpha.1 (W3.1) adds workspaces + members + invites (/api/workspaces) and the session API (/api/session) wired to Better Auth in cloud mode.',
     },
     paths: {
       '/api/health': {
@@ -196,6 +196,112 @@ app.get('/openapi.json', (c) =>
           responses: {
             '200': { description: '{ok: true, connection: serialized}' },
             '404': { description: 'No such connection' },
+          },
+        },
+      },
+      '/api/workspaces': {
+        get: {
+          summary: 'List workspaces the caller is a member of',
+          responses: {
+            '200': { description: '{workspaces: [{id, slug, name, role, ...}]}' },
+          },
+        },
+        post: {
+          summary: 'Create a workspace; the caller becomes its admin',
+          responses: {
+            '201': { description: '{workspace: {...}}' },
+            '400': { description: 'Invalid body shape' },
+          },
+        },
+      },
+      '/api/workspaces/{id}': {
+        get: {
+          summary: 'Read a single workspace (member-only)',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: '{workspace: {...}}' },
+            '403': { description: 'not_a_member' },
+            '404': { description: 'workspace_not_found' },
+          },
+        },
+        patch: {
+          summary: 'Update workspace name/slug (admin-only)',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: '{workspace: {...}}' },
+            '403': { description: 'insufficient_role' },
+          },
+        },
+        delete: {
+          summary: 'Delete a workspace (admin-only). Refuses synthetic local.',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: '{ok: true}' },
+            '403': { description: 'insufficient_role' },
+          },
+        },
+      },
+      '/api/workspaces/{id}/members': {
+        get: {
+          summary: 'List members of a workspace',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: { '200': { description: '{members: [{user_id, role, email, ...}]}' } },
+        },
+      },
+      '/api/workspaces/{id}/members/invite': {
+        post: {
+          summary: 'Create a pending workspace invite (admin-only)',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '201': { description: '{invite: {...}, accept_url: string}' },
+            '409': { description: 'duplicate_member' },
+          },
+        },
+      },
+      '/api/workspaces/{id}/members/accept-invite': {
+        post: {
+          summary: 'Accept a pending workspace invite using its token',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: '{member: {...}}' },
+            '404': { description: 'invite_not_found' },
+            '410': { description: 'invite_expired' },
+          },
+        },
+      },
+      '/api/workspaces/{id}/invites': {
+        get: {
+          summary: 'List invites for a workspace (admin-only)',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: { '200': { description: '{invites: [{...}]}' } },
+        },
+      },
+      '/api/session/me': {
+        get: {
+          summary: 'Composed payload: user + active workspace + memberships',
+          responses: { '200': { description: '{user, active_workspace, workspaces, cloud_mode}' } },
+        },
+      },
+      '/api/session/switch-workspace': {
+        post: {
+          summary: 'Set the active workspace pointer (member-only)',
+          responses: {
+            '200': { description: '{ok: true, active_workspace_id: string}' },
+            '403': { description: 'not_a_member' },
           },
         },
       },
