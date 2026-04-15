@@ -58,6 +58,13 @@ export interface NormalizedManifest {
   secrets_needed: string[];
   manifest_version: '1.0' | '2.0';
   apt_packages?: string[];
+  /**
+   * W2.1: creator-declared list of keys this app is allowed to persist in
+   * the per-user `app_memory` table. Attempts to get/set a key not in this
+   * list are rejected. Optional — defaults to empty (memory disabled) for
+   * apps that don't need per-user state.
+   */
+  memory_keys?: string[];
 }
 
 export type AuthType =
@@ -104,6 +111,11 @@ export interface AppRecord {
   timeout_ms: number | null;
   retries: number;
   async_mode: AsyncMode | null;
+  // Multi-tenant fields (v0.3.1 / W2.1). workspace_id defaults to 'local' in
+  // OSS mode. `memory_keys` is a JSON array declared in the app manifest that
+  // lists which keys this app is allowed to persist in `app_memory`.
+  workspace_id: string;
+  memory_keys: string | null; // JSON-stringified string[]
   created_at: string;
   updated_at: string;
 }
@@ -187,4 +199,78 @@ export interface ChatTurnRecord {
   //   assistant: { app_slug?, inputs?, run_id?, summary?, error?, parsed? }
   payload: string;
   created_at: string;
+}
+
+// =====================================================================
+// W2.1: multi-tenant schema types
+// =====================================================================
+
+export interface WorkspaceRecord {
+  id: string;
+  slug: string;
+  name: string;
+  plan: string;
+  wrapped_dek: string | null;
+  created_at: string;
+}
+
+export interface UserRecord {
+  id: string;
+  workspace_id: string | null;
+  email: string | null;
+  name: string | null;
+  auth_provider: string;
+  auth_subject: string | null;
+  created_at: string;
+}
+
+export interface WorkspaceMemberRecord {
+  workspace_id: string;
+  user_id: string;
+  role: 'admin' | 'editor' | 'viewer' | string;
+  joined_at: string;
+}
+
+/**
+ * Request-scoped tenant context. Every route handler builds this in middleware
+ * (via `resolveUserContext`) and passes it to services. In OSS mode this is
+ * always `{ workspace_id: 'local', user_id: 'local', device_id }`; in Cloud
+ * (post-W3.1) it's the logged-in user's real ids.
+ */
+export interface SessionContext {
+  workspace_id: string;
+  user_id: string;
+  device_id: string;
+  is_authenticated: boolean;
+}
+
+export interface AppMemoryRecord {
+  workspace_id: string;
+  app_slug: string;
+  user_id: string;
+  device_id: string | null;
+  key: string;
+  value: string; // JSON-encoded value
+  updated_at: string;
+}
+
+export interface UserSecretRecord {
+  workspace_id: string;
+  user_id: string;
+  key: string;
+  ciphertext: string;
+  nonce: string;
+  auth_tag: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Return shape from `rekeyDevice`. Each count tells the login handler how many
+ * rows were migrated from anonymous → authenticated, for logging and tests.
+ */
+export interface RekeyResult {
+  app_memory: number;
+  runs: number;
+  chat_threads: number;
 }
