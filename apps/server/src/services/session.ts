@@ -322,12 +322,18 @@ export function rekeyDevice(
       .run(user_id, workspace_id, device_id, DEFAULT_USER_ID);
     result.chat_threads = threadRes.changes;
 
-    // connections (W2.3): flip device-owned rows to user-owned. The unique
-    // key is (workspace_id, owner_kind, owner_id, provider), so if the
-    // user already has a `user`-owned row for the same provider, we skip
-    // the device row (it stays as-is until the user revokes it manually).
-    // This preserves the "double-Gmail" fallback documented in the P.2
-    // research.
+    // connections (W2.3): flip device-owned rows to user-owned, and migrate
+    // them to the target workspace. The match is by device_id alone, NOT
+    // by workspace_id — pre-login the user's connection lives in the
+    // synthetic 'local' workspace, but post-login it must move into the
+    // user's real workspace, the same as app_memory/runs/chat_threads.
+    //
+    // We still respect the unique key (workspace_id, owner_kind, owner_id,
+    // provider): if a `user`-owned row for the same provider already exists
+    // in the *target* workspace, we leave the device row alone so the user
+    // ends up with two parallel Gmails (one user-scoped, one
+    // device-orphaned). The NOT EXISTS subquery checks the target
+    // workspace, not the row's current workspace.
     const conRes = db
       .prepare(
         `UPDATE connections
@@ -337,10 +343,9 @@ export function rekeyDevice(
                updated_at = datetime('now')
          WHERE owner_kind = 'device'
            AND owner_id = ?
-           AND workspace_id = ?
            AND NOT EXISTS (
              SELECT 1 FROM connections c2
-              WHERE c2.workspace_id = connections.workspace_id
+              WHERE c2.workspace_id = ?
                 AND c2.owner_kind = 'user'
                 AND c2.owner_id = ?
                 AND c2.provider = connections.provider
