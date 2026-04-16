@@ -150,6 +150,16 @@ interface OpenApiRequestBodyContent {
   schema?: JsonSchema;
 }
 
+/**
+ * An OpenAPI security requirement object: a map from security scheme name
+ * to the list of scopes required. Multiple entries at the same level are
+ * AND-combined within one object; multiple objects in a `security` array
+ * are alternatives (OR-combined). An empty array `security: []` on an
+ * operation explicitly means "no security required for this operation"
+ * and overrides the global `security` setting (OpenAPI 3.x §4.8.10).
+ */
+type OpenApiSecurityRequirement = Record<string, string[]>;
+
 interface OpenApiOperation {
   operationId?: string;
   summary?: string;
@@ -161,6 +171,13 @@ interface OpenApiOperation {
   };
   responses?: Record<string, { description?: string }>;
   tags?: string[];
+  /**
+   * Operation-level security override. When present (even as an empty
+   * array), it REPLACES the global spec.security for this operation.
+   * See `deriveSecretsFromSpec` for how this is flattened into
+   * manifest.secrets_needed.
+   */
+  security?: OpenApiSecurityRequirement[];
 }
 
 interface OpenApiPath {
@@ -192,6 +209,23 @@ interface OpenApiSpec {
   info?: OpenApiInfo;
   paths?: Record<string, OpenApiPath>;
   servers?: OpenApiServer[];
+  /**
+   * Global security requirements. Applies to every operation that does
+   * not define its own `security` field. An operation-level `security`
+   * (including an empty array) REPLACES this for that operation.
+   */
+  security?: OpenApiSecurityRequirement[];
+  components?: {
+    securitySchemes?: Record<
+      string,
+      {
+        type?: string;
+        scheme?: string;
+        name?: string;
+        in?: string;
+      }
+    >;
+  };
 }
 
 // ---------- helpers ----------
@@ -572,7 +606,7 @@ function getMaxActionsCap(): number {
   return Math.floor(n); // 0 = unlimited
 }
 
-function specToManifest(
+export function specToManifest(
   spec: OpenApiSpec,
   appSpec: OpenApiAppSpec,
   secretNames: string[],
@@ -597,11 +631,20 @@ function specToManifest(
       while (actions[name]) {
         name = `${action.name}_${suffix++}`;
       }
+      // Per-op strict secret requirements: operation-level `security`
+      // overrides global, alternatives are OR-combined (see
+      // requiredSecretsForOperation). This lets the proxied-runner
+      // block an action only when THAT action's required secrets are
+      // missing, unblocking public operations on specs like petstore
+      // where `getInventory` strictly requires api_key but most other
+      // operations do not. Fix for INGEST-SECRETS-GLOBAL.
+      const opSecrets = requiredSecretsForOperation(spec, op);
       actions[name] = {
         label: action.description,
         description: action.description,
         inputs: action.inputs,
         outputs: action.outputs,
+        secrets_needed: opSecrets,
       };
       count++;
     }
@@ -977,7 +1020,7 @@ export async function detectAppFromUrl(
     description: info.description || undefined,
     auth: 'none',
   };
-  const manifest = specToManifest(derefed, appSpec, []);
+  const manifest = specToManifest(derefed, appSpec, deriveSecretsFromSpec(derefed));
   const actions = Object.entries(manifest.actions).map(([k, v]) => ({
     name: k,
     label: v.label,
@@ -1068,7 +1111,7 @@ export async function ingestAppFromUrl(args: {
     auth: 'none',
   };
 
-  const manifest = specToManifest(derefed, appSpec, manifest_secrets_from_spec(derefed));
+  const manifest = specToManifest(derefed, appSpec, deriveSecretsFromSpec(derefed));
   const resolvedBaseUrl = resolveBaseUrl(derefed, appSpec, openapi_url);
 
   if (existing) {
@@ -1128,27 +1171,127 @@ export async function ingestAppFromUrl(args: {
 }
 
 /**
- * Pull secret names from an OpenAPI spec's `components.securitySchemes`. Used
- * as the default secrets list when the caller doesn't specify any. Currently
- * returns a single placeholder name per scheme (one secret = one scheme) —
- * the UI lets the user rename later via the edit flow.
+ * Return true if the scheme produces a "secret" that Floom's manifest
+ * needs to request from the operator. We only model schemes we can
+ * actually inject at runtime: HTTP bearer and apiKey. OAuth2 flows are
+ * handled out-of-band (the user completes an authorization flow) so we
+ * do not list them as required secrets. http-basic is handled via two
+ * secrets (user/pass) but the creator is expected to declare those in
+ * apps.yaml — we do not auto-derive them here to avoid guessing names.
  */
-function manifest_secrets_from_spec(spec: OpenApiSpec): string[] {
-  type SpecWithComponents = {
-    components?: { securitySchemes?: Record<string, { type?: string; scheme?: string; name?: string }> };
-  };
-  const schemes =
-    ((spec as SpecWithComponents).components?.securitySchemes ?? {}) as Record<
-      string,
-      { type?: string; scheme?: string; name?: string }
-    >;
+function schemeRequiresSecret(scheme: {
+  type?: string;
+  scheme?: string;
+}): boolean {
+  if (!scheme) return false;
+  if (scheme.type === 'apiKey') return true;
+  if (scheme.type === 'http' && scheme.scheme === 'bearer') return true;
+  return false;
+}
+
+/**
+ * Resolve the EFFECTIVE security requirements for a single operation.
+ * Per OpenAPI 3.x §4.8.10, an operation-level `security` field REPLACES
+ * the global `security` field entirely (not merges). An empty array
+ * (`security: []`) is an explicit override meaning "no auth required",
+ * and must be distinguished from "security field missing entirely".
+ *
+ * Returns:
+ *   - null   : operation is public (no security requirements apply).
+ *   - array  : the list of alternative requirement objects.
+ */
+function effectiveSecurityForOperation(
+  spec: OpenApiSpec,
+  op: OpenApiOperation,
+): OpenApiSecurityRequirement[] | null {
+  // Operation-level security takes priority when the field is present —
+  // even if it is an empty array, which explicitly overrides global.
+  if (Object.prototype.hasOwnProperty.call(op, 'security')) {
+    const sec = op.security;
+    if (!sec || sec.length === 0) return null;
+    return sec;
+  }
+  // Fall back to global security.
+  const global = spec.security;
+  if (!global || global.length === 0) return null;
+  return global;
+}
+
+/**
+ * Return the set of security-scheme names that are STRICTLY required by
+ * a single operation. A scheme is strictly required iff it appears in
+ * EVERY alternative of the operation's effective security array. If at
+ * least one alternative omits the scheme, the caller can satisfy the op
+ * by picking that alternative, so the scheme is not strictly required.
+ *
+ * This is the correct reading of OpenAPI 3.x §4.8.10 "Security
+ * Requirement Object" (AND within an object, OR across the array).
+ *
+ * Only schemes that produce a manifest secret (apiKey, http bearer) are
+ * returned — oauth2 and other flows are handled out-of-band.
+ */
+export function requiredSecretsForOperation(
+  spec: OpenApiSpec,
+  op: OpenApiOperation,
+): string[] {
+  const schemes = spec.components?.securitySchemes ?? {};
+  if (Object.keys(schemes).length === 0) return [];
+
+  const effective = effectiveSecurityForOperation(spec, op);
+  if (!effective) return []; // op is public
+
+  // Intersect scheme names across all alternatives.
+  let intersection: Set<string> | null = null;
+  for (const requirement of effective) {
+    const namesInThisAlt = new Set(Object.keys(requirement));
+    if (intersection === null) {
+      intersection = namesInThisAlt;
+    } else {
+      for (const name of Array.from(intersection)) {
+        if (!namesInThisAlt.has(name)) intersection.delete(name);
+      }
+    }
+  }
+  if (!intersection) return [];
+
   const out: string[] = [];
-  for (const [key, scheme] of Object.entries(schemes)) {
-    if (scheme?.type === 'http' && scheme?.scheme === 'bearer') {
-      out.push((key || 'API_TOKEN').toUpperCase() + '_TOKEN');
-    } else if (scheme?.type === 'apiKey') {
-      out.push((key || 'API_KEY').toUpperCase() + '_KEY');
+  for (const schemeName of intersection) {
+    const scheme = schemes[schemeName];
+    if (scheme && schemeRequiresSecret(scheme)) {
+      out.push(schemeName);
     }
   }
   return out;
+}
+
+/**
+ * Collect the set of security-scheme names that are strictly required by
+ * at least one operation in the spec (after applying per-operation
+ * overrides) AND whose scheme type produces a manifest secret. Used to
+ * populate the app-level `manifest.secrets_needed`, which is surfaced to
+ * MCP clients and the /build preview UI so operators know which secrets
+ * to configure.
+ *
+ * Per-operation granularity lives on the action itself
+ * (`ActionSpec.secrets_needed`) so the proxied-runner only blocks an
+ * action when THAT action's required secrets are missing, rather than
+ * blanket-blocking the entire app.
+ */
+export function deriveSecretsFromSpec(spec: OpenApiSpec): string[] {
+  const required = new Set<string>();
+  const methods = ['get', 'post', 'put', 'patch', 'delete'] as const;
+
+  for (const pathItem of Object.values(spec.paths || {})) {
+    for (const method of methods) {
+      const op = pathItem[method as keyof OpenApiPath] as
+        | OpenApiOperation
+        | undefined;
+      if (!op) continue;
+      for (const name of requiredSecretsForOperation(spec, op)) {
+        required.add(name);
+      }
+    }
+  }
+
+  return Array.from(required);
 }

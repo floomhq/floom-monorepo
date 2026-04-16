@@ -44,6 +44,13 @@ export interface ActionSpec {
   description?: string;
   inputs: InputSpec[];
   outputs: OutputSpec[];
+  /**
+   * Optional per-action required secrets. Populated by the OpenAPI
+   * ingest pipeline from the operation's effective `security`. When
+   * set, the proxied-runner enforces this list instead of the app-level
+   * `secrets_needed`. See apps/server/src/types.ts for details.
+   */
+  secrets_needed?: string[];
 }
 
 export interface NormalizedManifest {

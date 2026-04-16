@@ -46,6 +46,19 @@ export interface ActionSpec {
   description?: string;
   inputs: InputSpec[];
   outputs: OutputSpec[];
+  /**
+   * Names of the secrets (from `manifest.secrets_needed`) that THIS
+   * action strictly requires. When set, the proxied-runner blocks the
+   * action only when these specific secrets are missing, instead of
+   * blanket-blocking on the app-level `secrets_needed`. When absent
+   * (undefined), the runner falls back to the app-level list for
+   * backwards compatibility with v1 manifests and non-proxied apps.
+   *
+   * Populated by the OpenAPI ingest pipeline from the operation's
+   * effective `security` (operation-level overrides global, per
+   * OpenAPI 3.x §4.8.10). Fix for INGEST-SECRETS-GLOBAL (2026-04-16).
+   */
+  secrets_needed?: string[];
 }
 
 export interface NormalizedManifest {

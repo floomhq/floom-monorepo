@@ -305,7 +305,19 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
 
     // Validate required secrets BEFORE making the request so the caller
     // (web UI / MCP / HTTP) can surface a clear missing_secrets error.
-    const requiredSecrets = manifest.secrets_needed || [];
+    //
+    // Prefer the action's own `secrets_needed` when present: the OpenAPI
+    // ingest pipeline populates it from each operation's effective
+    // `security` (operation-level overrides global). Falling back to the
+    // manifest-level list is only needed for v1 manifests and for apps
+    // ingested before this field existed. This is the fix for
+    // INGEST-SECRETS-GLOBAL — the old blanket check blocked public
+    // operations like petstore's findPetsByStatus just because some OTHER
+    // operation (getInventory) strictly required api_key.
+    const requiredSecrets =
+      actionSpec.secrets_needed !== undefined
+        ? actionSpec.secrets_needed
+        : manifest.secrets_needed || [];
     const missing = requiredSecrets.filter((name) => !secrets[name]);
     if (missing.length > 0) {
       throw new MissingSecretsError(
