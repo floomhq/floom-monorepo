@@ -150,6 +150,14 @@ function validateAction(raw: unknown, actionName: string): ActionSpec {
   if (raw.description !== undefined && typeof raw.description === 'string') {
     action.description = raw.description;
   }
+  // Per-action secrets (optional). Set by the OpenAPI ingest pipeline to
+  // scope the proxied-runner's required-secret check to the operations
+  // that actually reference a given security scheme. Fix for
+  // INGEST-SECRETS-GLOBAL (2026-04-16).
+  if (raw.secrets_needed !== undefined) {
+    assertStringArray(raw.secrets_needed, `actions.${actionName}.secrets_needed`);
+    action.secrets_needed = raw.secrets_needed;
+  }
   return action;
 }
 
