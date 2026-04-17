@@ -80,7 +80,7 @@ export function AppsDirectoryPage() {
       .catch(() => setLoading(false));
 
     return () => {
-      document.title = 'Floom · Production infrastructure for AI apps that do real work';
+      document.title = 'Floom · The protocol + runtime for agentic work';
     };
   }, []);
 
