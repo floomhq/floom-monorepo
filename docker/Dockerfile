@@ -32,11 +32,19 @@ COPY packages ./packages
 # stage can grab it from the builder image. Pure .mjs source, no build step.
 COPY examples/fast-apps ./examples/fast-apps
 
+# Re-run pnpm install to re-link workspace packages after the source COPY.
+# pnpm 9 has a symlink quirk where workspace package symlinks created by the
+# first install (line ~26) don't resolve correctly to the workspace source
+# once that source is layered in via COPY. Without this, `vite build` silently
+# fails to resolve '@floom/renderer' etc and hits the fallback stub below.
+RUN pnpm install --frozen-lockfile
+
 # Build server (TypeScript → dist/)
 RUN cd apps/server && pnpm run build
 
-# Build web (Vite → dist/) — non-fatal if it fails
-RUN cd apps/web && (pnpm run build || (echo "[docker] web build failed — creating empty dist" && mkdir -p dist && echo '<!doctype html><html><body>Backend only</body></html>' > dist/index.html))
+# Build web (Vite → dist/) — fail LOUDLY if the build breaks so we never
+# silently ship the backend-only stub again.
+RUN cd apps/web && pnpm run build
 
 # ── stage 2: runtime ────────────────────────────────────────────────────────
 FROM node:20-slim AS runtime
