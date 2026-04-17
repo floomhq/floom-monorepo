@@ -104,12 +104,15 @@ function InputField({
   onChange: (v: unknown) => void;
 }) {
   const str = typeof value === 'string' ? value : value == null ? '' : String(value);
+  // Some app manifests literally include " (optional)" in the label; strip it so the
+  // UI doesn't render "Field (optional) (optional)".
+  const cleanLabel = (spec.label ?? '').replace(/\s*\(optional\)\s*$/i, '');
 
   if (spec.type === 'textarea') {
     return (
       <div className="input-group">
         <label className="input-label" htmlFor={`inp-${spec.name}`}>
-          {spec.label}
+          {cleanLabel}
           {!spec.required && (
             <span style={{ fontWeight: 400, color: 'var(--muted)' }}> (optional)</span>
           )}
@@ -130,7 +133,7 @@ function InputField({
     return (
       <div className="input-group">
         <label className="input-label" htmlFor={`inp-${spec.name}`}>
-          {spec.label}
+          {cleanLabel}
         </label>
         <select
           id={`inp-${spec.name}`}
@@ -153,7 +156,7 @@ function InputField({
     return (
       <div className="input-group">
         <label className="input-label" htmlFor={`inp-${spec.name}`}>
-          {spec.label}
+          {cleanLabel}
           {!spec.required && (
             <span style={{ fontWeight: 400, color: 'var(--muted)' }}> (optional)</span>
           )}
@@ -180,7 +183,7 @@ function InputField({
           onChange={(e) => onChange(e.target.checked)}
         />
         <label className="input-label" htmlFor={`inp-${spec.name}`} style={{ margin: 0 }}>
-          {spec.label}
+          {cleanLabel}
         </label>
       </div>
     );
@@ -189,7 +192,7 @@ function InputField({
   return (
     <div className="input-group">
       <label className="input-label" htmlFor={`inp-${spec.name}`}>
-        {spec.label}
+        {cleanLabel}
         {!spec.required && (
           <span style={{ fontWeight: 400, color: 'var(--muted)' }}> (optional)</span>
         )}
