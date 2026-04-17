@@ -154,7 +154,7 @@ export function CreatorHeroPage() {
   const recentPreviewApps = previewApps.slice(0, 6);
 
   useEffect(() => {
-    document.title = 'Floom · Production for anything agents build.';
+    document.title = 'Floom · The protocol + runtime for agentic work';
     getHub()
       .then((apps) => {
         if (apps.length > 0) {
@@ -226,9 +226,9 @@ export function CreatorHeroPage() {
                     textWrap: 'balance' as unknown as 'balance',
                   }}
                 >
-                  Production for anything
+                  The protocol + runtime
                   <br />
-                  agents build.
+                  for agentic work.
                 </h1>
 
                 <p
@@ -239,7 +239,7 @@ export function CreatorHeroPage() {
                     fontSize: 19,
                   }}
                 >
-                  Point at a GitHub repo or paste an OpenAPI spec. Live in 30 seconds.
+                  Build agents, workflows, and scripts with AI. Floom deploys them as MCP, API, schedule, webhook, or UI — production-grade, live in 30 seconds.
                 </p>
 
                 <div

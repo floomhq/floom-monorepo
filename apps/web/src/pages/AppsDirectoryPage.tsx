@@ -80,7 +80,7 @@ export function AppsDirectoryPage() {
       .catch(() => setLoading(false));
 
     return () => {
-      document.title = 'Floom · Production for anything agents build.';
+      document.title = 'Floom · The protocol + runtime for agentic work';
     };
   }, []);
 
