@@ -380,6 +380,10 @@ body {
   .permalink-2col {
     grid-template-columns: 1fr;
   }
+  .permalink-hero-grid {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
   .protocol-comparison-2col {
     grid-template-columns: 1fr;
   }
