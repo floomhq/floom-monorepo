@@ -3,8 +3,9 @@
 
   <h1>Floom</h1>
 
-  <p><strong>Production infrastructure for AI apps that do real work.</strong><br/>
-  Vibe-coding speed, production-grade safety.</p>
+  <p><strong>The protocol + runtime for agentic work.</strong><br/>
+  Build agents, workflows, and scripts with AI. Floom deploys them as MCP, API, web, or CLI &mdash; production-grade, live in 30 seconds.<br/>
+  <sub>Vibe-coding speed. Production-grade safety. Open source.</sub></p>
 
   <p>
     <a href="https://github.com/floomhq/floom/blob/main/LICENSE"><img src="https://img.shields.io/github/license/floomhq/floom?color=111&label=license" alt="License"/></a>
