@@ -38,7 +38,6 @@ From the OpenAPI spec, Floom derives:
 
 - **MCP server**: each OpenAPI operation becomes an MCP tool, with the operation's parameters as the tool's inputs and the response schema as the output.
 - **HTTP API**: Floom proxies requests to the underlying service, injecting secrets at runtime and enforcing rate limits / access control.
-- **CLI**: each operation becomes a command. `floom run stripe list-customers --limit=10`.
 - **Web**: inputs are rendered as a form (typed by the OpenAPI schema) and outputs are piped through a built-in renderer. Long-running operations stream output.
 - **Typed SDKs**: openapi-generator spits out clients in any language.
 
@@ -61,22 +60,6 @@ Floom is MIT licensed. Floom.dev is the hosted flagship, but you can run the ful
 docker run -p 3000:3000 \
   -e OPENAI_API_KEY=... \
   ghcr.io/floomhq/floom:latest
-```
-
-**Via npm** (embed the runtime in your own Node server):
-```bash
-npm install @floom/runtime
-```
-
-```typescript
-import { runApp } from '@floom/runtime';
-
-const result = await runApp({
-  manifest,
-  inputs,
-  secrets,
-  onStream: (chunk) => console.log(chunk),
-});
 ```
 
 **Same runtime on cloud and self-host.** v1 runs Docker everywhere. v1.1 adds Cloud Run scale-to-zero on floom.dev (invisible to creators, manifest format unchanged).

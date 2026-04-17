@@ -1,7 +1,7 @@
-import { Server, Globe, Terminal, LayoutTemplate, FileCode } from 'lucide-react';
+import { Server, Globe, LayoutTemplate, FileCode } from 'lucide-react';
 
-// One spec, four surfaces. The diagram is a hub-and-spoke visual: an OpenAPI
-// node on the left, four agent surface nodes on the right, connected by SVG
+// One spec, three surfaces. The diagram is a hub-and-spoke visual: an OpenAPI
+// node on the left, three agent surface nodes on the right, connected by SVG
 // paths so the reader sees the relationship in one glance instead of reading
 // a paragraph.
 
@@ -16,12 +16,6 @@ const SURFACES = [
     Icon: Globe,
     label: 'HTTP API',
     desc: 'Pass-through proxy with secrets injection. Same routes as the upstream spec.',
-    accent: '#059669',
-  },
-  {
-    Icon: Terminal,
-    label: 'CLI',
-    desc: '@floom/cli. Every action becomes a command. Pipe inputs, pipe outputs.',
     accent: '#059669',
   },
   {
@@ -61,10 +55,9 @@ export function SurfacesDiagram() {
               <stop offset="100%" stopColor="#059669" stopOpacity="0.05" />
             </linearGradient>
           </defs>
-          <path d="M0 120 C 110 120, 180 30,  320 30"  stroke="url(#line-grad)" strokeWidth="1.2" />
-          <path d="M0 120 C 110 120, 180 90,  320 90"  stroke="url(#line-grad)" strokeWidth="1.2" />
-          <path d="M0 120 C 110 120, 180 150, 320 150" stroke="url(#line-grad)" strokeWidth="1.2" />
-          <path d="M0 120 C 110 120, 180 210, 320 210" stroke="url(#line-grad)" strokeWidth="1.2" />
+          <path d="M0 120 C 110 120, 180 40,  320 40"  stroke="url(#line-grad)" strokeWidth="1.2" />
+          <path d="M0 120 C 110 120, 180 120, 320 120" stroke="url(#line-grad)" strokeWidth="1.2" />
+          <path d="M0 120 C 110 120, 180 200, 320 200" stroke="url(#line-grad)" strokeWidth="1.2" />
         </svg>
 
         {/* surface nodes */}

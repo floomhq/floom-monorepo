@@ -6,12 +6,11 @@ Floom is pre-1.0. Anything here can shift as we learn from real usage.
 
 ## Current state
 
-Shipped layers (6): manifest, ingest, runner, 4 surfaces (web + MCP + HTTP + CLI), runs, auth. The cloud tier at [floom.dev](https://floom.dev) runs the same image as the self-host Docker release.
+Shipped layers (6): manifest, ingest, runner, 3 surfaces (web + MCP + HTTP), runs, auth. The cloud tier at [floom.dev](https://floom.dev) runs the same image as the self-host Docker release.
 
 - Web form + output renderer at `/p/:slug`
 - Per-app MCP server at `/mcp/app/:slug`
 - HTTP endpoint at `/api/:slug/run`
-- CLI via `@floom/cli`
 - Four MCP admin tools at `/mcp` root: `ingest_app`, `list_apps`, `search_apps`, `get_app`
 
 Self-host image: `ghcr.io/floomhq/floom-monorepo:v0.4.0-mvp.4` (CI publishes on `v*` tags).

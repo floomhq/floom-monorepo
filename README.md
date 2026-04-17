@@ -23,11 +23,11 @@
 
 ---
 
-Point Floom at an OpenAPI spec or a repo. In seconds you get a web form, an MCP server an agent can call, an HTTP endpoint, and a CLI command. All from the same manifest, all with auth, rate limits, secret injection, and a shareable output page.
+Point Floom at an OpenAPI spec. In seconds you get a web form, an MCP server an agent can call, and an HTTP endpoint. All from the same manifest, all with auth, rate limits, secret injection, and a shareable output page.
 
 ## What it does
 
-- **One manifest, four surfaces.** Web form at `/p/:slug`, MCP server at `/mcp/app/:slug`, HTTP endpoint at `/api/:slug/run`, CLI via `@floom/cli`.
+- **One manifest, three surfaces.** Web form at `/p/:slug`, MCP server at `/mcp/app/:slug`, HTTP endpoint at `/api/:slug/run`.
 - **Two ingest modes.** Proxied (wrap an existing API) or hosted (Floom runs your Docker container).
 - **Production layer included.** Bearer/API-key auth, per-operation rate limits, secret injection, run history, shareable result URLs.
 - **Async job queue + custom renderers.** Long-running ops stream status. JSON output can be rendered with your own HTML template.
@@ -43,11 +43,10 @@ Two equal ICPs. Two CTAs side by side. Two dashboards (`/me` for consumers, `/cr
 ## How it works
 
 ```
-OpenAPI spec ──▶ Floom manifest ──▶ 4 surfaces
+OpenAPI spec ──▶ Floom manifest ──▶ 3 surfaces
                                     ├─ Web form + output page  (/p/:slug)
                                     ├─ MCP server              (/mcp/app/:slug)
-                                    ├─ HTTP endpoint           (/api/:slug/run)
-                                    └─ CLI                     (floom run :slug)
+                                    └─ HTTP endpoint           (/api/:slug/run)
 ```
 
 Floom reads each OpenAPI operation, turns its parameters into a form field or MCP tool input, injects secrets at runtime, and renders the response. No glue code.
@@ -122,10 +121,7 @@ See real manifests under [`examples/`](./examples).
 
 - `apps/web` — floom.dev web surface (React, form + output renderer)
 - `apps/server` — backend (Hono + SQLite + Docker runner)
-- `packages/runtime` — `@floom/runtime`, execution layer
-- `packages/cli` — `@floom/cli`, command-line tool
-- `packages/detect` — auto-detection for runtimes and build systems
-- `packages/manifest` — manifest schema + parser
+- `packages/renderer` — `@floom/renderer`, default + custom output/input renderer library
 - `spec/protocol.md` — Floom Protocol spec
 - `examples/` — manifests for the launch apps
 
