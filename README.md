@@ -4,7 +4,7 @@
   <h1>Floom</h1>
 
   <p><strong>The protocol + runtime for agentic work.</strong><br/>
-  Build agents, workflows, and scripts with AI. Floom deploys them as MCP, API, schedule, webhook, or UI &mdash; production-grade, live in 30 seconds.<br/>
+  Build agents, workflows, and scripts with AI. Floom deploys them as MCP, API, web, or CLI &mdash; production-grade, live in 30 seconds.<br/>
   <sub>Vibe-coding speed. Production-grade safety. Open source.</sub></p>
 
   <p>

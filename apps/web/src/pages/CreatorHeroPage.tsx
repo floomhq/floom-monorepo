@@ -239,7 +239,7 @@ export function CreatorHeroPage() {
                     fontSize: 19,
                   }}
                 >
-                  Build agents, workflows, and scripts with AI. Floom deploys them as MCP, API, schedule, webhook, or UI — production-grade, live in 30 seconds.
+                  Build agents, workflows, and scripts with AI. Floom deploys them as MCP, API, web, or CLI — production-grade, live in 30 seconds.
                 </p>
 
                 <div
