@@ -24,7 +24,7 @@ import type { HubApp } from '../lib/types';
 import { LAUNCH_APPS } from '../data/demoData';
 import '../components/home/home.css';
 
-const HERO_BADGE = 'Self-host with Docker or apps.yaml · open source';
+const HERO_BADGE = 'Open source · self-host with Docker or run on Floom Cloud';
 
 const BUILT_IN_CHIPS = [
   'Auth',
@@ -154,7 +154,7 @@ export function CreatorHeroPage() {
   const recentPreviewApps = previewApps.slice(0, 6);
 
   useEffect(() => {
-    document.title = 'Floom · Production infrastructure for AI apps that do real work';
+    document.title = 'Floom · Production for anything agents build.';
     getHub()
       .then((apps) => {
         if (apps.length > 0) {
@@ -226,9 +226,9 @@ export function CreatorHeroPage() {
                     textWrap: 'balance' as unknown as 'balance',
                   }}
                 >
-                  Vibe-coding speed.
+                  Production for anything
                   <br />
-                  Production-grade safety.
+                  agents build.
                 </h1>
 
                 <p
@@ -239,7 +239,7 @@ export function CreatorHeroPage() {
                     fontSize: 19,
                   }}
                 >
-                  The open-source production layer for AI apps.
+                  Point at a GitHub repo or paste an OpenAPI spec. Live in 30 seconds.
                 </p>
 
                 <div
