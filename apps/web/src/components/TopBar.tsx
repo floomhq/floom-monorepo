@@ -269,7 +269,7 @@ export function TopBar(_props: Props = {}) {
                 borderColor: isDeploy ? 'var(--accent)' : 'var(--ink)',
               }}
             >
-              Deploy an app
+              Publish an app
             </Link>
           )}
           {isStudio && (
@@ -452,7 +452,7 @@ export function TopBar(_props: Props = {}) {
               role="menuitem"
               onClick={() => setMenuOpen(false)}
             >
-              Deploy an app
+              Publish an app
             </Link>
           )}
           {isAuthenticated ? (
