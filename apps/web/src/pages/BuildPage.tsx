@@ -283,7 +283,7 @@ export function BuildPage({
               letterSpacing: '-0.02em',
             }}
           >
-            {editSlug ? `Edit ${editSlug}` : 'What do you want to ship?'}
+            {editSlug ? `Edit ${editSlug}` : 'Publish a Floom app'}
           </h1>
           <p
             style={{
