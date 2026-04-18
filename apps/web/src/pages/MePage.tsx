@@ -99,6 +99,17 @@ const s: Record<string, CSSProperties> = {
     background: '#fdecea',
     color: '#5c2d26',
   },
+  welcome: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: '14px 16px',
+    marginBottom: 20,
+    borderRadius: 10,
+    border: '1px solid var(--accent)',
+    background: 'rgba(34, 197, 94, 0.08)',
+    color: 'var(--ink)',
+  },
   noticeDismiss: {
     flexShrink: 0,
     padding: '4px 10px',
@@ -150,11 +161,21 @@ export function MePage() {
 
   const showNotice = searchParams.get('notice') === 'app_not_found';
   const noticeSlug = searchParams.get('slug');
+  // /onboarding redirects to /me?welcome=1 (no standalone onboarding page).
+  // Show a one-shot welcome banner so users who just finished signup have
+  // a clear next step instead of landing on a bare runs list.
+  const showWelcome = searchParams.get('welcome') === '1';
 
   function dismissNotice() {
     const next = new URLSearchParams(searchParams);
     next.delete('notice');
     next.delete('slug');
+    setSearchParams(next, { replace: true });
+  }
+
+  function dismissWelcome() {
+    const next = new URLSearchParams(searchParams);
+    next.delete('welcome');
     setSearchParams(next, { replace: true });
   }
 
@@ -183,6 +204,8 @@ export function MePage() {
             Browse apps →
           </Link>
         </header>
+
+        {showWelcome && <WelcomeBanner onDismiss={dismissWelcome} />}
 
         {showNotice && (
           <AppNotFound slug={noticeSlug} onDismiss={dismissNotice} />
@@ -236,6 +259,32 @@ export function MePage() {
         )}
       </main>
     </PageShell>
+  );
+}
+
+function WelcomeBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div role="status" data-testid="me-welcome-banner" style={s.welcome}>
+      <div style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.55 }}>
+        <strong style={{ color: 'var(--accent)' }}>Welcome to Floom</strong>
+        <span style={{ display: 'block', marginTop: 4 }}>
+          Try an app below, or{' '}
+          <Link to="/apps" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+            browse the directory
+          </Link>
+          {' '}to get started.
+        </span>
+      </div>
+      <button
+        type="button"
+        aria-label="Dismiss welcome"
+        data-testid="me-welcome-dismiss"
+        onClick={onDismiss}
+        style={s.noticeDismiss}
+      >
+        Dismiss
+      </button>
+    </div>
   );
 }
 

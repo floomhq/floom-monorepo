@@ -119,6 +119,16 @@ function StudioSlugRedirect({ subpath }: { subpath?: string }) {
   return <Navigate to={`/studio/${slug ?? ''}${tail}`} replace />;
 }
 
+// Hard redirect to an external URL (e.g. /docs/changelog → GitHub Releases).
+// React Router's <Navigate> only handles in-app routes; for off-site targets
+// we swap the browser location directly so the URL bar and back button work.
+function ExternalRedirect({ to }: { to: string }) {
+  if (typeof window !== 'undefined') {
+    window.location.replace(to);
+  }
+  return null;
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <IconSprite />
@@ -185,7 +195,23 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/about" element={<Navigate to="/" replace />} />
         <Route path="/deploy" element={<Navigate to="/studio/build" replace />} />
         <Route path="/docs" element={<Navigate to="/protocol" replace />} />
+        {/* /docs/* deep links from wireframes/blogs/external docs. Map each
+            subpath to the closest anchor on /protocol (auto-generated from
+            heading text via slugify). Changelog has no on-page section, so
+            it points at GitHub Releases via a hard redirect. */}
+        <Route path="/docs/protocol" element={<Navigate to="/protocol" replace />} />
+        <Route path="/docs/self-host" element={<Navigate to="/protocol#self-hosting" replace />} />
+        <Route path="/docs/api-reference" element={<Navigate to="/protocol#api-surface" replace />} />
+        <Route path="/docs/rate-limits" element={<Navigate to="/protocol#plumbing-layers-auto-applied" replace />} />
+        <Route path="/docs/changelog" element={<ExternalRedirect to="https://github.com/floomhq/floom/releases" />} />
+        {/* Catch-all /docs/* (any other subpath wireframes advertise) falls back to /protocol. */}
+        <Route path="/docs/*" element={<Navigate to="/protocol" replace />} />
         <Route path="/self-host" element={<Navigate to="/#self-host" replace />} />
+        {/* /onboarding advertised by v16/onboarding.html wireframe and
+            linked from post-signup flows. No standalone page yet — redirect
+            to /me?welcome=1 so the dashboard shows a one-shot welcome
+            banner ("Welcome to Floom — try an app ↓"). */}
+        <Route path="/onboarding" element={<Navigate to="/me?welcome=1" replace />} />
         <Route path="/pricing" element={<Navigate to="/" replace />} />
         <Route path="/store" element={<Navigate to="/apps" replace />} />
         <Route path="/p/:slug/dashboard" element={<PSlugDashboardRedirect />} />
