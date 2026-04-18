@@ -91,6 +91,25 @@ export interface NormalizedManifest {
    * Surfaced on /p/:slug meta; omitted when the spec has no license block.
    */
   license?: string;
+  /**
+   * v16 renderer cascade: optional creator-declared hint for which stock
+   * library component to mount on the run output. See
+   * apps/web/src/components/output/ for the available components and
+   * their props (TextBig, CodeBlock, Markdown, FileDownload). When set,
+   * the web client picks this component at Layer 2 of the cascade, before
+   * the auto-pick heuristics in Layer 3. Any additional keys on this
+   * object are passed straight through to the component as props — the
+   * `*_field` convention (e.g. `value_field: "uuid"`) lets the component
+   * pluck the right property from the run output.
+   *
+   * Backwards compatible: apps without `render` fall through to auto-pick.
+   */
+  render?: RenderConfig;
+}
+
+export interface RenderConfig {
+  output_component?: string;
+  [key: string]: unknown;
 }
 
 export type AuthType =

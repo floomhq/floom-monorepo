@@ -106,6 +106,14 @@ interface OpenApiAppSpec {
    *     output_shape: table      # optional pin — used as the crash fallback
    */
   renderer?: unknown;
+  /**
+   * v16 renderer cascade (Layer 2): optional stock library component
+   * hint. Surfaces on the generated manifest under `render` so the web
+   * client can pick from the output library (TextBig / CodeBlock /
+   * Markdown / FileDownload) without shipping a custom bundle. Extra
+   * keys pass through; see apps/web/src/components/output/.
+   */
+  render?: { output_component?: string; [key: string]: unknown };
 }
 
 interface AppsConfig {
@@ -764,6 +772,7 @@ export function specToManifest(
     manifest_version: '2.0',
     ...(appSpec.blocked_reason ? { blocked_reason: appSpec.blocked_reason } : {}),
     ...(license ? { license } : {}),
+    ...(appSpec.render ? { render: appSpec.render } : {}),
   };
 }
 

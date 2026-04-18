@@ -396,6 +396,7 @@ export function FloomApp({
               >
                 <OutputPanel
                   app={appAsPickResult}
+                  appDetail={app}
                   run={state.run}
                   onIterate={handleIterate}
                   onOpenDetails={showSidebar ? () => setSidebarOpen(true) : undefined}
@@ -405,6 +406,7 @@ export function FloomApp({
           ) : (
             <OutputPanel
               app={appAsPickResult}
+              appDetail={app}
               run={state.run}
               onIterate={handleIterate}
               onOpenDetails={showSidebar ? () => setSidebarOpen(true) : undefined}

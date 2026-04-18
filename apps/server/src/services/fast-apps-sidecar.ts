@@ -91,6 +91,13 @@ interface FastAppDescriptor {
   description: string;
   category: string;
   icon: string;
+  /**
+   * v16 renderer cascade (Layer 2): optional stock library component
+   * hint. Materialized into the runtime apps.yaml and picked up by
+   * specToManifest so the web client renders a clean output card
+   * instead of raw JSON. See apps/web/src/components/output/.
+   */
+  render?: { output_component: string; [key: string]: unknown };
 }
 
 const FAST_APP_DESCRIPTORS: FastAppDescriptor[] = [
@@ -101,6 +108,11 @@ const FAST_APP_DESCRIPTORS: FastAppDescriptor[] = [
       'Generate one or more UUID v4 or v7 strings. Pure random v4, or time-ordered v7 for sortable ids.',
     category: 'developer-tools',
     icon: 'uuid',
+    render: {
+      output_component: 'TextBig',
+      value_field: 'uuids',
+      copyable: true,
+    },
   },
   {
     slug: 'password',
@@ -133,6 +145,11 @@ const FAST_APP_DESCRIPTORS: FastAppDescriptor[] = [
       'Parse and pretty-print JSON with configurable indent and optional sorted keys. Returns both formatted and minified forms.',
     category: 'developer-tools',
     icon: 'json-format',
+    render: {
+      output_component: 'CodeBlock',
+      code_field: 'formatted',
+      language: 'json',
+    },
   },
   {
     slug: 'jwt-decode',
@@ -170,6 +187,15 @@ function writeRuntimeAppsYaml(host: string, port: number): string {
     lines.push(`    description: ${JSON.stringify(d.description)}`);
     lines.push(`    category: ${d.category}`);
     lines.push(`    icon: ${d.icon}`);
+    if (d.render) {
+      // v16 renderer cascade hint. Emit as a nested YAML block; each
+      // value is JSON-stringified so booleans, numbers, and strings with
+      // special characters survive the parser without escaping gymnastics.
+      lines.push('    render:');
+      for (const [key, value] of Object.entries(d.render)) {
+        lines.push(`      ${key}: ${JSON.stringify(value)}`);
+      }
+    }
   }
   writeFileSync(path, lines.join('\n') + '\n', 'utf-8');
   return path;

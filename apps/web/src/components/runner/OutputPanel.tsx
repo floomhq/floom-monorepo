@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { PickResult, RunRecord } from '../../lib/types';
+import type { AppDetail, PickResult, RunRecord } from '../../lib/types';
+import { pickRenderer } from '../output/rendererCascade';
 
 function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -28,9 +29,17 @@ interface Props {
   run: RunRecord;
   onIterate?: (prompt: string) => void;
   onOpenDetails?: () => void;
+  /**
+   * v16 renderer cascade: when provided, the manifest is consulted to
+   * pick a stock library component (Layer 2) or auto-pick from declared
+   * outputs (Layer 3) before falling back to the legacy inline renderer
+   * (Layer 4). Optional — callers that don't have the full AppDetail
+   * keep the pre-v16 behaviour unchanged.
+   */
+  appDetail?: AppDetail;
 }
 
-export function OutputPanel({ app, run, onIterate, onOpenDetails }: Props) {
+export function OutputPanel({ app, run, onIterate, onOpenDetails, appDetail }: Props) {
   const duration = run.duration_ms
     ? run.duration_ms < 1000
       ? `${run.duration_ms}ms`
@@ -38,6 +47,15 @@ export function OutputPanel({ app, run, onIterate, onOpenDetails }: Props) {
     : '--';
 
   const isError = run.status !== 'success';
+
+  // Layer 2 + 3 of the v16 renderer cascade. Layer 1 (custom renderer)
+  // is handled in FloomApp.tsx via CustomRendererHost. Layer 4 is the
+  // legacy OutputRenderer below — we fall into it when the cascade
+  // returns `{ kind: 'fallback' }`.
+  const cascade =
+    !isError && appDetail
+      ? pickRenderer({ app: appDetail, action: run.action, runOutput: run.outputs })
+      : null;
 
   return (
     <div className="assistant-turn">
@@ -59,6 +77,8 @@ export function OutputPanel({ app, run, onIterate, onOpenDetails }: Props) {
 
       {isError ? (
         <ErrorCard run={run} />
+      ) : cascade && cascade.element ? (
+        cascade.element
       ) : (
         <OutputRenderer outputs={run.outputs} />
       )}

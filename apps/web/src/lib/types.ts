@@ -64,6 +64,18 @@ export interface NormalizedManifest {
   manifest_version: '1.0' | '2.0';
   /** From OpenAPI info.license at ingest */
   license?: string;
+  /**
+   * v16 renderer cascade: optional creator-declared hint for which stock
+   * library component to mount on the run output. Picked at Layer 2 of
+   * the cascade (before auto-pick). Extra keys pass through to the
+   * component as props. See apps/web/src/components/output/.
+   */
+  render?: RenderConfig;
+}
+
+export interface RenderConfig {
+  output_component?: string;
+  [key: string]: unknown;
 }
 
 export interface HubApp {
