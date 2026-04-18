@@ -187,7 +187,7 @@ export function CreatorHeroPage() {
                 spellCheck={false}
                 value={openapiUrl}
                 onChange={(e) => setOpenapiUrl(e.target.value)}
-                placeholder="https://your-api.com/openapi.json"
+                placeholder="github.com/you/repo  or  your-api.com/openapi.json"
                 aria-label="OpenAPI spec URL"
                 data-testid="hero-input"
                 style={{
