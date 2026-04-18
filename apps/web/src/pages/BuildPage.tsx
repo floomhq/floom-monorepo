@@ -38,7 +38,22 @@ type PendingPublish = {
   source: 'github' | 'openapi';
 };
 
-export function BuildPage() {
+interface BuildPageProps {
+  /** Wrapper component used for the outer layout. Defaults to PageShell
+   *  (store surface). Studio wraps with StudioLayout. */
+  layout?: React.ComponentType<{ children: React.ReactNode; title?: string }>;
+  /** Where the "Back" breadcrumb links to. Defaults to /creator (store).
+   *  Studio passes /studio. */
+  backHref?: string;
+  /** Redirect target after publish — Studio sends to /studio/:slug. */
+  postPublishHref?: (slug: string) => string;
+}
+
+export function BuildPage({
+  layout: Layout = PageShell,
+  backHref = '/creator',
+  postPublishHref,
+}: BuildPageProps = {}) {
   const [searchParams] = useSearchParams();
   const editSlug = searchParams.get('edit');
   // v15 landing hands off the pasted OpenAPI URL via /build?openapi=<url>.
@@ -230,12 +245,12 @@ export function BuildPage() {
   }
 
   return (
-    <PageShell title="Publish an app | Floom">
+    <Layout title="Publish an app | Floom">
       <div data-testid="build-page" style={{ maxWidth: 1040, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: 32 }}>
           <Link
-            to="/creator"
+            to={backHref}
             style={{
               fontSize: 13,
               color: 'var(--muted)',
@@ -984,7 +999,7 @@ export function BuildPage() {
                   Open app
                 </button>
                 <Link
-                  to={`/me/apps/${slug}`}
+                  to={postPublishHref ? postPublishHref(slug) : `/me/apps/${slug}`}
                   className="btn-ghost"
                   data-testid="build-install-claude"
                   style={{
@@ -995,21 +1010,23 @@ export function BuildPage() {
                     textDecoration: 'none',
                   }}
                 >
-                  Install in Claude
+                  {postPublishHref ? 'Manage in Studio' : 'Install in Claude'}
                 </Link>
-                <Link
-                  to={`/creator/${slug}`}
-                  className="btn-ghost"
-                  style={{
-                    padding: '9px 14px',
-                    fontSize: 13,
-                    border: '1px solid var(--line)',
-                    borderRadius: 8,
-                    textDecoration: 'none',
-                  }}
-                >
-                  View in creator dashboard
-                </Link>
+                {!postPublishHref && (
+                  <Link
+                    to={`/creator/${slug}`}
+                    className="btn-ghost"
+                    style={{
+                      padding: '9px 14px',
+                      fontSize: 13,
+                      border: '1px solid var(--line)',
+                      borderRadius: 8,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    View in creator dashboard
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -1038,7 +1055,7 @@ export function BuildPage() {
           onSignIn={() => navigate('/login?next=' + encodeURIComponent('/build'))}
         />
       )}
-    </PageShell>
+    </Layout>
   );
 }
 

@@ -37,9 +37,12 @@ export function AppPermalinkPage() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const runIdFromUrl = searchParams.get('run');
-  // Gate "Open creator dashboard" — anon visitors should never see it on the
-  // public product page. See 2026-04-18 consumer UX audit finding #5.
-  const { isAuthenticated } = useSession();
+  // Gate "Open in Studio" — only the app owner sees the creator bridge.
+  // Previously ANY authenticated user saw a link into the creator dashboard,
+  // which was a permission leak (audit 2026-04-18). Studio restructure locks
+  // this to owners only.
+  const { data: session } = useSession();
+  const sessionUserId = session?.user?.id ?? null;
 
   const [app, setApp] = useState<AppDetail | null>(null);
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
@@ -47,6 +50,16 @@ export function AppPermalinkPage() {
   const [notFound, setNotFound] = useState(false);
   const [comingSoon, setComingSoon] = useState<ComingSoonTarget | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+
+  // v16 restructure: /p/:slug is tabbed now (Run / About / Install / Source).
+  // Run is the default — the previous product-page layout made users scroll
+  // past marketing copy to find the actual run surface. Shared-run URLs
+  // (/p/:slug?run=<id>) auto-land on Run.
+  type PTab = 'run' | 'about' | 'install' | 'source';
+  const initialTab: PTab = searchParams.get('tab') as PTab | null ?? 'run';
+  const [activeTab, setActiveTab] = useState<PTab>(
+    ['run', 'about', 'install', 'source'].includes(initialTab) ? initialTab : 'run',
+  );
   // Run prefetched from /api/run/:id when the URL contains ?run=<id>. Lets
   // RunSurface hydrate directly into the `done` phase for shared links.
   const [initialRun, setInitialRun] = useState<RunRecord | null>(null);
@@ -302,10 +315,10 @@ export function AppPermalinkPage() {
             <Chevron />
             <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{app.name}</span>
           </div>
-          {isAuthenticated && (
+          {app.author && sessionUserId && app.author === sessionUserId && (
             <Link
-              to={`/creator/${app.slug}`}
-              data-testid="open-creator-dashboard"
+              to={`/studio/${app.slug}`}
+              data-testid="open-in-studio"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -313,9 +326,10 @@ export function AppPermalinkPage() {
                 color: 'var(--muted)',
                 textDecoration: 'none',
                 fontWeight: 500,
+                fontSize: 13,
               }}
             >
-              Open creator dashboard <ArrowRight />
+              Open in Studio <ArrowRight />
             </Link>
           )}
         </div>
@@ -557,6 +571,102 @@ export function AppPermalinkPage() {
           </div>
         </section>
 
+        {/* v16 tab bar: Run is default, everything else is opt-in. This
+            replaces the previous "scroll past marketing to reach the run
+            surface" layout. Shared-run URLs (?run=<id>) land here already. */}
+        <div
+          role="tablist"
+          aria-label="App content"
+          data-testid="permalink-tabs"
+          style={{
+            display: 'flex',
+            gap: 2,
+            borderBottom: '1px solid var(--line)',
+            marginBottom: 24,
+            overflowX: 'auto',
+          }}
+        >
+          {(
+            [
+              { id: 'run', label: 'Run' },
+              { id: 'about', label: 'About' },
+              { id: 'install', label: 'Install' },
+              { id: 'source', label: 'Source' },
+            ] as Array<{ id: PTab; label: string }>
+          ).map((t) => {
+            const isOn = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={isOn}
+                data-testid={`permalink-tab-${t.id}`}
+                data-state={isOn ? 'active' : 'inactive'}
+                onClick={() => {
+                  setActiveTab(t.id);
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    if (t.id === 'run') next.delete('tab');
+                    else next.set('tab', t.id);
+                    return next;
+                  }, { replace: true });
+                }}
+                style={{
+                  padding: '10px 16px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  border: 'none',
+                  background: 'transparent',
+                  color: isOn ? 'var(--accent)' : 'var(--muted)',
+                  borderBottom: isOn ? '2px solid var(--accent)' : '2px solid transparent',
+                  marginBottom: -1,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Run tab (DEFAULT) */}
+        {activeTab === 'run' && (
+          <section
+            id="run"
+            data-testid="tab-content-run-primary"
+            data-surface="run"
+            className="run-surface"
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderRadius: 14,
+              padding: '28px 24px',
+              marginBottom: 32,
+            }}
+          >
+            {initialRunLoading ? (
+              <div
+                data-testid="shared-run-loading"
+                style={{ color: 'var(--muted)', fontSize: 13, padding: 24, textAlign: 'center' }}
+              >
+                Loading shared run...
+              </div>
+            ) : (
+              <RunSurface
+                app={app}
+                initialRun={initialRun}
+                onResetInitialRun={handleResetInitialRun}
+              />
+            )}
+          </section>
+        )}
+
+        {/* About tab */}
+        {activeTab === 'about' && (
+        <>
         {/* How it works strip */}
         {howItWorks.length > 0 && (
           <section
@@ -656,8 +766,11 @@ export function AppPermalinkPage() {
 
           <AppReviews slug={app.slug} />
         </section>
+        </>
+        )}
 
-        {/* Connectors row */}
+        {/* Install tab: connectors (Claude, ChatGPT, Notion, Terminal) */}
+        {activeTab === 'install' && (
         <section id="connectors" data-testid="connectors" style={{ marginBottom: 32 }}>
           <h2
             style={{
@@ -712,33 +825,45 @@ export function AppPermalinkPage() {
             />
           </div>
         </section>
+        )}
 
-        {/* Run surface */}
-        <section
-          id="run"
-          data-testid="tab-content-run"
-          style={{
-            background: 'var(--card)',
-            border: '1px solid var(--line)',
-            borderRadius: 14,
-            padding: '28px 24px',
-          }}
-        >
-          {initialRunLoading ? (
+        {/* Source tab: OpenAPI + manifest viewer (v1.1 stub). */}
+        {activeTab === 'source' && (
+          <section
+            data-testid="tab-content-source"
+            style={{
+              background: 'var(--card)',
+              border: '1px dashed var(--line)',
+              borderRadius: 14,
+              padding: '32px 28px',
+              textAlign: 'center',
+            }}
+          >
             <div
-              data-testid="shared-run-loading"
-              style={{ color: 'var(--muted)', fontSize: 13, padding: 24, textAlign: 'center' }}
+              style={{
+                display: 'inline-block',
+                padding: '3px 8px',
+                borderRadius: 4,
+                background: 'var(--accent-soft)',
+                color: 'var(--accent)',
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: 12,
+              }}
             >
-              Loading shared run...
+              Coming soon
             </div>
-          ) : (
-            <RunSurface
-              app={app}
-              initialRun={initialRun}
-              onResetInitialRun={handleResetInitialRun}
-            />
-          )}
-        </section>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)', margin: '0 0 6px' }}>
+              Inspect the source
+            </h2>
+            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 auto', maxWidth: 520, lineHeight: 1.55 }}>
+              Browsable OpenAPI spec + floom manifest. Until this ships,
+              grab the spec from <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>/api/hub/{app.slug}/openapi.json</code>.
+            </p>
+          </section>
+        )}
       </main>
       <Footer />
       <FeedbackButton />

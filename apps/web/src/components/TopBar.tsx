@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from './Logo';
 import { useSession, clearSession } from '../hooks/useSession';
+import { useMyApps } from '../hooks/useMyApps';
 import * as api from '../api/client';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -78,17 +79,22 @@ export function TopBar(_props: Props = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const { data, isAuthenticated, refresh } = useSession();
+  const { apps: myApps } = useMyApps();
   const navigate = useNavigate();
   const location = useLocation();
   const dropRef = useRef<HTMLDivElement>(null);
 
   const isHome = location.pathname === '/';
   const selfHostHref = isHome ? '#self-host' : '/#self-host';
-  const isDocs = location.pathname.startsWith('/protocol');
+  const isDocs = location.pathname.startsWith('/protocol') || location.pathname === '/docs';
   const isStore = location.pathname.startsWith('/apps') || location.pathname.startsWith('/p/');
-  const isDeploy =
-    location.pathname.startsWith('/build') || location.pathname.startsWith('/creator');
-  const deployHref = isAuthenticated ? '/build' : '/signup?next=%2Fbuild';
+  const isStudio = location.pathname.startsWith('/studio');
+  const isMe = location.pathname === '/me' || location.pathname.startsWith('/me/');
+  // Legacy deploy/creator paths route to /studio/build now.
+  const isDeploy = location.pathname.startsWith('/studio/build') || location.pathname.startsWith('/build');
+  const ownedAppCount = myApps?.length ?? 0;
+  const showStudioLink = isAuthenticated && ownedAppCount > 0;
+  const deployHref = isAuthenticated ? '/studio/build' : '/signup?next=%2Fstudio%2Fbuild';
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -121,7 +127,7 @@ export function TopBar(_props: Props = {}) {
   const userInitial = userLabel.charAt(0).toUpperCase();
 
   return (
-    <header className="topbar">
+    <header className="topbar" data-context={isStudio ? 'studio' : 'store'}>
       <div
         className="topbar-inner"
         style={{
@@ -130,7 +136,7 @@ export function TopBar(_props: Props = {}) {
         }}
       >
         <Link
-          to="/"
+          to={isStudio ? '/studio' : '/'}
           className="brand"
           style={{
             display: 'inline-flex',
@@ -139,11 +145,27 @@ export function TopBar(_props: Props = {}) {
             color: 'var(--ink)',
             flexShrink: 0,
           }}
-          aria-label="Floom home"
+          aria-label={isStudio ? 'Floom Studio' : 'Floom home'}
         >
           <Logo size={26} withWordmark={true} />
+          {isStudio && (
+            <span
+              data-testid="topbar-studio-breadcrumb"
+              style={{
+                marginLeft: 10,
+                paddingLeft: 10,
+                borderLeft: '1px solid var(--line)',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--muted)',
+              }}
+            >
+              Studio
+            </span>
+          )}
         </Link>
 
+        {!isStudio && (
         <nav
           className="topbar-links topbar-links-desktop"
           aria-label="Desktop navigation"
@@ -161,13 +183,41 @@ export function TopBar(_props: Props = {}) {
           >
             Store
           </Link>
-          <Link
-            to={deployHref}
-            aria-current={isDeploy ? 'page' : undefined}
-            style={navStyle(isDeploy)}
-          >
-            Deploy
-          </Link>
+          {showStudioLink && (
+            <Link
+              to="/studio"
+              data-testid="topbar-studio"
+              aria-current={false}
+              style={navStyle(false)}
+            >
+              Studio
+              {ownedAppCount > 0 && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--muted)',
+                    background: 'var(--bg)',
+                    borderRadius: 999,
+                    padding: '1px 6px',
+                  }}
+                >
+                  {ownedAppCount}
+                </span>
+              )}
+            </Link>
+          )}
+          {isAuthenticated && (
+            <Link
+              to="/me"
+              data-testid="topbar-me"
+              aria-current={isMe ? 'page' : undefined}
+              style={navStyle(isMe)}
+            >
+              Me
+            </Link>
+          )}
           <Link
             to="/protocol"
             data-testid="topbar-protocol"
@@ -176,14 +226,19 @@ export function TopBar(_props: Props = {}) {
           >
             Docs
           </Link>
-          <a
-            href={selfHostHref}
-            aria-current={isHome && location.hash === '#self-host' ? 'page' : undefined}
-            style={navStyle(isHome && location.hash === '#self-host')}
-          >
-            Self-host
-          </a>
+          {!isAuthenticated && (
+            <a
+              href={selfHostHref}
+              aria-current={isHome && location.hash === '#self-host' ? 'page' : undefined}
+              style={navStyle(isHome && location.hash === '#self-host')}
+            >
+              Self-host
+            </a>
+          )}
         </nav>
+        )}
+
+        {isStudio && <div style={{ flex: 1 }} />}
 
         <div
           className="topbar-links topbar-links-desktop"
@@ -202,17 +257,28 @@ export function TopBar(_props: Props = {}) {
             </Link>
           )}
 
-          <Link
-            to={deployHref}
-            aria-current={isDeploy ? 'page' : undefined}
-            style={{
-              ...primaryCtaStyle,
-              background: isDeploy ? 'var(--accent)' : primaryCtaStyle.background,
-              borderColor: isDeploy ? 'var(--accent)' : 'var(--ink)',
-            }}
-          >
-            Deploy an app
-          </Link>
+          {!isStudio && !showStudioLink && (
+            <Link
+              to={deployHref}
+              aria-current={isDeploy ? 'page' : undefined}
+              style={{
+                ...primaryCtaStyle,
+                background: isDeploy ? 'var(--accent)' : primaryCtaStyle.background,
+                borderColor: isDeploy ? 'var(--accent)' : 'var(--ink)',
+              }}
+            >
+              Deploy an app
+            </Link>
+          )}
+          {isStudio && (
+            <Link
+              to="/"
+              data-testid="topbar-back-to-store"
+              style={secondaryCtaStyle}
+            >
+              ← Store
+            </Link>
+          )}
 
           {isAuthenticated && data && (
             <div ref={dropRef} style={{ position: 'relative', marginLeft: 2 }}>
@@ -293,12 +359,13 @@ export function TopBar(_props: Props = {}) {
                     My dashboard
                   </Link>
                   <Link
-                    to="/creator"
+                    to="/studio"
                     onClick={() => setDropOpen(false)}
                     role="menuitem"
+                    data-testid="topbar-menu-studio"
                     style={menuItemStyle}
                   >
-                    Creator dashboard
+                    {ownedAppCount > 0 ? `Studio (${ownedAppCount})` : 'Open Studio →'}
                   </Link>
                   <Link
                     to="/me/settings"
@@ -376,14 +443,16 @@ export function TopBar(_props: Props = {}) {
           >
             Self-host
           </a>
-          <Link
-            to={deployHref}
-            className="topbar-mobile-link"
-            role="menuitem"
-            onClick={() => setMenuOpen(false)}
-          >
-            Deploy an app
-          </Link>
+          {!isAuthenticated && (
+            <Link
+              to={deployHref}
+              className="topbar-mobile-link"
+              role="menuitem"
+              onClick={() => setMenuOpen(false)}
+            >
+              Deploy an app
+            </Link>
+          )}
           {isAuthenticated ? (
             <>
               <Link
@@ -395,12 +464,12 @@ export function TopBar(_props: Props = {}) {
                 My dashboard
               </Link>
               <Link
-                to="/creator"
+                to="/studio"
                 className="topbar-mobile-link"
                 role="menuitem"
                 onClick={() => setMenuOpen(false)}
               >
-                Creator dashboard
+                {ownedAppCount > 0 ? `Studio (${ownedAppCount})` : 'Open Studio →'}
               </Link>
               <Link
                 to="/me/settings"
