@@ -729,7 +729,13 @@ export function AppPermalinkPage() {
           </section>
         )}
 
-        {/* About + reviews */}
+        {/* About + reviews. Round 2 polish: description already prints in
+            the hero; duplicating it here created 2-3 repetitions on the
+            same page (finding from UI audit v2). For short descriptions
+            (< 200 chars) we skip the heading + paragraph entirely so the
+            About tab becomes a pure ratings + reviews surface. Long
+            descriptions (user-authored copy, > 200 chars) still render
+            here as a secondary read. */}
         <section
           style={{
             background: 'var(--card)',
@@ -739,28 +745,32 @@ export function AppPermalinkPage() {
             marginBottom: 24,
           }}
         >
-          <h2
-            style={{
-              fontSize: 18,
-              fontWeight: 600,
-              margin: '0 0 14px',
-              color: 'var(--ink)',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            About this app
-          </h2>
-          <p
-            style={{
-              fontSize: 14,
-              color: 'var(--text-2, var(--muted))',
-              margin: 0,
-              lineHeight: 1.65,
-              marginBottom: 24,
-            }}
-          >
-            {app.description}
-          </p>
+          {app.description && app.description.length >= 200 && (
+            <>
+              <h2
+                style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                  margin: '0 0 14px',
+                  color: 'var(--ink)',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                About this app
+              </h2>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: 'var(--text-2, var(--muted))',
+                  margin: 0,
+                  lineHeight: 1.65,
+                  marginBottom: 24,
+                }}
+              >
+                {app.description}
+              </p>
+            </>
+          )}
 
           {summary && summary.count > 0 && <RatingsWidget summary={summary} />}
 
