@@ -1,10 +1,6 @@
-import { createRequire } from 'node:module';
 import { Hono } from 'hono';
+import { SERVER_VERSION } from '../lib/server-version.js';
 import { db } from '../db.js';
-
-/** Single source of truth: apps/server/package.json (bumped on each release). */
-const require = createRequire(import.meta.url);
-const pkg = require('../../package.json') as { version: string };
 
 export const healthRouter = new Hono();
 
@@ -14,7 +10,7 @@ healthRouter.get('/', (c) => {
   return c.json({
     status: 'ok',
     service: 'floom-chat',
-    version: pkg.version,
+    version: SERVER_VERSION,
     apps: appCount,
     threads: threadCount,
     timestamp: new Date().toISOString(),
