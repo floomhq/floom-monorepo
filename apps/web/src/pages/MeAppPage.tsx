@@ -219,6 +219,12 @@ export function TabBar({ slug, active }: { slug: string; active: TabId }) {
           return (
             <span
               key={tab.id}
+              role="tab"
+              aria-selected={false}
+              aria-disabled="true"
+              aria-label={`${tab.label} (coming soon)`}
+              tabIndex={-1}
+              data-testid={`me-app-tab-${tab.id}`}
               title="Coming soon"
               style={{
                 ...base,
