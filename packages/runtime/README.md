@@ -11,6 +11,23 @@ the same `RuntimeProvider` interface so swaps are isolated.
 See [`docs/PRODUCT.md`](../../docs/PRODUCT.md) for the product framing and
 isolation model.
 
+## Where the host requirements apply
+
+End users of cloud-hosted Floom never install anything — they paste a GitHub
+URL into the web UI. The `git` and `docker` requirements below apply only to
+the machine running the Floom server process.
+
+- **Cloud-hosted Floom (default for ICP)**: requirements are satisfied once,
+  on the operator's box (the AX41). Users see only the web form / MCP / HTTP.
+- **Self-hosted Floom, running as a normal process on a host with Docker
+  installed**: supported. `git` and `docker` must be on the host and on
+  `PATH` for the user that runs the Floom server.
+- **Self-hosted Floom, running *inside* a container that wants to deploy
+  other repos**: not supported. We deliberately do not mount the host's
+  Docker socket into Floom's container (see `docs/PRODUCT.md` and
+  `AGENTS.md`); Docker-in-Docker is not configured either. Run Floom on the
+  host directly if you need the repo→hosted path on a self-hosted instance.
+
 ## Install
 
 Workspace-local package. Not published to npm.
@@ -65,8 +82,15 @@ A backend must implement five methods (see `src/provider/types.ts`):
 
 ## Ax41DockerProvider status
 
-- `clone` — implemented. Local `git clone --depth 1`, token-scrubbed.
-- `build`, `run`, `smokeTest` — throw `NotImplemented` until phase 2a-2.
-- `destroySnapshot` — implemented.
+- `clone` — local `git clone --depth 1`, token scrubbed from `.git/config`.
+- `build` — `docker build` in the manifest `workdir` (or repo root). If the
+  repo has no `Dockerfile`, Floom writes `floom-entry.sh` + `Dockerfile.floom`
+  from the detected `build` / `run` commands and sets `EXPOSE 8080` (override
+  with a `Dockerfile` + `EXPOSE` if your app uses another port).
+- `run` — `docker run -d --rm -p 127.0.0.1::<containerPort> -m … --cpus …`.
+- `smokeTest` — HTTP GET retries against `instance.url` (defaults to accepting
+  status 200–499 so JSON APIs that 404 on `/` still pass).
+- `destroySnapshot` — removes the clone working directory.
 
-See PR #50 and the linked roadmap for the remaining phases.
+Still not wired: `POST /api/deploy-github`, `/build` “host this repo” tile, and
+per-user deploy quotas — those live in `apps/server` + `apps/web`.
