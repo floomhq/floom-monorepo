@@ -285,6 +285,12 @@ export interface MeRunSummary {
    * for back-compat with older servers.
    */
   inputs?: Record<string, unknown> | null;
+  /**
+   * Fix 3 (2026-04-19): surface outputs on the list response so the
+   * earlier-runs rail on /p/:slug can render input → output previews
+   * without a per-row detail fetch. Arbitrary JSON shape. Optional.
+   */
+  outputs?: unknown;
 }
 
 export interface MeRunDetail extends MeRunSummary {

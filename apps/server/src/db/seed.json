@@ -161,7 +161,10 @@
         "secrets_needed": [
           "GEMINI_API_KEY"
         ],
-        "manifest_version": "2.0"
+        "manifest_version": "2.0",
+        "render": {
+          "refinable": true
+        }
       }
     },
     {
@@ -560,7 +563,10 @@
           "GEMINI_API_KEY"
         ],
         "manifest_version": "2.0",
-        "knowledge_enabled": true
+        "knowledge_enabled": true,
+        "render": {
+          "refinable": true
+        }
       }
     },
     {
@@ -709,7 +715,10 @@
         "secrets_needed": [
           "GOOGLE_API_KEY"
         ],
-        "manifest_version": "2.0"
+        "manifest_version": "2.0",
+        "render": {
+          "refinable": true
+        }
       }
     },
     {
@@ -1113,7 +1122,10 @@
         "secrets_needed": [
           "OPENPAPER_API_TOKEN"
         ],
-        "manifest_version": "2.0"
+        "manifest_version": "2.0",
+        "render": {
+          "refinable": true
+        }
       }
     },
     {
@@ -1299,7 +1311,8 @@
           "bytes_field": "pdf_base64",
           "filename": "slides.pdf",
           "mime": "application/pdf",
-          "previewHtml_field": "preview"
+          "previewHtml_field": "preview",
+          "refinable": true
         }
       }
     },
