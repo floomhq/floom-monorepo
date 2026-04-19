@@ -114,6 +114,14 @@ interface OpenApiAppSpec {
    * keys pass through; see apps/web/src/components/output/.
    */
   render?: { output_component?: string; [key: string]: unknown };
+  /**
+   * Per-input label overrides. Keys are input names (as they appear in the
+   * OpenAPI body schema), values replace the auto-generated label from
+   * formatLabel(). Lets apps.yaml rename UI-visible labels without
+   * changing input keys, e.g. { version: "UUID format" } so the uuid app
+   * reads "UUID format" in the form while still submitting `version: "v4"`.
+   */
+  input_labels?: Record<string, string>;
 }
 
 interface AppsConfig {
@@ -708,10 +716,22 @@ export function specToManifest(
     const opSecrets = requiredSecretsForOperation(spec, op);
     const label =
       (op.summary && op.summary.trim()) || action.description;
+    // Apply creator-declared per-input label overrides. Keys match input
+    // `name` (e.g. `version`); values replace the formatLabel() default.
+    // Used by fast-apps apps.yaml to rename the uuid app's "Version"
+    // selector to "UUID format" without changing the body key.
+    const labelOverrides = appSpec.input_labels;
+    const finalInputs = labelOverrides
+      ? action.inputs.map((inp) =>
+          labelOverrides[inp.name]
+            ? { ...inp, label: labelOverrides[inp.name] }
+            : inp,
+        )
+      : action.inputs;
     actions[name] = {
       label,
       description: action.description,
-      inputs: action.inputs,
+      inputs: finalInputs,
       outputs: action.outputs,
       secrets_needed: opSecrets,
     };

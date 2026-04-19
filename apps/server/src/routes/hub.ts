@@ -410,13 +410,30 @@ hubRouter.get('/:slug', async (c) => {
   }
   const manifest = safeManifest(row.manifest);
   const bundle = getBundleResult(slug);
+  // Release-version metadata for the /p/:slug hero. Derived from the
+  // manifest (creator-declared `version`) with a 0.1.0 fallback so every
+  // app can display a sensible version chip without a schema migration.
+  // `version_status` is hardcoded to 'stable' today — in v1.1 the Studio
+  // publish flow will emit 'beta' / 'draft' here. `creator_handle` is the
+  // public handle shown after "by @" in the hero; we reuse the existing
+  // authorDisplayFromRow logic and strip a leading `@` if present.
+  const manifestVersion =
+    typeof (manifest as Record<string, unknown>).version === 'string'
+      ? ((manifest as Record<string, string>).version)
+      : null;
+  const displayAuthor = authorDisplayFromRow(row);
+  const creatorHandle = displayAuthor ? displayAuthor.replace(/^@/, '') : null;
   return c.json({
     slug: row.slug,
     name: row.name,
     description: row.description,
     category: row.category,
     author: row.author,
-    author_display: authorDisplayFromRow(row),
+    author_display: displayAuthor,
+    creator_handle: creatorHandle,
+    version: manifestVersion || '0.1.0',
+    version_status: 'stable' as const,
+    published_at: row.created_at,
     icon: row.icon,
     manifest,
     // Visibility (public | unlisted | private). Surfaced so the web client

@@ -18,6 +18,11 @@ apps:
     description: "Generate one or more UUID v4 or v7 strings. Pure random v4, or time-ordered v7 for sortable ids."
     category: developer-tools
     icon: uuid
+    # UI-visible label for the `version` input. The body key stays `version`
+    # (OpenAPI schema), but the form label reads "UUID format" so it isn't
+    # confused with the app release version in the hero meta row.
+    input_labels:
+      version: UUID format
 
   - slug: password
     type: proxied

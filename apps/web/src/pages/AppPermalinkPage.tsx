@@ -222,6 +222,26 @@ export function AppPermalinkPage() {
     return null;
   }, [app]);
 
+  // Hero version meta row: "v0.1.0 · by @handle · 2d ago · stable".
+  // Fix 1 (2026-04-19): surface app release version to disambiguate from
+  // the uuid-action "Version" selector (now "UUID format") and give users
+  // a publish-date / stability signal.
+  const heroHandle = useMemo(() => {
+    if (!app) return null;
+    const raw =
+      (app.creator_handle && app.creator_handle.trim()) ||
+      (app.author_display && app.author_display.replace(/^@/, '').trim()) ||
+      (app.author && app.author.trim()) ||
+      null;
+    if (!raw) return null;
+    return raw.length > 22 ? `${raw.slice(0, 20)}…` : raw;
+  }, [app]);
+
+  const publishedRelative = useMemo(() => {
+    if (!app?.published_at) return null;
+    return formatRelativeTime(app.published_at);
+  }, [app]);
+
   if (loading) {
     // CLS fix (2026-04-18): previous loading state was a ~60px paragraph,
     // which caused a ~600px layout shift when the hero + meta card + tabs +
@@ -460,10 +480,35 @@ export function AppPermalinkPage() {
               >
                 {app.name}
               </h1>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
-                {createdByLabel && <span>by {createdByLabel}</span>}
-                {createdByLabel && app.category && <span> · </span>}
-                {app.category && <span>{app.category}</span>}
+              <div
+                data-testid="hero-version-meta"
+                style={{
+                  fontSize: 13,
+                  color: 'var(--muted)',
+                  marginBottom: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span data-testid="hero-version">v{app.version ?? '0.1.0'}</span>
+                {heroHandle && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span data-testid="hero-handle">by @{heroHandle}</span>
+                  </>
+                )}
+                {publishedRelative && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span data-testid="hero-published">{publishedRelative}</span>
+                  </>
+                )}
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span data-testid="hero-version-status">{app.version_status ?? 'stable'}</span>
+                </>
               </div>
 
               {/* Rating row. CLS fix (2026-04-18): reserve min-height 30px
@@ -992,6 +1037,28 @@ export function AppPermalinkPage() {
 }
 
 /* ----------------- small components ----------------- */
+
+function formatRelativeTime(iso: string): string | null {
+  try {
+    const d = new Date(iso);
+    const t = d.getTime();
+    if (Number.isNaN(t)) return null;
+    const diff = Date.now() - t;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo ago`;
+    const years = Math.floor(days / 365);
+    return `${years}y ago`;
+  } catch {
+    return null;
+  }
+}
 
 function Chevron() {
   return (
