@@ -37,6 +37,7 @@ import { getAuth, isCloudMode, runAuthMigrations } from './lib/better-auth.js';
 import { runRateLimitMiddleware } from './lib/rate-limit.js';
 import { resolveUserContext } from './services/session.js';
 import { startJobWorker } from './services/worker.js';
+import { securityHeaders } from './middleware/security.js';
 
 const PORT = Number(process.env.PORT || 3051);
 const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
@@ -47,6 +48,10 @@ initSentry();
 const app = new Hono();
 app.use('*', logger());
 app.use('*', cors({ origin: '*' }));
+// P1 security headers: CSP + HSTS + nosniff + Referrer-Policy.
+// Mounted before routes so it wraps every response. Routes that own a
+// tighter CSP (renderer frame) are exempted inside the middleware.
+app.use('*', securityHeaders);
 
 // Global error handler: forward uncaught exceptions to Sentry (if wired) and
 // surface a generic 500 to the caller. Hono's onError fires for any thrown

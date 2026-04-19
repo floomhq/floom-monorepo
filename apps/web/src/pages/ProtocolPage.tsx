@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
 import { FeedbackButton } from '../components/FeedbackButton';
 // Import the protocol markdown at build time via Vite ?raw
 import protocolMd from '../assets/protocol.md?raw';
 
-// ── Minimal Markdown renderer ──────────────────────────────────────────────
-// Handles: headings, code blocks (with copy), inline code, bold, paragraphs,
-// ordered/unordered lists, horizontal rules. No external deps.
+// ── Markdown rendering ─────────────────────────────────────────────────────
+// Uses `react-markdown` (CSP-safe, no HTML injection) with custom
+// renderers that preserve the page's visual style. Heading IDs are
+// generated so the TOC anchors keep working.
 
 interface TocItem {
   id: string;
@@ -37,6 +40,17 @@ function extractToc(md: string): TocItem[] {
     }
   }
   return toc;
+}
+
+// Pull plain text out of react-markdown's ReactNode children (for slug IDs).
+function childrenToText(children: React.ReactNode): string {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(childrenToText).join('');
+  if (React.isValidElement(children)) {
+    return childrenToText((children.props as { children?: React.ReactNode }).children);
+  }
+  return '';
 }
 
 function CopyCodeButton({ code }: { code: string }) {
@@ -72,202 +86,6 @@ function CopyCodeButton({ code }: { code: string }) {
       {copied ? 'Copied!' : 'Copy'}
     </button>
   );
-}
-
-interface RenderedBlock {
-  type: 'heading' | 'code' | 'paragraph' | 'ul' | 'ol' | 'hr';
-  level?: number;
-  id?: string;
-  text?: string;
-  lang?: string;
-  code?: string;
-  items?: string[];
-}
-
-function parseMd(md: string): RenderedBlock[] {
-  const lines = md.split('\n');
-  const blocks: RenderedBlock[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-
-    // Heading
-    const hm = line.match(/^(#{1,3})\s+(.+)/);
-    if (hm) {
-      const text = hm[2];
-      blocks.push({
-        type: 'heading',
-        level: hm[1].length,
-        id: slugify(text.replace(/`/g, '')),
-        text,
-      });
-      i++;
-      continue;
-    }
-
-    // Code block
-    if (line.startsWith('```')) {
-      const lang = line.slice(3).trim();
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].startsWith('```')) {
-        codeLines.push(lines[i]);
-        i++;
-      }
-      i++; // skip closing ```
-      blocks.push({ type: 'code', lang, code: codeLines.join('\n') });
-      continue;
-    }
-
-    // HR
-    if (/^---+$/.test(line.trim())) {
-      blocks.push({ type: 'hr' });
-      i++;
-      continue;
-    }
-
-    // Unordered list
-    if (/^[\-\*] /.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && /^[\-\*] /.test(lines[i])) {
-        items.push(lines[i].replace(/^[\-\*] /, ''));
-        i++;
-      }
-      blocks.push({ type: 'ul', items });
-      continue;
-    }
-
-    // Ordered list
-    if (/^\d+\. /.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\d+\. /.test(lines[i])) {
-        items.push(lines[i].replace(/^\d+\. /, ''));
-        i++;
-      }
-      blocks.push({ type: 'ol', items });
-      continue;
-    }
-
-    // Paragraph (skip blank lines)
-    if (line.trim()) {
-      const paraLines: string[] = [];
-      while (i < lines.length && lines[i].trim() && !lines[i].startsWith('#') && !lines[i].startsWith('```') && !/^[\-\*] /.test(lines[i]) && !/^\d+\. /.test(lines[i]) && !/^---/.test(lines[i])) {
-        paraLines.push(lines[i]);
-        i++;
-      }
-      blocks.push({ type: 'paragraph', text: paraLines.join(' ') });
-      continue;
-    }
-
-    i++;
-  }
-
-  return blocks;
-}
-
-function inlineHtml(text: string): string {
-  // Bold
-  let s = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  // Inline code
-  s = s.replace(/`([^`]+)`/g, '<code style="font-family:JetBrains Mono,monospace;font-size:0.88em;background:var(--bg);border:1px solid var(--line);padding:2px 6px;border-radius:4px">$1</code>');
-  // Links
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer" style="color:var(--accent);text-decoration:underline">$1</a>');
-  return s;
-}
-
-function BlockView({ block }: { block: RenderedBlock }) {
-  if (block.type === 'hr') {
-    return <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '28px 0' }} />;
-  }
-
-  if (block.type === 'heading') {
-    const Tag = `h${block.level ?? 2}` as 'h1' | 'h2' | 'h3';
-    const sizes: Record<number, number> = { 1: 32, 2: 22, 3: 16 };
-    const size = sizes[block.level ?? 2] ?? 18;
-    return (
-      <Tag
-        id={block.id}
-        style={{
-          fontSize: size,
-          fontWeight: 700,
-          color: 'var(--ink)',
-          margin: `${block.level === 1 ? '0 0 16px' : '32px 0 12px'}`,
-          lineHeight: 1.25,
-          scrollMarginTop: 72,
-        }}
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: inlineHtml(block.text ?? '') }}
-      />
-    );
-  }
-
-  if (block.type === 'code') {
-    const code = block.code ?? '';
-    return (
-      <div style={{ position: 'relative', margin: '16px 0' }}>
-        <pre
-          style={{
-            background: 'var(--terminal-bg, #0e0e0c)',
-            color: 'var(--terminal-ink, #d4d4c8)',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 12,
-            padding: '20px 16px',
-            borderRadius: 10,
-            overflowX: 'auto',
-            lineHeight: 1.6,
-            margin: 0,
-            whiteSpace: 'pre',
-          }}
-        >
-          {code}
-        </pre>
-        <CopyCodeButton code={code} />
-      </div>
-    );
-  }
-
-  if (block.type === 'paragraph') {
-    return (
-      <p
-        style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--ink)', margin: '12px 0' }}
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: inlineHtml(block.text ?? '') }}
-      />
-    );
-  }
-
-  if (block.type === 'ul') {
-    return (
-      <ul style={{ margin: '10px 0', paddingLeft: 22 }}>
-        {(block.items ?? []).map((item, idx) => (
-          <li
-            key={idx}
-            style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--ink)', marginBottom: 4 }}
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: inlineHtml(item) }}
-          />
-        ))}
-      </ul>
-    );
-  }
-
-  if (block.type === 'ol') {
-    return (
-      <ol style={{ margin: '10px 0', paddingLeft: 22 }}>
-        {(block.items ?? []).map((item, idx) => (
-          <li
-            key={idx}
-            style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--ink)', marginBottom: 4 }}
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: inlineHtml(item) }}
-          />
-        ))}
-      </ol>
-    );
-  }
-
-  return null;
 }
 
 // ── Flow Diagram ───────────────────────────────────────────────────────────
@@ -508,11 +326,123 @@ function ProxiedVsHosted() {
   );
 }
 
+// ── Markdown component overrides ───────────────────────────────────────────
+// These replace the previous `dangerouslySetInnerHTML` renderer with
+// react-markdown's React node tree. Styles mirror the old visual layer
+// 1:1 so the page looks identical.
+
+const mdHeadingStyle = (level: number): React.CSSProperties => {
+  const sizes: Record<number, number> = { 1: 32, 2: 22, 3: 16 };
+  return {
+    fontSize: sizes[level] ?? 18,
+    fontWeight: 700,
+    color: 'var(--ink)',
+    margin: `${level === 1 ? '0 0 16px' : '32px 0 12px'}`,
+    lineHeight: 1.25,
+    scrollMarginTop: 72,
+  };
+};
+
+const markdownComponents = {
+  h1: ({ children }: { children?: React.ReactNode }) => {
+    const text = childrenToText(children);
+    return <h1 id={slugify(text.replace(/`/g, ''))} style={mdHeadingStyle(1)}>{children}</h1>;
+  },
+  h2: ({ children }: { children?: React.ReactNode }) => {
+    const text = childrenToText(children);
+    return <h2 id={slugify(text.replace(/`/g, ''))} style={mdHeadingStyle(2)}>{children}</h2>;
+  },
+  h3: ({ children }: { children?: React.ReactNode }) => {
+    const text = childrenToText(children);
+    return <h3 id={slugify(text.replace(/`/g, ''))} style={mdHeadingStyle(3)}>{children}</h3>;
+  },
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--ink)', margin: '12px 0' }}>
+      {children}
+    </p>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul style={{ margin: '10px 0', paddingLeft: 22 }}>{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol style={{ margin: '10px 0', paddingLeft: 22 }}>{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--ink)', marginBottom: 4 }}>
+      {children}
+    </li>
+  ),
+  hr: () => (
+    <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '28px 0' }} />
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => <strong>{children}</strong>,
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      style={{ color: 'var(--accent)', textDecoration: 'underline' }}
+    >
+      {children}
+    </a>
+  ),
+  // Inline code + code blocks. react-markdown passes `inline=false` on
+  // block code and `inline=true` (or omitted) on backtick inline code.
+  code: ({ inline, className, children }: {
+    inline?: boolean;
+    className?: string;
+    children?: React.ReactNode;
+  }) => {
+    const raw = childrenToText(children).replace(/\n$/, '');
+    if (inline) {
+      return (
+        <code
+          style={{
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: '0.88em',
+            background: 'var(--bg)',
+            border: '1px solid var(--line)',
+            padding: '2px 6px',
+            borderRadius: 4,
+          }}
+        >
+          {children}
+        </code>
+      );
+    }
+    return (
+      <div style={{ position: 'relative', margin: '16px 0' }}>
+        <pre
+          style={{
+            background: 'var(--terminal-bg, #0e0e0c)',
+            color: 'var(--terminal-ink, #d4d4c8)',
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 12,
+            padding: '20px 16px',
+            borderRadius: 10,
+            overflowX: 'auto',
+            lineHeight: 1.6,
+            margin: 0,
+            whiteSpace: 'pre',
+          }}
+        >
+          <code className={className}>{raw}</code>
+        </pre>
+        <CopyCodeButton code={raw} />
+      </div>
+    );
+  },
+  // Wrap bare <pre> (language-less fenced blocks) so the custom `code`
+  // renderer above still runs. react-markdown nests `code` inside `pre`
+  // for fenced blocks; we return the code renderer's output directly
+  // (it already emits its own <pre>).
+  pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+};
+
 // ── ProtocolPage ───────────────────────────────────────────────────────────
 
 export function ProtocolPage() {
   const toc = useRef<TocItem[]>(extractToc(protocolMd));
-  const blocks = useRef<RenderedBlock[]>(parseMd(protocolMd));
   const [tocOpen, setTocOpen] = useState(false);
 
   useEffect(() => {
@@ -648,10 +578,13 @@ export function ProtocolPage() {
           {/* Proxied vs Hosted side-by-side */}
           <ProxiedVsHosted />
 
-          {/* Rendered markdown */}
-          {blocks.current.map((block, idx) => (
-            <BlockView key={idx} block={block} />
-          ))}
+          {/* Rendered markdown — no more dangerouslySetInnerHTML. */}
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={markdownComponents as never}
+          >
+            {protocolMd}
+          </ReactMarkdown>
 
           {/* Footer links */}
           <div

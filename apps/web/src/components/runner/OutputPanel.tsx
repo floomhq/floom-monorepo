@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { AppDetail, PickResult, RunRecord } from '../../lib/types';
 import { pickRenderer } from '../output/rendererCascade';
+import { sanitizeHtml } from '../../lib/sanitize';
 
 function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -150,29 +151,7 @@ function OutputRenderer({ outputs }: { outputs: unknown }) {
 
   if (typeof o.preview === 'string' || typeof o.html === 'string') {
     const html = (o.preview as string) || (o.html as string);
-    const downloadHtml = () => {
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `floom-output-${Date.now()}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-    return (
-      <div className="app-expanded-card" style={{ position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 6, zIndex: 1 }}>
-          <button type="button" className="output-copy-btn" onClick={downloadHtml}>
-            Download HTML
-          </button>
-          <CopyButton value={html} label="Copy HTML" />
-        </div>
-        <div
-          // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </div>
-    );
+    return <HtmlOutput html={html} />;
   }
 
   // Fallback: pretty JSON
@@ -193,6 +172,43 @@ function OutputRenderer({ outputs }: { outputs: unknown }) {
         <CopyButton value={json} label="Copy JSON" />
       </div>
       {json}
+    </div>
+  );
+}
+
+// Creator apps can legitimately return `type: "html"` outputs (e.g. a
+// rendered email preview, a generated slide deck). We inline that HTML
+// into the runner surface, so a malicious creator could otherwise run
+// scripts in the Floom origin and steal the viewer's session. DOMPurify
+// strips `<script>`, inline event handlers, `javascript:` URLs, form
+// actions, etc. before the string reaches dangerouslySetInnerHTML.
+//
+// The Download / Copy buttons still operate on the raw HTML so the
+// user can inspect what was returned — just not let it execute in our
+// origin.
+function HtmlOutput({ html }: { html: string }) {
+  const safeHtml = useMemo(() => sanitizeHtml(html), [html]);
+  const downloadHtml = () => {
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `floom-output-${Date.now()}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div className="app-expanded-card" style={{ position: 'relative' }}>
+      <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 6, zIndex: 1 }}>
+        <button type="button" className="output-copy-btn" onClick={downloadHtml}>
+          Download HTML
+        </button>
+        <CopyButton value={html} label="Copy HTML" />
+      </div>
+      <div
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: safeHtml }}
+      />
     </div>
   );
 }

@@ -1,9 +1,11 @@
 // File artifact card with Download button and optional inline preview.
 // Accepts either a remote URL, a base64 string (converted to a blob
 // URL in the browser), or raw bytes. The optional `previewHtml` field
-// is rendered via dangerouslySetInnerHTML — callers (or the cascade
-// auto-picker) are responsible for trusting that source.
+// is rendered via dangerouslySetInnerHTML AFTER DOMPurify sanitization
+// — creator-supplied HTML (slide deck preview, rendered report, etc.)
+// can't inject scripts into the Floom origin.
 import { useMemo } from 'react';
+import { sanitizeHtml } from '../../lib/sanitize';
 
 export interface FileDownloadProps {
   /** Remote URL. Takes precedence over `bytes` when both are set. */
@@ -61,6 +63,13 @@ export function FileDownload({
 
   const sizeHint = bytes ? formatBytes(Math.floor((bytes.length * 3) / 4)) : null;
 
+  // Sanitize the preview HTML once per change. DOMPurify strips scripts,
+  // inline handlers, and javascript: URLs before it reaches the DOM.
+  const safePreview = useMemo(
+    () => (previewHtml ? sanitizeHtml(previewHtml) : ''),
+    [previewHtml],
+  );
+
   return (
     // data-renderer lets audits confirm the cascade mapped file outputs
     // (e.g. openslides PDF, openblog .md) to FileDownload. Added
@@ -70,7 +79,7 @@ export function FileDownload({
       className="app-expanded-card"
       style={{ padding: 0, overflow: 'hidden' }}
     >
-      {previewHtml && (
+      {safePreview && (
         <div
           style={{
             padding: 16,
@@ -79,7 +88,7 @@ export function FileDownload({
             overflow: 'auto',
           }}
           // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: previewHtml }}
+          dangerouslySetInnerHTML={{ __html: safePreview }}
         />
       )}
       <div

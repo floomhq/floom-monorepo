@@ -34,25 +34,14 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Load Google Fonts non-render-blocking. print->all swap + noscript
-         fallback. Saved ~760ms FCP/LCP on mobile Lighthouse. -->
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
-    />
+    <!-- Google Fonts. The preload + print-swap onload trick was removed
+         in CSP hardening (GitHub #126); inline event handlers violate
+         `script-src 'self'`. `display=swap` in the URL still prevents
+         FOIT; the preconnect above keeps the connection cost low. -->
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      media="print"
-      onload="this.media='all'"
     />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      />
-    </noscript>
 
     <script type="application/ld+json">
     {
