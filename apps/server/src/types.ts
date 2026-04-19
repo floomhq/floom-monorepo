@@ -105,6 +105,20 @@ export interface NormalizedManifest {
    * Backwards compatible: apps without `render` fall through to auto-pick.
    */
   render?: RenderConfig;
+  /**
+   * Optional creator-pinned "primary action" for multi-action apps
+   * (audit 2026-04-20, Fix 3). When set to a valid key in `actions`, the
+   * /p/:slug run surface selects that tab by default instead of the
+   * first alphabetical action, and decorates the tab with a "Primary"
+   * pill so first-time users know where to start. Silently ignored if
+   * the value doesn't match any key in `actions` — invalid values never
+   * break the renderer (they're treated as "not set").
+   *
+   * Optional for backwards compatibility: every existing manifest in the
+   * database keeps working without this field, and the renderer
+   * transparently falls back to the first-action default.
+   */
+  primary_action?: string;
 }
 
 export interface RenderConfig {

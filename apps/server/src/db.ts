@@ -692,6 +692,51 @@ db.exec(`
     ON app_creator_secrets(workspace_id);
 `);
 
+// ---------------------------------------------------------------------
+// Idempotent data migrations (audit 2026-04-20, Fix 3)
+// ---------------------------------------------------------------------
+// `primary_action` is a new optional manifest field. The schema itself
+// doesn't change (manifests are JSON blobs inside `apps.manifest`), so
+// there's nothing to ALTER. But for a handful of seed apps where the
+// intended primary action is known, we stamp it on first boot so the
+// /p/:slug runner picks the right tab without requiring a full re-seed.
+// Guards: only patch when the manifest has ≥2 actions, the target
+// action exists, and the field isn't already set. Safe to run on every
+// boot — becomes a no-op once the field is persisted.
+const PRIMARY_ACTION_SEEDS: Array<{ slug: string; action: string }> = [
+  { slug: 'openslides', action: 'generate' },
+];
+for (const seed of PRIMARY_ACTION_SEEDS) {
+  try {
+    const row = db
+      .prepare('SELECT id, manifest FROM apps WHERE slug = ?')
+      .get(seed.slug) as { id: string; manifest: string } | undefined;
+    if (!row) continue;
+    let manifest: {
+      actions?: Record<string, unknown>;
+      primary_action?: string;
+    };
+    try {
+      manifest = JSON.parse(row.manifest);
+    } catch {
+      continue;
+    }
+    if (!manifest || !manifest.actions) continue;
+    const actionKeys = Object.keys(manifest.actions);
+    if (actionKeys.length < 2) continue;
+    if (!actionKeys.includes(seed.action)) continue;
+    if (manifest.primary_action === seed.action) continue;
+    manifest.primary_action = seed.action;
+    db.prepare(`UPDATE apps SET manifest = ?, updated_at = datetime('now') WHERE id = ?`).run(
+      JSON.stringify(manifest),
+      row.id,
+    );
+  } catch {
+    // Never let a data-migration failure block boot. These are cosmetic
+    // tab defaults, not critical schema changes.
+  }
+}
+
 // Bump user_version so operators can see at a glance which schema
 // revision their DB is on. v0.3.0 was at user_version=3; W2.1 lands v4;
 // W2.3 lands v5; W3.3 + W3.1 land v6 (rolled into the same alpha series).

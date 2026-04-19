@@ -176,6 +176,20 @@ export function CreatorHeroPage() {
       return;
     }
 
+    // Fix (2026-04-20 audit): always route to /studio/build with the raw
+    // URL in ?ingest_url=<urlencoded>. BuildPage picks it up on mount,
+    // pre-fills the matching ramp, and auto-triggers detect so the user
+    // sees the candidate operations without a second click. This is the
+    // belt-and-suspenders path that keeps the URL alive even if detect
+    // fails in the hero, or the user isn't authenticated yet (the URL
+    // survives the /signup?next= detour because it's a real query param
+    // on the `next` target, not just in localStorage).
+    const buildTarget =
+      '/studio/build?ingest_url=' + encodeURIComponent(rawLink);
+    const nextTarget = isAuthenticated
+      ? buildTarget
+      : '/signup?next=' + encodeURIComponent(buildTarget);
+
     setIsDetecting(true);
     try {
       window.localStorage.removeItem(PENDING_KEY);
@@ -190,35 +204,37 @@ export function CreatorHeroPage() {
           try {
             const detected = await api.detectApp(candidate);
             persistPendingPublish(detected, 'github');
-            navigate(
-              isAuthenticated
-                ? '/studio/build'
-                : '/signup?next=' + encodeURIComponent('/studio/build'),
-            );
+            navigate(nextTarget);
             return;
           } catch {
             // Try the next candidate path.
           }
         }
-        setHeroError(
-          "We couldn't find an openapi.yaml or openapi.json file in that repo yet. Add one, or paste the direct OpenAPI link instead.",
-        );
+        // All GitHub candidates failed — still route to /studio/build with
+        // the raw URL so BuildPage can show the same error inline with the
+        // full context (attempted paths, guidance). Losing the URL here
+        // was the "blank form" conversion killer the audit flagged.
+        navigate(nextTarget);
         return;
       }
 
       const detected = await api.detectApp(normalizeLink(rawLink));
       persistPendingPublish(detected, 'openapi');
-      navigate(
-        isAuthenticated
-          ? '/studio/build'
-          : '/signup?next=' + encodeURIComponent('/studio/build'),
-      );
+      navigate(nextTarget);
     } catch (err) {
-      const message =
-        err instanceof api.ApiError && err.status >= 400 && err.status < 500
-          ? "Paste a public GitHub repo, or the direct link to an openapi.json or openapi.yaml file."
-          : 'We could not read that link right now. Try again in a moment.';
-      setHeroError(message);
+      // Even on hero-side detect failure, take the user to /studio/build
+      // with the URL intact. BuildPage re-runs detect and renders the
+      // inline error per the new error taxonomy. This replaces the old
+      // "sorry, try again" dead-end at the hero.
+      // We still log the message so the user isn't surprised if they
+      // cancel the navigation.
+      if (err instanceof api.ApiError && err.status >= 500) {
+        // 5xx is likely transient — keep them in the hero with a retry hint
+        // instead of handing them a broken form downstream.
+        setHeroError('We could not read that link right now. Try again in a moment.');
+        return;
+      }
+      navigate(nextTarget);
     } finally {
       setIsDetecting(false);
     }
