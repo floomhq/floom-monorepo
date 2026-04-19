@@ -80,9 +80,30 @@ interface RunState {
   errorMessage?: string;
 }
 
+/**
+ * Return the creator-pinned `primary_action` when it points to a valid
+ * key in the manifest (audit 2026-04-20, Fix 3). Falls through to the
+ * first action for apps that didn't declare a primary — keeps every
+ * existing app rendering unchanged.
+ */
+function getPrimaryActionName(app: AppDetail): string | null {
+  const primary = app.manifest.primary_action;
+  if (primary && typeof primary === 'string' && app.manifest.actions[primary]) {
+    return primary;
+  }
+  return null;
+}
+
 function getDefaultActionSpec(app: AppDetail): { action: string; spec: ActionSpec } | null {
   const entries = Object.entries(app.manifest.actions);
   if (entries.length === 0) return null;
+  // Honor creator-pinned primary_action (Fix 3): it dictates which tab
+  // is active on first render for multi-action apps, so biz users see
+  // the "start here" action instead of the first one alphabetically.
+  const primary = getPrimaryActionName(app);
+  if (primary) {
+    return { action: primary, spec: app.manifest.actions[primary] };
+  }
   const [action, spec] = entries[0];
   return { action, spec };
 }
@@ -203,6 +224,11 @@ export function RunSurface({
     [app.manifest.actions],
   );
   const hasMultipleActions = actionEntries.length > 1;
+  // Fix 3 (2026-04-20): creator-pinned primary action. When set, its
+  // tab gets a "Primary" pill and a subtle green background so first-time
+  // users see "start here" on apps with a long tab list (e.g. petstore
+  // has 19 operations).
+  const primaryActionName = useMemo(() => getPrimaryActionName(app), [app]);
 
   const [state, setState] = useState<RunState>(() => {
     const initialPick = pickInitialAction(app, initialActionParam);
@@ -562,6 +588,7 @@ export function RunSurface({
         >
           {actionEntries.map(([name, spec]) => {
             const isOn = state.action === name;
+            const isPrimary = primaryActionName === name;
             return (
               <button
                 key={name}
@@ -570,13 +597,20 @@ export function RunSurface({
                 aria-selected={isOn}
                 data-testid={`run-surface-action-tab-${name}`}
                 data-state={isOn ? 'active' : 'inactive'}
+                data-primary={isPrimary ? 'true' : 'false'}
                 onClick={() => handleSelectAction(name)}
                 style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
                   padding: '10px 16px',
                   fontSize: 13,
                   fontWeight: 600,
                   border: 'none',
-                  background: 'transparent',
+                  // Subtle green tint on the primary tab (Fix 3) so it
+                  // reads as "start here" without competing with the
+                  // active-tab underline.
+                  background: isPrimary ? 'var(--accent-soft, #ecfdf5)' : 'transparent',
                   color: isOn ? 'var(--accent)' : 'var(--muted)',
                   borderBottom: isOn ? '2px solid var(--accent)' : '2px solid transparent',
                   marginBottom: -1,
@@ -586,6 +620,24 @@ export function RunSurface({
                 }}
               >
                 {spec.label || name}
+                {isPrimary && (
+                  <span
+                    data-testid={`run-surface-action-tab-${name}-primary-pill`}
+                    aria-label="Primary action"
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                      background: 'var(--accent, #10b981)',
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Primary
+                  </span>
+                )}
               </button>
             );
           })}

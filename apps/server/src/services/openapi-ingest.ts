@@ -1086,6 +1086,81 @@ export function slugify(raw: string): string {
 }
 
 /**
+ * Thrown by `ingestAppFromSpec` when the requested slug is already owned
+ * by a different workspace. Carries three recovery suggestions that the
+ * UI renders as clickable pills so the creator can publish with one
+ * click instead of hitting a dead-end (audit 2026-04-20, Fix 2).
+ *
+ *   - numeric suffix (`petstore-2`, `petstore-3`)
+ *   - version suffix (`petstore-v2`)
+ *   - random short suffix (`petstore-8f3a2b1c`)
+ *
+ * Generator skips any suffix variant that is itself taken, so all three
+ * pills resolve cleanly in 99%+ of cases.
+ */
+export class SlugTakenError extends Error {
+  code = 'slug_taken' as const;
+  slug: string;
+  suggestions: string[];
+  constructor(slug: string, suggestions: string[]) {
+    super(`slug "${slug}" is already taken`);
+    this.name = 'SlugTakenError';
+    this.slug = slug;
+    this.suggestions = suggestions;
+  }
+}
+
+/**
+ * Derive three distinct slug suggestions when `base` is taken:
+ *   1. Numeric suffix `-2` (or `-3`, `-4`, ...)
+ *   2. Version suffix `-v2` (or `-v3`, ...)
+ *   3. Random 8-char hex suffix (virtually collision-free)
+ *
+ * Each candidate is probed against the apps table and the suffix is
+ * bumped until it's free. The 8-char hex path is effectively guaranteed
+ * to be free on the first try.
+ *
+ * Exported for tests; callers should raise `SlugTakenError` rather than
+ * computing suggestions themselves.
+ */
+export function deriveSlugSuggestions(base: string): string[] {
+  // Cap the base so base + '-NN' still fits the 48-char slug ceiling.
+  const truncated = base.slice(0, 40);
+  const exists = db.prepare('SELECT 1 FROM apps WHERE slug = ?');
+  const isFree = (s: string) => !exists.get(s);
+
+  // Numeric: petstore-2, petstore-3, ...
+  let numeric = `${truncated}-2`;
+  for (let i = 2; i < 1000 && !isFree(numeric); i++) {
+    numeric = `${truncated}-${i}`;
+  }
+
+  // Version: petstore-v2, petstore-v3, ...
+  let version = `${truncated}-v2`;
+  for (let i = 2; i < 1000 && !isFree(version); i++) {
+    version = `${truncated}-v${i}`;
+  }
+
+  // Random 8-char hex. Node's randomUUID gives us enough entropy.
+  // Stripped to a-z0-9 to match the slug regex.
+  let random = `${truncated}-${randomSlugSuffix()}`;
+  for (let i = 0; i < 8 && !isFree(random); i++) {
+    random = `${truncated}-${randomSlugSuffix()}`;
+  }
+
+  // De-duplicate in the extremely unlikely case two strategies collapsed
+  // to the same value (e.g. base ends in "-v1" already).
+  return Array.from(new Set([numeric, version, random]));
+}
+
+function randomSlugSuffix(): string {
+  // 8 hex chars is ~32 bits of entropy — collision-free for our scale.
+  // Use Math.random rather than crypto.randomUUID to keep this file
+  // dependency-free and runnable in every worker context.
+  return Math.random().toString(16).slice(2, 10).padEnd(8, '0');
+}
+
+/**
  * Detect an app from an OpenAPI URL without persisting it. Used as the
  * "preview" step of /build Step 2 — the UI shows what we found, user
  * edits the name/slug, then clicks Publish.
@@ -1214,11 +1289,14 @@ export async function ingestAppFromSpec(args: {
   const description = args.description || info.description || '';
 
   // Refuse to silently collide with an existing app unless owned by same workspace.
+  // On collision, attach three recovery suggestions (numeric / version /
+  // random suffix) so the UI can render clickable pills instead of a
+  // dead-end error (audit 2026-04-20, Fix 2).
   const existing = db
     .prepare('SELECT id, workspace_id, visibility FROM apps WHERE slug = ?')
     .get(slug) as { id: string; workspace_id: string; visibility: string } | undefined;
   if (existing && existing.workspace_id !== args.workspace_id && existing.workspace_id !== 'local') {
-    throw new Error(`slug "${slug}" is already taken`);
+    throw new SlugTakenError(slug, deriveSlugSuggestions(slug));
   }
 
   let visibility: 'public' | 'private' | 'auth-required';

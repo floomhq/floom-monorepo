@@ -56,16 +56,32 @@ export function BuildPage({
 }: BuildPageProps = {}) {
   const [searchParams] = useSearchParams();
   const editSlug = searchParams.get('edit');
-  // v15 landing hands off the pasted OpenAPI URL via /build?openapi=<url>.
-  // Pre-populate the OpenAPI ramp input so the user lands mid-flow.
-  const prefilledOpenapi = searchParams.get('openapi') ?? '';
+  // Landing hero hands off the pasted URL via /studio/build?ingest_url=<url>.
+  // Legacy: ?openapi=<url> is still accepted so older hero builds and
+  // external links keep working. Both pre-populate the matching ramp input
+  // and (for ingest_url) auto-trigger detect so the user lands mid-flow
+  // with candidate operations already visible.
+  const ingestUrlParam = searchParams.get('ingest_url') ?? '';
+  const legacyOpenapiParam = searchParams.get('openapi') ?? '';
   const navigate = useNavigate();
   const { isAuthenticated } = useSession();
   const [signupPrompt, setSignupPrompt] = useState(false);
 
+  // Classify the hero-provided URL. A github.com URL goes in the GitHub
+  // ramp; anything else goes in the OpenAPI ramp. The regex matches both
+  // the GitHub owner/repo shape and the direct repo URL.
+  const heroUrl = ingestUrlParam || legacyOpenapiParam;
+  const heroIsGithub = /github\.com[/:][^/]+\/[^/]+/i.test(heroUrl);
+
   // Inputs shared across ramps
-  const [githubUrl, setGithubUrl] = useState('');
-  const [openapiUrl, setOpenapiUrl] = useState(prefilledOpenapi);
+  const [githubUrl, setGithubUrl] = useState(heroIsGithub ? heroUrl : '');
+  const [openapiUrl, setOpenapiUrl] = useState(
+    !heroIsGithub && heroUrl ? heroUrl : '',
+  );
+  // Tracks whether we've already kicked off the auto-detect for this
+  // mount so we don't re-run it on every render (e.g. when the user
+  // manually edits the input after auto-detect).
+  const [heroAutoDetected, setHeroAutoDetected] = useState(false);
 
   // Which ramp submitted last — controls the review heading
   const [source, setSource] = useState<'github' | 'openapi' | null>(null);
@@ -80,6 +96,13 @@ export function BuildPage({
   const [githubError, setGithubError] = useState<'private' | 'no-openapi' | 'unreachable' | null>(
     null,
   );
+  // Slug-taken recovery (audit 2026-04-20, Fix 2). When the publish
+  // request 409s with `slug_taken`, the server returns three suggestions
+  // (numeric / version / random suffix). We surface them as clickable
+  // pills above the submit button — one click populates the slug field
+  // and the user can resubmit. Cleared whenever the user edits the slug
+  // manually or after a successful publish.
+  const [slugSuggestions, setSlugSuggestions] = useState<string[] | null>(null);
 
   // Editable metadata (populated after detect)
   const [name, setName] = useState('');
@@ -137,6 +160,8 @@ export function BuildPage({
       setVisibility(p.visibility || 'public');
       setSource(p.source);
       setStep('review');
+      // Hydrated from localStorage — don't re-run auto-detect.
+      setHeroAutoDetected(true);
     } catch {
       window.localStorage.removeItem(PENDING_KEY);
     }
@@ -157,14 +182,19 @@ export function BuildPage({
     return urls;
   }
 
-  async function handleGithubDetect(e: React.FormEvent) {
-    e.preventDefault();
+  /**
+   * Run detect against all GitHub raw-URL candidates, in order. Returns
+   * true on success (state updated to `review`); false means every
+   * candidate failed and `githubError` was set. Shared between the
+   * manual GitHub ramp form and the hero-URL auto-detect on mount.
+   */
+  async function runGithubDetect(inputUrl: string): Promise<boolean> {
     setError(null);
     setGithubError(null);
-    const candidates = githubCandidates(githubUrl);
+    const candidates = githubCandidates(inputUrl);
     if (candidates.length === 0) {
       setGithubError('unreachable');
-      return;
+      return false;
     }
     setGithubAttempts({ attemptedUrls: candidates });
     for (const candidate of candidates) {
@@ -176,7 +206,7 @@ export function BuildPage({
         setDescription(result.description);
         setSource('github');
         setStep('review');
-        return;
+        return true;
       } catch {
         // try next
       }
@@ -185,23 +215,96 @@ export function BuildPage({
     // missing OpenAPI. Without a HEAD request we can't tell reliably, so
     // show the no-openapi hint by default.
     setGithubError('no-openapi');
+    return false;
   }
 
-  async function handleOpenapiDetect(e: React.FormEvent) {
-    e.preventDefault();
+  /**
+   * Run detect against an OpenAPI URL. Returns true on success; false
+   * sets the inline `error` state. Shared between the manual OpenAPI
+   * ramp form and the hero-URL auto-detect on mount.
+   *
+   * Error classification matches the protocol's error taxonomy (§
+   * types.ts ErrorType):
+   *   - network_unreachable: fetch failed before any response landed
+   *   - user_input_error: upstream 4xx (bad URL, non-JSON content, etc.)
+   *   - upstream_outage: upstream 5xx (transient)
+   */
+  async function runOpenapiDetect(inputUrl: string): Promise<boolean> {
     setError(null);
     try {
-      const result = await api.detectApp(openapiUrl, name || undefined, slug || undefined);
+      const result = await api.detectApp(inputUrl, name || undefined, slug || undefined);
       setDetected(result);
       setName(result.name);
       setSlug(result.slug);
       setDescription(result.description);
       setSource('openapi');
       setStep('review');
+      return true;
     } catch (err) {
-      setError((err as Error).message || 'Could not fetch that file.');
+      const apiErr = err instanceof api.ApiError ? err : null;
+      // Map the raw error to taxonomy-aware copy. The detect endpoint
+      // returns 400 with a code when the URL is reachable but the body
+      // isn't a valid spec; 0/5xx means the network hop itself failed.
+      let message: string;
+      if (!apiErr || apiErr.status === 0) {
+        message =
+          "We couldn't reach that URL. Check the link and try again, or paste your openapi.json directly.";
+      } else if (apiErr.status >= 400 && apiErr.status < 500) {
+        message =
+          apiErr.message ||
+          "That URL didn't return a valid OpenAPI spec. Double-check the link.";
+      } else {
+        message = 'The server returned an error. Try again in a moment.';
+      }
+      setError(message);
+      return false;
     }
   }
+
+  async function handleGithubDetect(e: React.FormEvent) {
+    e.preventDefault();
+    await runGithubDetect(githubUrl);
+  }
+
+  async function handleOpenapiDetect(e: React.FormEvent) {
+    e.preventDefault();
+    await runOpenapiDetect(openapiUrl);
+  }
+
+  // Auto-detect from hero-provided URL (2026-04-20 audit fix). When the
+  // landing hero hands off a URL via ?ingest_url=<url>, we pre-fill the
+  // matching ramp above and immediately kick off detect so the user
+  // sees detected operations without a second click. The conversion
+  // killer the audit flagged was a blank /studio/build form after the
+  // user typed a URL in the hero. This effect closes that gap.
+  //
+  // Guards:
+  //   - Skip if the user came in via /build?edit=<slug> (already mid-
+  //     edit of an existing app).
+  //   - Skip if localStorage already re-hydrated a pending detection
+  //     (setHeroAutoDetected(true) from the effect above).
+  //   - Run exactly once per mount per URL.
+  useEffect(() => {
+    if (editSlug) return;
+    if (!heroUrl) return;
+    if (heroAutoDetected) return;
+    // Defer the detect until the next tick so any localStorage-hydrate
+    // effect above has a chance to set heroAutoDetected first.
+    let cancelled = false;
+    setHeroAutoDetected(true);
+    (async () => {
+      if (cancelled) return;
+      if (heroIsGithub) {
+        await runGithubDetect(heroUrl);
+      } else {
+        await runOpenapiDetect(heroUrl);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editSlug, heroUrl, heroIsGithub]);
 
   async function handlePublish() {
     if (!detected) return;
@@ -227,6 +330,7 @@ export function BuildPage({
     }
     setStep('publishing');
     setError(null);
+    setSlugSuggestions(null);
     try {
       await api.ingestApp({
         openapi_url: detected.openapi_spec_url,
@@ -247,6 +351,68 @@ export function BuildPage({
       // "Open app" button on the done step handles navigation manually.
     } catch (err) {
       setStep('review');
+      // Slug-taken: server returns 409 with suggestions (audit 2026-04-20,
+      // Fix 2). Render the three pills above the submit button and let
+      // the user pick one or keep editing. Any other error keeps the
+      // generic inline red message.
+      if (err instanceof api.ApiError && err.status === 409 && err.code === 'slug_taken') {
+        const payload = err.payload as { suggestions?: string[] } | undefined;
+        const suggestions = Array.isArray(payload?.suggestions)
+          ? payload!.suggestions.slice(0, 3)
+          : [];
+        setSlugSuggestions(suggestions.length > 0 ? suggestions : null);
+        setError(
+          `That slug is already taken. Pick one of the suggestions below, or edit the slug field above.`,
+        );
+        return;
+      }
+      setError((err as Error).message || 'Publish failed.');
+    }
+  }
+
+  // Apply one of the slug-taken suggestions and immediately retry publish.
+  // Wipes the suggestion list so a second collision (vanishingly rare, but
+  // possible under concurrent writes) gets a fresh batch.
+  async function handleApplySlugSuggestion(next: string) {
+    setSlug(next);
+    setSlugSuggestions(null);
+    // Wait one microtask so React state has committed the new slug before
+    // the publish reads from it.
+    await Promise.resolve();
+    // handlePublish reads from component state which won't see the freshly
+    // set `slug` until the next render. We replicate the core publish with
+    // the explicit new slug to avoid the stale-state trap.
+    if (!detected) return;
+    setStep('publishing');
+    setError(null);
+    try {
+      await api.ingestApp({
+        openapi_url: detected.openapi_spec_url,
+        name,
+        slug: next,
+        description,
+        category: category || undefined,
+        visibility,
+      });
+      try {
+        window.localStorage.removeItem(PENDING_KEY);
+      } catch {
+        /* ignore */
+      }
+      setStep('done');
+    } catch (err) {
+      setStep('review');
+      if (err instanceof api.ApiError && err.status === 409 && err.code === 'slug_taken') {
+        const payload = err.payload as { suggestions?: string[] } | undefined;
+        const suggestions = Array.isArray(payload?.suggestions)
+          ? payload!.suggestions.slice(0, 3)
+          : [];
+        setSlugSuggestions(suggestions.length > 0 ? suggestions : null);
+        setError(
+          `That slug is also taken. Pick another suggestion or edit manually.`,
+        );
+        return;
+      }
       setError((err as Error).message || 'Publish failed.');
     }
   }
@@ -806,7 +972,12 @@ export function BuildPage({
             <Label>Slug (URL path)</Label>
             <Input
               value={slug}
-              onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+              onChange={(e) => {
+                setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'));
+                // User is editing manually — clear any collision pills so
+                // we don't show stale suggestions over a fresh attempt.
+                if (slugSuggestions) setSlugSuggestions(null);
+              }}
               data-testid="build-slug"
             />
 
@@ -864,6 +1035,74 @@ export function BuildPage({
               >
                 {error}
               </p>
+            )}
+
+            {/* Slug-taken recovery pills (audit 2026-04-20, Fix 2).
+                Rendered only when the server returned 409 slug_taken.
+                Clicking a pill writes the suggestion into the slug field
+                and retries publish immediately. */}
+            {slugSuggestions && slugSuggestions.length > 0 && (
+              <div
+                data-testid="build-slug-suggestions"
+                style={{
+                  marginTop: 12,
+                  padding: '12px 14px',
+                  background: '#fff7ed',
+                  border: '1px solid #fcd9ae',
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: '#7a4b19',
+                    marginBottom: 8,
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  Try one of these:
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {slugSuggestions.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => handleApplySlugSuggestion(suggestion)}
+                      data-testid={`build-slug-suggestion-${suggestion}`}
+                      style={{
+                        padding: '6px 14px',
+                        background: 'var(--card)',
+                        border: '1px solid var(--accent, #10b981)',
+                        borderRadius: 999,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: 'var(--accent, #10b981)',
+                        cursor: 'pointer',
+                        fontFamily: 'JetBrains Mono, monospace',
+                      }}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+                <p
+                  style={{
+                    margin: '10px 0 0',
+                    fontSize: 11.5,
+                    color: 'var(--muted)',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Click a suggestion to publish with that slug, or edit the field above.
+                </p>
+              </div>
             )}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 24, flexWrap: 'wrap' }}>

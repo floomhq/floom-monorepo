@@ -15,7 +15,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { db } from '../db.js';
 import { resolveUserContext } from '../services/session.js';
-import { detectAppFromUrl, ingestAppFromUrl } from '../services/openapi-ingest.js';
+import {
+  detectAppFromUrl,
+  ingestAppFromUrl,
+  SlugTakenError,
+} from '../services/openapi-ingest.js';
 import {
   bundleRenderer,
   forgetBundle,
@@ -149,6 +153,19 @@ hubRouter.post('/ingest', async (c) => {
     });
     return c.json(result, result.created ? 201 : 200);
   } catch (err) {
+    // Slug collision: 409 with three recovery suggestions (audit 2026-04-20,
+    // Fix 2). The UI picks one as a pill or lets the user edit freely.
+    if (err instanceof SlugTakenError) {
+      return c.json(
+        {
+          error: err.message,
+          code: err.code,
+          slug: err.slug,
+          suggestions: err.suggestions,
+        },
+        409,
+      );
+    }
     return c.json(
       { error: (err as Error).message || 'ingest_failed', code: 'ingest_failed' },
       400,
@@ -332,11 +349,19 @@ hubRouter.delete('/:slug', async (c) => {
 // re-ingesting the spec, which is destructive (loses runs). This endpoint
 // lets the Studio UI toggle visibility without touching the manifest.
 //
-// Only `visibility` is supported today. Name/description/category edits
-// still go through re-ingest so the `updated_at` bookkeeping stays tight;
-// they can be added here later when the Studio grows an inline-edit UI.
+// Audit 2026-04-20 (Fix 3): also accepts `primary_action`, which pins one
+// action key as the "start here" tab on /p/:slug for multi-action apps.
+// Unlike visibility (a top-level apps column), primary_action lives inside
+// the JSON `manifest` blob, so we round-trip through parse/update/write.
+// Setting `null` or omitting the field clears it (falls back to first action).
+//
+// Only these two fields are mutable here today. Name/description/category
+// edits still go through re-ingest so the updated_at bookkeeping stays
+// tight; they can be added here later when the Studio grows inline-edit UI.
 const PatchBody = z.object({
   visibility: z.enum(['public', 'private', 'auth-required']).optional(),
+  // null clears; a string pins; omitted means "don't touch".
+  primary_action: z.union([z.string().min(1).max(128), z.null()]).optional(),
 });
 
 hubRouter.patch('/:slug', async (c) => {
@@ -376,6 +401,41 @@ hubRouter.patch('/:slug', async (c) => {
     updates.push('visibility = ?');
     values.push(parsed.data.visibility);
   }
+
+  // primary_action lives in the JSON manifest, not in its own column.
+  // Parse, mutate, write. Validate that the declared primary exists in
+  // `actions`; reject upfront so the 95% typo case doesn't silently
+  // produce a manifest with an invalid primary_action (renderer would
+  // just fall back to the first action, but the creator would think
+  // they'd saved a pin).
+  if (parsed.data.primary_action !== undefined) {
+    const manifest = safeManifest(app.manifest);
+    if (!manifest) {
+      return c.json(
+        { error: 'App has no parseable manifest', code: 'manifest_invalid' },
+        409,
+      );
+    }
+    if (parsed.data.primary_action === null) {
+      delete (manifest as NormalizedManifest & { primary_action?: string }).primary_action;
+    } else {
+      if (!manifest.actions[parsed.data.primary_action]) {
+        return c.json(
+          {
+            error: `primary_action "${parsed.data.primary_action}" is not a declared action`,
+            code: 'invalid_primary_action',
+            valid_actions: Object.keys(manifest.actions),
+          },
+          400,
+        );
+      }
+      (manifest as NormalizedManifest & { primary_action?: string }).primary_action =
+        parsed.data.primary_action;
+    }
+    updates.push('manifest = ?');
+    values.push(JSON.stringify(manifest));
+  }
+
   if (updates.length === 0) {
     return c.json({ error: 'No updatable fields in body', code: 'empty_patch' }, 400);
   }
@@ -387,6 +447,8 @@ hubRouter.patch('/:slug', async (c) => {
     ok: true,
     slug,
     visibility: parsed.data.visibility ?? app.visibility,
+    primary_action:
+      parsed.data.primary_action !== undefined ? parsed.data.primary_action : undefined,
   });
 });
 
