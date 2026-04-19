@@ -70,8 +70,7 @@ export function BuiltBy() {
           >
             @federicodeponte
           </a>
-          . Everything in the six production layers is Apache 2.0 and lives
-          on GitHub.
+          . Everything is on GitHub, yours to read, fork, or run yourself.
         </p>
         <a
           href={`https://github.com/${GH_REPO}`}

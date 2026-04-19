@@ -1098,7 +1098,9 @@ function formatRelativeTime(iso: string): string | null {
     const d = new Date(iso);
     const t = d.getTime();
     if (Number.isNaN(t)) return null;
-    const diff = Date.now() - t;
+    // Clamp negative diffs (future timestamps / clock skew) to 0 so we
+    // never render `-Nm ago`. See lib/time.ts for the same guard.
+    const diff = Math.max(0, Date.now() - t);
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;

@@ -1,11 +1,14 @@
 /**
- * IntegrationLogos — row of real MCP-client logos shown under the hero
- * input. No fabricated marks: every SVG here is either a Simple Icons path
- * or a restrained typographic badge. Claude + ChatGPT + Cursor are the
- * first-class clients; "+ more" pill acknowledges that Floom speaks the
- * open MCP protocol and works with any compliant client.
+ * IntegrationLogos — row of real AI-app logos shown under the hero input.
+ * No fabricated marks: every SVG here is either a Simple Icons path or a
+ * restrained typographic badge. Claude + ChatGPT + Cursor are the
+ * first-class clients; "+ more" pill acknowledges that Floom works with
+ * any AI app that speaks the open MCP protocol.
+ *
+ * 2026-04-19 UX pass: removed the inline "any MCP client" Link so the
+ * hero only has two CTAs (Publish your app / Browse live apps). The
+ * third underlined link was reading as a 3rd button above the fold.
  */
-import { Link } from 'react-router-dom';
 
 interface LogoProps {
   title: string;
@@ -73,9 +76,9 @@ export function IntegrationLogos() {
             />
           </svg>
         </LogoChip>
-        {/* MCP glyph — the spec logo is a simple hex/dot; keep it as a
-             plain geometric badge so we never misrepresent the logo. */}
-        <LogoChip title="Any MCP client">
+        {/* MCP glyph — the protocol logo is a simple hex/dot; keep it as
+             a plain geometric badge so we never misrepresent the logo. */}
+        <LogoChip title="And more">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <circle cx="12" cy="12" r="3" fill="currentColor" />
             <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 3" />
@@ -83,11 +86,7 @@ export function IntegrationLogos() {
         </LogoChip>
       </div>
       <span style={{ color: 'var(--muted)', fontSize: 13 }}>
-        Works with Claude, ChatGPT, Cursor,{' '}
-        <Link to="/docs" style={{ color: 'var(--muted)', textDecoration: 'underline' }}>
-          any MCP client
-        </Link>
-        .
+        Works with Claude, ChatGPT, Cursor, and more.
       </span>
     </div>
   );

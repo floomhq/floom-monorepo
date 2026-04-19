@@ -913,7 +913,8 @@ function formatTimestamp(iso: string): string {
   try {
     const d = new Date(iso);
     const now = Date.now();
-    const diff = now - d.getTime();
+    // Clamp negative diffs (future timestamps / clock skew). See lib/time.ts.
+    const diff = Math.max(0, now - d.getTime());
     const min = Math.floor(diff / 60000);
     if (min < 1) return 'just now';
     if (min < 60) return `${min}m ago`;

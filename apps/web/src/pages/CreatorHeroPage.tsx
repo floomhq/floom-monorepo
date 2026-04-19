@@ -128,7 +128,7 @@ export function CreatorHeroPage() {
             - Removed centered pennant: nav logo already carries the brand.
             - Single serif display layer (H1). Sub downgraded to Inter muted
               so hierarchy is H1 > accent > sub > input.
-            - Dual CTA (Publish spec / Browse apps) so both ICPs land.
+            - Dual CTA (Publish your app / Browse apps) so both ICPs land.
             - Radial glow softened from 0.08 to 0.05 opacity.
             - Section padding shortened so the form clears the fold at
               1279x712. */}
@@ -226,8 +226,8 @@ export function CreatorHeroPage() {
                 spellCheck={false}
                 value={openapiUrl}
                 onChange={(e) => setOpenapiUrl(e.target.value)}
-                placeholder="github.com/you/repo  or  your-api.com/openapi.json"
-                aria-label="OpenAPI spec URL"
+                placeholder="github.com/you/repo  or  your-app.com"
+                aria-label="Your app URL or GitHub repo"
                 data-testid="hero-input"
                 style={{
                   flex: 1,
@@ -259,7 +259,7 @@ export function CreatorHeroPage() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                Publish spec
+                Publish your app
                 <ArrowRight size={16} aria-hidden="true" />
               </button>
             </form>
@@ -328,11 +328,11 @@ export function CreatorHeroPage() {
                 label="apps live"
               />
               <StatDivider />
-              <Stat value="6" label="layers shipped" />
+              <Stat value="6" label="pieces shipped" />
               <StatDivider />
-              <Stat value="5" label="surfaces" />
+              <Stat value="5" label="ways to use it" />
               <StatDivider />
-              <Stat value="OSS" label="Docker-first" />
+              <Stat value="OSS" label="run it yourself" />
             </div>
           </div>
         </section>
@@ -468,8 +468,8 @@ export function CreatorHeroPage() {
                 lineHeight: 1.55,
               }}
             >
-              One command. Every Floom layer is open source and runs in
-              one container.
+              One line in your terminal. Floom is open source, top to
+              bottom. Your data stays with you.
             </p>
             <div
               style={{
@@ -501,7 +501,7 @@ export function CreatorHeroPage() {
                 rel="noreferrer"
                 style={{ color: 'var(--muted)', textDecoration: 'underline' }}
               >
-                Need to customize? Read the self-host guide →
+                Want the details? Read the self-host guide →
               </a>
             </p>
           </div>

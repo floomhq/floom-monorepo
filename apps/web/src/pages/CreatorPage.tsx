@@ -229,7 +229,7 @@ export function CreatorPage() {
                 lineHeight: 1.55,
               }}
             >
-              Paste an OpenAPI URL. Floom generates the MCP server, HTTP API, store page, and docs.
+              Paste your app's link. Floom gives you a Claude tool, a page to share, a CLI, and a URL your teammates can hit.
             </p>
             <Link
               to="/build"
