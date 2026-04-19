@@ -23,7 +23,7 @@
 //   - Async apps (is_async) route through JobProgress in the output slot.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type {
   ActionSpec,
   AppDetail,
@@ -84,6 +84,22 @@ function getDefaultActionSpec(app: AppDetail): { action: string; spec: ActionSpe
   if (entries.length === 0) return null;
   const [action, spec] = entries[0];
   return { action, spec };
+}
+
+/**
+ * Upgrade 2 (2026-04-19): pick the entry action on mount. Honors an
+ * optional `?action=<name>` URL param so multi-action apps can be linked
+ * directly to a specific tab (e.g. /p/session-recall?action=report).
+ * Falls back to the first action if the param is absent or unknown.
+ */
+function pickInitialAction(
+  app: AppDetail,
+  actionParam: string | null,
+): { action: string; spec: ActionSpec } | null {
+  if (actionParam && app.manifest.actions[actionParam]) {
+    return { action: actionParam, spec: app.manifest.actions[actionParam] };
+  }
+  return getDefaultActionSpec(app);
 }
 
 function buildInitialInputs(
@@ -164,10 +180,32 @@ export function RunSurface({
   onResetInitialRun,
   onResult,
 }: RunSurfaceProps) {
+  // Upgrade 2 (2026-04-19): honor ?action=<name> on mount so multi-action
+  // apps can be linked directly to a specific tab. Only the initial
+  // value is consumed below so later param changes don't stomp on the
+  // user's active selection. Tab clicks update the URL via
+  // setSearchParams to keep links shareable.
+  const [, setSearchParams] = useSearchParams();
+  const initialActionParam = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return new URLSearchParams(window.location.search).get('action');
+    } catch {
+      return null;
+    }
+    // Intentionally empty deps: we only want the initial URL at mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const defaultEntry = getDefaultActionSpec(app);
+  const actionEntries = useMemo(
+    () => Object.entries(app.manifest.actions) as Array<[string, ActionSpec]>,
+    [app.manifest.actions],
+  );
+  const hasMultipleActions = actionEntries.length > 1;
 
   const [state, setState] = useState<RunState>(() => {
-    if (!defaultEntry) {
+    const initialPick = pickInitialAction(app, initialActionParam);
+    if (!initialPick) {
       return {
         phase: 'error',
         inputs: {},
@@ -181,8 +219,8 @@ export function RunSurface({
       const actionName =
         initialRun.action in app.manifest.actions
           ? initialRun.action
-          : defaultEntry.action;
-      const spec = app.manifest.actions[actionName] ?? defaultEntry.spec;
+          : initialPick.action;
+      const spec = app.manifest.actions[actionName] ?? initialPick.spec;
       return {
         phase: 'done',
         inputs: (initialRun.inputs as Record<string, unknown>) ?? buildInitialInputs(spec),
@@ -195,9 +233,9 @@ export function RunSurface({
     }
     return {
       phase: 'ready',
-      inputs: buildInitialInputs(defaultEntry.spec, initialInputs),
-      action: defaultEntry.action,
-      actionSpec: defaultEntry.spec,
+      inputs: buildInitialInputs(initialPick.spec, initialInputs),
+      action: initialPick.action,
+      actionSpec: initialPick.spec,
       hasRun: false,
     };
   });
@@ -206,17 +244,64 @@ export function RunSurface({
     setState((s) => ({ ...s, inputs: { ...s.inputs, [name]: value } }));
   }, []);
 
+  // Upgrade 2: swap to a different action tab. Clears any in-flight
+  // run state so the new tab starts clean; preserves `hasRun` so the
+  // Run → Refine flip (when refinable) persists across tab switches.
+  const handleSelectAction = useCallback(
+    (nextAction: string) => {
+      const spec = app.manifest.actions[nextAction];
+      if (!spec) return;
+      setState((s) => ({
+        ...s,
+        phase: 'ready',
+        action: nextAction,
+        actionSpec: spec,
+        inputs: buildInitialInputs(spec),
+        runId: undefined,
+        run: undefined,
+        logs: undefined,
+        job: undefined,
+        jobId: undefined,
+        errorMessage: undefined,
+      }));
+      onResetInitialRun?.();
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          // Keep the URL clean for the default action; any non-default
+          // action stays explicit so it remains shareable.
+          if (defaultEntry && nextAction === defaultEntry.action) {
+            next.delete('action');
+          } else {
+            next.set('action', nextAction);
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [app.manifest.actions, defaultEntry, onResetInitialRun, setSearchParams],
+  );
+
   const handleReset = useCallback(() => {
     if (!defaultEntry) return;
-    setState((s) => ({
-      phase: 'ready',
-      inputs: buildInitialInputs(defaultEntry.spec, initialInputs),
-      action: defaultEntry.action,
-      actionSpec: defaultEntry.spec,
-      hasRun: s.hasRun,
-    }));
+    setState((s) => {
+      // Upgrade 2 (2026-04-19): preserve the currently-selected action on
+      // reset instead of snapping back to the first action. Users picking
+      // a non-default tab and pressing Reset expect the same tab to stay.
+      const currentSpec =
+        (s.action && app.manifest.actions[s.action]) || defaultEntry.spec;
+      const currentAction = s.action || defaultEntry.action;
+      return {
+        phase: 'ready',
+        inputs: buildInitialInputs(currentSpec, initialInputs),
+        action: currentAction,
+        actionSpec: currentSpec,
+        hasRun: s.hasRun,
+      };
+    });
     onResetInitialRun?.();
-  }, [defaultEntry, initialInputs, onResetInitialRun]);
+  }, [app.manifest.actions, defaultEntry, initialInputs, onResetInitialRun]);
 
   const handleRun = useCallback(async () => {
     if (state.phase !== 'ready' && state.phase !== 'done' && state.phase !== 'error') return;
@@ -455,6 +540,54 @@ export function RunSurface({
           >
             Run this yourself &rarr;
           </button>
+        </div>
+      )}
+
+      {/* Upgrade 2 (2026-04-19): action tab strip for multi-action apps.
+          Hidden on single-action apps to preserve the current layout.
+          Each tab swaps the input card + POST target action. */}
+      {hasMultipleActions && (
+        <div
+          role="tablist"
+          aria-label="App actions"
+          data-testid="run-surface-action-tabs"
+          style={{
+            display: 'flex',
+            gap: 2,
+            borderBottom: '1px solid var(--line)',
+            marginBottom: 16,
+            overflowX: 'auto',
+          }}
+        >
+          {actionEntries.map(([name, spec]) => {
+            const isOn = state.action === name;
+            return (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                aria-selected={isOn}
+                data-testid={`run-surface-action-tab-${name}`}
+                data-state={isOn ? 'active' : 'inactive'}
+                onClick={() => handleSelectAction(name)}
+                style={{
+                  padding: '10px 16px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  border: 'none',
+                  background: 'transparent',
+                  color: isOn ? 'var(--accent)' : 'var(--muted)',
+                  borderBottom: isOn ? '2px solid var(--accent)' : '2px solid transparent',
+                  marginBottom: -1,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {spec.label || name}
+              </button>
+            );
+          })}
         </div>
       )}
 

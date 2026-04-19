@@ -15,6 +15,7 @@ import { RunSurface } from '../components/runner/RunSurface';
 import { AppIcon } from '../components/AppIcon';
 import { AppReviews } from '../components/AppReviews';
 import { FeedbackButton } from '../components/FeedbackButton';
+import { DescriptionMarkdown } from '../components/DescriptionMarkdown';
 import { getApp, getAppReviews, getRun } from '../api/client';
 import { useSession } from '../hooks/useSession';
 import type { ActionSpec, AppDetail, ReviewSummary, RunRecord } from '../lib/types';
@@ -382,9 +383,16 @@ export function AppPermalinkPage() {
   -d '{"app_slug":"${app.slug}","action":"${firstAction}","inputs":{}}'`;
   const cliExample = `floom run ${app.slug}`;
 
+  // Upgrade 4 (2026-04-19): compact TopBar when a run is active so the
+  // output gets more vertical room. True whenever ?run=<id> is present
+  // (shared-run hydration path) OR we have a resolved initialRun in
+  // state. Single-source-of-truth read so the flag flips back to false
+  // as soon as the user clears the shared-run banner.
+  const topBarCompact = Boolean(runIdFromUrl || initialRun);
+
   return (
     <div className="page-root">
-      <TopBar />
+      <TopBar compact={topBarCompact} />
 
       <main
         style={{ padding: '24px 24px 80px', maxWidth: 1200, margin: '0 auto' }}
@@ -537,17 +545,11 @@ export function AppPermalinkPage() {
                 )}
               </div>
 
-              <p
-                style={{
-                  fontSize: 16,
-                  color: 'var(--text-2, var(--ink))',
-                  margin: '0 0 24px',
-                  lineHeight: 1.55,
-                  maxWidth: 620,
-                }}
-              >
-                {app.description}
-              </p>
+              {/* Upgrade 3 (2026-04-19): markdown-enabled description. */}
+              <DescriptionMarkdown
+                description={app.description}
+                testId="hero-description"
+              />
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <a
@@ -926,7 +928,10 @@ export function AppPermalinkPage() {
               >
                 About this app
               </h2>
-              <p
+              {/* Upgrade 3 (2026-04-19): markdown-enabled About copy. */}
+              <DescriptionMarkdown
+                description={app.description}
+                testId="about-description"
                 style={{
                   fontSize: 14,
                   color: 'var(--text-2, var(--muted))',
@@ -934,9 +939,7 @@ export function AppPermalinkPage() {
                   lineHeight: 1.65,
                   marginBottom: 24,
                 }}
-              >
-                {app.description}
-              </p>
+              />
             </>
           )}
 
