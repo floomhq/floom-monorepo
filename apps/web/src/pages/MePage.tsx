@@ -17,7 +17,7 @@ import { AppIcon } from '../components/AppIcon';
 import { useMyApps } from '../hooks/useMyApps';
 import * as api from '../api/client';
 import { formatTime } from '../lib/time';
-import type { MeRunSummary, RunStatus } from '../lib/types';
+import type { CreatorApp, MeRunSummary, RunStatus } from '../lib/types';
 
 const INITIAL_LIMIT = 25;
 const LOAD_STEP = 25;
@@ -185,6 +185,11 @@ export function MePage() {
   );
   const hasMore = runs ? runs.length > visibleCount : false;
   const publishedAppCount = apps ? apps.length : 0;
+  // Upgrade 1 (2026-04-19): surface the caller's published apps on /me
+  // above the runs feed. Previously /me only showed runs, so creators had
+  // to bounce to /studio to see what they published. Apps are sorted by
+  // updated_at DESC by the /api/hub/mine endpoint already.
+  const hasApps = apps !== null && apps.length > 0;
 
   function openRun(run: MeRunSummary) {
     if (!run.app_slug) return;
@@ -209,6 +214,57 @@ export function MePage() {
 
         {showNotice && (
           <AppNotFound slug={noticeSlug} onDismiss={dismissNotice} />
+        )}
+
+        {/* Upgrade 1 (2026-04-19): "Your apps" section. Lives above the
+            runs feed so creators see their published apps on /me instead
+            of bouncing to /studio. Empty state (zero apps) renders a
+            "Publish your first app" CTA below the runs feed. */}
+        {hasApps && apps && (
+          <section
+            data-testid="me-apps-list"
+            style={{ marginBottom: 28 }}
+            aria-label="Your apps"
+          >
+            <header
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
+              <h2
+                style={{
+                  fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontSize: 20,
+                  fontWeight: 500,
+                  lineHeight: 1.2,
+                  margin: 0,
+                  color: 'var(--ink)',
+                }}
+              >
+                Your apps
+              </h2>
+              <Link
+                to="/studio/build"
+                data-testid="me-publish-another"
+                style={s.headerLink}
+              >
+                Publish another →
+              </Link>
+            </header>
+            <div style={s.card}>
+              {apps.map((app, i) => (
+                <AppRow
+                  key={app.slug}
+                  app={app}
+                  isLast={i === apps.length - 1}
+                />
+              ))}
+            </div>
+          </section>
         )}
 
         {runs === null && !runsError ? (
@@ -256,6 +312,50 @@ export function MePage() {
               Open Studio →
             </Link>
           </footer>
+        )}
+
+        {/* Upgrade 1 (2026-04-19): empty state for creators with zero
+            published apps. Gated on apps !== null so we don't flash it
+            while the hook is still fetching. */}
+        {apps !== null && apps.length === 0 && (
+          <section
+            data-testid="me-apps-empty"
+            style={{
+              marginTop: 28,
+              border: '1px dashed var(--line)',
+              borderRadius: 12,
+              background: 'var(--card)',
+              padding: '24px 20px',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 14,
+                color: 'var(--muted)',
+                marginBottom: 12,
+                lineHeight: 1.55,
+              }}
+            >
+              Build your own Floom app in minutes.
+            </div>
+            <Link
+              to="/studio/build"
+              data-testid="me-empty-publish"
+              style={{
+                display: 'inline-block',
+                padding: '10px 18px',
+                background: 'var(--ink)',
+                color: '#fff',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Publish your first app →
+            </Link>
+          </section>
         )}
       </main>
     </PageShell>
@@ -421,6 +521,144 @@ function RunRow({
         {time}
       </span>
     </button>
+  );
+}
+
+// Upgrade 1 (2026-04-19): AppRow — one row per owned app. Shows icon +
+// name + version + visibility pill + updated-at + "Open in Studio" CTA.
+// Clicking anywhere on the row opens /studio/:slug. Matches RunRow
+// visual weight so /me reads as one unified dashboard.
+function AppRow({ app, isLast }: { app: CreatorApp; isLast: boolean }) {
+  const navigate = useNavigate();
+  const version = appVersion(app);
+  const updated = formatTime(app.updated_at);
+  const visibility = app.visibility ?? 'public';
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/studio/${app.slug}`)}
+      data-testid={`me-app-row-${app.slug}`}
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '14px 16px',
+        minHeight: 56,
+        border: 'none',
+        borderBottom: isLast ? 'none' : '1px solid var(--line)',
+        background: 'transparent',
+        textAlign: 'left',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        color: 'var(--ink)',
+      }}
+    >
+      <span aria-hidden style={s.appIconWrap}>
+        <AppIcon slug={app.slug} size={14} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: 8,
+            fontSize: 14,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 600,
+              color: 'var(--ink)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: 240,
+            }}
+          >
+            {app.name}
+          </span>
+          <span
+            data-testid={`me-app-version-${app.slug}`}
+            style={{
+              fontSize: 12,
+              color: 'var(--muted)',
+              fontFamily: 'JetBrains Mono, monospace',
+            }}
+          >
+            {version}
+          </span>
+          <VisibilityPill visibility={visibility} />
+        </div>
+      </div>
+      <span
+        style={{
+          fontSize: 12,
+          color: 'var(--muted)',
+          flexShrink: 0,
+          fontVariantNumeric: 'tabular-nums',
+          marginRight: 12,
+        }}
+      >
+        {updated}
+      </span>
+      <span
+        data-testid={`me-app-open-${app.slug}`}
+        aria-hidden="true"
+        style={{
+          fontSize: 12,
+          color: 'var(--accent)',
+          fontWeight: 600,
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Open in Studio →
+      </span>
+    </button>
+  );
+}
+
+function appVersion(app: CreatorApp): string {
+  // CreatorApp doesn't carry a version field today; AppDetail does. For
+  // /me we fall back to the app.status when non-active (e.g. "draft")
+  // and a canonical "v0.1.0" otherwise. When a real version pipeline
+  // lands on CreatorApp, swap this for app.version.
+  const status = (app.status || '').trim();
+  if (status && status !== 'active') return status;
+  return 'v0.1.0';
+}
+
+function VisibilityPill({ visibility }: { visibility: string }) {
+  const label =
+    visibility === 'private'
+      ? 'private'
+      : visibility === 'auth-required'
+        ? 'auth only'
+        : visibility === 'invite-only'
+          ? 'invite only'
+          : visibility === 'public'
+            ? 'public'
+            : visibility;
+  const isPrivate = visibility !== 'public';
+  return (
+    <span
+      data-testid={`me-app-visibility-${visibility}`}
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        padding: '2px 6px',
+        borderRadius: 4,
+        background: isPrivate ? 'var(--bg)' : 'var(--accent-soft, rgba(16,185,129,0.08))',
+        color: isPrivate ? 'var(--muted)' : 'var(--accent)',
+        border: isPrivate ? '1px solid var(--line)' : '1px solid transparent',
+      }}
+    >
+      {label}
+    </span>
   );
 }
 

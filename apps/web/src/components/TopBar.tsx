@@ -9,6 +9,13 @@ import * as api from '../api/client';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface Props {
   onSignIn?: () => void;
+  /**
+   * Upgrade 4 (2026-04-19): shrink the TopBar when a run is active on
+   * /p/:slug so the output card has more vertical real estate. Reduces
+   * height (56 -> 40), tightens padding, hides the wordmark on desktop.
+   * Wired by the parent page via route state — see AppPermalinkPage.
+   */
+  compact?: boolean;
 }
 
 const navBaseStyle: CSSProperties = {
@@ -74,8 +81,7 @@ function navStyle(active: boolean): CSSProperties {
 //
 // Mobile: hamburger menu keeps the same links plus a sign-in / sign-out
 // entry.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function TopBar(_props: Props = {}) {
+export function TopBar({ compact = false }: Props = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const { data, isAuthenticated, refresh } = useSession();
@@ -129,12 +135,18 @@ export function TopBar(_props: Props = {}) {
   const userInitial = userLabel.charAt(0).toUpperCase();
 
   return (
-    <header className="topbar" data-context={isStudio ? 'studio' : 'store'}>
+    <header
+      className="topbar"
+      data-context={isStudio ? 'studio' : 'store'}
+      data-compact={compact ? 'true' : 'false'}
+      style={compact ? { height: 40, top: 0 } : undefined}
+    >
       <div
         className="topbar-inner"
         style={{
           maxWidth: 1180,
-          gap: 16,
+          gap: compact ? 10 : 16,
+          padding: compact ? '0 20px' : undefined,
         }}
       >
         <Link
@@ -149,7 +161,7 @@ export function TopBar(_props: Props = {}) {
           }}
           aria-label={isStudio ? 'Floom Studio' : 'Floom home'}
         >
-          <Logo size={26} withWordmark={true} />
+          <Logo size={compact ? 20 : 26} withWordmark={!compact} />
           {isStudio && (
             <span
               data-testid="topbar-studio-breadcrumb"
