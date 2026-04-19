@@ -555,6 +555,33 @@ if (webDist) {
   // see the per-app card.
   const pSlugPattern = /^\/p\/([a-z0-9][a-z0-9-]*)\/?$/;
   const publicOrigin = process.env.PUBLIC_ORIGIN || PUBLIC_URL || '';
+  const defaultOgImage = `${publicOrigin}/og-image.png`;
+
+  function rewriteHeadForLanding(html: string): string {
+    let out = html;
+    out = out.replace(
+      /<link rel="canonical" href="[^"]*"/,
+      `<link rel="canonical" href="${publicOrigin}/"`,
+    );
+    out = out.replace(
+      /<meta property="og:url" content="[^"]*"/,
+      `<meta property="og:url" content="${publicOrigin}/"`,
+    );
+    out = out.replace(
+      /<meta property="og:image" content="[^"]*"/,
+      `<meta property="og:image" content="${defaultOgImage}"`,
+    );
+    out = out.replace(
+      /<meta name="twitter:image" content="[^"]*"/,
+      `<meta name="twitter:image" content="${defaultOgImage}"`,
+    );
+    out = out.replace(
+      /"url":\s*"[^"]*"/,
+      `"url": "${publicOrigin}/"`,
+    );
+    return out;
+  }
+
   function rewriteHeadForSlug(html: string, slug: string): string {
     const row = db
       .prepare('SELECT name, description FROM apps WHERE slug = ?')
@@ -608,6 +635,16 @@ if (webDist) {
       spaExcludedExact.has(pathname)
     ) {
       return next();
+    }
+
+    if (pathname === '/' || pathname === '/index.html') {
+      return new Response(rewriteHeadForLanding(indexHtml), {
+        status: 200,
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-cache',
+        },
+      });
     }
 
     // Attempt to serve the file from disk.

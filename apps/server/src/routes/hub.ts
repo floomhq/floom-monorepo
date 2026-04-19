@@ -381,6 +381,20 @@ function safeParse(raw: string | null): unknown {
   }
 }
 
+// Public-directory fixture filter (launch hardening, 2026-04-19): QA/demo
+// fixtures are harmless in the DB but erode trust if they show up in the
+// consumer-facing /api/hub feed. Keep direct permalinks live; only suppress
+// them from the public directory list.
+const TEST_FIXTURE_SLUG = /^(swagger-petstore|stopwatch-\d|e2e-stopwatch|my-renderer-test)$/i;
+const TEST_FIXTURE_DESC =
+  /^(This is a sample Pet Store Server|GitHub's v3 REST API\.|A simple HTTP Request & Response Service)/i;
+
+function isPublicDirectoryFixture(row: Pick<AppRecord, 'slug' | 'description'>): boolean {
+  if (TEST_FIXTURE_SLUG.test(row.slug)) return true;
+  if (row.description && TEST_FIXTURE_DESC.test(row.description)) return true;
+  return false;
+}
+
 // FLOOM_STORE_HIDE_SLUGS (lock-in 2026-04-18): comma-separated list of app
 // slugs that the public store feed should suppress. Default empty, no
 // filtering. Useful for creators who want to temporarily take a published
@@ -434,14 +448,14 @@ hubRouter.get('/', (c) => {
     AppRecord & { author_name: string | null; author_email: string | null }
   >;
 
-  // Apply FLOOM_STORE_HIDE_SLUGS server-side filter. This is the canonical
-  // place to hide apps from the public directory; the client-side
-  // `isTestFixture` pass in AppsDirectoryPage stays as a defense-in-depth
-  // safety net against test fixtures accidentally ingested in dev.
-  const rows =
-    HIDDEN_SLUGS.size === 0
-      ? rowsAll
-      : rowsAll.filter((row) => !HIDDEN_SLUGS.has(row.slug.toLowerCase()));
+  // Canonical public-directory filter:
+  //   1. operator-configured hidden slugs
+  //   2. QA/test fixtures accidentally ingested into the same instance
+  // Client-side filtering remains as a defense-in-depth safety net only.
+  const rows = rowsAll.filter(
+    (row) =>
+      !HIDDEN_SLUGS.has(row.slug.toLowerCase()) && !isPublicDirectoryFixture(row),
+  );
 
   return c.json(
     rows.map((row) => {

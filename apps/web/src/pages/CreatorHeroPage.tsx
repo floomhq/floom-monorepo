@@ -12,8 +12,9 @@ import { WhyFloom } from '../components/home/WhyFloom';
 import { LayersGrid } from '../components/home/LayersGrid';
 import { McpSnippet } from '../components/home/McpSnippet';
 import { BuiltBy } from '../components/home/BuiltBy';
-import { getHub } from '../api/client';
-import type { HubApp } from '../lib/types';
+import * as api from '../api/client';
+import { useSession } from '../hooks/useSession';
+import type { DetectedApp, HubApp } from '../lib/types';
 import { publicHubApps } from '../lib/hub-filter';
 import { LAUNCH_APPS } from '../data/demoData';
 
@@ -56,6 +57,55 @@ const FALLBACK_STRIPES: Stripe[] = [
   },
 ];
 
+const PENDING_KEY = 'floom:pending-publish';
+
+type PendingPublish = {
+  detected: DetectedApp;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  visibility: 'public' | 'private' | 'auth-required';
+  source: 'github' | 'openapi';
+};
+
+function normalizeLink(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function githubCandidates(raw: string): string[] {
+  const normalized = normalizeLink(raw);
+  const m = normalized.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/|$)/i);
+  if (!m) return [];
+  const [, owner, repo] = m;
+  const bases = [
+    `https://raw.githubusercontent.com/${owner}/${repo}/main`,
+    `https://raw.githubusercontent.com/${owner}/${repo}/master`,
+  ];
+  const paths = ['openapi.yaml', 'openapi.yml', 'openapi.json', 'docs/openapi.yaml', 'api/openapi.yaml'];
+  const urls: string[] = [];
+  for (const base of bases) {
+    for (const path of paths) urls.push(`${base}/${path}`);
+  }
+  return urls;
+}
+
+function persistPendingPublish(detected: DetectedApp, source: 'github' | 'openapi') {
+  const pending: PendingPublish = {
+    detected,
+    name: detected.name,
+    slug: detected.slug,
+    description: detected.description,
+    category: detected.category || '',
+    visibility: 'public',
+    source,
+  };
+  window.localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+}
+
 function pickStripes(apps: HubApp[]): Stripe[] {
   if (apps.length === 0) return FALLBACK_STRIPES;
   const bySlug = new Map(apps.map((app) => [app.slug, app]));
@@ -75,14 +125,18 @@ function pickStripes(apps: HubApp[]): Stripe[] {
 
 export function CreatorHeroPage() {
   const navigate = useNavigate();
-  const [openapiUrl, setOpenapiUrl] = useState('');
+  const { isAuthenticated } = useSession();
+  const [sourceLink, setSourceLink] = useState('');
+  const [heroError, setHeroError] = useState('');
+  const [isDetecting, setIsDetecting] = useState(false);
   const [stripes, setStripes] = useState<Stripe[]>(FALLBACK_STRIPES);
   const [hubCount, setHubCount] = useState<number | null>(null);
 
   useEffect(() => {
     document.title =
       'Floom · Production infrastructure for AI apps that do real work';
-    getHub()
+    api
+      .getHub()
       .then((apps) => {
         // Filter QA/test fixtures so the landing "N apps running right
         // now" matches the /apps directory header count. Single source
@@ -105,14 +159,66 @@ export function CreatorHeroPage() {
 
   const visibleStripes = stripes === FALLBACK_STRIPES ? enrichedFallbackStripes : stripes;
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const url = openapiUrl.trim();
-    if (!url) {
-      navigate('/build');
+    setHeroError('');
+
+    const rawLink = sourceLink.trim();
+    if (!rawLink) {
+      navigate(
+        isAuthenticated
+          ? '/studio/build'
+          : '/signup?next=' + encodeURIComponent('/studio/build'),
+      );
       return;
     }
-    navigate(`/build?openapi=${encodeURIComponent(url)}`);
+
+    setIsDetecting(true);
+    try {
+      window.localStorage.removeItem(PENDING_KEY);
+    } catch {
+      // Ignore storage failures; the redirect still works for signed-in users.
+    }
+
+    try {
+      const candidates = githubCandidates(rawLink);
+      if (candidates.length > 0) {
+        for (const candidate of candidates) {
+          try {
+            const detected = await api.detectApp(candidate);
+            persistPendingPublish(detected, 'github');
+            navigate(
+              isAuthenticated
+                ? '/studio/build'
+                : '/signup?next=' + encodeURIComponent('/studio/build'),
+            );
+            return;
+          } catch {
+            // Try the next candidate path.
+          }
+        }
+        setHeroError(
+          "We couldn't find an openapi.yaml or openapi.json file in that repo yet. Add one, or paste the direct OpenAPI link instead.",
+        );
+        return;
+      }
+
+      const detected = await api.detectApp(normalizeLink(rawLink));
+      persistPendingPublish(detected, 'openapi');
+      navigate(
+        isAuthenticated
+          ? '/studio/build'
+          : '/signup?next=' + encodeURIComponent('/studio/build'),
+      );
+    } catch (err) {
+      const message =
+        err instanceof api.ApiError && err.status >= 400 && err.status < 500
+          ? "Paste a public GitHub repo, or the direct link to an openapi.json or openapi.yaml file."
+          : 'We could not read that link right now. Try again in a moment.';
+      setHeroError(message);
+    } finally {
+      setIsDetecting(false);
+    }
   };
 
   return (
@@ -124,14 +230,6 @@ export function CreatorHeroPage() {
       <TopBar />
 
       <main style={{ display: 'block' }}>
-        {/* HERO (2026-04-19 UX pass):
-            - Removed centered pennant: nav logo already carries the brand.
-            - Single serif display layer (H1). Sub downgraded to Inter muted
-              so hierarchy is H1 > accent > sub > input.
-            - Dual CTA (Publish your app / Browse apps) so both ICPs land.
-            - Radial glow softened from 0.08 to 0.05 opacity.
-            - Section padding shortened so the form clears the fold at
-              1279x712. */}
         <section
           data-testid="hero"
           style={{
@@ -148,27 +246,22 @@ export function CreatorHeroPage() {
               textAlign: 'center',
             }}
           >
-            {/* H1 (locked 2026-04-18). Kept copy verbatim. Sized down to
-                68px so it fits two lines at 1279px. */}
             <h1
               className="hero-headline"
               style={{
                 fontFamily: "'DM Serif Display', Georgia, serif",
                 fontWeight: 400,
-                fontSize: 68,
-                lineHeight: 1.04,
-                letterSpacing: '-0.025em',
+                fontSize: 62,
+                lineHeight: 1.06,
+                letterSpacing: 0,
                 color: 'var(--ink)',
                 margin: '0 0 16px',
                 textWrap: 'balance' as unknown as 'balance',
               }}
             >
-              Production infrastructure for AI apps that do real work.
+              Turn your API into a live app your team can use.
             </h1>
 
-            {/* Accent line, green value prop (locked). Promoted above
-                the sub so the user sees the benefit before the
-                positioning. */}
             <p
               className="hero-accent"
               data-testid="hero-accent"
@@ -177,16 +270,14 @@ export function CreatorHeroPage() {
                 fontSize: 17,
                 lineHeight: 1.4,
                 fontWeight: 600,
-                letterSpacing: '-0.005em',
+                letterSpacing: 0,
                 color: 'var(--accent)',
                 margin: '0 0 8px',
               }}
             >
-              Vibe-coding speed. Production-grade safety.
+              Start with a public GitHub repo that includes an OpenAPI file, or paste the spec directly.
             </p>
 
-            {/* Sub-positioning (locked copy). Downgraded from serif 26px
-                to Inter muted 16px: positioning line, not a headline. */}
             <p
               className="hero-sub-positioning"
               data-testid="hero-sub-positioning"
@@ -199,7 +290,7 @@ export function CreatorHeroPage() {
                 margin: '0 0 32px',
               }}
             >
-              The protocol + runtime for agentic work.
+              You get a page to share, a Claude tool, and a URL to call.
             </p>
 
             <form
@@ -220,14 +311,14 @@ export function CreatorHeroPage() {
               }}
             >
               <input
-                type="url"
+                type="text"
                 inputMode="url"
                 autoComplete="url"
                 spellCheck={false}
-                value={openapiUrl}
-                onChange={(e) => setOpenapiUrl(e.target.value)}
-                placeholder="github.com/you/repo  or  your-app.com"
-                aria-label="Your app URL or GitHub repo"
+                value={sourceLink}
+                onChange={(e) => setSourceLink(e.target.value)}
+                placeholder="github.com/you/api"
+                aria-label="Your GitHub repo with an OpenAPI file, or a direct OpenAPI link"
                 data-testid="hero-input"
                 style={{
                   flex: 1,
@@ -244,6 +335,7 @@ export function CreatorHeroPage() {
               <button
                 type="submit"
                 data-testid="hero-cta"
+                disabled={isDetecting}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -255,19 +347,69 @@ export function CreatorHeroPage() {
                   padding: '14px 22px',
                   fontSize: 15,
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: isDetecting ? 'wait' : 'pointer',
+                  opacity: isDetecting ? 0.8 : 1,
                   whiteSpace: 'nowrap',
                 }}
               >
-                Publish your app
+                {isDetecting ? 'Checking link...' : 'Start setup'}
                 <ArrowRight size={16} aria-hidden="true" />
               </button>
             </form>
 
-            {/* Secondary CTA: always-visible "Browse apps" so the biz
-                ICP has a lane without having to parse the input. Linear
-                / Vercel pattern: two CTAs side-by-side, one primary
-                (green) one secondary (outline). */}
+            <p
+              className="hero-helper"
+              data-testid="hero-helper"
+              style={{
+                maxWidth: 620,
+                margin: '14px auto 0',
+                fontSize: 13,
+                lineHeight: 1.55,
+                color: '#4d4942',
+              }}
+            >
+              Start with a public GitHub repo that includes{' '}
+              <code
+                style={{
+                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontSize: 12.5,
+                  color: 'var(--ink)',
+                }}
+              >
+                openapi.json
+              </code>{' '}
+              or{' '}
+              <code
+                style={{
+                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontSize: 12.5,
+                  color: 'var(--ink)',
+                }}
+              >
+                openapi.yaml
+              </code>
+              . Already host your API? Paste the direct spec link instead.
+            </p>
+
+            {heroError && (
+              <p
+                data-testid="hero-error"
+                style={{
+                  maxWidth: 620,
+                  margin: '12px auto 0',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  border: '1px solid #f3d7bf',
+                  background: '#fff7ef',
+                  color: '#7a4b19',
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                {heroError}
+              </p>
+            )}
+
             <div
               className="hero-cta-row"
               style={{
@@ -281,7 +423,7 @@ export function CreatorHeroPage() {
                 flexWrap: 'wrap',
               }}
             >
-              <span>No API yet?</span>
+              <span>Want to see examples first?</span>
               <Link
                 to="/apps"
                 data-testid="hero-browse-apps"
@@ -305,10 +447,6 @@ export function CreatorHeroPage() {
 
             <IntegrationLogos />
 
-            {/* Compact trust row (new 2026-04-19): the only quantified
-                proof above the fold. Live hub count from /api/hub, plus
-                two static truths ("6 layers", "5 surfaces") that match
-                the rest of the page. No fabricated metrics. */}
             <div
               className="hero-stats"
               data-testid="hero-stats"
@@ -328,16 +466,15 @@ export function CreatorHeroPage() {
                 label="apps live"
               />
               <StatDivider />
-              <Stat value="6" label="pieces shipped" />
+              <Stat value="1" label="repo to start" />
               <StatDivider />
-              <Stat value="5" label="ways to use it" />
+              <Stat value="3" label="ways to use it" />
               <StatDivider />
               <Stat value="OSS" label="run it yourself" />
             </div>
           </div>
         </section>
 
-        {/* ARCHITECTURE · one spec, five surfaces */}
         <ArchitectureDiagram />
 
         {/* INLINE DEMO · real /api/run/uuid executed in-page */}
@@ -514,23 +651,26 @@ export function CreatorHeroPage() {
       <PublicFooter />
       <FeedbackButton />
 
-      {/* Inline responsive tweaks (2026-04-19): typography shrinks so
-         the single-serif headline fits two lines at every viewport. */}
       <style>{`
+        .hero-input input::placeholder {
+          color: #5b554d;
+          opacity: 1;
+        }
         @media (max-width: 900px) {
-          .hero-headline { font-size: 52px !important; }
+          .hero-headline { font-size: 48px !important; }
           .hero-accent { font-size: 16px !important; }
           .hero-stats { gap: 24px !important; }
         }
         @media (max-width: 640px) {
           [data-testid="hero"] { padding: 48px 20px 48px; }
-          .hero-headline { font-size: 36px !important; line-height: 1.07 !important; margin-bottom: 14px !important; }
+          .hero-headline { font-size: 34px !important; line-height: 1.1 !important; margin-bottom: 14px !important; }
           .hero-accent { font-size: 14px !important; margin-bottom: 6px !important; }
           .hero-sub-positioning { font-size: 15px !important; margin-bottom: 22px !important; }
+          .hero-helper { font-size: 12.5px !important; }
           .hero-input { flex-direction: column !important; align-items: stretch !important; padding: 10px !important; }
           .hero-input input { padding: 14px !important; font-size: 13.5px !important; }
           .hero-input button { width: 100% !important; padding: 14px !important; justify-content: center !important; }
-          .hero-cta-row { gap: 10px !important; }
+          .hero-cta-row { flex-direction: column !important; gap: 10px !important; }
           .hero-stats { gap: 18px !important; font-size: 12px !important; }
           .integration-logos { flex-direction: column !important; gap: 12px !important; }
           .live-apps-header { flex-direction: column !important; align-items: flex-start !important; }

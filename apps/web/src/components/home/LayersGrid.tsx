@@ -22,8 +22,8 @@ interface Layer {
 
 const LAYERS: Layer[] = [
   {
-    name: 'Paste a link',
-    desc: 'A GitHub repo or an API URL. That\u2019s the whole setup.',
+    name: 'Paste your repo',
+    desc: 'Start with a public GitHub repo that includes an OpenAPI file. Already hosted? A direct spec link works too.',
   },
   {
     name: 'Runs on its own',

@@ -17,11 +17,12 @@
 
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
 import { AppIcon } from '../components/AppIcon';
 import { ToolTile } from '../components/me/ToolTile';
 import { useMyApps } from '../hooks/useMyApps';
+import { useSession } from '../hooks/useSession';
 import * as api from '../api/client';
 import { formatTime } from '../lib/time';
 import type { CreatorApp, HubApp, MeRunSummary, RunStatus } from '../lib/types';
@@ -103,6 +104,16 @@ const s: Record<string, CSSProperties> = {
     gap: 16,
     flexWrap: 'wrap',
   },
+  signedOutBanner: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    padding: '18px 20px',
+    marginBottom: 24,
+    borderRadius: 12,
+    border: '1px solid var(--line)',
+    background: 'var(--card)',
+  },
   notice: {
     display: 'flex',
     alignItems: 'flex-start',
@@ -136,6 +147,38 @@ const s: Record<string, CSSProperties> = {
     borderRadius: 6,
     cursor: 'pointer',
     fontFamily: 'inherit',
+  },
+  primaryButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '10px 16px',
+    borderRadius: 8,
+    border: '1px solid var(--ink)',
+    background: 'var(--ink)',
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 600,
+    textDecoration: 'none',
+  },
+  secondaryButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '10px 16px',
+    borderRadius: 8,
+    border: '1px solid var(--line)',
+    background: 'var(--bg)',
+    color: 'var(--ink)',
+    fontSize: 13,
+    fontWeight: 600,
+    textDecoration: 'none',
+  },
+  lockedCard: {
+    border: '1px dashed var(--line)',
+    borderRadius: 12,
+    background: 'var(--card)',
+    padding: '20px 18px',
   },
   appIconWrap: {
     width: 26,
@@ -171,17 +214,32 @@ type Tool = {
 };
 
 export function MePage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { apps } = useMyApps();
+  const { apps, error: appsError } = useMyApps();
+  const { data: session, loading: sessionLoading, error: sessionError } = useSession();
 
   const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
   const [runsError, setRunsError] = useState<string | null>(null);
   const [curated, setCurated] = useState<HubApp[] | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_LIMIT);
+  const sessionPending = sessionLoading || (session === null && !sessionError);
+  const signedOutPreview = !!session && session.cloud_mode && session.user.is_local;
+  const canLoadPersonalData = !signedOutPreview;
+  const signInHref =
+    '/login?next=' + encodeURIComponent(location.pathname + location.search);
 
   useEffect(() => {
+    if (sessionPending) return;
+    if (!canLoadPersonalData) {
+      setRuns([]);
+      setRunsError(null);
+      return;
+    }
     let cancelled = false;
+    setRuns(null);
+    setRunsError(null);
     api
       .getMyRuns(FETCH_LIMIT)
       .then((res) => {
@@ -193,7 +251,7 @@ export function MePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [canLoadPersonalData, sessionPending]);
 
   // Derive "Your tools" from runs: group by slug, take N most-recent
   // distinct slugs. Runs arrive started_at DESC from the backend, so a
@@ -218,7 +276,7 @@ export function MePage() {
   // If the user has no runs yet, fetch the public directory and surface a
   // curated row. /api/hub returns sorted by featured DESC, avg_run_ms ASC,
   // created_at DESC, name ASC — already the order we want.
-  const needsCurated = tools !== null && tools.length === 0;
+  const needsCurated = signedOutPreview || (tools !== null && tools.length === 0);
   useEffect(() => {
     if (!needsCurated || curated !== null) return;
     let cancelled = false;
@@ -261,20 +319,21 @@ export function MePage() {
     [runs, visibleCount],
   );
   const hasMore = runs ? runs.length > visibleCount : false;
-  const publishedAppCount = apps ? apps.length : 0;
-  const hasApps = apps !== null && apps.length > 0;
+  const publishedAppCount = !signedOutPreview && apps ? apps.length : 0;
+  const hasApps = !signedOutPreview && apps !== null && apps.length > 0;
 
   function openRun(run: MeRunSummary) {
     if (!run.app_slug) return;
     navigate(`/p/${run.app_slug}?run=${encodeURIComponent(run.id)}`);
   }
 
-  const appsLoading = apps === null;
-  const toolsLoading = tools === null;
+  const appsLoading = canLoadPersonalData && apps === null && !appsError;
+  const toolsLoading = !signedOutPreview && tools === null;
 
   return (
     <PageShell
       requireAuth="cloud"
+      allowSignedOutShell={signedOutPreview}
       title="Me · Floom"
       contentStyle={{ padding: 0, maxWidth: 'none', minHeight: 'auto' }}
     >
@@ -290,6 +349,46 @@ export function MePage() {
 
         {showNotice && (
           <AppNotFound slug={noticeSlug} onDismiss={dismissNotice} />
+        )}
+
+        {signedOutPreview && (
+          <section data-testid="me-signed-out-shell" style={s.signedOutBanner}>
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: 'var(--accent)',
+                  marginBottom: 10,
+                }}
+              >
+                Signed-out preview
+              </div>
+              <h2 style={{ ...s.sectionH2, marginBottom: 8 }}>Your workspace after sign-in</h2>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  color: 'var(--muted)',
+                  maxWidth: 640,
+                }}
+              >
+                Me is where your recent tools, personal run history, and creator inventory come together.
+                Sign in to load your own runs, reopen saved tools, and jump into the apps you publish.
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              <Link to={signInHref} style={s.primaryButton}>
+                Sign in to open Me
+              </Link>
+              <Link to="/apps" style={s.secondaryButton}>
+                Browse apps
+              </Link>
+            </div>
+          </section>
         )}
 
         {/* Your tools — FIRST on /me as of 2026-04-19. Primary job on /me
@@ -489,6 +588,39 @@ export function MePage() {
                 />
               ))}
             </div>
+          ) : signedOutPreview ? (
+            <section data-testid="me-apps-empty" style={s.lockedCard}>
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: 'var(--ink)',
+                  marginBottom: 8,
+                }}
+              >
+                Your apps unlock after sign-in
+              </div>
+              <p
+                style={{
+                  margin: '0 0 14px',
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: 'var(--muted)',
+                  maxWidth: 520,
+                }}
+              >
+                Once you sign in, this section lists every app you own and links straight into Studio for
+                access, secrets, analytics, renderer, and run management.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                <Link to={signInHref} style={s.primaryButton}>
+                  Sign in to load your apps
+                </Link>
+                <Link to="/studio" style={s.secondaryButton}>
+                  Preview Studio
+                </Link>
+              </div>
+            </section>
           ) : (
             <section
               data-testid="me-apps-empty"
@@ -551,7 +683,7 @@ export function MePage() {
           ) : runsError ? (
             <ErrorPanel message={runsError} />
           ) : runs && runs.length === 0 ? (
-            <EmptyRuns />
+            <EmptyRuns signedOutPreview={signedOutPreview} signInHref={signInHref} />
           ) : (
             <div data-testid="me-runs-list" style={s.card}>
               {visibleRuns.map((run, i) => (
@@ -1011,7 +1143,13 @@ function ErrorPanel({ message }: { message: string }) {
   );
 }
 
-function EmptyRuns() {
+function EmptyRuns({
+  signedOutPreview = false,
+  signInHref = '/login?next=%2Fme',
+}: {
+  signedOutPreview?: boolean;
+  signInHref?: string;
+}) {
   return (
     <section
       data-testid="me-runs-empty"
@@ -1031,7 +1169,7 @@ function EmptyRuns() {
           marginBottom: 8,
         }}
       >
-        No runs yet.
+        {signedOutPreview ? 'Sign in to load your runs.' : 'No runs yet.'}
       </div>
       <p
         style={{
@@ -1042,25 +1180,34 @@ function EmptyRuns() {
           maxWidth: 380,
         }}
       >
-        Run any Floom app and it will show up here. Try one from the public
-        directory.
+        {signedOutPreview
+          ? 'Your recent runs, outputs, and quick reopen links appear here after you sign in.'
+          : 'Run any Floom app and it will show up here. Try one from the public directory.'}
       </p>
-      <Link
-        to="/apps"
-        data-testid="me-empty-browse"
-        style={{
-          display: 'inline-block',
-          padding: '10px 18px',
-          background: 'var(--ink)',
-          color: '#fff',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 600,
-          textDecoration: 'none',
-        }}
-      >
-        Browse apps →
-      </Link>
+      <div style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {signedOutPreview ? (
+          <Link to={signInHref} data-testid="me-empty-signin" style={s.primaryButton}>
+            Sign in
+          </Link>
+        ) : null}
+        <Link
+          to="/apps"
+          data-testid="me-empty-browse"
+          style={{
+            display: 'inline-block',
+            padding: '10px 18px',
+            background: signedOutPreview ? 'var(--card)' : 'var(--ink)',
+            color: signedOutPreview ? 'var(--ink)' : '#fff',
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: 'none',
+            border: signedOutPreview ? '1px solid var(--line)' : '1px solid var(--ink)',
+          }}
+        >
+          Browse apps →
+        </Link>
+      </div>
     </section>
   );
 }

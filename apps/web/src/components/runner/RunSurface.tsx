@@ -40,6 +40,7 @@ import { StreamingTerminal } from './StreamingTerminal';
 import { ARRAY_INPUT_NAMES, InputField, maybePrependHttps } from './InputField';
 import { useSession } from '../../hooks/useSession';
 import * as api from '../../api/client';
+import { buildPublicRunPath, getRunStartErrorMessage } from '../../lib/publicPermalinks';
 
 export interface RunSurfaceResult {
   runId: string;
@@ -370,7 +371,7 @@ export function RunSurface({
         setState((s) => ({
           ...s,
           phase: 'error',
-          errorMessage: e.message || 'Could not enqueue job',
+          errorMessage: getRunStartErrorMessage(e, 'Could not enqueue job'),
         }));
       }
       return;
@@ -420,7 +421,7 @@ export function RunSurface({
       setState((s) => ({
         ...s,
         phase: 'error',
-        errorMessage: e.message || 'Run failed to start',
+        errorMessage: getRunStartErrorMessage(e, 'Run failed to start'),
       }));
     }
   }, [state, app.slug, app.is_async, defaultEntry, onResetInitialRun, onResult]);
@@ -975,7 +976,7 @@ function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
             {runs.slice(0, 5).map((r) => (
               <li key={r.id}>
                 <Link
-                  to={`/p/${appSlug}?run=${encodeURIComponent(r.id)}`}
+                  to={buildPublicRunPath(r.id)}
                   data-testid={`run-surface-past-row-${r.id}`}
                   className="run-surface-past-row"
                   style={{

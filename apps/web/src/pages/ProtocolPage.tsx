@@ -216,6 +216,15 @@ openapi_spec: ./openapi.yaml
 build: pip install .
 run: uvicorn my_app.server:app --port 8000`;
 
+const EXAMPLE_MANIFEST_LINKS = [
+  'blast-radius',
+  'claude-wrapped',
+  'dep-check',
+  'flyfast',
+  'hook-stats',
+  'session-recall',
+] as const;
+
 function ProxiedVsHosted() {
   const [copiedLeft, setCopiedLeft] = React.useState(false);
   const [copiedRight, setCopiedRight] = React.useState(false);
@@ -658,10 +667,10 @@ export function ProtocolPage() {
               Example manifests
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {['blast-radius', 'opendraft', 'bouncer', 'openanalytics', 'openpaper'].map((slug) => (
+              {EXAMPLE_MANIFEST_LINKS.map((slug) => (
                 <a
                   key={slug}
-                  href={`https://github.com/floomhq/floom-monorepo/tree/main/examples/${slug}/floom.yaml`}
+                  href={`https://github.com/floomhq/floom/blob/main/examples/${slug}/floom.yaml`}
                   target="_blank"
                   rel="noreferrer"
                   style={{
