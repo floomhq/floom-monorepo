@@ -1,0 +1,124 @@
+#!/usr/bin/env node
+// Security headers middleware test (GitHub #126).
+//
+// Verifies the P1 CSP/HSTS/referrer/nosniff middleware applies the
+// expected headers to responses, and does NOT clobber the renderer
+// frame's own tighter CSP.
+
+const { Hono } = await import(
+  '../../apps/server/node_modules/hono/dist/index.js'
+);
+const { securityHeaders, TOP_LEVEL_CSP } = await import(
+  '../../apps/server/src/middleware/security.ts'
+);
+
+let passed = 0;
+let failed = 0;
+function log(label, ok, detail) {
+  if (ok) {
+    passed++;
+    console.log(`  ok  ${label}`);
+  } else {
+    failed++;
+    console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`);
+  }
+}
+
+// Build a tiny Hono app that mirrors how apps/server/src/index.ts mounts
+// the middleware: before any routes.
+const app = new Hono();
+app.use('*', securityHeaders);
+app.get('/landing', (c) => c.html('<p>ok</p>'));
+app.get('/api/health', (c) => c.json({ ok: true }));
+app.get('/renderer/foo/frame.html', (c) => {
+  // Simulate renderer.ts setting its own stricter CSP.
+  return new Response('<html></html>', {
+    status: 200,
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'Content-Security-Policy':
+        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+    },
+  });
+});
+
+// Test 1: landing page gets the full top-level CSP.
+{
+  const res = await app.request('/landing');
+  const csp = res.headers.get('content-security-policy') || '';
+  log('landing: CSP applied', csp === TOP_LEVEL_CSP, `got=${csp}`);
+  log(
+    'landing: has default-src self',
+    csp.includes("default-src 'self'"),
+  );
+  log(
+    'landing: has script-src self (no unsafe-inline)',
+    csp.includes("script-src 'self'") && !csp.includes("script-src 'self' 'unsafe-inline'"),
+  );
+  log(
+    'landing: has frame-ancestors none',
+    csp.includes("frame-ancestors 'none'"),
+  );
+  log(
+    'landing: has object-src none',
+    csp.includes("object-src 'none'"),
+  );
+  log(
+    'landing: has base-uri self',
+    csp.includes("base-uri 'self'"),
+  );
+  log(
+    'landing: has form-action self',
+    csp.includes("form-action 'self'"),
+  );
+  log(
+    'landing: HSTS with preload',
+    res.headers.get('strict-transport-security') ===
+      'max-age=31536000; includeSubDomains; preload',
+  );
+  log(
+    'landing: nosniff',
+    res.headers.get('x-content-type-options') === 'nosniff',
+  );
+  log(
+    'landing: referrer policy',
+    res.headers.get('referrer-policy') === 'strict-origin-when-cross-origin',
+  );
+}
+
+// Test 2: API routes also get CSP (safe; browsers ignore on JSON).
+{
+  const res = await app.request('/api/health');
+  log(
+    'api: HSTS applied',
+    res.headers.get('strict-transport-security') ===
+      'max-age=31536000; includeSubDomains; preload',
+  );
+  log(
+    'api: nosniff',
+    res.headers.get('x-content-type-options') === 'nosniff',
+  );
+}
+
+// Test 3: renderer frame keeps its own stricter CSP (not overwritten).
+{
+  const res = await app.request('/renderer/foo/frame.html');
+  const csp = res.headers.get('content-security-policy') || '';
+  log(
+    'renderer frame: preserves own CSP',
+    csp.includes("default-src 'none'"),
+    `got=${csp}`,
+  );
+  log(
+    'renderer frame: not overwritten with top-level CSP',
+    csp !== TOP_LEVEL_CSP,
+  );
+  log(
+    'renderer frame: still gets HSTS',
+    res.headers.get('strict-transport-security') ===
+      'max-age=31536000; includeSubDomains; preload',
+  );
+}
+
+console.log(`\n  ${passed} passed, ${failed} failed`);
+process.exit(failed === 0 ? 0 : 1);
