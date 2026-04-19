@@ -474,9 +474,11 @@ export function CreatorHeroPage() {
             </div>
 
             {/* Hero app-tile strip (new 2026-04-20). Proof-of-life above
-                the fold: 5 compact chips showing real live apps, each
-                linking to /p/:slug. */}
-            <HeroAppTiles tiles={visibleStripes} />
+                the fold: 4 compact chips showing real live apps, each
+                linking to /p/:slug. The fourth tile shows "+N more"
+                where N reflects the real hub count (passed via
+                totalCount), not the teaser slice of 5. */}
+            <HeroAppTiles tiles={visibleStripes} totalCount={hubCount ?? undefined} />
           </div>
         </section>
 

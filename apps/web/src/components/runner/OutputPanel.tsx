@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { AppDetail, PickResult, RunRecord } from '../../lib/types';
-import { pickRenderer } from '../output/rendererCascade';
+import { pickRenderer, shapePick } from '../output/rendererCascade';
+import { JsonRaw } from '../output/JsonRaw';
+import { Markdown } from '../output/Markdown';
+import { ScalarBig } from '../output/ScalarBig';
+import { TextBig } from '../output/TextBig';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { useSession } from '../../hooks/useSession';
 
@@ -123,14 +127,16 @@ export function OutputPanel({ app, run, onIterate, onOpenDetails, onRetry, appDe
 
 function OutputRenderer({ outputs }: { outputs: unknown }) {
   if (!outputs || typeof outputs !== 'object') {
-    return (
-      <div
-        className="app-expanded-card"
-        style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, whiteSpace: 'pre-wrap' }}
-      >
-        {String(outputs ?? '(no output)')}
-      </div>
-    );
+    // Primitive top-level value — render it as a big value card so a
+    // bare string / number / boolean response still looks like a real
+    // app output rather than a monospace blob.
+    if (typeof outputs === 'string') {
+      return outputs.length > 0 ? <TextBig value={outputs} /> : <JsonRaw data="(no output)" />;
+    }
+    if (typeof outputs === 'number' || typeof outputs === 'boolean') {
+      return <ScalarBig value={outputs} />;
+    }
+    return <JsonRaw data={outputs} />;
   }
 
   // Special-case FlyFast results: flight cards.
@@ -164,14 +170,7 @@ function OutputRenderer({ outputs }: { outputs: unknown }) {
     typeof o.summary === 'string' ? o.summary :
     typeof o.report === 'string' ? o.report : null;
   if (markdown) {
-    return (
-      <div className="app-expanded-card" style={{ position: 'relative', whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6 }}>
-        <div style={{ position: 'absolute', top: 12, right: 12 }}>
-          <CopyButton value={markdown} label="Copy markdown" />
-        </div>
-        {markdown}
-      </div>
-    );
+    return <Markdown content={markdown} />;
   }
 
   if (typeof o.preview === 'string' || typeof o.html === 'string') {
@@ -179,26 +178,19 @@ function OutputRenderer({ outputs }: { outputs: unknown }) {
     return <HtmlOutput html={html} />;
   }
 
-  // Fallback: pretty JSON
-  const json = JSON.stringify(outputs, null, 2);
-  return (
-    <div
-      className="app-expanded-card"
-      style={{
-        position: 'relative',
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: 12,
-        whiteSpace: 'pre-wrap',
-        maxHeight: 360,
-        overflow: 'auto',
-      }}
-    >
-      <div style={{ position: 'sticky', top: 0, display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
-        <CopyButton value={json} label="Copy JSON" />
-      </div>
-      {json}
-    </div>
-  );
+  // Runtime-shape fallback. When OutputPanel calls OutputRenderer it
+  // has already tried the schema-driven cascade (`pickRenderer`), so
+  // anything that reaches here is either a call-site without an
+  // appDetail (legacy callers) OR a genuine Layer 4 fallback where
+  // none of the shape heuristics matched. We still want to avoid the
+  // JSON dump if we can, so run shapePick here too. If that also
+  // returns null, the JsonRaw card is the honest last resort — with
+  // a Copy button AND a "Why is this raw?" tooltip so the creator
+  // knows they can fix it.
+  const shape = shapePick(outputs);
+  if (shape) return shape;
+
+  return <JsonRaw data={outputs} />;
 }
 
 // Creator apps can legitimately return `type: "html"` outputs (e.g. a

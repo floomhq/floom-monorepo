@@ -192,6 +192,10 @@ console.log('v16 renderer cascade tests');
 // ---------- Layer 4: genuine fallback ----------
 
 {
+  // Truly heterogeneous nested shape: one outer key → one inner object →
+  // one deeply-nested object. None of the shape heuristics have enough
+  // signal to render this as something other than a JSON dump, so the
+  // cascade falls through and OutputPanel renders JsonRaw.
   const app = {
     manifest: mkManifest({
       outputs: [{ name: 'response', label: 'Response', type: 'json' }],
@@ -200,6 +204,175 @@ console.log('v16 renderer cascade tests');
   const out = { response: { nested: { shape: true } } };
   const result = pickRenderer({ app, action: 'go', runOutput: out });
   log('No match → kind=fallback, element=null', result.kind === 'fallback' && result.element === null);
+}
+
+// ---------- Layer 3b: runtime-shape heuristics ---------------------
+//
+// Added 2026-04-20. Covers the common OpenAPI-ingested app outputs
+// (uuid, password, jwt-decode, word-count, base64) which all declare a
+// single generic `json` output and therefore bypass the schema-driven
+// Layer 3a auto-pick.
+
+{
+  // uuid: {version, count, uuids: [...]}. The uuids array has 3+ items,
+  // but the headline pattern doesn't match (no password / result /
+  // answer field). Should fall to KeyValueTable, not raw JSON.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = { version: 'v4', count: 3, uuids: ['a-1', 'a-2', 'a-3'] };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: uuid-shaped output → kind=shape', result.kind === 'shape');
+  log('Shape: uuid output renders as KeyValueTable', result.element?.type === OUTPUT_LIBRARY.KeyValueTable);
+}
+
+{
+  // Single-key unwrap: {uuids: ['...']} alone → StringList on the array.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = { uuids: ['a-1', 'a-2'] };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: {uuids: [...]} unwraps to StringList', result.element?.type === OUTPUT_LIBRARY.StringList);
+}
+
+{
+  // password: {password, length, alphabet_size, entropy_bits}. Password
+  // is the headline, the three numerics are meta chips.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = {
+    password: 'Xk9!mP2qRvL4',
+    length: 12,
+    alphabet_size: 94,
+    entropy_bits: 78.7,
+  };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: password output → HeadlineWithMeta', result.element?.type === OUTPUT_LIBRARY.HeadlineWithMeta);
+  log('Shape: password headline plucked', result.element?.props.headline === 'Xk9!mP2qRvL4');
+  log('Shape: password has 3 meta chips', result.element?.props.meta.length === 3);
+}
+
+{
+  // base64 decode: {mode: 'decode', url_safe: false, result: 'hello',
+  // result_length: 5}. `result` is the headline, the rest are chips.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = {
+    mode: 'decode',
+    url_safe: false,
+    result: 'hello world',
+    result_length: 11,
+  };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: base64 decode → HeadlineWithMeta', result.element?.type === OUTPUT_LIBRARY.HeadlineWithMeta);
+  log('Shape: base64 headline is the decoded text', result.element?.props.headline === 'hello world');
+}
+
+{
+  // jwt-decode: {header: {...}, payload: {...}, ...}. Multiple nested
+  // fields, no headline field → KeyValueTable.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = {
+    header: { alg: 'HS256', typ: 'JWT' },
+    payload: { sub: '123', name: 'Jane' },
+    signature: 'abc',
+    algorithm: 'HS256',
+    verified: false,
+  };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: jwt-decode → KeyValueTable', result.element?.type === OUTPUT_LIBRARY.KeyValueTable);
+  log('Shape: jwt-decode has all entries', result.element?.props.entries.length === 5);
+}
+
+{
+  // word-count: {words, chars, chars_no_spaces, lines, sentences, paragraphs,
+  // reading_time_minutes}. All numeric, no headline. → KeyValueTable.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = {
+    words: 42,
+    chars: 210,
+    chars_no_spaces: 175,
+    lines: 3,
+    sentences: 4,
+    paragraphs: 1,
+    reading_time_minutes: 1,
+  };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: word-count → KeyValueTable', result.element?.type === OUTPUT_LIBRARY.KeyValueTable);
+}
+
+{
+  // Single URL field → UrlLink.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = { url: 'https://example.com/foo' };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: single URL → UrlLink', result.element?.type === OUTPUT_LIBRARY.UrlLink);
+}
+
+{
+  // Single image (data URL) → ImageView.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = {
+    image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: image data URL → ImageView', result.element?.type === OUTPUT_LIBRARY.ImageView);
+}
+
+{
+  // Array of flat objects at the top level → RowTable.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = [
+    { name: 'Alice', age: 30, city: 'NYC' },
+    { name: 'Bob', age: 25, city: 'SF' },
+  ];
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: array of flat objects → RowTable', result.element?.type === OUTPUT_LIBRARY.RowTable);
+  log('Shape: RowTable has all rows', result.element?.props.rows.length === 2);
+}
+
+{
+  // Single scalar (number) as a one-key object → ScalarBig.
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+    }),
+  };
+  const out = { count: 42 };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  log('Shape: {count: 42} → ScalarBig', result.element?.type === OUTPUT_LIBRARY.ScalarBig);
+  log('Shape: ScalarBig value is 42', result.element?.props.value === 42);
 }
 
 // ---------- resolveRenderProps edge cases ----------
@@ -220,6 +393,21 @@ console.log('v16 renderer cascade tests');
     { other: 'thing' },
   );
   log('resolveRenderProps: missing field → null (bail)', resolved === null);
+}
+
+{
+  // items_field plucks the raw array (not a string) — used by the
+  // StringList library component for uuid-style outputs where each
+  // item needs to render as its own chip.
+  const resolved = __test__.resolveRenderProps(
+    { output_component: 'StringList', items_field: 'uuids', label: 'UUIDs' },
+    { uuids: ['a', 'b', 'c'] },
+  );
+  log(
+    'resolveRenderProps: items_field returns raw array',
+    Array.isArray(resolved.items) && resolved.items.length === 3,
+  );
+  log('resolveRenderProps: label pass-through', resolved.label === 'UUIDs');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -1,7 +1,14 @@
-// Cookie consent banner. Non-intrusive, fixed to bottom of viewport.
-// - "Accept essential only" and "Accept all" buttons (essential-only is the
-//   left/secondary action; we currently set zero non-essential cookies, so
-//   both choices lead to the same set today but the choice is recorded).
+// Cookie consent banner.
+//
+// Desktop/tablet: fixed bottom-centre pill, ~460px max-width, Accept / Essential
+// buttons inline. Behaves like a real banner.
+//
+// Mobile (< 640px, issue #104 from 2026-04-20 audit): the desktop layout
+// ate ~30% of a 375x812 iPhone viewport and overlapped the hero CTAs
+// ("Publish your app" / "Browse live apps"). On mobile we now render a
+// small bottom-left pill (link-style, ~92px wide) that says "Cookies"
+// and expands on tap. Nothing below the fold until the user chooses to
+// open it, so the hero is never blocked.
 // - Persists to localStorage AND a first-party cookie so server-rendered
 //   pages can also respect the choice if we add any.
 // - Hidden once a choice exists. SSR-safe (guards against undefined window).
@@ -12,6 +19,7 @@ import { Link } from 'react-router-dom';
 const STORAGE_KEY = 'floom.cookie-consent';
 const COOKIE_NAME = 'floom.cookie-consent';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+const MOBILE_BREAKPOINT = 640;
 
 type Choice = 'essential' | 'all';
 
@@ -48,8 +56,23 @@ function writeChoice(choice: Choice) {
   }
 }
 
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return isMobile;
+}
+
 export function CookieBanner() {
   const [visible, setVisible] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (readChoice() === null) setVisible(true);
@@ -62,11 +85,52 @@ export function CookieBanner() {
     setVisible(false);
   };
 
+  // Mobile collapsed pill — bottom-left, ~92px, doesn't touch the
+  // viewport centre where CTAs live. Tap expands to the full banner.
+  if (isMobile && !expanded) {
+    return (
+      <button
+        type="button"
+        data-testid="cookie-banner-pill"
+        onClick={() => setExpanded(true)}
+        aria-label="Cookie consent"
+        style={{
+          position: 'fixed',
+          left: 12,
+          bottom: 12,
+          zIndex: 1000,
+          padding: '7px 12px',
+          background: 'var(--card)',
+          border: '1px solid var(--line)',
+          borderRadius: 999,
+          boxShadow: '0 6px 20px rgba(14, 14, 12, 0.12)',
+          fontFamily: 'inherit',
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'var(--ink)',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <span aria-hidden="true">🍪</span>
+        Cookies
+      </button>
+    );
+  }
+
+  // Desktop banner (and expanded mobile banner). On mobile, the
+  // expanded variant is centred with a close button so the user can
+  // collapse back to the pill.
+  const isExpandedMobile = isMobile && expanded;
+
   return (
     <div
       role="dialog"
       aria-live="polite"
       aria-label="Cookie consent"
+      data-testid="cookie-banner"
       style={{
         position: 'fixed',
         left: 12,
@@ -130,6 +194,27 @@ export function CookieBanner() {
         >
           Accept all
         </button>
+        {isExpandedMobile && (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            aria-label="Close"
+            style={{
+              padding: '7px 10px',
+              borderRadius: 8,
+              border: '1px solid var(--line)',
+              background: 'transparent',
+              color: 'var(--muted)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 14,
+              fontWeight: 600,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        )}
       </div>
     </div>
   );
