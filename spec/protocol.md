@@ -76,6 +76,7 @@ The normalized manifest shape (v2.0):
 | `blocked_reason` | string | no | Free-text reason the app can't run (surfaced on the store). |
 | `license` | string | no | SPDX identifier (e.g. `"MIT"`), set from `info.license` at ingest. |
 | `render` | `RenderConfig` | no | Renderer hints (§3.3). |
+| `primary_action` | string | no | Key of the action the /p/:slug runner should select by default on multi-action apps. Must match a key in `actions` (invalid values are ignored, falling back to the first action). Surfaced as a "Primary" pill on the tab. Creators set this from `/studio/:slug`. |
 
 ### 3.1 `ActionSpec`
 

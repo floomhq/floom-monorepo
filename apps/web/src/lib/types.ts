@@ -71,6 +71,13 @@ export interface NormalizedManifest {
    * component as props. See apps/web/src/components/output/.
    */
   render?: RenderConfig;
+  /**
+   * Creator-pinned "primary action" for multi-action apps (audit
+   * 2026-04-20, Fix 3). When set to a valid key in `actions`, RunSurface
+   * selects that tab by default and decorates it with a "Primary" pill.
+   * Falls back to the first action key when missing or invalid.
+   */
+  primary_action?: string;
 }
 
 export interface RenderConfig {

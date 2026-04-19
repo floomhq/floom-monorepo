@@ -27,6 +27,11 @@ export function StudioAppPage() {
   // the pill flips before the round-trip lands. Failure reverts it.
   const [visibilityBusy, setVisibilityBusy] = useState(false);
   const [visibilityError, setVisibilityError] = useState<string | null>(null);
+  // Audit 2026-04-20 (Fix 3): primary-action control. Persists to manifest
+  // via PATCH /api/hub/:slug. Optimistic update so the dropdown reflects
+  // the new value before the round-trip lands.
+  const [primaryActionBusy, setPrimaryActionBusy] = useState(false);
+  const [primaryActionError, setPrimaryActionError] = useState<string | null>(null);
 
   async function handleDelete() {
     if (!app) return;
@@ -58,6 +63,35 @@ export function StudioAppPage() {
       setVisibilityError((err as Error).message || 'Could not update visibility');
     } finally {
       setVisibilityBusy(false);
+    }
+  }
+
+  async function handlePrimaryActionChange(next: string) {
+    if (!app || primaryActionBusy) return;
+    // Empty string = clear the pin (null server-side).
+    const serverValue = next === '' ? null : next;
+    const previous = app.manifest.primary_action ?? '';
+    if (previous === next) return;
+    setPrimaryActionBusy(true);
+    setPrimaryActionError(null);
+    // Optimistic update on the nested manifest.
+    const optimistic = {
+      ...app,
+      manifest: {
+        ...app.manifest,
+        primary_action: serverValue ?? undefined,
+      },
+    };
+    setApp(optimistic);
+    try {
+      await api.updateAppPrimaryAction(app.slug, serverValue);
+    } catch (err) {
+      setApp(app); // revert
+      setPrimaryActionError(
+        (err as Error).message || 'Could not update primary action',
+      );
+    } finally {
+      setPrimaryActionBusy(false);
     }
   }
 
@@ -206,6 +240,83 @@ export function StudioAppPage() {
               </p>
             )}
           </section>
+
+          {/* Audit 2026-04-20 (Fix 3): primary-action pin for multi-action
+              apps. Hidden when the app has ≤1 actions (nothing to pin).
+              Persists to manifest via PATCH /api/hub/:slug. */}
+          {Object.keys(app.manifest.actions).length > 1 && (
+            <>
+              <h2 style={sectionHeader}>Primary action</h2>
+              <section
+                data-testid="studio-app-primary-action"
+                style={{
+                  marginBottom: 32,
+                  border: '1px solid var(--line)',
+                  borderRadius: 10,
+                  background: 'var(--card)',
+                  padding: 20,
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0 0 12px',
+                    fontSize: 13,
+                    color: 'var(--muted)',
+                    lineHeight: 1.55,
+                    maxWidth: 620,
+                  }}
+                >
+                  Pick the action users should land on by default. Shows as
+                  an active tab with a "Primary" pill on /p/{app.slug}.
+                  Leave on "First action" to keep the default behavior.
+                </p>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'var(--ink)',
+                    marginBottom: 6,
+                  }}
+                >
+                  Primary action
+                </label>
+                <select
+                  data-testid="studio-app-primary-action-select"
+                  value={app.manifest.primary_action ?? ''}
+                  disabled={primaryActionBusy}
+                  onChange={(e) => handlePrimaryActionChange(e.target.value)}
+                  style={{
+                    width: '100%',
+                    maxWidth: 360,
+                    padding: '10px 12px',
+                    border: '1px solid var(--line)',
+                    borderRadius: 8,
+                    background: 'var(--card)',
+                    fontSize: 14,
+                    color: 'var(--ink)',
+                    fontFamily: 'inherit',
+                    cursor: primaryActionBusy ? 'wait' : 'pointer',
+                  }}
+                >
+                  <option value="">First action (default)</option>
+                  {Object.entries(app.manifest.actions).map(([key, spec]) => (
+                    <option key={key} value={key}>
+                      {spec.label || key}
+                    </option>
+                  ))}
+                </select>
+                {primaryActionError && (
+                  <p
+                    data-testid="studio-app-primary-action-error"
+                    style={{ margin: '12px 0 0', fontSize: 12, color: '#c2321f' }}
+                  >
+                    {primaryActionError}
+                  </p>
+                )}
+              </section>
+            </>
+          )}
 
           <h2 style={sectionHeader}>Recent runs</h2>
           {!runs && <div style={{ fontSize: 13, color: 'var(--muted)' }}>Loading…</div>}

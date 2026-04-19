@@ -24,10 +24,22 @@ const API_BASE = '';
 export class ApiError extends Error {
   status: number;
   code: string | null;
-  constructor(message: string, status: number, code: string | null = null) {
+  /**
+   * Full parsed JSON body from the error response, when the server
+   * returned structured data (e.g. `slug_taken` carries `suggestions[]`).
+   * Null for plain-text errors or when JSON parsing failed.
+   */
+  payload: unknown;
+  constructor(
+    message: string,
+    status: number,
+    code: string | null = null,
+    payload: unknown = null,
+  ) {
     super(message);
     this.status = status;
     this.code = code;
+    this.payload = payload;
   }
 }
 
@@ -44,14 +56,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const text = await res.text().catch(() => '');
     let code: string | null = null;
     let msg = text;
+    let payload: unknown = null;
     try {
       const j = JSON.parse(text) as { error?: string; code?: string };
       msg = j.error || text;
       code = j.code || null;
+      payload = j;
     } catch {
       // non-JSON error
     }
-    throw new ApiError(msg || `${res.status} ${res.statusText}`, res.status, code);
+    throw new ApiError(
+      msg || `${res.status} ${res.statusText}`,
+      res.status,
+      code,
+      payload,
+    );
   }
   return (await res.json()) as T;
 }
@@ -480,6 +499,21 @@ export function updateAppVisibility(
   return request(`/api/hub/${slug}`, {
     method: 'PATCH',
     body: JSON.stringify({ visibility }),
+  });
+}
+
+/**
+ * Audit 2026-04-20 (Fix 3): owner can pin a "primary_action" so
+ * multi-action apps default to the creator-chosen tab on /p/:slug.
+ * Pass `null` to clear the pin (falls back to first action).
+ */
+export function updateAppPrimaryAction(
+  slug: string,
+  primaryAction: string | null,
+): Promise<{ ok: true; slug: string; primary_action: string | null }> {
+  return request(`/api/hub/${slug}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ primary_action: primaryAction }),
   });
 }
 
