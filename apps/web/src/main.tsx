@@ -217,18 +217,21 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/pricing" element={<Navigate to="/" replace />} />
         <Route path="/store" element={<Navigate to="/apps" replace />} />
         <Route path="/p/:slug/dashboard" element={<PSlugDashboardRedirect />} />
-        {/* Legal pages (DE commercial site: §5 TMG imprint is mandatory). */}
+        {/* Legal pages. Floom, Inc. is a Delaware C-Corp. /legal is the
+            canonical company-info route; /imprint is kept as a back-compat
+            alias because earlier builds (and external sitemaps) used it. */}
+        <Route path="/legal" element={<ImprintPage />} />
         <Route path="/imprint" element={<ImprintPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/cookies" element={<CookiesPage />} />
-        {/* /legal/* aliases so both URL conventions work. */}
-        <Route path="/legal/imprint" element={<Navigate to="/imprint" replace />} />
+        {/* /legal/* subpath aliases so both URL conventions work. */}
+        <Route path="/legal/imprint" element={<Navigate to="/legal" replace />} />
         <Route path="/legal/privacy" element={<Navigate to="/privacy" replace />} />
         <Route path="/legal/terms" element={<Navigate to="/terms" replace />} />
         <Route path="/legal/cookies" element={<Navigate to="/cookies" replace />} />
-        {/* German-language alias for imprint (users may type /impressum). */}
-        <Route path="/impressum" element={<Navigate to="/imprint" replace />} />
+        {/* German-language alias for anyone typing /impressum from habit. */}
+        <Route path="/impressum" element={<Navigate to="/legal" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       </Suspense>
