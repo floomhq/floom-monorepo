@@ -7,20 +7,28 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StudioLayout } from '../components/studio/StudioLayout';
+import { StudioSignedOutState } from '../components/studio/StudioSignedOutState';
 import * as api from '../api/client';
 import { refreshMyApps, useMyApps } from '../hooks/useMyApps';
+import { useSession } from '../hooks/useSession';
 import { formatTime } from '../lib/time';
 
 export function StudioHomePage() {
   const { apps, error: loadError } = useMyApps();
+  const { data: session } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [confirmSlug, setConfirmSlug] = useState<string | null>(null);
   const [confirmInput, setConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const signedOutPreview = !!session && session.cloud_mode && session.user.is_local;
 
   useEffect(() => {
+    if (signedOutPreview) {
+      setError(null);
+      return;
+    }
     if (loadError) setError(loadError.message);
-  }, [loadError]);
+  }, [loadError, signedOutPreview]);
 
   async function handleDelete() {
     if (!confirmSlug) return;
@@ -38,8 +46,15 @@ export function StudioHomePage() {
   }
 
   return (
-    <StudioLayout title="Studio · Floom">
+    <StudioLayout
+      title="Studio · Floom"
+      allowSignedOutShell={signedOutPreview}
+    >
       <div data-testid="studio-home">
+        {signedOutPreview ? (
+          <StudioSignedOutState />
+        ) : (
+          <>
         <div
           style={{
             display: 'flex',
@@ -248,6 +263,8 @@ export function StudioHomePage() {
               </div>
             ))}
           </div>
+        )}
+          </>
         )}
 
         {confirmSlug && (

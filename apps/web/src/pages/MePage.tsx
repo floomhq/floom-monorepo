@@ -24,7 +24,7 @@
 
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
 import { AppIcon } from '../components/AppIcon';
 import { ToolTile } from '../components/me/ToolTile';
@@ -176,6 +176,42 @@ const s: Record<string, CSSProperties> = {
     cursor: 'pointer',
     fontFamily: 'inherit',
   },
+  signedOutBanner: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    padding: '18px 20px',
+    marginBottom: 24,
+    borderRadius: 12,
+    border: '1px solid var(--line)',
+    background: 'var(--card)',
+  },
+  primaryButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '10px 16px',
+    borderRadius: 8,
+    border: '1px solid var(--ink)',
+    background: 'var(--ink)',
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 600,
+    textDecoration: 'none',
+  },
+  secondaryButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '10px 16px',
+    borderRadius: 8,
+    border: '1px solid var(--line)',
+    background: 'var(--bg)',
+    color: 'var(--ink)',
+    fontSize: 13,
+    fontWeight: 600,
+    textDecoration: 'none',
+  },
   appIconWrap: {
     width: 26,
     height: 26,
@@ -208,16 +244,28 @@ type UsedApp = {
 };
 
 export function MePage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: sessionData } = useSession();
+  const { data: sessionData, loading: sessionLoading, error: sessionError } = useSession();
 
   const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
   const [runsError, setRunsError] = useState<string | null>(null);
   const [curated, setCurated] = useState<HubApp[] | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_LIMIT);
+  const sessionPending = sessionLoading || (sessionData === null && !sessionError);
+  const signedOutPreview = !!sessionData && sessionData.cloud_mode && sessionData.user.is_local;
+  const canLoadPersonalData = !signedOutPreview;
+  const signInHref =
+    '/login?next=' + encodeURIComponent(location.pathname + location.search);
 
   useEffect(() => {
+    if (sessionPending) return;
+    if (!canLoadPersonalData) {
+      setRuns([]);
+      setRunsError(null);
+      return;
+    }
     let cancelled = false;
     api
       .getMyRuns(FETCH_LIMIT)
@@ -230,7 +278,7 @@ export function MePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [canLoadPersonalData, sessionPending]);
 
   // Derive "Your apps" from runs: group by slug, take N most-recent
   // distinct slugs. Runs arrive started_at DESC from the backend, so a
@@ -254,7 +302,7 @@ export function MePage() {
   // If the user has no runs yet, fetch the public directory and surface a
   // curated row. /api/hub returns sorted by featured DESC, avg_run_ms ASC,
   // created_at DESC, name ASC — already the order we want.
-  const needsCurated = usedApps !== null && usedApps.length === 0;
+  const needsCurated = signedOutPreview || (usedApps !== null && usedApps.length === 0);
   useEffect(() => {
     if (!needsCurated || curated !== null) return;
     let cancelled = false;
@@ -316,6 +364,7 @@ export function MePage() {
       requireAuth="cloud"
       title="Me · Floom"
       contentStyle={{ padding: 0, maxWidth: 'none', minHeight: 'auto' }}
+      allowSignedOutShell={signedOutPreview}
     >
       <main data-testid="me-page" style={s.main}>
         <header style={s.header}>
@@ -342,6 +391,23 @@ export function MePage() {
 
         {showNotice && (
           <AppNotFound slug={noticeSlug} onDismiss={dismissNotice} />
+        )}
+
+        {signedOutPreview && (
+          <section data-testid="me-signed-out-shell" style={s.signedOutBanner}>
+            <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--ink)' }}>
+              <strong style={{ display: 'block', marginBottom: 4 }}>Sign in to load your runs.</strong>
+              You can still browse live apps and preview how this page works before you log in.
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <Link to={signInHref} style={s.primaryButton}>
+                Sign in
+              </Link>
+              <Link to="/apps" style={s.secondaryButton}>
+                Browse apps
+              </Link>
+            </div>
+          </section>
         )}
 
         {/* Your apps — the only apps section on /me. These are the apps
@@ -507,7 +573,7 @@ export function MePage() {
           ) : runsError ? (
             <ErrorPanel message={runsError} />
           ) : runs && runs.length === 0 ? (
-            <EmptyRuns />
+            <EmptyRuns signedOutPreview={signedOutPreview} signInHref={signInHref} />
           ) : (
             <div data-testid="me-runs-list" style={s.card}>
               {visibleRuns.map((run, i) => (
@@ -904,7 +970,13 @@ function ErrorPanel({ message }: { message: string }) {
   );
 }
 
-function EmptyRuns() {
+function EmptyRuns({
+  signedOutPreview = false,
+  signInHref = '/login?next=%2Fme',
+}: {
+  signedOutPreview?: boolean;
+  signInHref?: string;
+}) {
   return (
     <section
       data-testid="me-runs-empty"
@@ -924,7 +996,7 @@ function EmptyRuns() {
           marginBottom: 8,
         }}
       >
-        No runs yet.
+        {signedOutPreview ? 'Sign in to see your runs.' : 'No runs yet.'}
       </div>
       <p
         style={{
@@ -935,25 +1007,47 @@ function EmptyRuns() {
           maxWidth: 380,
         }}
       >
-        Run any Floom app and it will show up here. Try one from the public
-        directory.
+        {signedOutPreview
+          ? 'Your run history appears here after you sign in. You can still try apps from the public directory right now.'
+          : 'Run any Floom app and it will show up here. Try one from the public directory.'}
       </p>
-      <Link
-        to="/apps"
-        data-testid="me-empty-browse"
-        style={{
-          display: 'inline-block',
-          padding: '10px 18px',
-          background: 'var(--ink)',
-          color: '#fff',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 600,
-          textDecoration: 'none',
-        }}
-      >
-        Browse apps →
-      </Link>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {signedOutPreview ? (
+          <Link
+            to={signInHref}
+            data-testid="me-empty-signin"
+            style={{
+              display: 'inline-block',
+              padding: '10px 18px',
+              background: 'var(--ink)',
+              color: '#fff',
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            Sign in
+          </Link>
+        ) : null}
+        <Link
+          to="/apps"
+          data-testid="me-empty-browse"
+          style={{
+            display: 'inline-block',
+            padding: '10px 18px',
+            background: signedOutPreview ? 'var(--card)' : 'var(--ink)',
+            color: signedOutPreview ? 'var(--ink)' : '#fff',
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: 'none',
+            border: signedOutPreview ? '1px solid var(--line)' : '1px solid var(--ink)',
+          }}
+        >
+          Browse apps →
+        </Link>
+      </div>
     </section>
   );
 }

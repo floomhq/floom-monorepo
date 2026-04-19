@@ -25,12 +25,15 @@ process.env.FLOOM_DISABLE_JOB_WORKER = 'true';
 process.env.FLOOM_MASTER_KEY =
   '0'.repeat(16) + '1'.repeat(16) + '2'.repeat(16) + '3'.repeat(16);
 process.env.FLOOM_CLOUD_MODE = 'true';
+process.env.FLOOM_AUTH_TOKEN = 'stream-test-token';
 process.env.BETTER_AUTH_SECRET =
   '0'.repeat(16) + '1'.repeat(16) + '2'.repeat(16) + '3'.repeat(16);
 
 const { db } = await import('../../apps/server/dist/db.js');
 const auth = await import('../../apps/server/dist/lib/better-auth.js');
 const { hubRouter } = await import('../../apps/server/dist/routes/hub.js');
+const { runRouter } = await import('../../apps/server/dist/routes/run.js');
+const { getOrCreateStream } = await import('../../apps/server/dist/lib/log-stream.js');
 
 let passed = 0;
 let failed = 0;
@@ -81,7 +84,7 @@ function seedWorkspace(id, slug, user_id) {
   ).run(user_id, id);
 }
 
-function insertApp({ slug, workspace_id, author }) {
+function insertApp({ slug, workspace_id, author, visibility = 'public' }) {
   const id = `app_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
   const manifest = JSON.stringify({
     name: slug,
@@ -94,8 +97,8 @@ function insertApp({ slug, workspace_id, author }) {
     `INSERT INTO apps
        (id, slug, name, description, manifest, status, code_path,
         author, workspace_id, app_type, visibility)
-     VALUES (?, ?, ?, ?, ?, 'active', 'proxied:test', ?, ?, 'proxied', 'public')`,
-  ).run(id, slug, slug, `${slug} app`, manifest, author, workspace_id);
+     VALUES (?, ?, ?, ?, ?, 'active', 'proxied:test', ?, ?, 'proxied', ?)`,
+  ).run(id, slug, slug, `${slug} app`, manifest, author, workspace_id, visibility);
   return id;
 }
 
@@ -175,6 +178,38 @@ insertRun({
   outputs: { greeting: 'hi' },
 });
 
+const authRequiredAppId = insertApp({
+  slug: 'token-gated-app',
+  workspace_id: 'ws-alice',
+  author: 'user-alice',
+  visibility: 'auth-required',
+});
+const authRequiredRunId = insertRun({
+  app_id: authRequiredAppId,
+  workspace_id: 'ws-alice',
+  user_id: 'user-alice',
+  device_id: 'dev-token',
+  inputs: { mode: 'token' },
+  outputs: { password: 'TOKEN-SECRET-123' },
+});
+getOrCreateStream(authRequiredRunId).finish();
+
+const privateAppId = insertApp({
+  slug: 'private-stream-app',
+  workspace_id: 'ws-alice',
+  author: 'user-alice',
+  visibility: 'private',
+});
+const privateRunId = insertRun({
+  app_id: privateAppId,
+  workspace_id: 'ws-alice',
+  user_id: 'user-alice',
+  device_id: 'dev-private',
+  inputs: { mode: 'private' },
+  outputs: { password: 'PRIVATE-SECRET-456' },
+});
+getOrCreateStream(privateRunId).finish();
+
 // ---- inject Better Auth sessions ----
 auth._resetAuthForTests();
 const a = auth.getAuth();
@@ -231,9 +266,56 @@ log(
 );
 
 // =====================================================================
-// 3. Cloud mode · Bob is NOT the owner → 403 not_owner
+// 3. GET /api/run/:id/stream matches GET /api/run/:id auth/visibility
 // =====================================================================
-console.log('\n[3] Authed non-owner Bob → 403 not_owner');
+console.log('\n[3] Run stream auth/visibility parity');
+fakeUser = null;
+let snapshot = await fetchRoute(runRouter, 'GET', `/${authRequiredRunId}`);
+let stream = await fetchRoute(runRouter, 'GET', `/${authRequiredRunId}/stream`);
+log('auth-required snapshot without bearer: 401', snapshot.status === 401, `got ${snapshot.status}`);
+log('auth-required stream without bearer: 401', stream.status === 401, `got ${stream.status}`);
+log(
+  'auth-required stream without bearer: no leak',
+  stream.text.indexOf('TOKEN-SECRET-123') === -1,
+);
+
+snapshot = await fetchRoute(runRouter, 'GET', `/${authRequiredRunId}`, {
+  authorization: 'Bearer stream-test-token',
+});
+stream = await fetchRoute(runRouter, 'GET', `/${authRequiredRunId}/stream`, {
+  authorization: 'Bearer stream-test-token',
+});
+log('auth-required snapshot with bearer: 200', snapshot.status === 200, `got ${snapshot.status}`);
+log('auth-required stream with bearer: 200', stream.status === 200, `got ${stream.status}`);
+log(
+  'auth-required stream with bearer: emits status payload',
+  stream.text.includes('event: status') && stream.text.includes('TOKEN-SECRET-123'),
+  stream.text,
+);
+
+fakeUser = { id: 'user-bob', email: 'bob@example.com', name: 'Bob' };
+snapshot = await fetchRoute(runRouter, 'GET', `/${privateRunId}`);
+stream = await fetchRoute(runRouter, 'GET', `/${privateRunId}/stream`);
+log('private snapshot for non-owner: 404', snapshot.status === 404, `got ${snapshot.status}`);
+log('private stream for non-owner: 404', stream.status === 404, `got ${stream.status}`);
+log(
+  'private stream for non-owner: no leak',
+  stream.text.indexOf('PRIVATE-SECRET-456') === -1,
+);
+
+fakeUser = { id: 'user-alice', email: 'alice@example.com', name: 'Alice' };
+stream = await fetchRoute(runRouter, 'GET', `/${privateRunId}/stream`);
+log('private stream for owner: 200', stream.status === 200, `got ${stream.status}`);
+log(
+  'private stream for owner: emits status payload',
+  stream.text.includes('event: status') && stream.text.includes('PRIVATE-SECRET-456'),
+  stream.text,
+);
+
+// =====================================================================
+// 4. Cloud mode · Bob is NOT the owner → 403 not_owner
+// =====================================================================
+console.log('\n[4] Authed non-owner Bob → 403 not_owner');
 fakeUser = { id: 'user-bob', email: 'bob@example.com', name: 'Bob' };
 r = await fetchRoute(hubRouter, 'GET', '/leaky-app/runs');
 log('Bob: 403 Forbidden', r.status === 403, `got ${r.status}`);
@@ -244,9 +326,9 @@ log(
 );
 
 // =====================================================================
-// 4. Cloud mode · anon cannot fish local-seeded app either
+// 5. Cloud mode · anon cannot fish local-seeded app either
 // =====================================================================
-console.log('\n[4] Cloud mode anon cannot fish local-authored app');
+console.log('\n[5] Cloud mode anon cannot fish local-authored app');
 fakeUser = null;
 r = await fetchRoute(hubRouter, 'GET', '/seed-local/runs');
 log('anon on /seed-local/runs: 401', r.status === 401, `got ${r.status}`);
@@ -256,9 +338,9 @@ log(
 );
 
 // =====================================================================
-// 5. OSS mode · synthetic local caller keeps access to their own runs
+// 6. OSS mode · synthetic local caller keeps access to their own runs
 // =====================================================================
-console.log('\n[5] OSS mode · local self-host back-compat');
+console.log('\n[6] OSS mode · local self-host back-compat');
 // Flip cloud mode off so resolveUserContext returns the OSS synthetic ctx.
 delete process.env.FLOOM_CLOUD_MODE;
 auth._resetAuthForTests();

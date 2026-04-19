@@ -90,8 +90,6 @@ export function TopBar({ compact = false }: Props = {}) {
   const location = useLocation();
   const dropRef = useRef<HTMLDivElement>(null);
 
-  const isHome = location.pathname === '/';
-  const selfHostHref = isHome ? '#self-host' : '/#self-host';
   const isDocs = location.pathname.startsWith('/protocol') || location.pathname === '/docs';
   const isStore = location.pathname.startsWith('/apps') || location.pathname.startsWith('/p/');
   const isStudio = location.pathname.startsWith('/studio');
@@ -101,7 +99,6 @@ export function TopBar({ compact = false }: Props = {}) {
   const isLoginPage =
     location.pathname === '/login' || location.pathname === '/signup';
   const ownedAppCount = myApps?.length ?? 0;
-  const showStudioLink = isAuthenticated && ownedAppCount > 0;
   const deployHref = isAuthenticated ? '/studio/build' : '/signup?next=%2Fstudio%2Fbuild';
 
   useEffect(() => {
@@ -195,33 +192,16 @@ export function TopBar({ compact = false }: Props = {}) {
             aria-current={isStore ? 'page' : undefined}
             style={navStyle(isStore)}
           >
-            Store
+            Apps
           </Link>
-          {showStudioLink && (
-            <Link
-              to="/studio"
-              data-testid="topbar-studio"
-              aria-current={false}
-              style={navStyle(false)}
-            >
-              Studio
-              {ownedAppCount > 0 && (
-                <span
-                  style={{
-                    marginLeft: 6,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: 'var(--muted)',
-                    background: 'var(--bg)',
-                    borderRadius: 999,
-                    padding: '1px 6px',
-                  }}
-                >
-                  {ownedAppCount}
-                </span>
-              )}
-            </Link>
-          )}
+          <Link
+            to="/protocol"
+            data-testid="topbar-protocol"
+            aria-current={isDocs ? 'page' : undefined}
+            style={navStyle(isDocs)}
+          >
+            Docs
+          </Link>
           {isAuthenticated && (
             <Link
               to="/me"
@@ -232,22 +212,15 @@ export function TopBar({ compact = false }: Props = {}) {
               Me
             </Link>
           )}
-          <Link
-            to="/protocol"
-            data-testid="topbar-protocol"
-            aria-current={isDocs ? 'page' : undefined}
-            style={navStyle(isDocs)}
-          >
-            Docs
-          </Link>
-          {!isAuthenticated && (
-            <a
-              href={selfHostHref}
-              aria-current={isHome && location.hash === '#self-host' ? 'page' : undefined}
-              style={navStyle(isHome && location.hash === '#self-host')}
+          {isAuthenticated && ownedAppCount > 0 && (
+            <Link
+              to="/studio"
+              data-testid="topbar-studio"
+              aria-current={isStudio ? 'page' : undefined}
+              style={navStyle(isStudio)}
             >
-              Self-host
-            </a>
+              Studio ({ownedAppCount})
+            </Link>
           )}
         </nav>
         )}
@@ -271,7 +244,7 @@ export function TopBar({ compact = false }: Props = {}) {
             </Link>
           )}
 
-          {!isStudio && !showStudioLink && (
+          {!isStudio && !isAuthenticated && (
             <Link
               to={deployHref}
               aria-current={isDeploy ? 'page' : undefined}
@@ -439,7 +412,7 @@ export function TopBar({ compact = false }: Props = {}) {
             role="menuitem"
             onClick={() => setMenuOpen(false)}
           >
-            Store
+            Apps
           </Link>
           <Link
             to="/protocol"
@@ -449,14 +422,6 @@ export function TopBar({ compact = false }: Props = {}) {
           >
             Docs
           </Link>
-          <a
-            href={selfHostHref}
-            className="topbar-mobile-link"
-            role="menuitem"
-            onClick={() => setMenuOpen(false)}
-          >
-            Self-host
-          </a>
           {!isAuthenticated && (
             <Link
               to={deployHref}

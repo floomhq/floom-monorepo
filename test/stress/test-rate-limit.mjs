@@ -17,6 +17,8 @@ for (const k of [
   'FLOOM_RATE_LIMIT_USER_PER_HOUR',
   'FLOOM_RATE_LIMIT_APP_PER_HOUR',
   'FLOOM_RATE_LIMIT_MCP_INGEST_PER_DAY',
+  'FLOOM_TRUSTED_PROXY_CIDRS',
+  'FLOOM_TRUSTED_PROXY_HOP_COUNT',
 ]) delete process.env[k];
 
 let passed = 0;
@@ -31,16 +33,33 @@ const log = (label, ok, detail) => {
   }
 };
 
-// Fake Hono Context: header+param+json enough to drive the middleware.
+// Fake Hono Context: header+param+json+peer socket enough to drive the
+// middleware.
 // `header(name, value)` writes a response header too, matching Hono's own
 // dual-purpose API so applyLimitHeaders (issue #128) can attach
 // X-RateLimit-* on the success path.
-function makeCtx({ ip = '1.2.3.4', slug = null, headers = {} } = {}) {
+function makeCtx({
+  ip = '1.2.3.4',
+  peerIp = '127.0.0.1',
+  slug = null,
+  headers = {},
+} = {}) {
   const hdrs = new Headers(
     ip === null ? headers : { 'x-forwarded-for': ip, ...headers },
   );
   const responseHeaders = new Headers();
   return {
+    env:
+      peerIp === null
+        ? {}
+        : {
+            incoming: {
+              socket: {
+                remoteAddress: peerIp,
+                remoteFamily: peerIp.includes(':') ? 'IPv6' : 'IPv4',
+              },
+            },
+          },
     _responseHeaders: responseHeaders,
     req: {
       header: (n) => hdrs.get(n.toLowerCase()) || hdrs.get(n) || null,
@@ -81,55 +100,102 @@ log('mcp ingest default is 10/day', rl.defaultMcpIngestPerDay() === 10);
 process.env.FLOOM_RATE_LIMIT_IP_PER_HOUR = '5';
 log('FLOOM_RATE_LIMIT_IP_PER_HOUR override', rl.defaultAnonPerHour() === 5);
 
-// 3. extractIp precedence
+// 3. extractIp trust rules
 log(
-  'extractIp prefers cf-connecting-ip',
+  'extractIp trusts cf-connecting-ip from loopback proxy',
   rl.extractIp(
     makeCtx({ ip: '9.9.9.9', headers: { 'cf-connecting-ip': '10.0.0.1' } }),
   ) === '10.0.0.1',
 );
-// Issue #142: XFF is attacker-controlled on the prefix, trusted on the
-// LAST N entries. Default trusted hops = 1 → real client is xff[len-1].
 log(
-  'extractIp takes LAST XFF entry (not first)',
+  'extractIp takes last trusted XFF entry from loopback proxy',
   rl.extractIp(makeCtx({ ip: '1.1.1.1, 2.2.2.2' })) === '2.2.2.2',
 );
 log(
-  'extractIp ignores attacker-set prefix when nginx appends real IP',
-  rl.extractIp(
-    makeCtx({ ip: '6.6.6.6, 7.7.7.7, 203.0.113.9' }),
-  ) === '203.0.113.9',
-);
-log(
-  'extractIp prefers x-real-ip over xff (nginx-set, non-spoofable)',
+  'extractIp prefers x-real-ip from trusted proxy',
   rl.extractIp(
     makeCtx({ ip: '1.1.1.1, 2.2.2.2', headers: { 'x-real-ip': '203.0.113.9' } }),
   ) === '203.0.113.9',
 );
 log(
-  'extractIp falls back to unknown',
-  rl.extractIp(makeCtx({ ip: null })) === 'unknown',
+  'extractIp ignores spoofed XFF from untrusted peer',
+  rl.extractIp(makeCtx({ peerIp: '203.0.113.10', ip: '1.1.1.1' })) ===
+    '203.0.113.10',
 );
-// FLOOM_TRUSTED_PROXY_HOP_COUNT=N means N trusted proxies appended to
-// the chain. Real client sits at entries[len - N]. With N=2 and chain
-// '<fake>, <real>, <hop2>' (CDN hop + nginx hop), real client is entries[1].
+process.env.FLOOM_TRUSTED_PROXY_CIDRS = '203.0.113.0/24';
+log(
+  'extractIp trusts configured proxy CIDR',
+  rl.extractIp(makeCtx({ peerIp: '203.0.113.10', ip: '4.4.4.4' })) ===
+    '4.4.4.4',
+);
 process.env.FLOOM_TRUSTED_PROXY_HOP_COUNT = '2';
 log(
-  'hop_count=2 extracts real client before 2 trusted hops',
-  rl.extractIp(makeCtx({ ip: 'ATTACKER, 203.0.113.9, 10.0.0.1' })) === '203.0.113.9',
+  'trusted proxy hop count strips the trailing proxy hop',
+  rl.extractIp(makeCtx({ peerIp: '203.0.113.10', ip: 'ATTACKER, 203.0.113.9, 10.0.0.1' })) ===
+    '203.0.113.9',
 );
 log(
-  'hop_count=2 with too-short chain falls through to unknown',
-  rl.extractIp(makeCtx({ ip: '10.0.0.1' })) === 'unknown',
+  'trusted proxy hop count with too-short chain falls back to peer IP',
+  rl.extractIp(makeCtx({ peerIp: '203.0.113.10', ip: '10.0.0.1' })) ===
+    '203.0.113.10',
 );
 delete process.env.FLOOM_TRUSTED_PROXY_HOP_COUNT;
+delete process.env.FLOOM_TRUSTED_PROXY_CIDRS;
 log(
-  'trusted hop default is 1',
-  rl.defaultTrustedProxyHopCount() === 1,
+  'extractIp falls back to direct peer IP without proxy headers',
+  rl.extractIp(makeCtx({ ip: null, peerIp: '198.51.100.7' })) ===
+    '198.51.100.7',
 );
+log(
+  'extractIp falls back to unknown without peer or proxy IP',
+  rl.extractIp(makeCtx({ ip: null, peerIp: null })) === 'unknown',
+);
+
+// 3b. proxy spoofing guard on anon buckets
+rl.__resetStoreForTests();
+process.env.FLOOM_RATE_LIMIT_IP_PER_HOUR = '1';
+const mwSpoof = rl.runRateLimitMiddleware(anonResolve);
+const spoofA = await mwSpoof(
+  makeCtx({ peerIp: '203.0.113.10', ip: '1.1.1.1' }),
+  async () => undefined,
+);
+const spoofB = await mwSpoof(
+  makeCtx({ peerIp: '203.0.113.10', ip: '2.2.2.2' }),
+  async () => undefined,
+);
+log(
+  'untrusted peer cannot rotate XFF to evade anon IP cap',
+  spoofA?.status !== 429 && spoofB?.status === 429,
+);
+
+// 3c. configured proxy preserves per-client separation
+rl.__resetStoreForTests();
+process.env.FLOOM_RATE_LIMIT_IP_PER_HOUR = '1';
+process.env.FLOOM_TRUSTED_PROXY_CIDRS = '203.0.113.0/24';
+const mwTrustedProxy = rl.runRateLimitMiddleware(anonResolve);
+const trustedA = await mwTrustedProxy(
+  makeCtx({ peerIp: '203.0.113.10', ip: '1.1.1.1' }),
+  async () => undefined,
+);
+const trustedB = await mwTrustedProxy(
+  makeCtx({ peerIp: '203.0.113.10', ip: '2.2.2.2' }),
+  async () => undefined,
+);
+const trustedASecond = await mwTrustedProxy(
+  makeCtx({ peerIp: '203.0.113.10', ip: '1.1.1.1' }),
+  async () => undefined,
+);
+log(
+  'trusted proxy uses forwarded client IPs for anon buckets',
+  trustedA?.status !== 429 &&
+    trustedB?.status !== 429 &&
+    trustedASecond?.status === 429,
+);
+delete process.env.FLOOM_TRUSTED_PROXY_CIDRS;
 
 // 4. anon IP cap
 rl.__resetStoreForTests();
+process.env.FLOOM_RATE_LIMIT_IP_PER_HOUR = '5';
 const mw = rl.runRateLimitMiddleware(anonResolve);
 let blocked = 0;
 let ok = 0;

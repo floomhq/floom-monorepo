@@ -20,6 +20,8 @@ import * as api from '../api/client';
 
 type Mode = 'signin' | 'signup';
 
+const PENDING_KEY = 'floom:pending-publish';
+
 export function LoginPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -32,6 +34,7 @@ export function LoginPage() {
   const [name, setName] = useState('');
   const [state, setState] = useState<'idle' | 'submitting' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
 
   const nextPath = searchParams.get('next') || '/me';
 
@@ -45,6 +48,16 @@ export function LoginPage() {
   useEffect(() => {
     setMode(routeMode);
   }, [routeMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedDraft = window.localStorage.getItem(PENDING_KEY);
+      setHasSavedDraft(Boolean(savedDraft) && nextPath.startsWith('/studio/build'));
+    } catch {
+      setHasSavedDraft(false);
+    }
+  }, [nextPath]);
 
   // OAuth social sign-in (Google/GitHub) was removed 2026-04-17. The buttons
   // pointed at /auth/sign-in/social but Better Auth only registers a provider
@@ -135,6 +148,24 @@ export function LoginPage() {
             ? 'Use your email and password.'
             : 'One account. Run apps, connect tools, publish your own.'}
         </p>
+
+        {hasSavedDraft && (
+          <div
+            data-testid="auth-resume-banner"
+            style={{
+              background: '#ecfdf5',
+              border: '1px solid #b7ebd3',
+              color: '#0f5132',
+              borderRadius: 10,
+              padding: '12px 14px',
+              fontSize: 13,
+              marginBottom: 16,
+              lineHeight: 1.5,
+            }}
+          >
+            Your app draft is saved. {mode === 'signin' ? 'Sign in' : 'Create your account'} to pick up where you left off.
+          </div>
+        )}
 
         {/* Tabs */}
         <div
@@ -478,4 +509,3 @@ const primaryButtonStyle: React.CSSProperties = {
   cursor: 'pointer',
   marginTop: 12,
 };
-

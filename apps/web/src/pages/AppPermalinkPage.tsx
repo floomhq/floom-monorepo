@@ -19,6 +19,12 @@ import { DescriptionMarkdown } from '../components/DescriptionMarkdown';
 import { getApp, getAppReviews, getRun } from '../api/client';
 import { useSession } from '../hooks/useSession';
 import type { ActionSpec, AppDetail, ReviewSummary, RunRecord } from '../lib/types';
+import {
+  buildPublicRunPath,
+  classifyPermalinkLoadError,
+  getPermalinkLoadErrorMessage,
+  type PermalinkLoadOutcome,
+} from '../lib/publicPermalinks';
 
 // Map of known app slugs to GitHub repo URLs. Only slugs whose example
 // directory lives in examples/ are linked; stub-only apps (floom.yaml with
@@ -49,6 +55,7 @@ export function AppPermalinkPage() {
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadFailure, setLoadFailure] = useState<PermalinkLoadOutcome | null>(null);
   const [comingSoon, setComingSoon] = useState<ComingSoonTarget | null>(null);
   // Fix 4 (2026-04-19): tiny self-dismissing toast for the Share button.
   const [shareToast, setShareToast] = useState(false);
@@ -72,16 +79,22 @@ export function AppPermalinkPage() {
   useEffect(() => {
     if (!slug) {
       setNotFound(true);
+      setLoadFailure(null);
       setLoading(false);
       return;
     }
+    setLoading(true);
+    setNotFound(false);
+    setLoadFailure(null);
     getApp(slug)
       .then((a) => {
         setApp(a);
         setLoading(false);
       })
-      .catch(() => {
-        setNotFound(true);
+      .catch((err) => {
+        const outcome = classifyPermalinkLoadError(err);
+        setNotFound(outcome === 'not_found');
+        setLoadFailure(outcome === 'retryable' ? outcome : null);
         setLoading(false);
       });
     // Fetch review summary separately so hero can show it without waiting
@@ -348,31 +361,66 @@ export function AppPermalinkPage() {
   }
 
   if (notFound || !app) {
+    const retryable = loadFailure === 'retryable';
     return (
       <div className="page-root">
         <TopBar />
         <main className="main" style={{ paddingTop: 80, textAlign: 'center', maxWidth: 480, margin: '0 auto' }}>
-          <h1 style={{ fontSize: 32, fontWeight: 700, margin: '0 0 12px' }}>404</h1>
+          <h1 style={{ fontSize: 32, fontWeight: 700, margin: '0 0 12px' }}>
+            {retryable ? 'App temporarily unavailable' : '404'}
+          </h1>
           <p style={{ color: 'var(--muted)', fontSize: 16, margin: '0 0 32px' }}>
-            No app found at <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>/p/{slug}</code>
+            {retryable ? (
+              getPermalinkLoadErrorMessage('app')
+            ) : (
+              <>
+                No app found at{' '}
+                <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>/p/{slug}</code>
+              </>
+            )}
           </p>
-          <Link
-            to="/apps"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '10px 20px',
-              background: 'var(--accent)',
-              color: '#fff',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: 'none',
-            }}
-          >
-            Back to all apps
-          </Link>
+          <div style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap' }}>
+            {retryable ? (
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '10px 20px',
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  border: '1px solid var(--accent)',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Try again
+              </button>
+            ) : null}
+            <Link
+              to="/apps"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '10px 20px',
+                background: retryable ? 'var(--card)' : 'var(--accent)',
+                color: retryable ? 'var(--ink)' : '#fff',
+                borderRadius: 8,
+                border: retryable ? '1px solid var(--line)' : '1px solid var(--accent)',
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Back to all apps
+            </Link>
+          </div>
         </main>
         <Footer />
       </div>
@@ -639,8 +687,13 @@ export function AppPermalinkPage() {
                   data-testid="cta-share"
                   onClick={() => {
                     try {
+                      const currentUrl = new URL(window.location.href);
+                      const currentRunId = currentUrl.searchParams.get('run');
+                      const shareUrl = currentRunId
+                        ? `${window.location.origin}${buildPublicRunPath(currentRunId)}`
+                        : currentUrl.toString();
                       void navigator.clipboard
-                        .writeText(window.location.href)
+                        .writeText(shareUrl)
                         .then(() => {
                           setShareToast(true);
                           window.setTimeout(() => setShareToast(false), 1800);

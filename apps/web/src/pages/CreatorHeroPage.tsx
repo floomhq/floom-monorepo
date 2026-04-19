@@ -15,8 +15,9 @@ import { BuiltBy } from '../components/home/BuiltBy';
 import { HeroAppTiles } from '../components/home/HeroAppTiles';
 import { ProofRow } from '../components/home/ProofRow';
 import { SectionEyebrow } from '../components/home/SectionEyebrow';
-import { getHub } from '../api/client';
-import type { HubApp } from '../lib/types';
+import * as api from '../api/client';
+import { useSession } from '../hooks/useSession';
+import type { DetectedApp, HubApp } from '../lib/types';
 import { publicHubApps } from '../lib/hub-filter';
 import { LAUNCH_APPS } from '../data/demoData';
 
@@ -59,6 +60,55 @@ const FALLBACK_STRIPES: Stripe[] = [
   },
 ];
 
+const PENDING_KEY = 'floom:pending-publish';
+
+type PendingPublish = {
+  detected: DetectedApp;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  visibility: 'public' | 'private' | 'auth-required';
+  source: 'github' | 'openapi';
+};
+
+function normalizeLink(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function githubCandidates(raw: string): string[] {
+  const normalized = normalizeLink(raw);
+  const m = normalized.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/|$)/i);
+  if (!m) return [];
+  const [, owner, repo] = m;
+  const bases = [
+    `https://raw.githubusercontent.com/${owner}/${repo}/main`,
+    `https://raw.githubusercontent.com/${owner}/${repo}/master`,
+  ];
+  const paths = ['openapi.yaml', 'openapi.yml', 'openapi.json', 'docs/openapi.yaml', 'api/openapi.yaml'];
+  const urls: string[] = [];
+  for (const base of bases) {
+    for (const path of paths) urls.push(`${base}/${path}`);
+  }
+  return urls;
+}
+
+function persistPendingPublish(detected: DetectedApp, source: 'github' | 'openapi') {
+  const pending: PendingPublish = {
+    detected,
+    name: detected.name,
+    slug: detected.slug,
+    description: detected.description,
+    category: detected.category || '',
+    visibility: 'public',
+    source,
+  };
+  window.localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+}
+
 function pickStripes(apps: HubApp[]): Stripe[] {
   if (apps.length === 0) return FALLBACK_STRIPES;
   const bySlug = new Map(apps.map((app) => [app.slug, app]));
@@ -78,14 +128,18 @@ function pickStripes(apps: HubApp[]): Stripe[] {
 
 export function CreatorHeroPage() {
   const navigate = useNavigate();
-  const [openapiUrl, setOpenapiUrl] = useState('');
+  const { isAuthenticated } = useSession();
+  const [sourceLink, setSourceLink] = useState('');
+  const [heroError, setHeroError] = useState('');
+  const [isDetecting, setIsDetecting] = useState(false);
   const [stripes, setStripes] = useState<Stripe[]>(FALLBACK_STRIPES);
   const [hubCount, setHubCount] = useState<number | null>(null);
 
   useEffect(() => {
     document.title =
       'Floom · Production infrastructure for AI apps that do real work';
-    getHub()
+    api
+      .getHub()
       .then((apps) => {
         // Filter QA/test fixtures so the landing "N apps running right
         // now" matches the /apps directory header count. Single source
@@ -108,14 +162,66 @@ export function CreatorHeroPage() {
 
   const visibleStripes = stripes === FALLBACK_STRIPES ? enrichedFallbackStripes : stripes;
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const url = openapiUrl.trim();
-    if (!url) {
-      navigate('/build');
+    setHeroError('');
+
+    const rawLink = sourceLink.trim();
+    if (!rawLink) {
+      navigate(
+        isAuthenticated
+          ? '/studio/build'
+          : '/signup?next=' + encodeURIComponent('/studio/build'),
+      );
       return;
     }
-    navigate(`/build?openapi=${encodeURIComponent(url)}`);
+
+    setIsDetecting(true);
+    try {
+      window.localStorage.removeItem(PENDING_KEY);
+    } catch {
+      // Ignore storage failures; the redirect still works for signed-in users.
+    }
+
+    try {
+      const candidates = githubCandidates(rawLink);
+      if (candidates.length > 0) {
+        for (const candidate of candidates) {
+          try {
+            const detected = await api.detectApp(candidate);
+            persistPendingPublish(detected, 'github');
+            navigate(
+              isAuthenticated
+                ? '/studio/build'
+                : '/signup?next=' + encodeURIComponent('/studio/build'),
+            );
+            return;
+          } catch {
+            // Try the next candidate path.
+          }
+        }
+        setHeroError(
+          "We couldn't find an openapi.yaml or openapi.json file in that repo yet. Add one, or paste the direct OpenAPI link instead.",
+        );
+        return;
+      }
+
+      const detected = await api.detectApp(normalizeLink(rawLink));
+      persistPendingPublish(detected, 'openapi');
+      navigate(
+        isAuthenticated
+          ? '/studio/build'
+          : '/signup?next=' + encodeURIComponent('/studio/build'),
+      );
+    } catch (err) {
+      const message =
+        err instanceof api.ApiError && err.status >= 400 && err.status < 500
+          ? "Paste a public GitHub repo, or the direct link to an openapi.json or openapi.yaml file."
+          : 'We could not read that link right now. Try again in a moment.';
+      setHeroError(message);
+    } finally {
+      setIsDetecting(false);
+    }
   };
 
   return (
@@ -253,14 +359,14 @@ export function CreatorHeroPage() {
               }}
             >
               <input
-                type="url"
+                type="text"
                 inputMode="url"
                 autoComplete="url"
                 spellCheck={false}
-                value={openapiUrl}
-                onChange={(e) => setOpenapiUrl(e.target.value)}
-                placeholder="github.com/you/repo  or  your-app.com"
-                aria-label="Your app URL or GitHub repo"
+                value={sourceLink}
+                onChange={(e) => setSourceLink(e.target.value)}
+                placeholder="github.com/you/api"
+                aria-label="Public GitHub repo with OpenAPI, or direct OpenAPI link"
                 data-testid="hero-input"
                 style={{
                   flex: 1,
@@ -277,6 +383,7 @@ export function CreatorHeroPage() {
               <button
                 type="submit"
                 data-testid="hero-cta"
+                disabled={isDetecting}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -288,17 +395,35 @@ export function CreatorHeroPage() {
                   padding: '14px 22px',
                   fontSize: 15,
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: isDetecting ? 'wait' : 'pointer',
+                  opacity: isDetecting ? 0.84 : 1,
                   whiteSpace: 'nowrap',
                 }}
               >
-                Publish your app
+                {isDetecting ? 'Checking link...' : 'Start setup'}
                 <ArrowRight size={16} aria-hidden="true" />
               </button>
             </form>
 
-            {/* Dual equal-weight CTA row. v11 pattern: two same-height,
-                same-padding buttons framing the two ICPs. */}
+            {heroError && (
+              <p
+                data-testid="hero-error"
+                style={{
+                  maxWidth: 620,
+                  margin: '12px auto 0',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  border: '1px solid #f3d7bf',
+                  background: '#fff7ef',
+                  color: '#7a4b19',
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                {heroError}
+              </p>
+            )}
+
             <div
               className="hero-cta-row"
               style={{
@@ -330,22 +455,22 @@ export function CreatorHeroPage() {
                 Browse{hubCount !== null ? ` ${hubCount}` : ''} live apps
                 <ArrowRight size={14} aria-hidden="true" />
               </Link>
-              <a
-                href="#self-host"
+              <Link
+                to="/docs/self-host"
                 data-testid="hero-self-host"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
-                  fontSize: 13,
                   color: 'var(--muted)',
-                  textDecoration: 'none',
                   fontWeight: 500,
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                  padding: '12px 8px',
+                  fontSize: 13.5,
                 }}
               >
                 Self-host in one command
-                <ArrowRight size={13} aria-hidden="true" />
-              </a>
+              </Link>
             </div>
 
             {/* Hero app-tile strip (new 2026-04-20). Proof-of-life above
@@ -551,7 +676,7 @@ export function CreatorHeroPage() {
           .hero-input { flex-direction: column !important; align-items: stretch !important; padding: 10px !important; }
           .hero-input input { padding: 14px !important; font-size: 13.5px !important; }
           .hero-input button { width: 100% !important; padding: 14px !important; justify-content: center !important; }
-          .hero-cta-row { gap: 10px !important; }
+          .hero-cta-row { flex-direction: column !important; gap: 10px !important; }
           .hero-works-with { margin-bottom: 16px !important; }
           .integration-logos { flex-direction: column !important; gap: 10px !important; }
           .live-apps-header { flex-direction: column !important; align-items: flex-start !important; }
