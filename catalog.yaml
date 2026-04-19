@@ -1,0 +1,1101 @@
+apps:
+
+  - slug: 1forge-finance-apis
+    type: proxied
+    display_name: "1Forge Finance APIs"
+    description: "Stock and Forex Data and Realtime Quotes"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/1forge.com/0.0.1/swagger.json"
+    base_url: "https://1forge.com/forex-quotes"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_1forge.com_assets_images_f-blue.svg"
+
+  - slug: agco-api
+    type: proxied
+    display_name: "AGCO API"
+    description: "AGCO API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/agco-ats.com/v1/openapi.json"
+    base_url: "https://secure.agco-ats.com"
+    auth: none
+    category: "ecommerce"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_AGCOcorp_profile_image.jpeg"
+
+  - slug: ip-geolocation-api
+    type: proxied
+    display_name: "IP geolocation API"
+    description: "Abstract IP geolocation API allows developers to retrieve the region, country and city behind any IP worldwide"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/abstractapi.com/geolocation/1.0.0/openapi.json"
+    base_url: "https://ipgeolocation.abstractapi.com"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_global-uploads.webflow.com_5ebbd0a566a3996636e55959_5ec2ba29feeeb05d69160e7b_webclip.png"
+
+  - slug: afterbanks-api
+    type: proxied
+    display_name: "Afterbanks API"
+    description: "La estandarización de la conexión con cualquier banco en tiempo real"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/afterbanks.com/3.0.0/swagger.json"
+    base_url: "https://www.afterbanks.com"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_AfterbanksAPI_profile_image.jpeg"
+
+  - slug: geomag-api
+    type: proxied
+    display_name: "Geomag API"
+    description: " The World Magnetic Model calculates the intensity and direction of the Earth's magnetic field on a specific date-time, geodetic altitude, latitude, and longitude"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/amentum.space/global-magnet/1.3.0/openapi.json"
+    base_url: "https://api.apis.guru/wmm"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_amentumspace_profile_image.svg.jpeg"
+
+  - slug: atmosphere-api
+    type: proxied
+    display_name: "Atmosphere API"
+    description: "Instantly access empirical models of atmospheric density and composition that are recommended by the Committee on Space Research (COSPAR) for satellite drag calculations"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/amentum.space/atmosphere/1.1.1/openapi.json"
+    base_url: "https://api.apis.guru"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_amentumspace_profile_image.svg.jpeg"
+
+  - slug: flight-offers-search
+    type: proxied
+    display_name: "Flight Offers Search"
+    description: " Before using this API, we recommend you read our **[Authorization Guide](https://developers.amadeus.com/self-service/apis-docs/guides/authorization)** for more information on how to generate an ac..."
+    openapi_spec_url: "https://api.apis.guru/v2/specs/amadeus.com/2.2.0/openapi.json"
+    base_url: "https://test.api.amadeus.com/v2"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_amadeus.com_images_en_technology_mobile-tablet_mobile-woman-office-city.jpg.transform_medium_img.jpg"
+
+  - slug: gravity-api
+    type: proxied
+    display_name: "Gravity API"
+    description: "The gravitational field of the earth is non-uniform"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/amentum.space/gravity/1.1.1/openapi.json"
+    base_url: "https://api.apis.guru"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_amentumspace_profile_image.svg"
+
+  - slug: airflow-api-stable
+    type: proxied
+    display_name: "Airflow API (Stable)"
+    description: "# Overview To facilitate management, Apache Airflow supports a range of REST API endpoints across its objects"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/apache.org/2.5.1/openapi.json"
+    base_url: "https://api.apis.guru/api/v1"
+    auth: none
+    category: "messaging"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_TheASF_profile_image.svg"
+
+  - slug: anchore-engine-api-server
+    type: proxied
+    display_name: "Anchore Engine API Server"
+    description: "This is the Anchore Engine API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/anchore.io/0.1.20/openapi.json"
+    base_url: "https://api.apis.guru/"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_anchore_profile_image.jpeg"
+
+  - slug: space-radiation-api
+    type: proxied
+    display_name: "Space Radiation API"
+    description: "Space has a hostile radiation environment that increases the risk of cancers in humans and malfunctions in spacecraft electronics"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/amentum.space/space_radiation/1.1.2/openapi.json"
+    base_url: "https://api.apis.guru"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_amentumspace_profile_image.svg"
+
+  - slug: airflow-api-stable-4qj
+    type: proxied
+    display_name: "Airflow API (Stable)"
+    description: "# Overview To facilitate management, Apache Airflow supports a range of REST API endpoints across its objects"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/apache.org/airflow/2.5.1/openapi.json"
+    base_url: "https://api.apis.guru/api/v1"
+    auth: none
+    category: "messaging"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_TheASF_profile_image.svg"
+
+  - slug: aviation-radiation-api
+    type: proxied
+    display_name: "Aviation Radiation API"
+    description: "Our atmosphere protects us from a hostile space radiation environment comprising high energy particles of solar and intergalactic origin"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/amentum.space/aviation_radiation/1.5.0/openapi.json"
+    base_url: "https://api.apis.guru"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_amentumspace_profile_image.svg"
+
+  - slug: qakka
+    type: proxied
+    display_name: "Qakka"
+    description: "API for Qakka Queue System"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/apache.org/qakka/v1/openapi.json"
+    base_url: "https://apache.local"
+    auth: none
+    category: "messaging"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_TheASF_profile_image.svg.png"
+
+  - slug: vehicle-enquiry-api
+    type: proxied
+    display_name: "Vehicle Enquiry API"
+    description: "Interface specification for the DVLA Vehicle Enquiry API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/api.gov.uk/vehicle-enquiry/1.1.0/openapi.json"
+    base_url: "https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_GDSTeam_profile_image.png"
+
+  - slug: apicurio-registry-api-v2
+    type: proxied
+    display_name: "Apicurio Registry API [v2]"
+    description: "Apicurio Registry is a datastore for standard event schemas and API designs"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/apicurio.local/registry/2.4.x/openapi.json"
+    base_url: "http://apicurio.local"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: ecosystem-api
+    type: proxied
+    display_name: "Ecosystem API"
+    description: "Ecosystem API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/apideck.com/ecosystem/0.0.6/openapi.json"
+    base_url: "https://api.apideck.com"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_developers.apideck.com_icon.png"
+
+  - slug: registry-api
+    type: proxied
+    display_name: "Registry API"
+    description: "The Registry service allows teams to manage descriptions of APIs"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/apigee.local/registry/0.0.1/openapi.json"
+    base_url: "http://apigee.local"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: apimatic-api-transformer
+    type: proxied
+    display_name: "APIMATIC API Transformer"
+    description: "Transform API Descriptions from/to various formats"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/apimatic.io/1.0/openapi.json"
+    base_url: "https://apimatic.io/api/transform"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apimatic.io_img_theme_Convertron.svg"
+
+  - slug: apis-guru
+    type: proxied
+    display_name: "APIs.guru"
+    description: "Wikipedia for Web APIs"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/apis.guru/2.2.0/openapi.json"
+    base_url: "https://api.apis.guru/v2"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_branding_logo_vertical.svg"
+
+  - slug: sirikit-cloud-media
+    type: proxied
+    display_name: "SiriKit Cloud Media"
+    description: "SiriKit Cloud Media"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/apple.com/sirikit-cloud-media/1.0.2/openapi.json"
+    base_url: "https://cloudextension-testservice.local/api"
+    auth: none
+    category: "media"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: search-services
+    type: proxied
+    display_name: "Search Services"
+    description: "API for Internet Archive's Search-related services "
+    openapi_spec_url: "https://api.apis.guru/v2/specs/archive.org/search/1.0.0/openapi.json"
+    base_url: "https://api.archive.org"
+    auth: none
+    category: "search"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_internetarchive_profile_image.jpeg"
+
+  - slug: wayback-api
+    type: proxied
+    display_name: "Wayback API"
+    description: "API for Internet Archive's Wayback Machine"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/archive.org/wayback/1.0.0/openapi.json"
+    base_url: "https://api.archive.org"
+    auth: none
+    category: "search"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_internetarchive_profile_image.jpeg"
+
+  - slug: searchly-api-v1
+    type: proxied
+    display_name: "SearchLy API v1"
+    description: "# Introduction The SearchLy API provides similarity searching based on song lyrics"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/asuarez.dev/searchly/1.0/openapi.json"
+    base_url: "https://searchly.asuarez.dev/api/v1"
+    auth: none
+    category: "media"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: business-registries
+    type: proxied
+    display_name: "Business Registries"
+    description: "# Introduction The Business Registries API is built on HTTP"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/ato.gov.au/0.0.6/openapi.json"
+    base_url: "https://api.apis.guru//api.abr.ato.gov.au/"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_www.ato.gov.au_uploadedImages_Content__DEM_Images_logo-ato.png"
+
+  - slug: auckland-museum-api
+    type: proxied
+    display_name: "Auckland Museum API"
+    description: "This is technical documentation for the Auckland Museum API "
+    openapi_spec_url: "https://api.apis.guru/v2/specs/aucklandmuseum.com/2.0.0/swagger.json"
+    base_url: "https://api.aucklandmuseum.com"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_aucklandmuseum_profile_image.jpeg"
+
+  - slug: balldontlie
+    type: proxied
+    display_name: "balldontlie"
+    description: "balldontlie"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/balldontlie.io/1.0.0/openapi.json"
+    base_url: "https://balldontlie.io"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_balldontlie_io_logo192.svg"
+
+  - slug: radio-music-services
+    type: proxied
+    display_name: "Radio & Music Services"
+    description: "We encapsulate Radio & Music business logic for iPlayer Radio and BBC Music products on all platforms"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/bbc.co.uk/1.0.0/swagger.json"
+    base_url: "https://rms.api.bbc.co.uk"
+    auth: none
+    category: "media"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_upload.wikimedia.org_wikipedia_commons_thumb_6_63_BBC_Radio_logo.svg_140px-BBC_Radio_logo.svg.png"
+
+  - slug: axesso-api
+    type: proxied
+    display_name: "Axesso Api"
+    description: "Use this api to fetch information to Amazon products and more"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/axesso.de/1.0.0/openapi.json"
+    base_url: "http://api.axesso.de"
+    auth: none
+    category: "ecommerce"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: bc-laws
+    type: proxied
+    display_name: "BC Laws"
+    description: "BC Laws is an electronic library providing free public access to the laws of British Columbia"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/bclaws.ca/bclaws/1.0.0/openapi.json"
+    base_url: "http://www.bclaws.ca/civix"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_avatars1.githubusercontent.com_u_916280.jpeg"
+
+  - slug: datto-autotask-psa-rest-api
+    type: proxied
+    display_name: "Datto|Autotask PSA Rest API"
+    description: "Datto|Autotask PSA Rest API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/autotask.net/v1/swagger.json"
+    base_url: "https://webservices5.autotask.net/ATServicesRest"
+    auth: none
+    category: "tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_www.datto.com_img_brand_datto-logo-blue-datto.svg"
+
+  - slug: bikewise-api-v2
+    type: proxied
+    display_name: "BikeWise API v2"
+    description: "<p>This is an API for accessing information about bicycling related incidents"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/bikewise.org/v2/openapi.json"
+    base_url: "https://bikewise.org/api"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_www_bikewise_org_fav.png"
+
+  - slug: beanstream-payments
+    type: proxied
+    display_name: "Beanstream Payments"
+    description: "https://www.beanstream.com/api/v1"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/beanstream.com/1.0.1/swagger.json"
+    base_url: "https://www.beanstream.com/api/v1"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_bambora_na_profile_image.jpeg"
+
+  - slug: betfair-exchange-streaming-api
+    type: proxied
+    display_name: "Betfair: Exchange Streaming API"
+    description: "API to receive streamed updates"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/betfair.com/1.0.1423/openapi.json"
+    base_url: "http://stream-api.betfair.com:443/api"
+    auth: none
+    category: "entertainment"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_Betfair_profile_image.jpeg"
+
+  - slug: ip-geolocation-api-h19
+    type: proxied
+    display_name: "IP Geolocation API"
+    description: "BigDataCloud's IP Geolocation API returns detailed information about the geographical location, ownership and connectivity of the provided IPv4 IP address"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/bigdatacloud.net/1.0.0/openapi.json"
+    base_url: "https://api.bigdatacloud.net"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_res.cloudinary.com_bigdatacloud_image_upload_v1652921282_bdc-logo.svg"
+
+  - slug: budgea-api-documentation
+    type: proxied
+    display_name: "Budgea API Documentation"
+    description: "# Budgea Development Guides Welcome to **Budgea**'s documentation"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/biapi.pro/2.0/openapi.json"
+    base_url: "https://api.apis.guru//budgea.biapi.pro/2.0"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: big-red-cloud-api
+    type: proxied
+    display_name: "Big Red Cloud API"
+    description: " <div style='line-height: 30px;'> <strong>Welcome to the Big Red Cloud API</strong><br/> This API enables programmatic access to Big Red Cloud data.<br/> We have used Swagger to auto generate the A..."
+    openapi_spec_url: "https://api.apis.guru/v2/specs/bigredcloud.com/v1/openapi.json"
+    base_url: "https://app.bigredcloud.com/api"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_www_bigredcloud_com_wp-content_uploads_BRCfavicon.svg"
+
+  - slug: ibm-containers-api
+    type: proxied
+    display_name: "IBM Containers API"
+    description: "Containers are virtual software objects that include all the elements that an app needs to run"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/bluemix.net/containers/3.0.0/openapi.json"
+    base_url: "https://containers-api.ng.bluemix.net/v3"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_IBMCloud_profile_image.jpeg"
+
+  - slug: bin-lookup-api
+    type: proxied
+    display_name: "BIN Lookup API"
+    description: "BIN lookup API, the free api service from bintable.com to lookup card information using it's BIN"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/bintable.com/1.0.0-oas3/openapi.json"
+    base_url: "https://api.bintable.com/v1"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: biztoc
+    type: proxied
+    display_name: "BizToc"
+    description: "Get the latest business news articles"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/biztoc.com/v1/openapi.json"
+    base_url: "https://ai.biztoc.com"
+    auth: none
+    category: "media"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_biztoc.com_favicon.png"
+
+  - slug: fastapi
+    type: proxied
+    display_name: "FastAPI"
+    description: "FastAPI"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/botschaft.local/0.1.0/openapi.json"
+    base_url: "http://botschaft.local"
+    auth: none
+    category: "messaging"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: brainbi
+    type: proxied
+    display_name: "brainbi"
+    description: "Welcome to the official API of the brainbi platform"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/brainbi.net/1.0.0/openapi.json"
+    base_url: "https://api.apis.guru,"
+    auth: none
+    category: "ecommerce"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: bunq-api
+    type: proxied
+    display_name: "bunq API"
+    description: "***UPDATE:*** *We have released a [beta version of the new bunq API documentation.](https://beta.doc.bunq.com)* ***NOTICE:*** *We have updated the sandbox base url to `https://public-api.sandbox.bu..."
+    openapi_spec_url: "https://api.apis.guru/v2/specs/bunq.com/1.0/openapi.json"
+    base_url: "https://public-api.sandbox.bunq.com/{basePath}"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_bunq_profile_image.jpeg"
+
+  - slug: canada-holidays-api
+    type: proxied
+    display_name: "Canada Holidays API"
+    description: "This API lists all 31 public holidays for all 13 provinces and territories in Canada, including federal holidays"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/canada-holidays.ca/1.8.0/openapi.json"
+    base_url: "https://canada-holidays.ca"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_upload.wikimedia.org_wikipedia_commons_d_d9_Flag_of_Canada_%28Pantone%29.svg"
+
+  - slug: chaingateway-io
+    type: proxied
+    display_name: "Chaingateway.io"
+    description: "# Chaingateway.io REST API to build the bridge between Ethereum and the real world Please check out our [website](https://chaingateway.io?utm_source=postman) for detailed information about this API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/chaingateway.io/1.0/openapi.json"
+    base_url: "https://eu.eth.chaingateway.io/v1"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: gotomeeting
+    type: proxied
+    display_name: "GoToMeeting"
+    description: "<br>The GoToMeeting API provides seamless integration of GoToMeeting provisioning and meeting management into your existing infrastructure or third party applications.<br><br>For customers, the abi..."
+    openapi_spec_url: "https://api.apis.guru/v2/specs/citrixonline.com/gotomeeting/1.0.0/swagger.json"
+    base_url: "https://api.citrixonline.com/G2M/rest"
+    auth: none
+    category: "collaboration"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_citrix_profile_image.jpeg"
+
+  - slug: api-clarify-io
+    type: proxied
+    display_name: "api.clarify.io"
+    description: "The API to Search and Understand Audio & Video Data"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/clarify.io/1.3.7/swagger.json"
+    base_url: "https://api.clarify.io"
+    auth: none
+    category: "search"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_clarifyio_profile_image.png"
+
+  - slug: ecwid
+    type: proxied
+    display_name: "ecwid"
+    description: "ecwid"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/cloud-elements.com/ecwid/api-v2/swagger.json"
+    base_url: "https://api.cloud-elements.com/elements/api-v2"
+    auth: none
+    category: "ecommerce"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_cloud-elements.com_wp-content_uploads_2019_05_ces_favicon_32x32.png"
+
+  - slug: cnab-online
+    type: proxied
+    display_name: "Cnab Online"
+    description: "Processe arquivos de retorno CNAB"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/cnab-online.herokuapp.com/1.0.0/swagger.json"
+    base_url: "https://cnab-online.herokuapp.com/v1"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/http_cnab-online.github.io_img_logo.png"
+
+  - slug: color-name-api
+    type: proxied
+    display_name: "Color Name API"
+    description: "An API that provides names for colors based on their hex value"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/color.pizza/1.0.0/openapi.json"
+    base_url: "https://api.color.pizza/v1"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_github_com_meodai_color-name-api_raw_main_logo.svg"
+
+  - slug: the-consumer-financial-protection-bureau
+    type: proxied
+    display_name: "The Consumer Financial Protection Bureau"
+    description: "Learn more about home mortgage data, download the data yourself, or build new tools using our API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/consumerfinance.gov/1.0/swagger.json"
+    base_url: "https://api.consumerfinance.gov:443"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/http_cfpb.github.io_img_logo_210.png"
+
+  - slug: corrently-io
+    type: proxied
+    display_name: "Corrently.io"
+    description: "*Corrently - from italian corrente, which is energy* # Introduction The Corrently ecosystem gets maintained by [STROMDAO GmbH](https://www.stromdao.de/) to support green energy services for prosume..."
+    openapi_spec_url: "https://api.apis.guru/v2/specs/corrently.io/2.0.0/openapi.json"
+    base_url: "https://api.corrently.io/v2.0"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_corrently.de_assets_img_Corrently_1000x252.png"
+
+  - slug: datasette-api
+    type: proxied
+    display_name: "Datasette API"
+    description: "Execute SQL queries against a Datasette database and return the results as JSON"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/datasette.local/v1/openapi.json"
+    base_url: "http://datasette.local"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: open-skills-api
+    type: proxied
+    display_name: "Open Skills API"
+    description: "A complete and standard data store for canonical and emerging skills, knowledge, abilities, tools, technolgies, and how they relate to jobs"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/dataatwork.org/1.0/swagger.json"
+    base_url: "http://api.dataatwork.org/v1"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_593962900408008704_WT7rcPhZ_400x400.jpg"
+
+  - slug: crucible
+    type: proxied
+    display_name: "Crucible"
+    description: "Crucible"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/crucible.local/1.0.0/swagger.json"
+    base_url: "http://crucible.local/context"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_Atlassian_profile_image.png"
+
+  - slug: eu-bon-utis
+    type: proxied
+    display_name: "EU BON UTIS"
+    description: "The Unified Taxonomic Information Service (UTIS) is the taxonomic backbone for the EU-BON project"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/cybertaxonomy.eu/1.0/swagger.json"
+    base_url: "http://cybertaxonomy.eu/eu-bon/utis/1.0"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_cybertaxonomy.eu_themes_cybertaxonomy_images_cdm-platform-header.jpg"
+
+  - slug: api-datumbox-com
+    type: proxied
+    display_name: "api.datumbox.com"
+    description: "Datumbox offers a Machine Learning platform composed of 14 classifiers and Natural Language processing functions"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/datumbox.com/1.0/openapi.json"
+    base_url: "http://api.datumbox.com"
+    auth: none
+    category: "machine_learning"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/http_www.datumbox.com_img_logo.png"
+
+  - slug: departureboard-io-api
+    type: proxied
+    display_name: "departureboard.io API"
+    description: "The departureboard.io is a high performance API written in Golang"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/departureboard.io/2.0/openapi.json"
+    base_url: "https://api.departureboard.io/api/v2.0"
+    auth: none
+    category: "transport"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_departure_board_profile_image.jpeg"
+
+  - slug: flinkster-api-ng
+    type: proxied
+    display_name: "Flinkster_API_NG"
+    description: "This REST-API enables you to query for private transport sharing offers provided by companies and cities in Germany, Netherland and Austria"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/deutschebahn.com/flinkster/v1/swagger.json"
+    base_url: "https://api.deutschebahn.com/flinkster-api-ng/v1"
+    auth: none
+    category: "transport"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_591140150413025280_Cjcqjl2J.png"
+
+  - slug: betriebsstellen
+    type: proxied
+    display_name: "Betriebsstellen"
+    description: "This REST-API enables you to query station and stop infos"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/deutschebahn.com/betriebsstellen/v1/swagger.json"
+    base_url: "https://api.deutschebahn.com/betriebsstellen/v1"
+    auth: none
+    category: "transport"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_591140150413025280_Cjcqjl2J.png"
+
+  - slug: fahrplan-free
+    type: proxied
+    display_name: "Fahrplan-Free"
+    description: "A RESTful webservice to request a railway journey - FREE plan with restricted access (max"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/deutschebahn.com/fahrplan/v1/swagger.json"
+    base_url: "https://api.deutschebahn.com/freeplan/v1"
+    auth: none
+    category: "transport"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_591140150413025280_Cjcqjl2J.png"
+
+  - slug: stationsdatenbereitstellung
+    type: proxied
+    display_name: "Stationsdatenbereitstellung"
+    description: "An API providing master data for German railway stations by DB Station&Service AG"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/deutschebahn.com/stada/2.2.01/swagger.json"
+    base_url: "https://api.deutschebahn.com/stada/v2"
+    auth: none
+    category: "transport"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_591140150413025280_Cjcqjl2J.png"
+
+  - slug: reisezentren-api
+    type: proxied
+    display_name: "Reisezentren-API"
+    description: "This REST-API enables you to query information about travel centers in Germany"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/deutschebahn.com/reisezentren/v1/openapi.json"
+    base_url: "https://api.deutschebahn.com/reisezentren/v1"
+    auth: none
+    category: "transport"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_591140150413025280_Cjcqjl2J.png"
+
+  - slug: docker-engine-api
+    type: proxied
+    display_name: "Docker Engine API"
+    description: "The Engine API is an HTTP API served by Docker Engine"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/docker.com/engine/1.33/openapi.json"
+    base_url: "https://api.apis.guru/v1.33"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_docs.docker.com_images_logo-docker-main.png"
+
+  - slug: d-d-5e-api
+    type: proxied
+    display_name: "D&D 5e API"
+    description: "# Introduction Welcome to the dnd5eapi, the Dungeons & Dragons 5th Edition API! This documentation should help you familiarize yourself with the resources available and how to consume them with HTT..."
+    openapi_spec_url: "https://api.apis.guru/v2/specs/dnd5eapi.co/0.1/openapi.json"
+    base_url: "https://www.dnd5eapi.co"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: docker-hub-api
+    type: proxied
+    display_name: "Docker HUB API"
+    description: "Docker Hub is a service provided by Docker for finding and sharing container images with your team"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/docker.com/hub/beta/openapi.json"
+    base_url: "https://hub.docker.com"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_docs.docker.com_assets_images_logo-docker-main.png"
+
+  - slug: easypdfserver
+    type: proxied
+    display_name: "EasyPDFServer"
+    description: "API for converting HTML to PDF"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/easypdfserver.com/1/openapi.json"
+    base_url: "https://api.easypdfserver.com"
+    auth: none
+    category: "text"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: docusign-rest-api
+    type: proxied
+    display_name: "DocuSign REST API"
+    description: "The DocuSign REST API provides you with a powerful, convenient, and simple Web services API for interacting with DocuSign"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/docusign.net/v2.1/openapi.json"
+    base_url: "https://www.docusign.net/restapi"
+    auth: none
+    category: "ecommerce"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_DocuSign_profile_image.png"
+
+  - slug: crossbar-data-api
+    type: proxied
+    display_name: "CROssBAR Data API"
+    description: "# About CROssBAR & data **CROssBAR**: Comprehensive Resource of Biomedical Relations with Deep Learning Applications and Knowledge Graph Representations CROssBAR is a comprehensive system that inte..."
+    openapi_spec_url: "https://api.apis.guru/v2/specs/ebi.ac.uk/1.0/swagger.json"
+    base_url: "https://www.ebi.ac.uk/Tools/crossbar"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: elevenlabs-api-documentation
+    type: proxied
+    display_name: "ElevenLabs API Documentation"
+    description: "This is the documentation for the ElevenLabs API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/elevenlabs.io/1.0/openapi.json"
+    base_url: "https://api.elevenlabs.io"
+    auth: none
+    category: "machine_learning"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_elevenlabs.io_assets_icons_apple-touch-icon.png"
+
+  - slug: u-s-epa-enforcement-and-compliance-history-online-
+    type: proxied
+    display_name: "U.S. EPA Enforcement and Compliance History Online (ECHO) - Clean Air Act"
+    description: "Enforcement and Compliance History Online (ECHO) is a tool developed and maintained by EPA's Office of Enforcement and Compliance Assurance for public use"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/epa.gov/air/2019.10.15/swagger.json"
+    base_url: "https://echodata.epa.gov/echo"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_632233890594299904_DgRDU6dx_400x400.png"
+
+  - slug: u-s-epa-enforcement-and-compliance-history-online--5tm
+    type: proxied
+    display_name: "U.S. EPA Enforcement and Compliance History Online (ECHO) - Detailed Facility Report (DFR)"
+    description: "Enforcement and Compliance History Online (ECHO) is a tool developed and maintained by EPA's Office of Enforcement and Compliance Assurance for public use"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/epa.gov/dfr/0.0.0/swagger.json"
+    base_url: "https://echodata.epa.gov/echo"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_632233890594299904_DgRDU6dx_400x400.png"
+
+  - slug: u-s-epa-enforcement-and-compliance-history-online--dd4
+    type: proxied
+    display_name: "U.S. EPA Enforcement and Compliance History Online (ECHO) - Enforcement Case Search"
+    description: "Enforcement and Compliance History Online (ECHO) is a tool developed and maintained by EPA's Office of Enforcement and Compliance Assurance for public use"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/epa.gov/case/1.0.0/swagger.json"
+    base_url: "https://echodata.epa.gov/echo"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_632233890594299904_DgRDU6dx_400x400.png"
+
+  - slug: u-s-epa-enforcement-and-compliance-history-online--x6k
+    type: proxied
+    display_name: "U.S. EPA Enforcement and Compliance History Online (ECHO) - Clean Water Act (CWA) Rest Services"
+    description: "Enforcement and Compliance History Online (ECHO) is a tool developed and maintained by EPA's Office of Enforcement and Compliance Assurance for public use"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/epa.gov/cwa/2019.10.15/swagger.json"
+    base_url: "https://echodata.epa.gov/echo"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_632233890594299904_DgRDU6dx_400x400.png"
+
+  - slug: u-s-epa-enforcement-and-compliance-history-online--6rb
+    type: proxied
+    display_name: "U.S. EPA Enforcement and Compliance History Online (ECHO) - Effluent Charting and Reporting"
+    description: "Enforcement and Compliance History Online (ECHO) is a tool developed and maintained by EPA's Office of Enforcement and Compliance Assurance for public use"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/epa.gov/eff/2019.10.15/swagger.json"
+    base_url: "https://echodata.epa.gov/echo"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_632233890594299904_DgRDU6dx_400x400.png"
+
+  - slug: u-s-epa-enforcement-and-compliance-history-online--vom
+    type: proxied
+    display_name: "U.S. EPA Enforcement and Compliance History Online (ECHO) - Resource Conservation and Recovery Act "
+    description: "Enforcement and Compliance History Online (ECHO) is a tool developed and maintained by EPA's Office of Enforcement and Compliance Assurance for public use"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/epa.gov/rcra/2019.10.15/swagger.json"
+    base_url: "https://echodata.epa.gov/echo"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_632233890594299904_DgRDU6dx_400x400.png"
+
+  - slug: u-s-epa-enforcement-and-compliance-history-online--em4
+    type: proxied
+    display_name: "U.S. EPA Enforcement and Compliance History Online (ECHO) - Safe Drinking Water Act"
+    description: "Enforcement and Compliance History Online (ECHO) is a tool developed and maintained by EPA's Office of Enforcement and Compliance Assurance for public use"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/epa.gov/sdw/2019.10.15/swagger.json"
+    base_url: "https://echodata.epa.gov/echo"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_632233890594299904_DgRDU6dx_400x400.png"
+
+  - slug: u-s-epa-enforcement-and-compliance-history-online--d9s
+    type: proxied
+    display_name: "U.S. EPA Enforcement and Compliance History Online (ECHO) - All Data"
+    description: "Enforcement and Compliance History Online (ECHO) is a tool developed and maintained by EPA's Office of Enforcement and Compliance Assurance for public use"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/epa.gov/echo/2019.10.15/swagger.json"
+    base_url: "https://echodata.epa.gov/echo"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_pbs.twimg.com_profile_images_632233890594299904_DgRDU6dx_400x400.png"
+
+  - slug: europeana-search-record-api
+    type: proxied
+    display_name: "Europeana Search & Record API"
+    description: "This Swagger API console provides an overview of the Europeana Search & Record API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/europeana.eu/version unknown/swagger.json"
+    base_url: "https://api.europeana.eu"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_Europeanaeu_profile_image.png"
+
+  - slug: exchangerate-api
+    type: proxied
+    display_name: "ExchangeRate-API"
+    description: "Fetch the latest currency exchange rates via API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/exchangerate-api.com/4/openapi.json"
+    base_url: "https://api.exchangerate-api.com/v4"
+    auth: none
+    category: "financial"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_www.exchangerate-api.com_img_logo-cube-135px.png"
+
+  - slug: json-storage
+    type: proxied
+    display_name: "JSON storage"
+    description: "JSON storage API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/extendsclass.com/json-storage/0.1/openapi.json"
+    base_url: "https://extendsclass.com/api/json-storage"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: evemarketer-marketstat-api
+    type: proxied
+    display_name: "EVEMarketer Marketstat API"
+    description: "EVEMarketer Marketstat API is almost compatible with EVE-Central's Marketstat API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/evemarketer.com/1.0.1/swagger.json"
+    base_url: "https://api.evemarketer.com/ec"
+    auth: none
+    category: "entertainment"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_EVEMarketer_profile_image.jpeg"
+
+  - slug: exude-api-service
+    type: proxied
+    display_name: "Exude API Service"
+    description: "Exude API is an Open Source project, It is used for the primary ways for filtering the stopping, stemming words from the text data"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/exude-api.herokuapp.com/1.0.0/openapi.json"
+    base_url: "https://exude-api.herokuapp.com"
+    auth: none
+    category: "text"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+
+  - slug: fisheye-crucible
+    type: proxied
+    display_name: "Fisheye Crucible"
+    description: "Fisheye Crucible"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/fecru.local/1.0.0/swagger.json"
+    base_url: "http://fecru.local/context"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_Atlassian_profile_image.png"
+
+  - slug: firebrowse-beta-api
+    type: proxied
+    display_name: "FireBrowse Beta API"
+    description: "A simple and elegant way to explore cancer data"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/firebrowse.org/1.1.38/swagger.json"
+    base_url: "http://firebrowse.org/api/v1"
+    auth: none
+    category: "open_data"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/http_firebrowse.org_img_firebrowse.png"
+
+  - slug: flickr-api-schema
+    type: proxied
+    display_name: "Flickr API Schema"
+    description: "A subset of Flickr's API defined in Swagger format"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/flickr.com/1.0.0/openapi.json"
+    base_url: "https://api.flickr.com/services"
+    auth: none
+    category: "media"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_Flickr_profile_image.png"
+
+  - slug: fisheye
+    type: proxied
+    display_name: "FishEye"
+    description: "FishEye"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/fisheye.local/1.0.0/swagger.json"
+    base_url: "http://fisheye.local/context"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_Atlassian_profile_image.png"
+
+  - slug: freesound
+    type: proxied
+    display_name: "Freesound"
+    description: "With the Freesound APIv2 you can browse, search, and retrieve information about Freesound users, packs, and the sounds themselves of course"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/freesound.org/2.0.0/swagger.json"
+    base_url: "http://www.freesound.org/apiv2"
+    auth: none
+    category: "media"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_freesound.org_media_images_logo.png"
+
+  - slug: fraudlabs-pro-fraud-detection
+    type: proxied
+    display_name: "FraudLabs Pro Fraud Detection"
+    description: "Online payment fraud detection service"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/fraudlabspro.com/fraud-detection/1.1/openapi.json"
+    base_url: "https://api.fraudlabspro.com"
+    auth: none
+    category: "ecommerce"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_fraudlabspro_profile_image.png"
+
+  - slug: fraudlabs-pro-sms-verification
+    type: proxied
+    display_name: "FraudLabs Pro SMS Verification"
+    description: "Send an SMS with verification code and a custom message for authentication purpose"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/fraudlabspro.com/sms-verification/1.0/openapi.json"
+    base_url: "https://api.fraudlabspro.com"
+    auth: none
+    category: "ecommerce"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_fraudlabspro_profile_image.png"
+
+  - slug: news-plugin
+    type: proxied
+    display_name: "News Plugin"
+    description: "A plugin that allows the user to obtain and summary latest news using ChatGPT"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/freetv-app.com/v1/openapi.json"
+    base_url: "https://staging2.freetv-app.com"
+    auth: none
+    category: "media"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_s3.amazonaws.com_acps-iaa_freetv_tv-landing_tv-logo.png"
+
+  - slug: bng2latlong
+    type: proxied
+    display_name: "bng2latlong"
+    description: "Convert an OSGB36 easting and northing (British National Grid) to WGS84 latitude and longitude"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/getthedata.com/bng2latlong/1.0/openapi.json"
+    base_url: "https://api.getthedata.com"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_getthedatacom_profile_image.jpeg"
+
+  - slug: postman-api
+    type: proxied
+    display_name: "Postman API"
+    description: "The Postman API allows you to programmatically access data stored in Postman account with ease"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/getpostman.com/1.20.0/openapi.json"
+    base_url: "https://api.getpostman.com"
+    auth: none
+    category: "developer_tools"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_www.vectorlogo.zone_logos_getpostman_getpostman-ar21.svg"
+
+  - slug: geodatasource-location-search
+    type: proxied
+    display_name: "GeoDataSource Location Search"
+    description: "GeoDataSource™ Web Service is a REST API enable user to lookup for a city by using latitude and longitude coordinate"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/geodatasource.com/1.0/openapi.json"
+    base_url: "https://api.geodatasource.com"
+    auth: none
+    category: "location"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com__geodatasource_profile_image.png"
+
+  - slug: github-v3-rest-api
+    type: proxied
+    display_name: "GitHub v3 REST API"
+    description: "GitHub's v3 REST API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/github.com/1.1.4/openapi.json"
+    base_url: "https://api.github.com"
+    auth: none
+    category: "collaboration"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_github_profile_image.svg.jpeg"
+
+  - slug: github-v3-rest-api-hw4
+    type: proxied
+    display_name: "GitHub v3 REST API"
+    description: "GitHub's v3 REST API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/github.com/api.github.com/1.1.4/openapi.json"
+    base_url: "https://api.github.com"
+    auth: none
+    category: "collaboration"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_github_profile_image.svg.jpeg"
+
+  - slug: github-v3-rest-api-58u
+    type: proxied
+    display_name: "GitHub v3 REST API"
+    description: "GitHub's v3 REST API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/github.com/ghec/1.1.4/openapi.json"
+    base_url: "https://github.com"
+    auth: none
+    category: "collaboration"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_github_profile_image.svg"
+
+  - slug: github-v3-rest-api-x3a
+    type: proxied
+    display_name: "GitHub v3 REST API"
+    description: "GitHub's v3 REST API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/github.com/ghec.2022-11-28/1.1.4/openapi.json"
+    base_url: "https://github.com"
+    auth: none
+    category: "collaboration"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_github_profile_image.svg"
+
+  - slug: github-v3-rest-api-wii
+    type: proxied
+    display_name: "GitHub v3 REST API"
+    description: "GitHub's v3 REST API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/github.com/api.github.com.2022-11-28/1.1.4/openapi.json"
+    base_url: "https://github.com"
+    auth: none
+    category: "collaboration"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_github_profile_image.svg"
+
+  - slug: github-v3-rest-api-fac
+    type: proxied
+    display_name: "GitHub v3 REST API"
+    description: "GitHub's v3 REST API"
+    openapi_spec_url: "https://api.apis.guru/v2/specs/github.com/ghes-2.20/1.1.4/openapi.json"
+    base_url: "https://api.apis.guru{protocol}://{hostname}/api/v3"
+    auth: none
+    category: "collaboration"
+    visibility: public
+    icon: "https://api.apis.guru/v2/cache/logo/https_twitter_com_github_profile_image.svg.jpeg"
