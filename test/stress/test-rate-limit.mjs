@@ -18,6 +18,7 @@ for (const k of [
   'FLOOM_RATE_LIMIT_APP_PER_HOUR',
   'FLOOM_RATE_LIMIT_MCP_INGEST_PER_DAY',
   'FLOOM_TRUSTED_PROXY_CIDRS',
+  'FLOOM_TRUSTED_PROXY_HOP_COUNT',
 ]) delete process.env[k];
 
 let passed = 0;
@@ -107,8 +108,14 @@ log(
   ) === '10.0.0.1',
 );
 log(
-  'extractIp takes first XFF entry from loopback proxy',
-  rl.extractIp(makeCtx({ ip: '1.1.1.1, 2.2.2.2' })) === '1.1.1.1',
+  'extractIp takes last trusted XFF entry from loopback proxy',
+  rl.extractIp(makeCtx({ ip: '1.1.1.1, 2.2.2.2' })) === '2.2.2.2',
+);
+log(
+  'extractIp prefers x-real-ip from trusted proxy',
+  rl.extractIp(
+    makeCtx({ ip: '1.1.1.1, 2.2.2.2', headers: { 'x-real-ip': '203.0.113.9' } }),
+  ) === '203.0.113.9',
 );
 log(
   'extractIp ignores spoofed XFF from untrusted peer',
@@ -121,6 +128,18 @@ log(
   rl.extractIp(makeCtx({ peerIp: '203.0.113.10', ip: '4.4.4.4' })) ===
     '4.4.4.4',
 );
+process.env.FLOOM_TRUSTED_PROXY_HOP_COUNT = '2';
+log(
+  'trusted proxy hop count strips the trailing proxy hop',
+  rl.extractIp(makeCtx({ peerIp: '203.0.113.10', ip: 'ATTACKER, 203.0.113.9, 10.0.0.1' })) ===
+    '203.0.113.9',
+);
+log(
+  'trusted proxy hop count with too-short chain falls back to peer IP',
+  rl.extractIp(makeCtx({ peerIp: '203.0.113.10', ip: '10.0.0.1' })) ===
+    '203.0.113.10',
+);
+delete process.env.FLOOM_TRUSTED_PROXY_HOP_COUNT;
 delete process.env.FLOOM_TRUSTED_PROXY_CIDRS;
 log(
   'extractIp falls back to direct peer IP without proxy headers',

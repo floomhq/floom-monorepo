@@ -12,6 +12,9 @@ import { WhyFloom } from '../components/home/WhyFloom';
 import { LayersGrid } from '../components/home/LayersGrid';
 import { McpSnippet } from '../components/home/McpSnippet';
 import { BuiltBy } from '../components/home/BuiltBy';
+import { HeroAppTiles } from '../components/home/HeroAppTiles';
+import { ProofRow } from '../components/home/ProofRow';
+import { SectionEyebrow } from '../components/home/SectionEyebrow';
 import * as api from '../api/client';
 import { useSession } from '../hooks/useSession';
 import type { DetectedApp, HubApp } from '../lib/types';
@@ -24,9 +27,9 @@ interface Stripe {
   description: string;
 }
 
-// Landing v2 (2026-04-18): widen the stripe roster from 3 to 5. These are
-// real apps running on preview.floom.dev/api/hub. If any slug isn't live
-// when the hub call resolves, we fall back gracefully to whatever IS live.
+// Landing v4 (2026-04-20): keep the 5-slug preference. Tiles + stripes
+// share the same roster so the hero teaser and the featured section
+// stay in sync.
 const PREFERRED_SLUGS = ['opendraft', 'openpaper', 'bouncer', 'openslides', 'uuid'] as const;
 
 const FALLBACK_STRIPES: Stripe[] = [
@@ -230,38 +233,82 @@ export function CreatorHeroPage() {
       <TopBar />
 
       <main style={{ display: 'block' }}>
+        {/* HERO v4 (2026-04-20 deep audit):
+            - Integration logos moved ABOVE H1 as a tight "WORKS WITH" strip.
+              Gives the hero a visual anchor instead of opening with a
+              typography wall.
+            - H1 + accent + sub (all locked copy) retained but tightened:
+              H1 60px on desktop, 52px on small desktop, 34px on mobile.
+            - Dual equal-weight CTAs: Publish your app (primary emerald) +
+              Browse 22 live apps (secondary outlined, same padding/height).
+              v11 pattern restored.
+            - 5-tile app strip directly under the CTAs. This is the single
+              biggest structural fix: above-fold proof-of-life in the hero.
+            - hero-stats chip removed from hero; promoted to a dedicated
+              ProofRow section directly below. */}
         <section
           data-testid="hero"
           style={{
             position: 'relative',
-            padding: '72px 24px 64px',
+            padding: '48px 24px 56px',
             background:
-              'radial-gradient(ellipse 720px 380px at 50% 30%, rgba(5,150,105,0.05), transparent 70%)',
+              'radial-gradient(ellipse 720px 360px at 50% 20%, rgba(5,150,105,0.05), transparent 70%)',
           }}
         >
           <div
             style={{
-              maxWidth: 880,
+              maxWidth: 920,
               margin: '0 auto',
               textAlign: 'center',
             }}
           >
+            {/* WORKS WITH logos strip — visual anchor above the typography.
+                v11/v16 pattern. Same logos as before, smaller mono label. */}
+            <div
+              className="hero-works-with"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 14,
+                marginBottom: 20,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  color: 'var(--muted)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.12em',
+                }}
+              >
+                Works with
+              </span>
+              <IntegrationLogos variant="inline" />
+            </div>
+
+            {/* H1 (locked 2026-04-18). 60px desktop so there's more room for
+                the CTA + tile strip above the fold. */}
             <h1
               className="hero-headline"
               style={{
                 fontFamily: "'DM Serif Display', Georgia, serif",
                 fontWeight: 400,
-                fontSize: 62,
-                lineHeight: 1.06,
-                letterSpacing: 0,
+                fontSize: 60,
+                lineHeight: 1.05,
+                letterSpacing: '-0.025em',
                 color: 'var(--ink)',
-                margin: '0 0 16px',
+                margin: '0 0 14px',
                 textWrap: 'balance' as unknown as 'balance',
               }}
             >
-              Turn your API into a live app your team can use.
+              Production infrastructure for AI apps that do real work.
             </h1>
 
+            {/* Accent line (locked). */}
             <p
               className="hero-accent"
               data-testid="hero-accent"
@@ -270,27 +317,28 @@ export function CreatorHeroPage() {
                 fontSize: 17,
                 lineHeight: 1.4,
                 fontWeight: 600,
-                letterSpacing: 0,
+                letterSpacing: '-0.005em',
                 color: 'var(--accent)',
-                margin: '0 0 8px',
+                margin: '0 0 6px',
               }}
             >
-              Start with a public GitHub repo that includes an OpenAPI file, or paste the spec directly.
+              Vibe-coding speed. Production-grade safety.
             </p>
 
+            {/* Sub-positioning (locked copy). */}
             <p
               className="hero-sub-positioning"
               data-testid="hero-sub-positioning"
               style={{
                 fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 16,
+                fontSize: 15,
                 lineHeight: 1.5,
                 fontWeight: 400,
                 color: 'var(--muted)',
-                margin: '0 0 32px',
+                margin: '0 0 26px',
               }}
             >
-              You get a page to share, a Claude tool, and a URL to call.
+              Paste a repo or OpenAPI link. Floom gives you a live app page, share links, auth, and a Claude-ready tool.
             </p>
 
             <form
@@ -318,7 +366,7 @@ export function CreatorHeroPage() {
                 value={sourceLink}
                 onChange={(e) => setSourceLink(e.target.value)}
                 placeholder="github.com/you/api"
-                aria-label="Your GitHub repo with an OpenAPI file, or a direct OpenAPI link"
+                aria-label="Public GitHub repo with OpenAPI, or direct OpenAPI link"
                 data-testid="hero-input"
                 style={{
                   flex: 1,
@@ -348,7 +396,7 @@ export function CreatorHeroPage() {
                   fontSize: 15,
                   fontWeight: 600,
                   cursor: isDetecting ? 'wait' : 'pointer',
-                  opacity: isDetecting ? 0.8 : 1,
+                  opacity: isDetecting ? 0.84 : 1,
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -356,40 +404,6 @@ export function CreatorHeroPage() {
                 <ArrowRight size={16} aria-hidden="true" />
               </button>
             </form>
-
-            <p
-              className="hero-helper"
-              data-testid="hero-helper"
-              style={{
-                maxWidth: 620,
-                margin: '14px auto 0',
-                fontSize: 13,
-                lineHeight: 1.55,
-                color: '#4d4942',
-              }}
-            >
-              Start with a public GitHub repo that includes{' '}
-              <code
-                style={{
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                  fontSize: 12.5,
-                  color: 'var(--ink)',
-                }}
-              >
-                openapi.json
-              </code>{' '}
-              or{' '}
-              <code
-                style={{
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                  fontSize: 12.5,
-                  color: 'var(--ink)',
-                }}
-              >
-                openapi.yaml
-              </code>
-              . Already host your API? Paste the direct spec link instead.
-            </p>
 
             {heroError && (
               <p
@@ -413,83 +427,55 @@ export function CreatorHeroPage() {
             <div
               className="hero-cta-row"
               style={{
-                marginTop: 14,
+                marginTop: 16,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 14,
-                fontSize: 14,
-                color: 'var(--muted)',
+                gap: 12,
                 flexWrap: 'wrap',
               }}
             >
-              <span>Want to see examples first?</span>
               <Link
                 to="/apps"
                 data-testid="hero-browse-apps"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
+                  gap: 8,
                   color: 'var(--ink)',
                   fontWeight: 600,
                   textDecoration: 'none',
-                  padding: '8px 14px',
+                  padding: '12px 18px',
                   borderRadius: 10,
                   border: '1px solid var(--line)',
                   background: 'var(--card)',
+                  fontSize: 14,
                 }}
               >
-                Browse live apps
+                Browse{hubCount !== null ? ` ${hubCount}` : ''} live apps
                 <ArrowRight size={14} aria-hidden="true" />
               </Link>
             </div>
 
-            <IntegrationLogos />
-
-            <div
-              className="hero-stats"
-              data-testid="hero-stats"
-              style={{
-                marginTop: 28,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 36,
-                color: 'var(--muted)',
-                fontSize: 13,
-                flexWrap: 'wrap',
-              }}
-            >
-              <Stat
-                value={hubCount !== null ? String(hubCount) : '—'}
-                label="apps live"
-              />
-              <StatDivider />
-              <Stat value="1" label="repo to start" />
-              <StatDivider />
-              <Stat value="3" label="ways to use it" />
-              <StatDivider />
-              <Stat value="OSS" label="run it yourself" />
-            </div>
+            {/* Hero app-tile strip (new 2026-04-20). Proof-of-life above
+                the fold: 5 compact chips showing real live apps, each
+                linking to /p/:slug. */}
+            <HeroAppTiles tiles={visibleStripes} />
           </div>
         </section>
 
-        <ArchitectureDiagram />
+        {/* PROOF ROW (new 2026-04-20): quantified trust strip. Extracted
+            from the hero-stats inline chip into its own breathing-room
+            section. */}
+        <ProofRow hubCount={hubCount} />
 
-        {/* INLINE DEMO · real /api/run/uuid executed in-page */}
+        {/* INLINE DEMO (promoted): the strongest section on the page, now
+            the first proof a scrolling user hits after the ProofRow. */}
         <InlineDemo />
 
-        {/* WHY · problem / solution / proof */}
-        <WhyFloom />
-
-        {/* LAYERS · what ships today */}
-        <LayersGrid />
-
-        {/* FEATURED APPS · polished 5-stripe list, live count from /api/hub
-            2026-04-19 pass: compressed from a 40px serif header block
-            to an inline header row that matches Linear / Vercel's live-
-            feed patterns. The stripes do the talking. */}
+        {/* FEATURED APPS (promoted from below-demo). The stripes do the
+            heavy lifting; we lead into them with a compact inline header
+            and an eyebrow. */}
         <section
           data-testid="try-now-section"
           data-section="featured-apps"
@@ -498,61 +484,50 @@ export function CreatorHeroPage() {
             padding: '72px 24px',
           }}
         >
-          <div style={{ maxWidth: 760, margin: '0 auto' }}>
+          <div style={{ maxWidth: 820, margin: '0 auto' }}>
             <header
               className="live-apps-header"
               style={{
-                display: 'flex',
-                alignItems: 'baseline',
-                justifyContent: 'space-between',
-                gap: 16,
-                marginBottom: 22,
-                flexWrap: 'wrap',
+                marginBottom: 24,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+              <SectionEyebrow tone="accent" testid="live-apps-eyebrow">
+                Live now · open these in a browser
+              </SectionEyebrow>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                  flexWrap: 'wrap',
+                }}
+              >
                 <h2
                   style={{
-                    fontFamily: "'Inter', system-ui, sans-serif",
-                    fontWeight: 700,
-                    fontSize: 22,
-                    lineHeight: 1.2,
-                    letterSpacing: '-0.015em',
+                    fontFamily: "'DM Serif Display', Georgia, serif",
+                    fontWeight: 400,
+                    fontSize: 34,
+                    lineHeight: 1.1,
+                    letterSpacing: '-0.02em',
                     color: 'var(--ink)',
                     margin: 0,
                   }}
                 >
-                  Live apps now
+                  Real apps, running right now.
                 </h2>
-                {hubCount !== null && (
-                  <span
-                    style={{
-                      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: 'var(--accent)',
-                      background: '#ecfdf5',
-                      border: '1px solid #d1fae5',
-                      padding: '2px 8px',
-                      borderRadius: 999,
-                      letterSpacing: '0.02em',
-                    }}
-                  >
-                    {hubCount} running
-                  </span>
-                )}
+                <a
+                  href="/apps"
+                  style={{
+                    fontSize: 13.5,
+                    color: 'var(--muted)',
+                    textDecoration: 'none',
+                    fontWeight: 500,
+                  }}
+                >
+                  See every live app →
+                </a>
               </div>
-              <a
-                href="/apps"
-                style={{
-                  fontSize: 13,
-                  color: 'var(--muted)',
-                  textDecoration: 'none',
-                  fontWeight: 500,
-                }}
-              >
-                See every live app →
-              </a>
             </header>
 
             <div style={{ display: 'grid', gap: 12 }}>
@@ -569,10 +544,22 @@ export function CreatorHeroPage() {
           </div>
         </section>
 
+        {/* WHY · problem / solution / proof (now with eyebrows) */}
+        <WhyFloom />
+
+        {/* LAYERS · what ships today (now with icon-badges) */}
+        <LayersGrid />
+
+        {/* ARCHITECTURE · demoted from pre-demo position. Retitled to
+            "How a Floom app works" at the section level; dev-targeted
+            section, now labeled as such with a FOR BUILDERS eyebrow. */}
+        <ArchitectureDiagram />
+
         {/* MCP SNIPPET · Claude Desktop integration in 3 lines */}
         <McpSnippet />
 
-        {/* SELF-HOST · one docker line + boot output */}
+        {/* SELF-HOST · one docker line + boot output. Simplified caption
+            so the ":3051 MCP listening" jargon becomes plain English. */}
         <section
           id="self-host"
           data-testid="self-host-section"
@@ -584,12 +571,15 @@ export function CreatorHeroPage() {
           }}
         >
           <div style={{ maxWidth: 620, margin: '0 auto', textAlign: 'center' }}>
+            <SectionEyebrow testid="self-host-eyebrow">
+              For the open-source-first
+            </SectionEyebrow>
             <h2
               style={{
                 fontFamily: "'DM Serif Display', Georgia, serif",
                 fontWeight: 400,
-                fontSize: 40,
-                lineHeight: 1.15,
+                fontSize: 36,
+                lineHeight: 1.1,
                 letterSpacing: '-0.02em',
                 color: 'var(--ink)',
                 margin: '0 0 14px',
@@ -628,7 +618,7 @@ export function CreatorHeroPage() {
                 <span style={{ color: '#6ee7b7' }}>docker run -p 3010:3010 floomhq/floom</span>
               </div>
               <div style={{ color: '#94a3b8', marginTop: 6 }}>
-                <span style={{ color: '#6ee7b7' }}>✓</span> Started · 14 apps registered · MCP listening on :3051
+                <span style={{ color: '#6ee7b7' }}>✓</span> Floom is up. 14 apps ready. Claude integration live.
               </div>
             </div>
             <p style={{ marginTop: 24, fontSize: 14 }}>
@@ -651,72 +641,31 @@ export function CreatorHeroPage() {
       <PublicFooter />
       <FeedbackButton />
 
+      {/* Inline responsive tweaks v4: hero typography shrinks in steps so
+         the full hero (logos + H1 + CTA + app tiles) fits on the first
+         fold at every viewport. */}
       <style>{`
-        .hero-input input::placeholder {
-          color: #5b554d;
-          opacity: 1;
+        @media (max-width: 1040px) {
+          .hero-headline { font-size: 52px !important; }
         }
-        @media (max-width: 900px) {
-          .hero-headline { font-size: 48px !important; }
-          .hero-accent { font-size: 16px !important; }
-          .hero-stats { gap: 24px !important; }
+        @media (max-width: 780px) {
+          .hero-headline { font-size: 42px !important; }
+          .hero-works-with { gap: 10px !important; }
         }
         @media (max-width: 640px) {
-          [data-testid="hero"] { padding: 48px 20px 48px; }
-          .hero-headline { font-size: 34px !important; line-height: 1.1 !important; margin-bottom: 14px !important; }
-          .hero-accent { font-size: 14px !important; margin-bottom: 6px !important; }
-          .hero-sub-positioning { font-size: 15px !important; margin-bottom: 22px !important; }
-          .hero-helper { font-size: 12.5px !important; }
+          [data-testid="hero"] { padding: 36px 20px 40px !important; }
+          .hero-headline { font-size: 34px !important; line-height: 1.08 !important; margin-bottom: 12px !important; }
+          .hero-accent { font-size: 14px !important; margin-bottom: 4px !important; }
+          .hero-sub-positioning { font-size: 14px !important; margin-bottom: 20px !important; }
           .hero-input { flex-direction: column !important; align-items: stretch !important; padding: 10px !important; }
           .hero-input input { padding: 14px !important; font-size: 13.5px !important; }
           .hero-input button { width: 100% !important; padding: 14px !important; justify-content: center !important; }
           .hero-cta-row { flex-direction: column !important; gap: 10px !important; }
-          .hero-stats { gap: 18px !important; font-size: 12px !important; }
-          .integration-logos { flex-direction: column !important; gap: 12px !important; }
+          .hero-works-with { margin-bottom: 16px !important; }
+          .integration-logos { flex-direction: column !important; gap: 10px !important; }
           .live-apps-header { flex-direction: column !important; align-items: flex-start !important; }
         }
       `}</style>
     </div>
-  );
-}
-
-/** Single quantified stat for the compact trust row under the hero. */
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'baseline',
-        gap: 6,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      <span
-        style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-          fontSize: 15,
-          fontWeight: 700,
-          color: 'var(--ink)',
-          letterSpacing: '-0.01em',
-        }}
-      >
-        {value}
-      </span>
-      <span style={{ fontSize: 13, color: 'var(--muted)' }}>{label}</span>
-    </span>
-  );
-}
-
-function StatDivider() {
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        display: 'inline-block',
-        width: 1,
-        height: 14,
-        background: 'var(--line)',
-      }}
-    />
   );
 }

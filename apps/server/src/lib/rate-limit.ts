@@ -38,6 +38,8 @@ export const defaultPerAppPerHour = (): number =>
   envNumber('FLOOM_RATE_LIMIT_APP_PER_HOUR', 500);
 export const defaultMcpIngestPerDay = (): number =>
   envNumber('FLOOM_RATE_LIMIT_MCP_INGEST_PER_DAY', 10);
+export const defaultTrustedProxyHopCount = (): number =>
+  envNumber('FLOOM_TRUSTED_PROXY_HOP_COUNT', 1);
 
 // ---------- sliding-window store ----------
 
@@ -246,13 +248,22 @@ function parseForwardedIp(c: Context): string | null {
   const cf = normalizeIp(c.req.header('cf-connecting-ip'));
   if (cf) return cf;
 
+  const real = normalizeIp(c.req.header('x-real-ip'));
+  if (real) return real;
+
   const xff = c.req.header('x-forwarded-for');
   if (xff?.length) {
-    const first = normalizeIp(xff.split(',')[0]);
-    if (first) return first;
+    const entries = xff
+      .split(',')
+      .map((part) => normalizeIp(part))
+      .filter((part): part is string => !!part);
+    if (entries.length > 0) {
+      const hops = Math.max(1, defaultTrustedProxyHopCount());
+      const idx = entries.length - hops;
+      if (idx >= 0) return entries[idx] ?? null;
+    }
   }
-
-  return normalizeIp(c.req.header('x-real-ip'));
+  return null;
 }
 
 function isTrustedProxyPeer(ip: string | null): boolean {
