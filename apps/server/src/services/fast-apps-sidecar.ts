@@ -116,10 +116,14 @@ const FAST_APP_DESCRIPTORS: FastAppDescriptor[] = [
       'Generate one or more UUID v4 or v7 strings. Pure random v4, or time-ordered v7 for sortable ids.',
     category: 'developer-tools',
     icon: 'uuid',
+    // StringList handles both count=1 and count>1 cleanly (single chip
+    // vs a wrapping row of chips). Previously pinned to TextBig with
+    // value_field: 'uuids' which only plucked the first array item —
+    // correct for count=1 but silently hid the rest for count>N.
     render: {
-      output_component: 'TextBig',
-      value_field: 'uuids',
-      copyable: true,
+      output_component: 'StringList',
+      items_field: 'uuids',
+      label: 'UUIDs',
     },
     // Rename the `version` enum selector so the form field label doesn't
     // collide with the app release version ("v0.1.0") in the hero meta row.

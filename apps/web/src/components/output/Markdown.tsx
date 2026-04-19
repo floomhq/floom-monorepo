@@ -1,10 +1,14 @@
-// Markdown/plain-text renderer. Preserves the pre-v16 OutputPanel
-// polish: whitespace-preserved wrap, relative position so a CopyButton
-// can sit in the top-right corner. Intentionally does NOT parse the
-// markdown into HTML — the previous OutputPanel rendered raw text with
-// pre-wrap and that is what consumers expect today (see PR #7). A real
-// markdown-to-HTML pass is a separate, opt-in change because it needs
-// sanitization review.
+// Markdown renderer. Uses react-markdown + remark-gfm so outputs with
+// headings, lists, links, bold/italic, and fenced code blocks render as
+// real formatting, not a pre-wrapped blob of `# Title\n\n**bold**`.
+//
+// Safety: react-markdown 9 does NOT render raw HTML unless the caller
+// explicitly opts in to rehype-raw. We stay on the safe default so a
+// creator-controlled markdown string can't smuggle <script> into the
+// Floom origin. We also whitelist the allowed tag set so future changes
+// can't accidentally loosen the surface area.
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { CopyButton } from './CopyButton';
 
 export interface MarkdownProps {
@@ -12,18 +16,55 @@ export interface MarkdownProps {
   copyable?: boolean;
 }
 
+const ALLOWED_ELEMENTS = [
+  'p',
+  'a',
+  'strong',
+  'em',
+  'del',
+  'ul',
+  'ol',
+  'li',
+  'code',
+  'pre',
+  'blockquote',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'hr',
+  'br',
+  'table',
+  'thead',
+  'tbody',
+  'tr',
+  'th',
+  'td',
+];
+
+const COMPONENTS: Components = {
+  // External links open in a new tab with noopener so creator-supplied
+  // URLs can't hijack the Floom window (target=_blank without rel is a
+  // known tab-napping vector).
+  a: ({ href, children, ...rest }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+      {children}
+    </a>
+  ),
+};
+
 export function Markdown({ content, copyable = true }: MarkdownProps) {
   return (
-    // data-renderer lets audits confirm the cascade mapped markdown /
-    // long-text outputs to this component. Added 2026-04-18 (bug #9).
     <div
       data-renderer="Markdown"
-      className="app-expanded-card"
+      className="app-expanded-card markdown-output"
       style={{
         position: 'relative',
-        whiteSpace: 'pre-wrap',
         fontSize: 14,
         lineHeight: 1.6,
+        color: 'var(--ink)',
       }}
     >
       {copyable && (
@@ -31,7 +72,16 @@ export function Markdown({ content, copyable = true }: MarkdownProps) {
           <CopyButton value={content} label="Copy markdown" />
         </div>
       )}
-      {content}
+      <div style={{ paddingRight: copyable ? 72 : 0 }}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          allowedElements={ALLOWED_ELEMENTS}
+          unwrapDisallowed
+          components={COMPONENTS}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
     </div>
   );
 }
