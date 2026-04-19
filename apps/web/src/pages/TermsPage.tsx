@@ -15,8 +15,8 @@ export function TermsPage() {
 
         <LegalSection id="scope" title="1. Scope">
           <p>
-            These Terms govern your use of the Floom platform (floom.dev,
-            preview.floom.dev, and related services), operated by{' '}
+            These Terms govern your use of the Floom platform (floom.dev and
+            related services, including preview.floom.dev), operated by{' '}
             <strong>Floom, Inc.</strong>, a Delaware C-Corp with a business address
             at 1207 Delaware Ave, Suite 226, Wilmington, DE 19806, United States
             (&quot;Floom&quot;, &quot;we&quot;, &quot;us&quot;). By using Floom you agree to these Terms.

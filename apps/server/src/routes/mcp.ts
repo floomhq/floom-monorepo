@@ -37,7 +37,7 @@ import type {
 
 export const mcpRouter = new Hono();
 
-const PUBLIC_URL = process.env.PUBLIC_URL || 'https://preview.floom.dev';
+const PUBLIC_URL = process.env.PUBLIC_URL || 'https://floom.dev';
 
 function formatRun(row: RunRecord) {
   return {

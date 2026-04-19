@@ -13,7 +13,7 @@ const SNIPPET = `{
   "mcpServers": {
     "floom-uuid": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://preview.floom.dev/mcp/app/uuid"]
+      "args": ["-y", "mcp-remote", "https://floom.dev/mcp/app/uuid"]
     }
   }
 }`;
