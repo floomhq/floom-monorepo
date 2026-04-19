@@ -88,7 +88,7 @@ export function StudioSettingsPage() {
           <StubCard
             label="Coming v1.1"
             title="Personal access tokens"
-            desc="Publish + manage apps from CI or the Floom CLI. Until then, use your session cookie (browser) or the OSS API token (self-host)."
+            desc="Publish + manage apps from CI or the Floom CLI. Until then, use your browser session or the self-host API token."
           />
         </Section>
 
@@ -96,7 +96,7 @@ export function StudioSettingsPage() {
           <StubCard
             label="Coming v1.1"
             title="Cloud plan"
-            desc="Self-hosted Studio is free forever. Cloud billing ships with the Cloud tier (job queue, streaming, managed secrets)."
+            desc="Running Studio yourself is free forever. Paid Cloud adds longer-running jobs, live updates, and managed sign-in keys."
           />
         </Section>
 

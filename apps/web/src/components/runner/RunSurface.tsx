@@ -1126,7 +1126,9 @@ function formatWhen(iso: string): string {
     const d = new Date(iso);
     const t = d.getTime();
     if (Number.isNaN(t)) return '';
-    const diff = Date.now() - t;
+    // Clamp negative diffs (future timestamps / clock skew) so fresh runs
+    // never render `-Ns ago`. See lib/time.ts.
+    const diff = Math.max(0, Date.now() - t);
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;

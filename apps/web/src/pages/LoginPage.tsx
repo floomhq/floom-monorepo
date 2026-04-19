@@ -184,8 +184,8 @@ export function LoginPage() {
               lineHeight: 1.5,
             }}
           >
-            This server runs in OSS mode. Cloud auth endpoints are not mounted;
-            you can still browse and run apps as the local user.{' '}
+            This server is running in open-source mode. Sign-in with an account is off
+            here, but you can still browse and run apps as the local user.{' '}
             <Link to={nextPath} style={{ color: 'var(--accent)', fontWeight: 600 }}>
               Continue as local
             </Link>
@@ -351,15 +351,15 @@ export function LoginPage() {
         >
           <ValueBullet
             title="Ship AI apps in 30 seconds, not weeks."
-            desc="Paste an OpenAPI URL. Get MCP, HTTP API, store page, and docs in seconds."
+            desc="Paste your app's link. Get a Claude tool, a page to share, a CLI, and a URL your teammates can hit."
           />
           <ValueBullet
-            title="Self-host free. Cloud for the creator tools."
-            desc="The OSS runtime is yours forever. Cloud adds the job queue, streaming, and managed secrets."
+            title="Free to run yourself. Cloud for the creator tools."
+            desc="The open-source version is yours forever. Cloud adds longer-running jobs, live updates, and managed sign-in keys."
           />
           <ValueBullet
-            title="One spec. Five agent surfaces."
-            desc="Same app runs in Claude, ChatGPT, Notion, CLI, and the Store. Zero glue code."
+            title="One app. Five ways to use it."
+            desc="Same app runs in Claude, ChatGPT, Notion, your terminal, and the Store. No glue code."
           />
         </ul>
         <div

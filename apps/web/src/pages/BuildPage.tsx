@@ -199,7 +199,7 @@ export function BuildPage({
       setSource('openapi');
       setStep('review');
     } catch (err) {
-      setError((err as Error).message || 'Could not fetch that spec.');
+      setError((err as Error).message || 'Could not fetch that file.');
     }
   }
 
@@ -299,8 +299,8 @@ export function BuildPage({
               lineHeight: 1.55,
             }}
           >
-            Start from an idea or a tool you already use. Floom wraps it in auth, access control,
-            logs, versions, and a store listing from day one.
+            Start from an idea or a tool you already use. Floom handles the boring stuff for you:
+            sign-in, who can use it, history, versions, and a public page. From day one.
           </p>
         </div>
 
@@ -316,7 +316,7 @@ export function BuildPage({
               flexWrap: 'wrap',
             }}
           >
-            <StepBadge active={false} done={true} label="1. Detect spec" />
+            <StepBadge active={false} done={true} label="1. Find your app" />
             <StepBadge
               active={step === 'review'}
               done={step === 'publishing' || step === 'done'}
@@ -407,8 +407,8 @@ export function BuildPage({
                   maxWidth: 620,
                 }}
               >
-                Paste your repo URL. Floom looks for an OpenAPI spec at the root, wraps it with
-                auth and logs, and ships a live MCP server.
+                Paste your repo URL. Floom reads it and turns it into a live app: a Claude tool,
+                a page to share, and a URL your teammates can hit.
               </p>
               <div
                 style={{
@@ -465,8 +465,7 @@ export function BuildPage({
                 </button>
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                Works with public repos out of the box. Private repo support ships with the GitHub
-                App.
+                Works with any public repo. Private repos coming soon.
               </div>
 
               {/* Error states */}
@@ -483,15 +482,15 @@ export function BuildPage({
                   {githubError === 'no-openapi' && (
                     <ErrorCard
                       severity="red"
-                      title="We couldn't find an OpenAPI spec"
-                      copy="Floom v1 supports OpenAPI apps. Add openapi.yaml (or .json) to your repo root, or use the OpenAPI URL ramp below. Docker images and agent wrappers are on the roadmap."
+                      title="We couldn't find your app file"
+                      copy="Floom needs an openapi.yaml (or .json) file in your repo root. Add one, or paste the direct link below. Importing from Docker images and agent wrappers is on the roadmap."
                     />
                   )}
                   {githubError === 'private' && (
                     <ErrorCard
                       severity="amber"
                       title="This repo looks private"
-                      copy="We can't reach it without authorization. Make the repo public, or paste the raw OpenAPI URL below."
+                      copy="We can't reach it without permission. Make the repo public, or paste the direct link to your openapi.yaml below."
                     />
                   )}
                   {githubError === 'unreachable' && (
@@ -570,11 +569,11 @@ export function BuildPage({
                   <FileIcon />
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
-                  Paste an OpenAPI URL
+                  Paste your app's link
                 </div>
               </div>
               <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
-                Direct link to openapi.json or openapi.yaml. 3.0 and 3.1 supported.
+                Direct link to your app's openapi.json or openapi.yaml file.
               </p>
               <input
                 type="url"
@@ -618,7 +617,7 @@ export function BuildPage({
                 disabled={!openapiUrl}
                 style={primaryButton(!openapiUrl)}
               >
-                Detect spec
+                Find it
               </button>
             </form>
 
@@ -657,7 +656,7 @@ export function BuildPage({
                   icon={<DockerIcon />}
                   title="Import from a Docker image"
                   badge="Coming soon"
-                  desc="Paste an image and the OpenAPI path. Floom pulls, scans, and deploys behind the production layer."
+                  desc="Paste an image and the path to your app file. Floom pulls it, scans it, and runs it for you."
                   testId="ramp-docker"
                   onClick={() => setComingSoon('docker')}
                   compact
@@ -757,7 +756,7 @@ export function BuildPage({
                   />
                 </svg>
                 {source === 'github' && <span>Imported from GitHub.</span>}
-                Detected {detected.tools_count} tool{detected.tools_count === 1 ? '' : 's'} · auth:{' '}
+                Found {detected.tools_count} thing{detected.tools_count === 1 ? '' : 's'} your app can do · sign-in:{' '}
                 <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>
                   {detected.auth_type || 'none'}
                 </code>
@@ -927,8 +926,8 @@ export function BuildPage({
               </div>
               <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px' }}>
                 {visibility === 'private'
-                  ? 'Your app is live. Only your signed-in sessions can run it — flip visibility to Public later if you want to share.'
-                  : 'Your app is live. Share the link or install it into Claude Desktop to start running it.'}
+                  ? 'Your app is live. Only you can run it while signed in. You can flip it to Public later if you want to share.'
+                  : 'Your app is live. Share the link or add it to Claude Desktop to start running it.'}
               </p>
               {/* Shareable full URL + copy button. Before this fix the
                   banner only showed "/p/slug" relative path, which is not
@@ -1156,7 +1155,7 @@ function ComingSoonRampModal({
     docker: {
       title: 'Docker import (coming soon)',
       copy:
-        'Pulling apps from Docker registries is on the v1.1 roadmap. For now, host your OpenAPI spec somewhere reachable and use the URL ramp.',
+        'Importing apps from Docker is on the v1.1 roadmap. For now, host your app\u2019s openapi.json somewhere public and paste the link.',
     },
   }[target];
 
@@ -1287,8 +1286,8 @@ function SignupToPublishModal({
           Sign up to publish this app
         </h2>
         <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 20px', lineHeight: 1.55 }}>
-          Your detected spec is saved. Create a free account to publish it to the store, get a live
-          MCP endpoint, and see run logs.
+          Your app is saved. Create a free account to publish it to the store, get a live link,
+          and see who runs it.
         </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button
