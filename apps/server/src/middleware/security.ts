@@ -18,7 +18,8 @@
 //     tracked as a follow-up.
 //   - `img-src 'self' data: https:` — OG images, external icon CDNs
 //     (SimpleIcons, svgl, favicons), and data: for inline SVG sprites.
-//   - `connect-src 'self'` — all API calls go to same origin.
+//   - `connect-src 'self' https://api.github.com` — same-origin API
+//     calls plus the GitHub star-count fetch in components/home/BuiltBy.tsx.
 //     Sentry is only wired on the server; the browser bundle does not
 //     ship its own DSN. If we add a browser-side Sentry later, we'll
 //     need to allowlist `https://*.ingest.sentry.io` here.
@@ -57,7 +58,7 @@ export const TOP_LEVEL_CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self'",
+  "connect-src 'self' https://api.github.com",
   "frame-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
