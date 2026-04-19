@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { AppDetail } from '../lib/types';
 import { AppIcon } from './AppIcon';
 
-const PUBLIC_URL = 'https://preview.floom.dev';
+const PUBLIC_URL = 'https://floom.dev';
 
 interface Props {
   app: AppDetail | null;

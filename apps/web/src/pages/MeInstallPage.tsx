@@ -13,7 +13,7 @@ export function MeInstallPage() {
   const origin =
     typeof window !== 'undefined'
       ? window.location.origin
-      : 'https://preview.floom.dev';
+      : 'https://floom.dev';
   const mcpUrl = `${origin}/mcp`;
 
   const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
