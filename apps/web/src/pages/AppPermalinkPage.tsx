@@ -16,7 +16,7 @@ import { AppIcon } from '../components/AppIcon';
 import { AppReviews } from '../components/AppReviews';
 import { FeedbackButton } from '../components/FeedbackButton';
 import { DescriptionMarkdown } from '../components/DescriptionMarkdown';
-import { getApp, getAppReviews, getRun, ApiError } from '../api/client';
+import { getApp, getAppReviews, getRun, shareRun, ApiError } from '../api/client';
 import { useSession } from '../hooks/useSession';
 import type { ActionSpec, AppDetail, ReviewSummary, RunRecord } from '../lib/types';
 import {
@@ -787,17 +787,40 @@ export function AppPermalinkPage() {
                   type="button"
                   data-testid="cta-share"
                   onClick={() => {
+                    // P0 2026-04-20: runs are owner-only by default, so
+                    // copying the /r/:id URL without first flipping
+                    // `runs.is_public` on the server would hand out a
+                    // link that returns 404 to anyone but the owner.
+                    // When a run is in context we opt it in via
+                    // shareRun(); when no run is in context the button
+                    // shares the bare app page which needs no flip.
+                    const copyUrl = (url: string) => {
+                      void navigator.clipboard.writeText(url).then(() => {
+                        setShareToast(true);
+                        window.setTimeout(() => setShareToast(false), 1800);
+                      });
+                    };
                     try {
                       const currentUrl = new URL(window.location.href);
                       const currentRunId = currentUrl.searchParams.get('run');
-                      const shareUrl = currentRunId
-                        ? `${window.location.origin}${buildPublicRunPath(currentRunId)}`
-                        : currentUrl.toString();
-                      void navigator.clipboard
-                        .writeText(shareUrl)
+                      if (!currentRunId) {
+                        copyUrl(currentUrl.toString());
+                        return;
+                      }
+                      void shareRun(currentRunId)
                         .then(() => {
-                          setShareToast(true);
-                          window.setTimeout(() => setShareToast(false), 1800);
+                          copyUrl(
+                            `${window.location.origin}${buildPublicRunPath(currentRunId)}`,
+                          );
+                        })
+                        .catch(() => {
+                          // If the share flip fails (non-owner, network
+                          // blip) fall back to copying the app-page URL
+                          // without the run id — better a slightly less
+                          // helpful link than a link that 404s for the
+                          // recipient.
+                          currentUrl.searchParams.delete('run');
+                          copyUrl(currentUrl.toString());
                         });
                     } catch {
                       /* ignore */

@@ -134,6 +134,25 @@ export function isAuthenticated(c: Context): boolean {
 }
 
 /**
+ * Server-admin bearer check. Returns true ONLY when FLOOM_AUTH_TOKEN is
+ * configured AND the caller presented a matching bearer. Used by the
+ * run-auth lockdown (P0 2026-04-20) to let the self-host operator fetch
+ * any run by id with the shared admin token, without also opening the
+ * floodgates when no token is configured at all.
+ *
+ * Distinct from `isAuthenticated` which returns true when no token is
+ * configured ("public mode = everyone passes"). Here we explicitly want
+ * a FALSE for that branch so the ownership gate keeps protecting runs in
+ * OSS mode.
+ */
+export function hasValidAdminBearer(c: Context): boolean {
+  const expected = getExpectedToken();
+  if (!expected) return false;
+  const got = presentedToken(c);
+  return got !== null && constantTimeEqual(got, expected);
+}
+
+/**
  * Cloud-mode authentication gate for write routes.
  *
  * In OSS mode (FLOOM_CLOUD_MODE unset/false) every request is synthesized

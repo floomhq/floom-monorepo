@@ -362,6 +362,16 @@ if (!runCols.includes('user_id')) {
 if (!runCols.includes('device_id')) {
   db.exec(`ALTER TABLE runs ADD COLUMN device_id TEXT`);
 }
+// Security (P0 2026-04-20, run-auth lockdown): runs default to owner-only
+// reads. When a creator explicitly hits POST /api/run/:id/share, we flip
+// this to 1 so anonymous callers can view the run's outputs (inputs and
+// logs stay owner-only even when shared — inputs can hold user secrets
+// that a "share this output" intent never meant to expose). Default 0 =
+// private. Idempotent migration; existing rows come back as 0 and stay
+// unreachable from anon until the owner opts in.
+if (!runCols.includes('is_public')) {
+  db.exec(`ALTER TABLE runs ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0`);
+}
 db.exec(
   `CREATE INDEX IF NOT EXISTS idx_runs_workspace_user ON runs(workspace_id, user_id)`,
 );
