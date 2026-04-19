@@ -32,11 +32,14 @@ function log(label, ok, detail) {
 console.log('RunSurface shell tests');
 
 // ---------- deriveRunLabel ----------
+// As of 2026-04-19 (Fix 2): Refine is opt-in. Only refinable === true flips
+// the button. Default / undefined / false all stay on "Run".
 {
   log('Empty state → Run', deriveRunLabel({ hasRun: false, refinable: undefined }) === 'Run');
-  log('After run, default refinable → Refine', deriveRunLabel({ hasRun: true, refinable: undefined }) === 'Refine');
+  log('After run, default (undefined) stays Run', deriveRunLabel({ hasRun: true, refinable: undefined }) === 'Run');
   log('After run, refinable=true → Refine', deriveRunLabel({ hasRun: true, refinable: true }) === 'Refine');
   log('After run, refinable=false stays Run', deriveRunLabel({ hasRun: true, refinable: false }) === 'Run');
+  log('Before run, refinable=true → still Run', deriveRunLabel({ hasRun: false, refinable: true }) === 'Run');
   log('Before run, refinable=false → Run', deriveRunLabel({ hasRun: false, refinable: false }) === 'Run');
 }
 

@@ -356,7 +356,7 @@ meRouter.get('/runs', async (c) => {
     .prepare(
       `SELECT runs.id, runs.action, runs.status, runs.duration_ms,
               runs.started_at, runs.finished_at, runs.error, runs.error_type,
-              runs.inputs,
+              runs.inputs, runs.outputs,
               apps.slug AS app_slug, apps.name AS app_name, apps.icon AS app_icon
          FROM runs
          LEFT JOIN apps ON apps.id = runs.app_id
@@ -374,6 +374,7 @@ meRouter.get('/runs', async (c) => {
     error: string | null;
     error_type: string | null;
     inputs: string | null;
+    outputs: string | null;
     app_slug: string | null;
     app_name: string | null;
     app_icon: string | null;
@@ -396,6 +397,18 @@ meRouter.get('/runs', async (c) => {
           // whole /runs list. UI will fall back to "Run #<id>".
         }
       }
+      // Fix 3 (2026-04-19): surface `outputs` on the list response so the
+      // earlier-runs rail on /p/:slug can render input → output previews
+      // without a per-row detail fetch. Outputs can be arbitrary shapes;
+      // the UI calls JSON.stringify() + truncates on the client side.
+      let outputs: unknown = null;
+      if (r.outputs) {
+        try {
+          outputs = JSON.parse(r.outputs);
+        } catch {
+          outputs = r.outputs; // surface as raw string so snippet is visible
+        }
+      }
       return {
         id: r.id,
         action: r.action,
@@ -409,6 +422,7 @@ meRouter.get('/runs', async (c) => {
         app_name: r.app_name,
         app_icon: r.app_icon,
         inputs,
+        outputs,
       };
     }),
   });

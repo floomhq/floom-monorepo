@@ -83,8 +83,14 @@ export function OutputPanel({ app, run, onIterate, onOpenDetails, appDetail }: P
         <OutputRenderer outputs={run.outputs} />
       )}
 
-      <p className="iterate-label">Iterate</p>
-      <IterateInput onSubmit={onIterate} />
+      {/* Iterate block is opt-in (manifest.render.refinable === true).
+          RunSurface hides the composer by passing onIterate=undefined. */}
+      {onIterate && (
+        <>
+          <p className="iterate-label">Iterate</p>
+          <IterateInput onSubmit={onIterate} />
+        </>
+      )}
     </div>
   );
 }
