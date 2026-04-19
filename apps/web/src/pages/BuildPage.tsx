@@ -1629,7 +1629,7 @@ function ShareableUrl({ slug }: { slug: string }) {
   // /p/slug that the old banner displayed.
   const [copied, setCopied] = useState(false);
   const origin =
-    typeof window !== 'undefined' ? window.location.origin : 'https://preview.floom.dev';
+    typeof window !== 'undefined' ? window.location.origin : 'https://floom.dev';
   const fullUrl = `${origin}/p/${slug}`;
   async function copy() {
     try {

@@ -11,17 +11,17 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
   "mcpServers": {
     "flyfast": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://preview.floom.dev/mcp/app/flyfast"]
+      "args": ["-y", "mcp-remote", "https://floom.dev/mcp/app/flyfast"]
     },
     "floom-search": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://preview.floom.dev/mcp/search"]
+      "args": ["-y", "mcp-remote", "https://floom.dev/mcp/search"]
     }
   }
 }
 ```
 
-Replace `flyfast` with any app slug from [preview.floom.dev](https://preview.floom.dev). The `/mcp/search` endpoint lets Claude search all available apps.
+Replace `flyfast` with any app slug from [floom.dev](https://floom.dev). The `/mcp/search` endpoint lets Claude search all available apps.
 
 ## Self-hosted instance
 
@@ -44,19 +44,19 @@ The MCP handshake is verified working. These curl commands reproduce what Claude
 
 ```bash
 # Initialize
-curl -s -X POST https://preview.floom.dev/mcp/app/flyfast \
+curl -s -X POST https://floom.dev/mcp/app/flyfast \
   -H "content-type: application/json" \
   -H "accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.0.1"}}}'
 
 # List tools
-curl -s -X POST https://preview.floom.dev/mcp/app/flyfast \
+curl -s -X POST https://floom.dev/mcp/app/flyfast \
   -H "content-type: application/json" \
   -H "accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 
 # Call a tool
-curl -s -X POST https://preview.floom.dev/mcp/app/flyfast \
+curl -s -X POST https://floom.dev/mcp/app/flyfast \
   -H "content-type: application/json" \
   -H "accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search","arguments":{"prompt":"Berlin to Lisbon"}}}'
@@ -75,4 +75,4 @@ All three return valid JSON-RPC responses. The `accept` header must include both
 | `opendraft` | Document drafting |
 | ...and 10 more | See `/api/hub` |
 
-Full list: `curl https://preview.floom.dev/api/hub | jq '.[].slug'`
+Full list: `curl https://floom.dev/api/hub | jq '.[].slug'`

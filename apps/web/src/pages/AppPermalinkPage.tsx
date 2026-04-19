@@ -224,7 +224,7 @@ export function AppPermalinkPage() {
       name: app.name,
       description: app.description,
       applicationCategory: app.category || 'UtilitiesApplication',
-      url: `https://preview.floom.dev/p/${app.slug}`,
+      url: `https://floom.dev/p/${app.slug}`,
       author: {
         '@type': 'Person',
         name: app.author_display || app.author || 'floomhq',
@@ -449,8 +449,8 @@ export function AppPermalinkPage() {
     );
   }
 
-  const mcpEndpoint = `https://preview.floom.dev/mcp/app/${app.slug}`;
-  const httpEndpoint = `https://preview.floom.dev/api/run`;
+  const mcpEndpoint = `https://floom.dev/mcp/app/${app.slug}`;
+  const httpEndpoint = `https://floom.dev/api/run`;
   const githubRepo = GITHUB_REPOS[app.slug];
   const firstAction = Object.keys(app.manifest?.actions ?? {})[0] || app.actions?.[0] || 'run';
   const curlExample = `curl -X POST ${httpEndpoint} \\
