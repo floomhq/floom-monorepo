@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Floom">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="24 24 52 52" role="img" aria-label="Floom">
   <!--
     Floom mark. Flat green on transparent. Used for the tab favicon and
     inline contexts where SVG filters won't render crisp at small sizes.
