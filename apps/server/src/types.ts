@@ -264,6 +264,24 @@ export interface RunRecord {
   duration_ms: number | null;
   started_at: string;
   finished_at: string | null;
+  /**
+   * Multi-tenant scope columns (W2.1). `workspace_id` is always set; `user_id`
+   * and `device_id` track who started the run so the owner-only read gate on
+   * GET /api/run/:id can match without a separate join. Nullable on older
+   * rows seeded before the W2.1 migration.
+   */
+  workspace_id?: string;
+  user_id?: string | null;
+  device_id?: string | null;
+  /**
+   * Security (P0 2026-04-20, run-auth lockdown): 0 by default — only the
+   * owner (matched via workspace_id + user_id | device_id) can GET the run.
+   * Flipped to 1 when the creator explicitly shares the run via
+   * `POST /api/run/:id/share`; anonymous callers then get a *redacted*
+   * view (outputs only — no inputs, no logs, no upstream_status) on
+   * GET /api/run/:id.
+   */
+  is_public?: 0 | 1;
 }
 
 export interface SecretRecord {

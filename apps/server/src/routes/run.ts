@@ -5,15 +5,21 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { db } from '../db.js';
+import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newRunId } from '../lib/ids.js';
 import { dispatchRun, getRun } from '../services/runner.js';
 import { validateInputs, ManifestError } from '../services/manifest.js';
 import { getOrCreateStream } from '../lib/log-stream.js';
-import { checkAppVisibility } from '../lib/auth.js';
+import { checkAppVisibility, hasValidAdminBearer } from '../lib/auth.js';
+import { isCloudMode } from '../lib/better-auth.js';
 import { resolveUserContext } from '../services/session.js';
 import { parseJsonBody, bodyParseError } from '../lib/body.js';
-import type { AppRecord, NormalizedManifest } from '../types.js';
+import type {
+  AppRecord,
+  NormalizedManifest,
+  RunRecord,
+  SessionContext,
+} from '../types.js';
 
 export const runRouter = new Hono();
 
@@ -37,6 +43,110 @@ async function loadAuthorizedRunApp(
     ctx,
   });
   return { app, blocked };
+}
+
+/**
+ * Ownership check for a GET on a specific run.
+ *
+ * Security contract (P0 2026-04-20):
+ *   - The run is always scoped by workspace_id.
+ *   - In cloud mode (is_authenticated=true), the caller must match
+ *     `runs.user_id`. Device id is never sufficient for an authed caller
+ *     because device cookies can trivially be copied between browsers.
+ *   - In OSS / anonymous mode, the caller must match `runs.device_id` and
+ *     the run must not carry a non-default `user_id` (i.e. someone else
+ *     authenticated and claimed it). This keeps the self-host single-user
+ *     box working while preventing cookie theft from leaking a logged-in
+ *     user's run back to an anonymous session.
+ *
+ * Returns `'owner'` when the caller owns the run, `'public'` when the run
+ * has been explicitly shared via POST /api/run/:id/share (caller gets a
+ * redacted view, outputs only), and `'deny'` for everyone else. The
+ * caller must treat `'deny'` as a 404 (not 403) so that probing run ids
+ * can't distinguish "this run doesn't exist" from "this run exists but
+ * you can't see it".
+ */
+function checkRunAccess(
+  ctx: SessionContext,
+  run: Pick<RunRecord, 'workspace_id' | 'user_id' | 'device_id' | 'is_public'>,
+): 'owner' | 'public' | 'deny' {
+  // Defensive: older rows predating the W2.1 migration may lack workspace_id.
+  // Treat missing as the synthetic default — they always belonged to the
+  // local workspace.
+  const runWorkspace = run.workspace_id || DEFAULT_WORKSPACE_ID;
+
+  // OSS single-user box back-compat: when Floom boots without
+  // FLOOM_CLOUD_MODE the whole environment is one user. `fetch`-based
+  // clients (curl, CI scripts, node tests) don't carry the device cookie
+  // across calls, so enforcing device_id parity would 404 every legit
+  // poll on the self-host flow. Unauthenticated reads on the synthetic
+  // 'local' workspace are allowed; Cloud deployments never hit this
+  // branch because isCloudMode() is true.
+  if (!isCloudMode() && runWorkspace === DEFAULT_WORKSPACE_ID) {
+    return 'owner';
+  }
+
+  // Owner match path. In cloud mode we require authenticated user_id
+  // equality; in OSS / anon we require device_id equality and a run that
+  // hasn't been claimed by a logged-in user. Both branches also require
+  // workspace_id parity so cross-workspace leaks are impossible in a
+  // multi-tenant Cloud deployment.
+  if (ctx.is_authenticated) {
+    if (
+      runWorkspace === ctx.workspace_id &&
+      run.user_id &&
+      run.user_id === ctx.user_id
+    ) {
+      return 'owner';
+    }
+  } else {
+    const runUser = run.user_id || null;
+    const isUnclaimed = runUser === null || runUser === DEFAULT_USER_ID;
+    if (
+      runWorkspace === ctx.workspace_id &&
+      isUnclaimed &&
+      run.device_id &&
+      run.device_id === ctx.device_id
+    ) {
+      return 'owner';
+    }
+  }
+
+  if (run.is_public === 1) return 'public';
+  return 'deny';
+}
+
+/**
+ * Redacted public-view payload for a run the creator explicitly shared.
+ * Strips inputs (may carry API keys or user PII), logs (may echo
+ * validation traces that reference inputs), and upstream_status (not
+ * useful to a public viewer, and removing it keeps the diagnostic surface
+ * owner-only). Consumers see just enough to render the output surface.
+ */
+function formatPublicShareView(
+  run: RunRecord,
+  appSlug: string | null,
+): Record<string, unknown> {
+  return {
+    id: run.id,
+    app_id: run.app_id,
+    app_slug: appSlug,
+    action: run.action,
+    status: run.status,
+    outputs: safeParse(run.outputs),
+    duration_ms: run.duration_ms,
+    started_at: run.started_at,
+    finished_at: run.finished_at,
+    is_public: true,
+    // Explicit nulls so the client can distinguish "redacted" from
+    // "missing field" without guessing from shape.
+    inputs: null,
+    logs: null,
+    error: null,
+    error_type: null,
+    upstream_status: null,
+    thread_id: null,
+  };
 }
 
 runRouter.post('/', async (c) => {
@@ -127,33 +237,65 @@ runRouter.post('/', async (c) => {
 
 // GET /api/run/:id — latest snapshot.
 //
-// Used by two flows:
-//   1. Live polling fallback from streamRun() while a run is in flight.
-//   2. URL-to-run state restore: /p/:slug?run=<id> renders the run
-//      read-only for anyone who opens a shared link (2026-04-17).
-//
-// Visibility rule: if the run is on an auth-required app, the caller must
-// present the bearer token (same check the POST /api/run path uses). Runs
-// on public apps stay viewable by run-id — they already were, and shared
-// run URLs rely on that. App slug is included in the payload so the
-// client can guard against opening a run-id that doesn't match the slug
-// in the URL.
+// Security (P0 2026-04-20, run-auth lockdown):
+//   - Default: owner-only. Runs are scoped by (workspace_id, user_id) for
+//     authenticated callers and (workspace_id, device_id) for anonymous
+//     ones. Non-owners get 404 (not 403) so run-id probing can't
+//     distinguish "doesn't exist" from "you can't see it".
+//   - Opt-in public share: when the owner hits POST /api/run/:id/share,
+//     `runs.is_public` flips to 1. Anonymous callers then see a redacted
+//     view (outputs only — inputs/logs/upstream_status stripped).
+//   - The app-level auth-required / private visibility gate still runs
+//     on top of the ownership check, so an auth-required app's runs stay
+//     bearer-token-gated even when marked public.
 runRouter.get('/:id', async (c) => {
   const id = c.req.param('id');
   const row = getRun(id);
   if (!row) return c.json({ error: 'Run not found' }, 404);
+
   const { app, blocked } = await loadAuthorizedRunApp(c, row.app_id);
   if (blocked) return blocked;
-  return c.json({ ...formatRun(row), app_slug: app?.slug ?? null });
+
+  // Server-admin escape hatch: when FLOOM_AUTH_TOKEN is configured and the
+  // caller presents it, they bypass the ownership gate and see the full
+  // payload. This preserves the self-host operator flow (same as the one
+  // on auth-required apps). Without an explicitly-set token this branch
+  // is a no-op, so OSS mode without FLOOM_AUTH_TOKEN still enforces
+  // per-device ownership.
+  if (hasValidAdminBearer(c)) {
+    return c.json({ ...formatRun(row), app_slug: app?.slug ?? null });
+  }
+
+  const ctx = await resolveUserContext(c);
+  const access = checkRunAccess(ctx, row);
+  if (access === 'owner') {
+    return c.json({ ...formatRun(row), app_slug: app?.slug ?? null });
+  }
+  if (access === 'public') {
+    return c.json(formatPublicShareView(row, app?.slug ?? null));
+  }
+  return c.json({ error: 'Run not found' }, 404);
 });
 
-// GET /api/run/:id/stream — SSE stream of stdout + status transitions
+// GET /api/run/:id/stream — SSE stream of stdout + status transitions.
+// Same ownership contract as GET /api/run/:id. Public-shared runs do NOT
+// open the stream — live logs can leak partial inputs and the share
+// intent is strictly "see the final output".
 runRouter.get('/:id/stream', async (c) => {
   const id = c.req.param('id');
   const row = getRun(id);
   if (!row) return c.json({ error: 'Run not found' }, 404);
   const { blocked } = await loadAuthorizedRunApp(c, row.app_id);
   if (blocked) return blocked;
+
+  // Same admin-bearer bypass as GET /api/run/:id. See the rationale there.
+  const ctx = await resolveUserContext(c);
+  if (!hasValidAdminBearer(c)) {
+    const access = checkRunAccess(ctx, row);
+    if (access !== 'owner') {
+      return c.json({ error: 'Run not found' }, 404);
+    }
+  }
 
   return streamSSE(c, async (stream) => {
     const logStream = getOrCreateStream(id);
@@ -236,6 +378,48 @@ runRouter.get('/:id/stream', async (c) => {
         resolve();
       }
     });
+  });
+});
+
+// POST /api/run/:id/share — flip `runs.is_public` to 1. Owner-only; returns
+// 404 to everyone else to keep run-ids unguessable. Idempotent: re-sharing
+// an already-public run is a no-op and returns the same URLs.
+//
+// Response shape:
+//   { share_url: string, public_view_url: string, is_public: true }
+// where `share_url` is the web /r/:id permalink (what humans paste in a
+// DM) and `public_view_url` is the redacted JSON GET that the permalink
+// page hydrates from.
+runRouter.post('/:id/share', async (c) => {
+  const id = c.req.param('id');
+  const row = getRun(id);
+  if (!row) return c.json({ error: 'Run not found' }, 404);
+
+  // App-level visibility still applies. Private apps never get a public
+  // share link — the run's outputs might cite private-app metadata, and
+  // the whole point of `private` is that the app is owner-only too.
+  const { app, blocked } = await loadAuthorizedRunApp(c, row.app_id);
+  if (blocked) return blocked;
+
+  // Admin-bearer bypass mirrors GET; otherwise require ownership.
+  if (!hasValidAdminBearer(c)) {
+    const ctx = await resolveUserContext(c);
+    const access = checkRunAccess(ctx, row);
+    if (access !== 'owner') {
+      return c.json({ error: 'Run not found' }, 404);
+    }
+  }
+
+  // Idempotent flip. SQLite returns changes=0 on a no-op UPDATE which is fine.
+  db.prepare(`UPDATE runs SET is_public = 1 WHERE id = ?`).run(id);
+
+  const publicUrl = `/api/run/${encodeURIComponent(id)}`;
+  const shareUrl = `/r/${encodeURIComponent(id)}`;
+  return c.json({
+    share_url: shareUrl,
+    public_view_url: publicUrl,
+    is_public: true,
+    app_slug: app?.slug ?? null,
   });
 });
 

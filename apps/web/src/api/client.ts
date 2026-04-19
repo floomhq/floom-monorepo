@@ -117,6 +117,29 @@ export function getRun(runId: string): Promise<RunRecord> {
   return request<RunRecord>(`/api/run/${runId}`);
 }
 
+/**
+ * Mark a run as publicly shareable and get back the permalink.
+ *
+ * Security (P0 2026-04-20): /api/run/:id is owner-only by default.
+ * Before handing out a /r/:id URL, the creator must hit this endpoint so
+ * the server flips `runs.is_public`. After that, anon callers can GET
+ * the run via /api/run/:id and receive a redacted view (outputs only,
+ * no inputs, no logs). Only the owner can call this; non-owners get 404.
+ */
+export interface ShareRunResponse {
+  share_url: string;
+  public_view_url: string;
+  is_public: boolean;
+  app_slug: string | null;
+}
+
+export function shareRun(runId: string): Promise<ShareRunResponse> {
+  return request<ShareRunResponse>(`/api/run/${runId}/share`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export interface RunStreamHandlers {
   onLog?: (line: { stream: 'stdout' | 'stderr'; text: string; ts: number }) => void;
   onStatus?: (run: RunRecord) => void;
