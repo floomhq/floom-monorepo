@@ -101,7 +101,7 @@ export function CookiesPage() {
         <LegalLangToggle lang={lang} onChange={setLang} />
         <LegalPageHeader
           title={lang === 'de' ? 'Cookie-Richtlinie' : 'Cookie Policy'}
-          updated="2026-04-17"
+          updated="2026-04-20"
           lang={lang}
         />
 
@@ -125,8 +125,8 @@ export function CookiesPage() {
 
             <LegalSection id="einwilligung" title="Einwilligung und Widerruf">
               <p>
-                Technisch notwendige Cookies setzen wir auf Grundlage von § 25 Abs. 2 TTDSG ohne
-                Einwilligung, da sie für den Betrieb der Seite erforderlich sind. Sollten wir zukünftig
+                Technisch notwendige Cookies setzen wir ohne Einwilligung, da sie für den Betrieb der
+                Seite erforderlich sind (z. B. um dich eingeloggt zu halten). Sollten wir zukünftig
                 Cookies einsetzen, die eine Einwilligung erfordern (z. B. Analyse), fragen wir diese über
                 den Cookie-Banner ab. Du kannst eine einmal erteilte Einwilligung jederzeit widerrufen,
                 indem du den Banner erneut aufrufst oder die Cookies in deinem Browser löschst.
@@ -161,10 +161,10 @@ export function CookiesPage() {
 
             <LegalSection id="consent" title="Consent and withdrawal">
               <p>
-                Strictly necessary cookies are set on the basis of § 25 (2) TTDSG without consent because
-                they are required to operate the site. If we introduce cookies that require consent (for
-                example analytics), we will ask for it via the cookie banner. You can withdraw consent at
-                any time by reopening the banner or clearing cookies in your browser.
+                Strictly necessary cookies are set without consent because they are required to operate
+                the site (for example keeping you signed in). If we introduce cookies that require consent
+                (for example analytics), we will ask for it via the cookie banner. You can withdraw
+                consent at any time by reopening the banner or clearing cookies in your browser.
               </p>
             </LegalSection>
 

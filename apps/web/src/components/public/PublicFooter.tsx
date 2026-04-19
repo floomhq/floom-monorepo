@@ -5,6 +5,11 @@ import { Link } from 'react-router-dom';
 // Terms, Cookies, or the open-source GitHub repo: major trust + EU
 // compliance gap. Expanded to match the signed-in Footer.tsx link set
 // while keeping the landing's centered, muted, one-line rhythm.
+//
+// 2026-04-20: Floom, Inc. is a Delaware C-Corp, not a German sole
+// proprietorship. Renamed the "Imprint" link to "Legal" — the /imprint
+// route still resolves (back-compat for bookmarks and sitemaps), and
+// /legal is added as an alias so either URL hits the same page.
 const LINK_STYLE: React.CSSProperties = { color: 'var(--muted)', textDecoration: 'none' };
 
 function FootLink({ children, to, href }: { children: React.ReactNode; to?: string; href?: string }) {
@@ -53,7 +58,7 @@ export function PublicFooter() {
         <span aria-hidden="true">·</span>
         <FootLink href="https://github.com/floomhq/floom">GitHub</FootLink>
         <span aria-hidden="true">·</span>
-        <FootLink to="/imprint">Imprint</FootLink>
+        <FootLink to="/legal">Legal</FootLink>
         <span aria-hidden="true">·</span>
         <FootLink to="/privacy">Privacy</FootLink>
         <span aria-hidden="true">·</span>
