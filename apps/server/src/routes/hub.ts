@@ -34,6 +34,50 @@ import type { OutputShape } from '@floom/renderer/contract';
 
 export const hubRouter = new Hono();
 
+// ---------------------------------------------------------------------
+// Perf launch-blocker fix (2026-04-20): in-memory cache for GET /api/hub.
+//
+// Root cause: every request re-runs the SELECT + parses up to 448KB of
+// manifest JSON across 46 apps (manifests live in the `apps.manifest`
+// TEXT column). At c=10 concurrency the handler pegged at ~2.5 req/s
+// with p95=15s — blocking launch.
+//
+// Fix: cache the serialized JSON body for 5s per (category, sort,
+// includeFixtures) tuple. Apps don't mutate often enough for stale-
+// by-5s to matter; every mutation path (POST /ingest, DELETE /:slug,
+// PATCH /:slug) also calls `invalidateHubCache()` below so creator
+// edits land immediately in the public directory.
+//
+// Cache key MUST include every query param that changes the response,
+// otherwise `?category=productivity` would serve the uncategorized
+// list. `include_fixtures` is a boolean, stored explicitly so a
+// `?include_fixtures=false` request (explicit false) hits the same
+// bucket as an omitted param.
+// ---------------------------------------------------------------------
+type HubCacheEntry = { body: unknown; expiresAt: number };
+const hubCache = new Map<string, HubCacheEntry>();
+const HUB_CACHE_TTL_MS = 5_000;
+
+function hubCacheKey(
+  category: string | null,
+  sort: string,
+  includeFixtures: boolean,
+): string {
+  return `${category ?? ''}|${sort}|${includeFixtures ? '1' : '0'}`;
+}
+
+/**
+ * Invalidate the hub directory cache. Called by every mutation path
+ * (ingest, delete, patch) so creator edits land immediately in the
+ * /api/hub directory feed without waiting for the 5s TTL.
+ *
+ * Exported so non-hub routes that mutate the apps table (e.g. the
+ * seed-apps bootstrapper) can invalidate too.
+ */
+export function invalidateHubCache(): void {
+  hubCache.clear();
+}
+
 /**
  * Pull just the host out of a proxied app's base_url, for the
  * `/api/hub/:slug` response. Used by the /p/:slug runner surface to
@@ -151,6 +195,10 @@ hubRouter.post('/ingest', async (c) => {
       workspace_id: ctx.workspace_id,
       author_user_id: ctx.user_id,
     });
+    // Perf fix (2026-04-20): bust the /api/hub 5s cache so the newly
+    // ingested (or re-ingested) app shows up in the public directory
+    // immediately for the creator.
+    invalidateHubCache();
     return c.json(result, result.created ? 201 : 200);
   } catch (err) {
     // Slug collision: 409 with three recovery suggestions (audit 2026-04-20,
@@ -339,6 +387,9 @@ hubRouter.delete('/:slug', async (c) => {
 
   db.prepare('DELETE FROM apps WHERE id = ?').run(app.id);
   // Runs are dropped by ON DELETE CASCADE (see db.ts CREATE TABLE runs).
+  // Perf fix (2026-04-20): drop the /api/hub 5s cache so the deleted
+  // app stops appearing in the directory immediately.
+  invalidateHubCache();
   return c.json({ ok: true, slug });
 });
 
@@ -443,6 +494,9 @@ hubRouter.patch('/:slug', async (c) => {
   values.push(app.id);
 
   db.prepare(`UPDATE apps SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  // Perf fix (2026-04-20): bust the /api/hub 5s cache so visibility /
+  // primary_action changes land in the public directory immediately.
+  invalidateHubCache();
   return c.json({
     ok: true,
     slug,
@@ -490,6 +544,17 @@ hubRouter.get('/', (c) => {
   // fixtures themselves aren't sensitive — just noisy). Any truthy value
   // disables the filter.
   const includeFixtures = c.req.query('include_fixtures') === 'true';
+
+  // Perf launch-blocker fix (2026-04-20): serve from the 5s in-memory
+  // cache when we have a fresh entry for this (category, sort,
+  // includeFixtures) tuple. See the `hubCache` block near the top of
+  // this file for the full rationale.
+  const cacheKey = hubCacheKey(category ?? null, sort, includeFixtures);
+  const cached = hubCache.get(cacheKey);
+  const nowMs = Date.now();
+  if (cached && cached.expiresAt > nowMs) {
+    return c.json(cached.body);
+  }
   // Default store sort (fast-apps wave):
   //   1. featured desc   — pinned apps always first
   //   2. avg_run_ms asc  — fastest apps next (NULLs last so unmeasured
@@ -536,35 +601,40 @@ hubRouter.get('/', (c) => {
   // slugs like `e2e-stopwatch-*`, `my-renderer-test`, `swagger-petstore`.
   const rows = includeFixtures ? rowsHidden : filterTestFixtures(rowsHidden);
 
-  return c.json(
-    rows.map((row) => {
-      const manifest = safeManifest(row.manifest);
-      return {
-        slug: row.slug,
-        name: row.name,
-        description: row.description,
-        category: row.category,
-        author: row.author,
-        author_display: authorDisplayFromRow(row),
-        icon: row.icon,
-        actions: manifest ? Object.keys(manifest.actions) : [],
-        runtime: manifest?.runtime ?? 'python',
-        created_at: row.created_at,
-        // Fast-apps wave fields. `featured` is coerced to boolean for the
-        // JSON response so clients do not have to deal with 0/1. `avg_run_ms`
-        // stays nullable because an app that has never run has no average.
-        featured: row.featured === 1,
-        avg_run_ms: row.avg_run_ms,
-        // Optional annotation for self-host blocked apps. Present only when
-        // the manifest explicitly declares a blocked_reason. Surfaced on the
-        // store card as a warning pill so users know the app is not
-        // runnable in this environment.
-        ...(manifest?.blocked_reason
-          ? { blocked_reason: manifest.blocked_reason }
-          : {}),
-      };
-    }),
-  );
+  const body = rows.map((row) => {
+    const manifest = safeManifest(row.manifest);
+    return {
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      category: row.category,
+      author: row.author,
+      author_display: authorDisplayFromRow(row),
+      icon: row.icon,
+      actions: manifest ? Object.keys(manifest.actions) : [],
+      runtime: manifest?.runtime ?? 'python',
+      created_at: row.created_at,
+      // Fast-apps wave fields. `featured` is coerced to boolean for the
+      // JSON response so clients do not have to deal with 0/1. `avg_run_ms`
+      // stays nullable because an app that has never run has no average.
+      featured: row.featured === 1,
+      avg_run_ms: row.avg_run_ms,
+      // Optional annotation for self-host blocked apps. Present only when
+      // the manifest explicitly declares a blocked_reason. Surfaced on the
+      // store card as a warning pill so users know the app is not
+      // runnable in this environment.
+      ...(manifest?.blocked_reason
+        ? { blocked_reason: manifest.blocked_reason }
+        : {}),
+    };
+  });
+
+  // Perf launch-blocker fix (2026-04-20): park the body in the 5s
+  // cache so subsequent requests for this (category, sort,
+  // includeFixtures) tuple skip the SELECT + manifest parse entirely.
+  hubCache.set(cacheKey, { body, expiresAt: nowMs + HUB_CACHE_TTL_MS });
+
+  return c.json(body);
 });
 
 // GET /api/hub/:slug — single-app detail.
