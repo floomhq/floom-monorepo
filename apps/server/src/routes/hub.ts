@@ -418,8 +418,8 @@ hubRouter.get('/:slug', async (c) => {
   // public handle shown after "by @" in the hero; we reuse the existing
   // authorDisplayFromRow logic and strip a leading `@` if present.
   const manifestVersion =
-    typeof (manifest as Record<string, unknown>).version === 'string'
-      ? ((manifest as Record<string, string>).version)
+    manifest && typeof (manifest as unknown as { version?: unknown }).version === 'string'
+      ? ((manifest as unknown as { version: string }).version)
       : null;
   const displayAuthor = authorDisplayFromRow(row);
   const creatorHandle = displayAuthor ? displayAuthor.replace(/^@/, '') : null;
