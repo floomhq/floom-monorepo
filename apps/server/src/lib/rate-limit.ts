@@ -9,6 +9,7 @@
 // Escape: FLOOM_RATE_LIMIT_DISABLED=true skips every check.
 
 import type { Context, MiddlewareHandler } from 'hono';
+import { BlockList, isIP } from 'node:net';
 import type { SessionContext } from '../types.js';
 import { recordRateLimitHit } from './metrics-counters.js';
 
@@ -37,14 +38,6 @@ export const defaultPerAppPerHour = (): number =>
   envNumber('FLOOM_RATE_LIMIT_APP_PER_HOUR', 500);
 export const defaultMcpIngestPerDay = (): number =>
   envNumber('FLOOM_RATE_LIMIT_MCP_INGEST_PER_DAY', 10);
-
-// Number of trusted proxy hops between the server and the internet. Nginx
-// (or any reverse proxy) appends the real client IP at the END of
-// X-Forwarded-For via `$proxy_add_x_forwarded_for`. Anything the attacker
-// put in XFF is prefix; the last N entries are trusted hops we added. Strip
-// N from the back and take the next-to-last entry — that's the real caller.
-// Default 1 = one nginx hop. Set to 2 if you're behind nginx + CDN that
-// also appends. See issue #142 (XFF spoofing).
 export const defaultTrustedProxyHopCount = (): number =>
   envNumber('FLOOM_TRUSTED_PROXY_HOP_COUNT', 1);
 
@@ -150,62 +143,147 @@ function incrementAndCheck(
 
 // ---------- key extraction ----------
 
-/**
- * Caller IP.
- *
- * SECURITY (issue #142, 2026-04-20): attackers can set any `X-Forwarded-For`
- * they want on the inbound request. nginx's `proxy_add_x_forwarded_for`
- * APPENDS the real remote_addr at the END of the chain. So the FIRST entry
- * is attacker-controlled; the LAST N entries (N = trusted proxy hops) are
- * trustworthy, with the real caller sitting at `xff[len - N]`.
- *
- * Precedence:
- *   1. cf-connecting-ip      — Cloudflare injects this; not attacker-settable
- *                              because Cloudflare rewrites it on the edge.
- *   2. x-real-ip             — nginx sets this to `$remote_addr`; also not
- *                              attacker-settable when nginx is configured
- *                              to override-rather-than-append (our preview
- *                              + prod configs both do this).
- *   3. x-forwarded-for chain — strip FLOOM_TRUSTED_PROXY_HOP_COUNT (default 1)
- *                              trusted hops from the back, take the last
- *                              remaining entry. NEVER take xff[0] — that's
- *                              whatever the attacker wrote.
- *   4. 'unknown' fallback.
- */
-export function extractIp(c: Context): string {
-  // 1. Cloudflare (edge-owned header).
-  const cf = c.req.header('cf-connecting-ip');
-  if (cf?.length) {
-    const v = cf.trim();
-    if (v) return v;
+const TRUSTED_PROXY_ENV = 'FLOOM_TRUSTED_PROXY_CIDRS';
+const LOOPBACK_PROXY_RULES = ['127.0.0.0/8', '::1/128'];
+const DEV_PROXY_RULES = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7'];
+
+interface SocketLike {
+  remoteAddress?: string;
+}
+
+interface HttpBindingsLike {
+  incoming?: {
+    socket?: SocketLike;
+  };
+}
+
+interface TrustedProxyMatcherCache {
+  envRaw: string;
+  nodeEnv: string | undefined;
+  matcher: BlockList;
+}
+
+let trustedProxyMatcherCache: TrustedProxyMatcherCache | null = null;
+
+function normalizeIp(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let value = raw.trim();
+  if (!value) return null;
+  if (value.startsWith('[') && value.endsWith(']')) {
+    value = value.slice(1, -1);
+  }
+  const zoneIndex = value.indexOf('%');
+  if (zoneIndex >= 0) value = value.slice(0, zoneIndex);
+  return isIP(value) ? value.toLowerCase() : null;
+}
+
+function addTrustedProxyRule(matcher: BlockList, rawRule: string): boolean {
+  const rule = rawRule.trim();
+  if (!rule) return false;
+
+  const slash = rule.indexOf('/');
+  if (slash === -1) {
+    const ip = normalizeIp(rule);
+    if (!ip) return false;
+    matcher.addAddress(ip, isIP(ip) === 6 ? 'ipv6' : 'ipv4');
+    return true;
   }
 
-  // 2. nginx-set real IP. Our nginx configs set this to $remote_addr, which
-  // is the TCP peer — not client-controllable.
-  const real = c.req.header('x-real-ip');
-  if (real?.length) {
-    const v = real.trim();
-    if (v) return v;
+  const ip = normalizeIp(rule.slice(0, slash));
+  const prefix = Number(rule.slice(slash + 1));
+  if (!ip || !Number.isInteger(prefix)) return false;
+
+  const family = isIP(ip);
+  const maxPrefix = family === 6 ? 128 : 32;
+  if (prefix < 0 || prefix > maxPrefix) return false;
+
+  matcher.addSubnet(ip, prefix, family === 6 ? 'ipv6' : 'ipv4');
+  return true;
+}
+
+function buildTrustedProxyMatcher(): BlockList {
+  const matcher = new BlockList();
+  const configured = (process.env[TRUSTED_PROXY_ENV] || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const defaults =
+    process.env.NODE_ENV === 'production'
+      ? LOOPBACK_PROXY_RULES
+      : [...LOOPBACK_PROXY_RULES, ...DEV_PROXY_RULES];
+  const rules = configured.length > 0 ? [...LOOPBACK_PROXY_RULES, ...configured] : defaults;
+
+  for (const rule of rules) {
+    if (!addTrustedProxyRule(matcher, rule)) {
+      console.warn(`[rate-limit] ignoring invalid ${TRUSTED_PROXY_ENV} entry: ${rule}`);
+    }
   }
 
-  // 3. X-Forwarded-For chain. Parse from the back, strip trusted hops.
+  return matcher;
+}
+
+function getTrustedProxyMatcher(): BlockList {
+  const envRaw = process.env[TRUSTED_PROXY_ENV] || '';
+  const nodeEnv = process.env.NODE_ENV;
+  if (
+    trustedProxyMatcherCache &&
+    trustedProxyMatcherCache.envRaw === envRaw &&
+    trustedProxyMatcherCache.nodeEnv === nodeEnv
+  ) {
+    return trustedProxyMatcherCache.matcher;
+  }
+
+  const matcher = buildTrustedProxyMatcher();
+  trustedProxyMatcherCache = { envRaw, nodeEnv, matcher };
+  return matcher;
+}
+
+function extractPeerIp(c: Context): string | null {
+  const env = (c as { env?: HttpBindingsLike & { server?: HttpBindingsLike } }).env;
+  const bindings = env?.server ?? env;
+  return normalizeIp(bindings?.incoming?.socket?.remoteAddress);
+}
+
+function parseForwardedIp(c: Context): string | null {
+  const cf = normalizeIp(c.req.header('cf-connecting-ip'));
+  if (cf) return cf;
+
+  const real = normalizeIp(c.req.header('x-real-ip'));
+  if (real) return real;
+
   const xff = c.req.header('x-forwarded-for');
   if (xff?.length) {
     const entries = xff
       .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+      .map((part) => normalizeIp(part))
+      .filter((part): part is string => !!part);
     if (entries.length > 0) {
       const hops = Math.max(1, defaultTrustedProxyHopCount());
-      // Real client sits at index `len - hops`. If the attacker sent a
-      // shorter chain than the trusted-hop count, fall through to unknown
-      // rather than returning an attacker-controlled prefix.
       const idx = entries.length - hops;
-      if (idx >= 0 && entries[idx]) return entries[idx];
+      if (idx >= 0) return entries[idx] ?? null;
     }
   }
+  return null;
+}
 
-  return 'unknown';
+function isTrustedProxyPeer(ip: string | null): boolean {
+  if (!ip) return false;
+  const family = isIP(ip);
+  if (family === 0) return false;
+  return getTrustedProxyMatcher().check(ip, family === 6 ? 'ipv6' : 'ipv4');
+}
+
+/**
+ * Caller IP: use forwarded headers only when the peer socket address is a
+ * trusted proxy; otherwise fall back to the direct peer IP.
+ */
+export function extractIp(c: Context): string {
+  const peerIp = extractPeerIp(c);
+  if (isTrustedProxyPeer(peerIp)) {
+    const forwardedIp = parseForwardedIp(c);
+    if (forwardedIp) return forwardedIp;
+  }
+  return peerIp || 'unknown';
 }
 
 // ---------- response helpers ----------

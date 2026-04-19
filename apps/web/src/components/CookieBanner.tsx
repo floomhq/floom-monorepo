@@ -69,13 +69,13 @@ export function CookieBanner() {
       aria-label="Cookie consent"
       style={{
         position: 'fixed',
-        left: 16,
-        right: 16,
-        bottom: 16,
+        left: 12,
+        right: 12,
+        bottom: 12,
         zIndex: 1000,
-        maxWidth: 560,
+        maxWidth: 460,
         margin: '0 auto',
-        padding: '14px 16px',
+        padding: '12px 14px',
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 12,
@@ -83,31 +83,31 @@ export function CookieBanner() {
         display: 'flex',
         flexWrap: 'wrap',
         alignItems: 'center',
-        gap: 12,
-        fontSize: 13,
+        gap: 10,
+        fontSize: 12.5,
         color: 'var(--ink)',
       }}
     >
-      <p style={{ margin: 0, flex: '1 1 260px', lineHeight: 1.5 }}>
-        Floom uses strictly necessary cookies to keep you signed in and remember your preferences. See our{' '}
+      <p style={{ margin: 0, flex: '1 1 240px', lineHeight: 1.45 }}>
+        Floom uses essential cookies for sign-in and preferences. See the{' '}
         <Link to="/cookies" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
           cookie policy
         </Link>
         .
       </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
         <button
           type="button"
           onClick={() => accept('essential')}
           style={{
-            padding: '8px 14px',
+            padding: '7px 12px',
             borderRadius: 8,
             border: '1px solid var(--line)',
             background: 'transparent',
             color: 'var(--ink)',
             cursor: 'pointer',
             fontFamily: 'inherit',
-            fontSize: 13,
+            fontSize: 12.5,
             fontWeight: 600,
           }}
         >
@@ -117,14 +117,14 @@ export function CookieBanner() {
           type="button"
           onClick={() => accept('all')}
           style={{
-            padding: '8px 14px',
+            padding: '7px 12px',
             borderRadius: 8,
             border: '1px solid var(--accent)',
             background: 'var(--accent)',
             color: '#fff',
             cursor: 'pointer',
             fontFamily: 'inherit',
-            fontSize: 13,
+            fontSize: 12.5,
             fontWeight: 600,
           }}
         >

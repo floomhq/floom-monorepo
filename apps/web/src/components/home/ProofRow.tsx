@@ -7,7 +7,7 @@
  *
  * We intentionally only show truths we can verify:
  *   - live hub count (sourced from /api/hub via props)
- *   - "6 layers shipped" (matches LayersGrid cards count)
+ *   - "5 layers shipped" (matches LayersGrid cards count)
  *   - "OSS · MIT" (public repo truth)
  *
  * NO fabricated "N runs executed" or "N% uptime" — v16 showed those as
@@ -47,7 +47,7 @@ export function ProofRow({ hubCount }: ProofRowProps) {
           label="apps running"
         />
         <Divider />
-        <Stat value="6" label="layers shipped" />
+        <Stat value="5" label="layers shipped" />
         <Divider />
         <Stat value="5" label="ways to use it" />
         <Divider />

@@ -22,14 +22,25 @@ const RAIL_WIDTH = 240;
 interface Props {
   activeAppSlug?: string;
   activeSubsection?: 'overview' | 'runs' | 'secrets' | 'access' | 'renderer' | 'analytics';
+  signedOutPreview?: boolean;
 }
 
-export function StudioSidebar({ activeAppSlug, activeSubsection = 'overview' }: Props) {
-  const { apps, loading } = useMyApps();
+export function StudioSidebar({
+  activeAppSlug,
+  activeSubsection = 'overview',
+  signedOutPreview = false,
+}: Props) {
+  const { apps, loading, error } = useMyApps();
   const { data: session } = useSession();
   const user = session?.user;
   const location = useLocation();
   const ownedCount = apps?.length ?? 0;
+  const settingsHref = signedOutPreview
+    ? '/login?next=%2Fstudio%2Fsettings'
+    : '/studio/settings';
+  const newAppHref = signedOutPreview
+    ? '/signup?next=%2Fstudio%2Fbuild'
+    : '/studio/build';
 
   return (
     <aside
@@ -75,12 +86,12 @@ export function StudioSidebar({ activeAppSlug, activeSubsection = 'overview' }: 
         </Link>
 
         <Link
-          to="/studio/build"
+          to={newAppHref}
           data-testid="studio-new-app"
           style={primaryCtaStyle}
         >
           <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
-          <span>New app</span>
+          <span>{signedOutPreview ? 'Publish an app' : 'New app'}</span>
         </Link>
       </div>
 
@@ -95,9 +106,16 @@ export function StudioSidebar({ activeAppSlug, activeSubsection = 'overview' }: 
         }}
       >
         <section style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <SectionLabel>Your apps ({ownedCount})</SectionLabel>
-          {loading && !apps ? (
+          <SectionLabel>Your apps {signedOutPreview ? '' : `(${ownedCount})`}</SectionLabel>
+          {signedOutPreview ? (
+            <RailHint>
+              Sign in to load the apps you own here, then open their overview,
+              runs, access, secrets, renderer, and analytics from one place.
+            </RailHint>
+          ) : loading && !apps ? (
             <RailHint>Loading…</RailHint>
+          ) : error && !apps ? (
+            <RailHint>Couldn&rsquo;t load your apps yet.</RailHint>
           ) : apps && apps.length === 0 ? (
             <RailHint>
               No apps yet.{' '}
@@ -168,6 +186,13 @@ export function StudioSidebar({ activeAppSlug, activeSubsection = 'overview' }: 
             })
           )}
         </section>
+
+        {signedOutPreview && (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <SectionLabel>Inside each app</SectionLabel>
+            <PreviewSection />
+          </section>
+        )}
       </div>
 
       <div
@@ -181,9 +206,9 @@ export function StudioSidebar({ activeAppSlug, activeSubsection = 'overview' }: 
         }}
       >
         <Link
-          to="/studio/settings"
+          to={settingsHref}
           data-testid="studio-sidebar-settings"
-          style={footerLink(location.pathname === '/studio/settings')}
+          style={footerLink(!signedOutPreview && location.pathname === '/studio/settings')}
         >
           Settings
         </Link>
@@ -197,7 +222,7 @@ export function StudioSidebar({ activeAppSlug, activeSubsection = 'overview' }: 
         >
           ← Back to Store
         </Link>
-        {user && (
+        {user && !signedOutPreview && (
           <div
             style={{
               display: 'flex',
@@ -246,8 +271,68 @@ export function StudioSidebar({ activeAppSlug, activeSubsection = 'overview' }: 
             </div>
           </div>
         )}
+        {signedOutPreview && (
+          <RailHint>
+            Sign in before you publish, rotate secrets, or change app access.
+          </RailHint>
+        )}
       </div>
     </aside>
+  );
+}
+
+function PreviewSection() {
+  const items = [
+    'Overview',
+    'Runs',
+    'Secrets',
+    'Access',
+    'Renderer',
+    'Analytics',
+  ];
+
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        padding: '0 8px 2px',
+      }}
+    >
+      {items.map((label) => (
+        <div
+          key={label}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '7px 10px',
+            borderRadius: 8,
+            color: 'var(--muted)',
+            background: 'rgba(255,255,255,0.45)',
+            border: '1px dashed var(--line)',
+            fontSize: 12,
+            fontWeight: 500,
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--line)',
+              flexShrink: 0,
+            }}
+          />
+          <span>{label}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 10, textTransform: 'uppercase' }}>
+            Sign in
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 

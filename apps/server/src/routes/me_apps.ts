@@ -1,14 +1,14 @@
-// /api/me/apps/:slug/... — creator + viewer surface for per-app config.
+// /api/me/apps/:slug/... — creator surface for per-app config.
 //
 // Today this module owns the secrets policy surface (secrets-policy
 // feature). Two domains live here:
 //
 //   GET  /api/me/apps/:slug/secret-policies
-//     Available to any logged-in viewer. Returns one row per key in
-//     the app's `manifest.secrets_needed`, with the current policy
+//     Creator-only. Returns one row per key in the app's
+//     `manifest.secrets_needed`, with the current policy
 //     ('user_vault' or 'creator_override') and a boolean telling the
-//     caller whether the creator has a value stored (without leaking
-//     the value itself).
+//     creator whether they already have a value stored (without
+//     leaking the value itself).
 //
 //   PUT  /api/me/apps/:slug/secret-policies/:key
 //     Creator-only. Flips the policy for one key between 'user_vault'
@@ -32,7 +32,7 @@ import { db } from '../db.js';
 import { resolveUserContext } from '../services/session.js';
 import * as creatorSecrets from '../services/app_creator_secrets.js';
 import { SecretDecryptError } from '../services/user_secrets.js';
-import { requireAuthenticatedInCloud } from '../lib/auth.js';
+import { checkAppVisibility, requireAuthenticatedInCloud } from '../lib/auth.js';
 import type {
   AppRecord,
   NormalizedManifest,
@@ -78,6 +78,8 @@ function isOwner(
  * `manifest.secrets_needed`, with default `policy='user_vault'` filled
  * in for keys that have no explicit row. `creator_has_value` is
  * populated from app_creator_secrets (presence only; no plaintext).
+ * Creator-only: non-owners must not learn which keys are overridden or
+ * already configured on the creator's account.
  */
 meAppsRouter.get('/:slug/secret-policies', async (c) => {
   const ctx = await resolveUserContext(c);
@@ -87,6 +89,17 @@ meAppsRouter.get('/:slug/secret-policies', async (c) => {
   const slug = c.req.param('slug') || '';
   const app = loadApp(slug);
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
+  const blocked = checkAppVisibility(c, app.visibility || 'public', {
+    author: app.author,
+    ctx,
+  });
+  if (blocked) return blocked;
+  if (!isOwner(app, ctx)) {
+    return c.json(
+      { error: 'Not the owner of this app', code: 'not_owner' },
+      403,
+    );
+  }
 
   const manifest = safeManifest(app.manifest);
   const neededKeys = manifest?.secrets_needed ?? [];

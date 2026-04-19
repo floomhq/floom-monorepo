@@ -242,6 +242,144 @@ log(
   afterFlipBack.EVOMI_PROXY_URL === 'http://proxy.example:3128',
 );
 
+// ---- 9. route auth: only the owner can read creator policy metadata ----
+process.env.FLOOM_CLOUD_MODE = 'true';
+process.env.BETTER_AUTH_SECRET =
+  '0'.repeat(16) + '1'.repeat(16) + '2'.repeat(16) + '3'.repeat(16);
+process.env.PUBLIC_URL = 'http://localhost';
+
+const auth = await import('../../apps/server/dist/lib/better-auth.js');
+const { meAppsRouter } = await import('../../apps/server/dist/routes/me_apps.js');
+
+async function fetchRoute(router, method, path, headers = {}) {
+  const req = new Request(`http://localhost${path}`, { method, headers });
+  const res = await router.fetch(req);
+  const text = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    // leave null
+  }
+  return { status: res.status, json, text };
+}
+
+db.prepare(
+  `INSERT INTO apps
+     (id, slug, name, description, manifest, status, code_path, workspace_id, author, visibility)
+   VALUES (?, ?, ?, ?, ?, 'active', 'proxied:test', ?, ?, ?)`,
+).run(
+  'app-policy-public',
+  'creator-owned-public',
+  'Creator Owned Public',
+  'Route auth fixture',
+  JSON.stringify({
+    name: 'creator-owned-public',
+    description: 'Route auth fixture',
+    actions: { run: { label: 'Run', inputs: [], outputs: [] } },
+    secrets_needed: ['OPENAI_API_KEY'],
+  }),
+  DEFAULT_WORKSPACE_ID,
+  'user-owner',
+  'public',
+);
+creatorSecrets.setPolicy('app-policy-public', 'OPENAI_API_KEY', 'creator_override');
+creatorSecrets.setCreatorSecret(
+  'app-policy-public',
+  DEFAULT_WORKSPACE_ID,
+  'OPENAI_API_KEY',
+  'owner-secret-value',
+);
+
+db.prepare(
+  `INSERT INTO apps
+     (id, slug, name, description, manifest, status, code_path, workspace_id, author, visibility)
+   VALUES (?, ?, ?, ?, ?, 'active', 'proxied:test', ?, ?, ?)`,
+).run(
+  'app-policy-private',
+  'creator-owned-private',
+  'Creator Owned Private',
+  'Private route auth fixture',
+  JSON.stringify({
+    name: 'creator-owned-private',
+    description: 'Private route auth fixture',
+    actions: { run: { label: 'Run', inputs: [], outputs: [] } },
+    secrets_needed: ['OPENAI_API_KEY'],
+  }),
+  DEFAULT_WORKSPACE_ID,
+  'user-owner',
+  'private',
+);
+creatorSecrets.setPolicy('app-policy-private', 'OPENAI_API_KEY', 'creator_override');
+creatorSecrets.setCreatorSecret(
+  'app-policy-private',
+  DEFAULT_WORKSPACE_ID,
+  'OPENAI_API_KEY',
+  'owner-private-secret',
+);
+
+auth._resetAuthForTests();
+const a = auth.getAuth();
+let fakeUser = null;
+a.api.getSession = async () => {
+  if (!fakeUser) return null;
+  return { user: fakeUser, session: { id: 'sess_fake' } };
+};
+
+fakeUser = { id: 'user-viewer', email: 'viewer@example.com', name: 'Viewer' };
+let routeRes = await fetchRoute(
+  meAppsRouter,
+  'GET',
+  '/creator-owned-public/secret-policies',
+);
+log(
+  'public secret-policies: non-owner gets 403',
+  routeRes.status === 403,
+  `got ${routeRes.status}`,
+);
+log(
+  'public secret-policies: non-owner response does not leak policy metadata',
+  routeRes.text.indexOf('creator_has_value') === -1 &&
+    routeRes.text.indexOf('creator_override') === -1,
+  routeRes.text,
+);
+
+routeRes = await fetchRoute(
+  meAppsRouter,
+  'GET',
+  '/creator-owned-private/secret-policies',
+);
+log(
+  'private secret-policies: non-owner gets 404',
+  routeRes.status === 404,
+  `got ${routeRes.status}`,
+);
+log(
+  'private secret-policies: non-owner response does not leak policy metadata',
+  routeRes.text.indexOf('creator_has_value') === -1 &&
+    routeRes.text.indexOf('creator_override') === -1,
+  routeRes.text,
+);
+
+fakeUser = { id: 'user-owner', email: 'owner@example.com', name: 'Owner' };
+routeRes = await fetchRoute(
+  meAppsRouter,
+  'GET',
+  '/creator-owned-public/secret-policies',
+);
+const ownerPolicy = routeRes.json?.policies?.find((p) => p.key === 'OPENAI_API_KEY');
+log(
+  'public secret-policies: owner gets 200',
+  routeRes.status === 200,
+  `got ${routeRes.status}`,
+);
+log(
+  'public secret-policies: owner sees creator override metadata',
+  ownerPolicy?.policy === 'creator_override' &&
+    ownerPolicy?.creator_has_value === true,
+  JSON.stringify(routeRes.json),
+);
+
 // ---- cleanup ----
 db.close();
 rmSync(tmp, { recursive: true, force: true });

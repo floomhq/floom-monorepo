@@ -3,6 +3,7 @@
 // Returns { run_id } immediately. The client opens /api/run/:id/stream as SSE
 // to receive stdout lines live, and GET /api/run/:id for the final status.
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db.js';
 import { newRunId } from '../lib/ids.js';
@@ -14,6 +15,28 @@ import { resolveUserContext } from '../services/session.js';
 import type { AppRecord, NormalizedManifest } from '../types.js';
 
 export const runRouter = new Hono();
+
+type RunAppAccessRow = {
+  slug: string;
+  visibility: string | null;
+  author: string | null;
+};
+
+async function loadAuthorizedRunApp(
+  c: Context,
+  appId: string,
+): Promise<{ app: RunAppAccessRow | undefined; blocked: Response | null }> {
+  const app = db
+    .prepare('SELECT slug, visibility, author FROM apps WHERE id = ?')
+    .get(appId) as RunAppAccessRow | undefined;
+  if (!app) return { app: undefined, blocked: null };
+  const ctx = await resolveUserContext(c);
+  const blocked = checkAppVisibility(c, app.visibility || 'public', {
+    author: app.author,
+    ctx,
+  });
+  return { app, blocked };
+}
 
 runRouter.post('/', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
@@ -110,27 +133,18 @@ runRouter.get('/:id', async (c) => {
   const id = c.req.param('id');
   const row = getRun(id);
   if (!row) return c.json({ error: 'Run not found' }, 404);
-  const app = db
-    .prepare('SELECT slug, visibility, author FROM apps WHERE id = ?')
-    .get(row.app_id) as
-    | { slug: string; visibility: string | null; author: string | null }
-    | undefined;
-  if (app) {
-    const ctx = await resolveUserContext(c);
-    const blocked = checkAppVisibility(c, app.visibility || 'public', {
-      author: app.author,
-      ctx,
-    });
-    if (blocked) return blocked;
-  }
+  const { app, blocked } = await loadAuthorizedRunApp(c, row.app_id);
+  if (blocked) return blocked;
   return c.json({ ...formatRun(row), app_slug: app?.slug ?? null });
 });
 
 // GET /api/run/:id/stream — SSE stream of stdout + status transitions
-runRouter.get('/:id/stream', (c) => {
+runRouter.get('/:id/stream', async (c) => {
   const id = c.req.param('id');
   const row = getRun(id);
   if (!row) return c.json({ error: 'Run not found' }, 404);
+  const { blocked } = await loadAuthorizedRunApp(c, row.app_id);
+  if (blocked) return blocked;
 
   return streamSSE(c, async (stream) => {
     const logStream = getOrCreateStream(id);

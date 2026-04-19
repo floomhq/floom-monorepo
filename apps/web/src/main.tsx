@@ -10,6 +10,7 @@ import { CreatorHeroPage } from './pages/CreatorHeroPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 const AppsDirectoryPage = lazy(() => import('./pages/AppsDirectoryPage').then(m => ({ default: m.AppsDirectoryPage })));
 const AppPermalinkPage = lazy(() => import('./pages/AppPermalinkPage').then(m => ({ default: m.AppPermalinkPage })));
+const PublicRunPermalinkPage = lazy(() => import('./pages/PublicRunPermalinkPage').then(m => ({ default: m.PublicRunPermalinkPage })));
 const ProtocolPage = lazy(() => import('./pages/ProtocolPage').then(m => ({ default: m.ProtocolPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const MePage = lazy(() => import('./pages/MePage').then(m => ({ default: m.MePage })));
@@ -141,6 +142,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/apps" element={<AppsDirectoryPage />} />
         {/* Standalone app permalink */}
         <Route path="/p/:slug" element={<AppPermalinkPage />} />
+        <Route path="/r/:runId" element={<PublicRunPermalinkPage />} />
         {/* Protocol spec page */}
         <Route path="/protocol" element={<ProtocolPage />} />
         {/* W4-minimal: auth pages */}

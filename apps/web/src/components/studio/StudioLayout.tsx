@@ -24,6 +24,7 @@ interface Props {
   activeAppSlug?: string;
   activeSubsection?: 'overview' | 'runs' | 'secrets' | 'access' | 'renderer' | 'analytics';
   contentStyle?: CSSProperties;
+  allowSignedOutShell?: boolean;
 }
 
 export function StudioLayout({
@@ -32,6 +33,7 @@ export function StudioLayout({
   activeAppSlug,
   activeSubsection,
   contentStyle,
+  allowSignedOutShell = false,
 }: Props) {
   const { data, loading, error } = useSession();
   const navigate = useNavigate();
@@ -39,19 +41,20 @@ export function StudioLayout({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const sessionPending = loading || (data === null && !error);
-  const needsLogin =
+  const signedOutCloud =
     !!data && data.cloud_mode && data.user.is_local;
+  const needsLogin = signedOutCloud && !allowSignedOutShell;
 
   useEffect(() => {
     if (loading) return;
     if (!data) return;
-    if (data.cloud_mode && data.user.is_local) {
+    if (data.cloud_mode && data.user.is_local && !allowSignedOutShell) {
       navigate(
         '/login?next=' + encodeURIComponent(location.pathname + location.search),
         { replace: true },
       );
     }
-  }, [data, loading, navigate, location.pathname, location.search]);
+  }, [allowSignedOutShell, data, loading, navigate, location.pathname, location.search]);
 
   useEffect(() => {
     if (title) document.title = title;
@@ -114,6 +117,7 @@ export function StudioLayout({
           <StudioSidebar
             activeAppSlug={activeAppSlug}
             activeSubsection={activeSubsection}
+            signedOutPreview={signedOutCloud && allowSignedOutShell}
           />
         </div>
 
@@ -135,6 +139,7 @@ export function StudioLayout({
               <StudioSidebar
                 activeAppSlug={activeAppSlug}
                 activeSubsection={activeSubsection}
+                signedOutPreview={signedOutCloud && allowSignedOutShell}
               />
             </div>
           </div>

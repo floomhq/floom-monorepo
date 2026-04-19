@@ -23,6 +23,7 @@ interface Props {
   requireAuth?: 'cloud' | 'any' | null;
   title?: string;
   contentStyle?: React.CSSProperties;
+  allowSignedOutShell?: boolean;
 }
 
 export function PageShell({
@@ -30,6 +31,7 @@ export function PageShell({
   requireAuth = null,
   title,
   contentStyle,
+  allowSignedOutShell = false,
 }: Props) {
   const { data, loading, error } = useSession();
   const navigate = useNavigate();
@@ -37,11 +39,14 @@ export function PageShell({
 
   const sessionPendingForCloud =
     requireAuth === 'cloud' && (loading || (data === null && !error));
-  const cloudNeedsLoginRedirect =
-    requireAuth === 'cloud' &&
+  const signedOutCloud =
     !!data &&
     data.cloud_mode &&
     data.user.is_local;
+  const cloudNeedsLoginRedirect =
+    requireAuth === 'cloud' &&
+    signedOutCloud &&
+    !allowSignedOutShell;
   const showCloudAuthLoading = sessionPendingForCloud || cloudNeedsLoginRedirect;
 
   // Only cloud mode forces a real login; in OSS mode the synthetic local
@@ -50,12 +55,12 @@ export function PageShell({
     if (!requireAuth) return;
     if (loading) return;
     if (!data) return;
-    if (requireAuth === 'cloud' && data.cloud_mode && data.user.is_local) {
+    if (requireAuth === 'cloud' && data.cloud_mode && data.user.is_local && !allowSignedOutShell) {
       navigate('/login?next=' + encodeURIComponent(location.pathname + location.search), {
         replace: true,
       });
     }
-  }, [requireAuth, data, loading, navigate, location.pathname, location.search]);
+  }, [allowSignedOutShell, requireAuth, data, loading, navigate, location.pathname, location.search]);
 
   useEffect(() => {
     if (title) document.title = title;
