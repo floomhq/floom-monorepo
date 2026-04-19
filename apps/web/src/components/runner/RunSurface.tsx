@@ -371,7 +371,13 @@ export function RunSurface({
   const renderHint = app.manifest?.render?.render_hint;
   const stacked = renderHint === 'stacked';
 
-  const refinable = app.manifest?.render?.refinable !== false;
+  // Refine UI is opt-in as of 2026-04-19 (previously default-on). Creators
+  // declare `render.refinable: true` in seed.json / manifest to flip the
+  // primary button to "Refine" after the first run AND to expose the
+  // bottom "Iterate" free-text composer on OutputPanel. Apps that are
+  // deterministic one-shots (uuid, hash, password, …) correctly stay
+  // stuck on "Run" and hide the iterate box. Fix 2 (2026-04-19).
+  const refinable = app.manifest?.render?.refinable === true;
   const runLabel = state.hasRun && refinable ? 'Refine' : 'Run';
 
   const hasInputs = (state.actionSpec?.inputs?.length ?? 0) > 0;
@@ -389,6 +395,8 @@ export function RunSurface({
       className={`run-surface${stacked ? ' run-surface-stacked' : ''}`}
       data-testid="run-surface"
       data-phase={state.phase}
+      data-has-refine={refinable ? 'true' : 'false'}
+      data-has-iterate={refinable ? 'true' : 'false'}
     >
       {viewingSharedRun && (
         <div
@@ -471,6 +479,7 @@ export function RunSurface({
             app={app}
             appAsPickResult={appAsPickResult}
             state={state}
+            refinable={refinable}
             onCancelJob={handleCancelJob}
             onCancelStream={handleCancelStream}
             onIterate={(prompt) => {
@@ -610,6 +619,7 @@ interface OutputSlotProps {
   app: AppDetail;
   appAsPickResult: PickResult;
   state: RunState;
+  refinable: boolean;
   onCancelJob: () => void;
   onCancelStream: () => void;
   onIterate: (prompt: string) => void;
@@ -619,6 +629,7 @@ function OutputSlot({
   app,
   appAsPickResult,
   state,
+  refinable,
   onCancelJob,
   onCancelStream,
   onIterate,
@@ -661,6 +672,11 @@ function OutputSlot({
   // phase === 'done'
   if (!state.run) return null;
 
+  // Hide the bottom "Iterate" composer when refinable is not opted in.
+  // OutputPanel renders the Iterate row iff onIterate is truthy, so
+  // passing undefined cleanly hides both the label and the input.
+  const iterateHandler = refinable ? onIterate : undefined;
+
   if (app.renderer) {
     return (
       <CustomRendererHost
@@ -672,7 +688,7 @@ function OutputSlot({
           app={appAsPickResult}
           appDetail={app}
           run={state.run}
-          onIterate={onIterate}
+          onIterate={iterateHandler}
         />
       </CustomRendererHost>
     );
@@ -683,7 +699,7 @@ function OutputSlot({
       app={appAsPickResult}
       appDetail={app}
       run={state.run}
-      onIterate={onIterate}
+      onIterate={iterateHandler}
     />
   );
 }
@@ -750,24 +766,84 @@ function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
           </div>
         )}
         {!loading && runs !== null && runs.length > 0 && (
-          <ul className="run-surface-past-list">
-            {runs.slice(0, 20).map((r) => (
+          // Fix 3 (2026-04-19): show up to 5 recent runs as cards with
+          // status-dot · input-summary → output-summary · relative time.
+          // Clicking navigates to /p/:slug?run=<id> which hydrates via
+          // the shared-run path.
+          <ul className="run-surface-past-list" data-testid="run-surface-past-list">
+            {runs.slice(0, 5).map((r) => (
               <li key={r.id}>
                 <Link
                   to={`/p/${appSlug}?run=${encodeURIComponent(r.id)}`}
                   data-testid={`run-surface-past-row-${r.id}`}
                   className="run-surface-past-row"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    padding: '10px 12px',
+                    borderBottom: '1px solid var(--line)',
+                    textDecoration: 'none',
+                    color: 'var(--ink)',
+                    minHeight: 44,
+                  }}
                 >
-                  <span className="run-surface-past-when">
-                    {formatWhen(r.started_at)}
+                  <span
+                    aria-hidden="true"
+                    data-status={r.status}
+                    style={{
+                      display: 'inline-block',
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      flexShrink: 0,
+                      background: statusDotColor(r.status),
+                    }}
+                  />
+                  <span
+                    className="run-surface-past-input"
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--ink)',
+                      maxWidth: 260,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {summarizeInputs(r.inputs)}
                   </span>
                   <span
-                    className={`run-surface-past-status run-surface-past-status-${r.status}`}
+                    aria-hidden="true"
+                    style={{ color: 'var(--muted)', fontSize: 12 }}
                   >
-                    {r.status}
+                    &rarr;
                   </span>
-                  <span className="run-surface-past-snippet">
-                    {summarizeInputs(r.inputs)}
+                  <span
+                    className="run-surface-past-output"
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--muted)',
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {summarizeOutputs(r.outputs, r.status, r.error)}
+                  </span>
+                  <span
+                    className="run-surface-past-when"
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--muted)',
+                      marginLeft: 'auto',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {formatWhen(r.started_at)}
                   </span>
                 </Link>
               </li>
@@ -777,6 +853,71 @@ function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
       </div>
     </details>
   );
+}
+
+/**
+ * Map run status to a CSS color for the row's status dot. Green for
+ * success, warning for timeout, red for errors, muted for anything else
+ * (pending/running — which shouldn't appear in the history list but we
+ * fall back gracefully).
+ */
+export function statusDotColor(status: string): string {
+  if (status === 'success') return 'var(--accent, #10b981)';
+  if (status === 'error') return 'var(--warning, #dc2626)';
+  if (status === 'timeout') return 'var(--warning-soft, #f59e0b)';
+  return 'var(--muted, #6b7280)';
+}
+
+/**
+ * Produce a short human-readable snippet from a run's outputs for the
+ * earlier-runs rail. Handles: error rows (shows the error string),
+ * plain strings, and objects (picks the first non-empty primitive
+ * field). Truncates at 40 chars.
+ */
+export function summarizeOutputs(
+  outputs: unknown,
+  status: string,
+  error: string | null,
+): string {
+  if (status === 'error' || status === 'timeout') {
+    const msg = (error || '').trim();
+    return msg.length > 0
+      ? msg.length > 40
+        ? `${msg.slice(0, 37)}…`
+        : msg
+      : status;
+  }
+  if (outputs == null) return '';
+  if (typeof outputs === 'string') {
+    return outputs.length > 40 ? `${outputs.slice(0, 37)}…` : outputs;
+  }
+  if (typeof outputs === 'object') {
+    const o = outputs as Record<string, unknown>;
+    // Prefer common primary-field names first.
+    const preferred = ['summary', 'uuid', 'result', 'output', 'text', 'message'];
+    for (const key of preferred) {
+      const v = o[key];
+      if (typeof v === 'string' && v.trim()) {
+        return v.length > 40 ? `${v.slice(0, 37)}…` : v;
+      }
+      if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'string') {
+        const first = v[0] as string;
+        return first.length > 40 ? `${first.slice(0, 37)}…` : first;
+      }
+    }
+    // Fall back to the first non-empty primitive value.
+    for (const v of Object.values(o)) {
+      if (typeof v === 'string' && v.trim()) {
+        return v.length > 40 ? `${v.slice(0, 37)}…` : v;
+      }
+      if (typeof v === 'number' || typeof v === 'boolean') {
+        return String(v);
+      }
+    }
+    const keys = Object.keys(o);
+    if (keys.length > 0) return `{${keys.slice(0, 3).join(', ')}…}`;
+  }
+  return '';
 }
 
 function formatWhen(iso: string): string {
@@ -816,7 +957,11 @@ export function deriveRunLabel(args: {
   hasRun: boolean;
   refinable: boolean | undefined;
 }): 'Run' | 'Refine' {
-  const refinable = args.refinable !== false;
+  // Refine is opt-in: only flips on when the creator explicitly sets
+  // `render.refinable: true` in the manifest. Default (undefined or false)
+  // keeps the primary button on "Run" forever — desirable for one-shot
+  // apps like uuid/hash where there's nothing to refine.
+  const refinable = args.refinable === true;
   return args.hasRun && refinable ? 'Refine' : 'Run';
 }
 
@@ -850,5 +995,7 @@ export const __test__ = {
   buildInitialInputs,
   getDefaultActionSpec,
   summarizeInputs,
+  summarizeOutputs,
+  statusDotColor,
   formatWhen,
 };
