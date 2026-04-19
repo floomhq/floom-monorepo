@@ -49,7 +49,8 @@ export function AppPermalinkPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [comingSoon, setComingSoon] = useState<ComingSoonTarget | null>(null);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
+  // Fix 4 (2026-04-19): tiny self-dismissing toast for the Share button.
+  const [shareToast, setShareToast] = useState(false);
 
   // v16 restructure: /p/:slug is tabbed now (Run / About / Install / Source).
   // Run is the default — the previous product-page layout made users scroll
@@ -564,9 +565,30 @@ export function AppPermalinkPage() {
                 >
                   Run {app.name}
                 </a>
-                <a
-                  href="#connectors"
+                {/* Fix 4 (2026-04-19): wire the 3 previously-dead CTAs.
+                    "Add to your tools" switches to the Install tab (where
+                    the MCP connector card lives). Schedule opens the
+                    shared ComingSoonModal. Share copies the URL and pops
+                    a toast instead of a silent write. */}
+                <button
+                  type="button"
                   data-testid="cta-add-to-tools"
+                  onClick={() => {
+                    setActiveTab('install');
+                    setSearchParams(
+                      (prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.set('tab', 'install');
+                        return next;
+                      },
+                      { replace: true },
+                    );
+                    // Defer the anchor scroll until the tab has swapped content.
+                    requestAnimationFrame(() => {
+                      const el = document.getElementById('connectors');
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                  }}
                   style={{
                     padding: '11px 18px',
                     border: '1px solid var(--line)',
@@ -575,18 +597,19 @@ export function AppPermalinkPage() {
                     fontWeight: 600,
                     color: 'var(--ink)',
                     background: 'var(--card)',
-                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 6,
                   }}
                 >
                   Add to your tools <ChevronDown />
-                </a>
+                </button>
                 <button
                   type="button"
                   data-testid="cta-schedule"
-                  onClick={() => setScheduleOpen((v) => !v)}
+                  onClick={() => setComingSoon('schedule')}
                   style={{
                     padding: '11px 18px',
                     border: '1px solid var(--line)',
@@ -609,7 +632,12 @@ export function AppPermalinkPage() {
                   data-testid="cta-share"
                   onClick={() => {
                     try {
-                      void navigator.clipboard.writeText(window.location.href);
+                      void navigator.clipboard
+                        .writeText(window.location.href)
+                        .then(() => {
+                          setShareToast(true);
+                          window.setTimeout(() => setShareToast(false), 1800);
+                        });
                     } catch {
                       /* ignore */
                     }
@@ -632,10 +660,6 @@ export function AppPermalinkPage() {
                   <ShareIcon /> Share
                 </button>
               </div>
-
-              {scheduleOpen && (
-                <ScheduleDrawer onClose={() => setScheduleOpen(false)} appName={app.name} />
-              )}
             </div>
 
             {/* Meta card. CLS fix (2026-04-18): min-height so the hero
@@ -1032,6 +1056,29 @@ export function AppPermalinkPage() {
           onClose={() => setComingSoon(null)}
         />
       )}
+
+      {shareToast && (
+        <div
+          role="status"
+          data-testid="share-toast"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '10px 18px',
+            borderRadius: 999,
+            background: 'var(--ink)',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 500,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+            zIndex: 1100,
+          }}
+        >
+          Link copied
+        </div>
+      )}
     </div>
   );
 }
@@ -1201,200 +1248,6 @@ function RatingsWidget({ summary }: { summary: ReviewSummary }) {
           {summary.count} rating{summary.count === 1 ? '' : 's'}
         </div>
       </div>
-    </div>
-  );
-}
-
-function ScheduleDrawer({ onClose, appName }: { onClose: () => void; appName: string }) {
-  return (
-    <div
-      data-testid="schedule-drawer"
-      style={{
-        marginTop: 20,
-        background: 'var(--accent-soft, var(--bg))',
-        border: '1px solid var(--accent-border, var(--line))',
-        borderRadius: 14,
-        padding: 22,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: 'var(--accent-soft, var(--bg))',
-            border: '1px solid var(--accent-border, var(--line))',
-            color: 'var(--accent)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <CalendarClock />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
-            Run {appName} on a schedule
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            Pick a frequency, time, and default input. Floom handles the rest.
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close schedule drawer"
-          style={{
-            padding: 6,
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--muted)',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            borderRadius: 6,
-          }}
-        >
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 16,
-        }}
-      >
-        <ScheduleField label="Frequency">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {['Daily', 'Weekdays', 'Weekly', 'Monthly'].map((f) => (
-              <span
-                key={f}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 999,
-                  fontSize: 11,
-                  fontWeight: 500,
-                  border: '1px solid var(--line)',
-                  background: 'var(--card)',
-                  color: 'var(--muted)',
-                }}
-              >
-                {f}
-              </span>
-            ))}
-          </div>
-        </ScheduleField>
-        <ScheduleField label="Time">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input
-              type="text"
-              value="09:00"
-              readOnly
-              style={{
-                width: 72,
-                padding: '6px 8px',
-                border: '1px solid var(--line)',
-                borderRadius: 6,
-                background: 'var(--card)',
-                fontSize: 12,
-                color: 'var(--muted)',
-                fontFamily: 'inherit',
-              }}
-            />
-            <select
-              disabled
-              style={{
-                padding: '6px 8px',
-                border: '1px solid var(--line)',
-                borderRadius: 6,
-                background: 'var(--card)',
-                fontSize: 12,
-                color: 'var(--muted)',
-                fontFamily: 'inherit',
-              }}
-            >
-              <option>UTC</option>
-            </select>
-          </div>
-        </ScheduleField>
-        <ScheduleField label="Run with input from">
-          <select
-            disabled
-            style={{
-              padding: '6px 8px',
-              border: '1px solid var(--line)',
-              borderRadius: 6,
-              background: 'var(--card)',
-              fontSize: 12,
-              color: 'var(--muted)',
-              fontFamily: 'inherit',
-              width: '100%',
-            }}
-          >
-            <option>Last successful run</option>
-          </select>
-        </ScheduleField>
-      </div>
-
-      <div
-        style={{
-          marginTop: 18,
-          paddingTop: 14,
-          borderTop: '1px solid var(--line)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-          Scheduling ships with the job queue release. Preview only.
-        </div>
-        <button
-          type="button"
-          disabled
-          style={{
-            padding: '8px 16px',
-            background: 'var(--accent)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'not-allowed',
-            opacity: 0.55,
-            fontFamily: 'inherit',
-          }}
-        >
-          Coming soon
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ScheduleField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 600,
-          color: 'var(--muted)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.07em',
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </div>
-      {children}
     </div>
   );
 }
