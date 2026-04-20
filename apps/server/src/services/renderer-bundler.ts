@@ -246,6 +246,19 @@ function ensureRenderersDir(dir: string = RENDERERS_DIR): void {
 /**
  * Validate that `entry` exists + is inside `manifestDir`. Throws if either
  * check fails. Returns the resolved absolute path.
+ *
+ * Defense in depth: after the string-level checks we also `realpathSync`
+ * both the candidate and the manifest root and require the candidate's
+ * real path to live under the real root. Without this, a malicious app
+ * dir containing a symlink named e.g. `entry.js` pointing at /etc/hosts
+ * would slip past the `..`/absolute/prefix checks (they operate on the
+ * unresolved string) and let the bundler read a file from elsewhere on
+ * disk at ingest time. Same boundary we apply on the read path; makes
+ * both ends of the renderer pipeline share one enforcement rule.
+ *
+ * `realpathSync` can throw for broken/missing symlinks or EPERM; those
+ * are treated as "unsafe → reject" so we never leak a raw errno to the
+ * caller or let a weird FS state bypass the check by erroring out past it.
  */
 export function resolveEntryPath(entry: string, manifestDir: string): string {
   if (isAbsolute(entry)) {
@@ -258,7 +271,7 @@ export function resolveEntryPath(entry: string, manifestDir: string): string {
   // Confirm the resolved path is a descendant of manifestDir (defense in
   // depth against symlinks or ..-escaped relative paths slipping past the
   // string check).
-  const relative = absolute.startsWith(manifestDir + '/') || absolute === manifestDir;
+  const relative = absolute.startsWith(manifestDir + sep) || absolute === manifestDir;
   if (!relative) {
     throw new Error(
       `renderer.entry resolves outside the manifest directory: ${absolute} not under ${manifestDir}`,
@@ -266,6 +279,31 @@ export function resolveEntryPath(entry: string, manifestDir: string): string {
   }
   if (!existsSync(absolute)) {
     throw new Error(`renderer.entry does not exist on disk: ${absolute}`);
+  }
+
+  // Symlink-escape guard: resolve both sides through realpathSync and
+  // require the real candidate to be a descendant of the real root. The
+  // `sep` suffix ensures `/foo/barbaz` cannot masquerade as being under
+  // `/foo/bar`. Any realpathSync failure (broken link, EPERM, …) is
+  // surfaced as the same "unsafe" outcome; we deliberately don't include
+  // the underlying errno in the thrown message so a caller can't use it
+  // as an oracle for FS layout outside the manifest dir.
+  let realRoot: string;
+  let realAbsolute: string;
+  try {
+    realRoot = realpathSync(manifestDir);
+    realAbsolute = realpathSync(absolute);
+  } catch {
+    throw new Error(
+      `renderer.entry could not be safely resolved (symlink or permissions issue): ${entry}`,
+    );
+  }
+  const realRelative =
+    realAbsolute === realRoot || realAbsolute.startsWith(realRoot + sep);
+  if (!realRelative) {
+    throw new Error(
+      `renderer.entry resolves outside the manifest directory via symlink: ${entry}`,
+    );
   }
   return absolute;
 }
