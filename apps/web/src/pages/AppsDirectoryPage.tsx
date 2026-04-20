@@ -6,30 +6,10 @@ import { AppStripe } from '../components/public/AppStripe';
 import { FeedbackButton } from '../components/FeedbackButton';
 import { getHub } from '../api/client';
 import type { HubApp } from '../lib/types';
-import { isTestFixture } from '../lib/hub-filter';
+import { qualityHubApps } from '../lib/hub-filter';
+import { labelForCategory, normalizeCategory } from '../lib/categories';
 
 const ALL = 'all';
-
-const CATEGORY_LABELS: Record<string, string> = {
-  all: 'All',
-  travel: 'Travel',
-  'developer-tools': 'Developer',
-  research: 'Research',
-  marketing: 'Marketing',
-  analytics: 'Analytics',
-  productivity: 'Productivity',
-  writing: 'Writing',
-  ai: 'AI',
-  seo: 'SEO',
-  design: 'Design',
-};
-
-function labelForCategory(category: string): string {
-  return (
-    CATEGORY_LABELS[category] ??
-    category.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-  );
-}
 
 /**
  * Small debounce hook so the search input doesn't thrash the filtered
@@ -73,7 +53,7 @@ export function AppsDirectoryPage() {
   }, [loadHub]);
 
   const sortedApps = useMemo(() => {
-    return apps.filter((a) => !isTestFixture(a)).sort((a, b) => {
+    return qualityHubApps(apps).sort((a, b) => {
       if ((a.featured ?? false) !== (b.featured ?? false)) {
         return a.featured ? -1 : 1;
       }
@@ -89,8 +69,9 @@ export function AppsDirectoryPage() {
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>([[ALL, sortedApps.length]]);
     for (const app of sortedApps) {
-      if (!app.category) continue;
-      counts.set(app.category, (counts.get(app.category) ?? 0) + 1);
+      const cat = normalizeCategory(app.category);
+      if (!cat) continue;
+      counts.set(cat, (counts.get(cat) ?? 0) + 1);
     }
     return counts;
   }, [sortedApps]);
@@ -98,7 +79,8 @@ export function AppsDirectoryPage() {
   const categories = useMemo(() => {
     const found = new Set<string>();
     for (const app of sortedApps) {
-      if (app.category) found.add(app.category);
+      const cat = normalizeCategory(app.category);
+      if (cat) found.add(cat);
     }
     const ordered = Array.from(found).sort((a, b) => {
       const ca = categoryCounts.get(a) ?? 0;
@@ -114,7 +96,9 @@ export function AppsDirectoryPage() {
   const filteredApps = useMemo(() => {
     let list = sortedApps;
     if (activeCategory !== ALL) {
-      list = list.filter((app) => app.category === activeCategory);
+      list = list.filter(
+        (app) => normalizeCategory(app.category) === activeCategory,
+      );
     }
     if (trimmedSearch) {
       list = list.filter((app) =>
