@@ -70,18 +70,49 @@ function navStyle(active: boolean): CSSProperties {
   };
 }
 
-// MVP TopBar.
+// Mode-toggle pill. Replaces the scattered "| Studio" breadcrumb + "← Store"
+// CTA pattern that used to live in the studio branch of this TopBar (and
+// confused Federico — two competing back affordances on /studio/build).
 //
-// Two states:
-//   1. Loading / OSS mode (local user) — show "Sign in" CTA that links to /login.
-//   2. Logged in — show avatar + name + dropdown (My dashboard / Creator /
-//      Settings / Sign out).
+// Rendered for authenticated users on every surface: both sides always
+// visible, current side highlighted black-on-white. Clicking the inactive
+// side switches modes. No back arrows, no breadcrumbs — the pill IS the
+// mode indicator.
+const pillWrapStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: 3,
+  borderRadius: 999,
+  border: '1px solid var(--line)',
+  background: 'var(--card)',
+  gap: 0,
+};
+function pillSideStyle(active: boolean): CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '6px 14px',
+    borderRadius: 999,
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: 1,
+    textDecoration: 'none',
+    color: active ? '#fff' : 'var(--muted)',
+    background: active ? 'var(--ink)' : 'transparent',
+    transition: 'background 0.15s, color 0.15s',
+  };
+}
+
+// MVP TopBar — one header, one pattern.
 //
-// The workspace switcher is deferred — see docs/DEFERRED-UI.md and
-// feature/ui-workspace-switcher. Every user auto-lands in their personal
-// workspace on signup; the backend still returns workspaces +
-// active_workspace in /api/session/me and the routes stay live, so the
-// switcher is a UI-only concern.
+// After the 2026-04-20 nav unification: same shape on every surface.
+// Logo (home) | Store/Studio pill toggle (authed only) | profile or
+// sign-in. No context-specific breadcrumbs, no back arrows in the
+// header, no hidden "← Creator dashboard" inside page bodies.
+//
+// Loading / OSS mode shows "Sign in" + "Publish an app" instead of the
+// pill; the logged-in cloud user gets the pill + avatar dropdown.
 //
 // Mobile: hamburger menu keeps the same links plus a sign-in / sign-out
 // entry.
@@ -98,16 +129,17 @@ export function TopBar({ compact = false }: Props = {}) {
   // users lose focus context after dismissing the menu.
   const hamburgerRef = useRef<HTMLButtonElement>(null);
 
-  const isDocs = location.pathname.startsWith('/protocol') || location.pathname === '/docs';
-  const isStore = location.pathname.startsWith('/apps') || location.pathname.startsWith('/p/');
   const isStudio = location.pathname.startsWith('/studio');
-  const isMe = location.pathname === '/me' || location.pathname.startsWith('/me/');
-  // Legacy deploy/creator paths route to /studio/build now.
-  const isDeploy = location.pathname.startsWith('/studio/build') || location.pathname.startsWith('/build');
   const isLoginPage =
     location.pathname === '/login' || location.pathname === '/signup';
   const ownedAppCount = myApps?.length ?? 0;
   const deployHref = isAuthenticated ? '/studio/build' : '/signup?next=%2Fstudio%2Fbuild';
+
+  // Pill is only useful for authed users (anon users can't enter Studio
+  // without signing up first, so forcing a "Studio" tab on them adds
+  // noise). Authed users see it on EVERY surface so they can always
+  // jump between modes.
+  const showPill = isAuthenticated;
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -169,8 +201,12 @@ export function TopBar({ compact = false }: Props = {}) {
           padding: compact ? '0 20px' : undefined,
         }}
       >
+        {/* Logo: always links home. No context-specific destination,
+            no breadcrumb alongside. Federico's audit: "floom | Studio"
+            next to the logo looked like a breadcrumb competing with the
+            back arrow. Killed. */}
         <Link
-          to={isStudio ? '/studio' : '/'}
+          to="/"
           className="brand"
           style={{
             display: 'inline-flex',
@@ -179,82 +215,87 @@ export function TopBar({ compact = false }: Props = {}) {
             color: 'var(--ink)',
             flexShrink: 0,
           }}
-          aria-label={isStudio ? 'Floom Studio' : 'Floom home'}
+          aria-label="Floom home"
         >
-          {/* v6-align 2026-04-20: use the `glow` variant so the pennant
-              carries the subtle SVG halo (per PR #35) even in chrome.
-              Shrunk pennant 26 -> 20 (compact 20 -> 18) and wordmark to
-              14px (see Logo.tsx) so the mark stops dominating the TopBar.
-              Federico's audit: "logo top left is very big and not halo
-              glow". */}
           <Logo size={compact ? 18 : 20} withWordmark={!compact} variant="glow" />
-          {isStudio && (
-            <span
-              data-testid="topbar-studio-breadcrumb"
-              style={{
-                marginLeft: 10,
-                paddingLeft: 10,
-                borderLeft: '1px solid var(--line)',
-                fontSize: 13,
-                fontWeight: 600,
-                color: 'var(--muted)',
-              }}
-            >
-              Studio
-            </span>
-          )}
         </Link>
 
-        {!isStudio && (
-        <nav
-          className="topbar-links topbar-links-desktop"
-          aria-label="Desktop navigation"
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            gap: 10,
-          }}
-        >
-          <Link
-            to="/apps"
-            data-testid="topbar-apps"
-            aria-current={isStore ? 'page' : undefined}
-            style={navStyle(isStore)}
+        {/* Middle slot: Store/Studio pill for authed users, marketing
+            nav for anon store visitors, nothing for anon login/signup. */}
+        {showPill ? (
+          <nav
+            className="topbar-links topbar-links-desktop topbar-pill-nav"
+            aria-label="Mode switcher"
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+            }}
           >
-            Apps
-          </Link>
-          <Link
-            to="/protocol"
-            data-testid="topbar-protocol"
-            aria-current={isDocs ? 'page' : undefined}
-            style={navStyle(isDocs)}
+            <div style={pillWrapStyle} role="group" aria-label="Switch mode">
+              <Link
+                to="/apps"
+                data-testid="topbar-mode-store"
+                aria-current={!isStudio ? 'page' : undefined}
+                style={pillSideStyle(!isStudio)}
+              >
+                Store
+              </Link>
+              <Link
+                to="/studio"
+                data-testid="topbar-mode-studio"
+                aria-current={isStudio ? 'page' : undefined}
+                style={pillSideStyle(isStudio)}
+              >
+                Studio{ownedAppCount > 0 ? ` (${ownedAppCount})` : ''}
+              </Link>
+            </div>
+          </nav>
+        ) : !isLoginPage ? (
+          <nav
+            className="topbar-links topbar-links-desktop"
+            aria-label="Desktop navigation"
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              gap: 10,
+            }}
           >
-            Docs
-          </Link>
-          {isAuthenticated && (
             <Link
-              to="/me"
-              data-testid="topbar-me"
-              aria-current={isMe ? 'page' : undefined}
-              style={navStyle(isMe)}
+              to="/apps"
+              data-testid="topbar-apps"
+              aria-current={
+                location.pathname.startsWith('/apps') ||
+                location.pathname.startsWith('/p/')
+                  ? 'page'
+                  : undefined
+              }
+              style={navStyle(
+                location.pathname.startsWith('/apps') ||
+                  location.pathname.startsWith('/p/'),
+              )}
             >
-              Me
+              Apps
             </Link>
-          )}
-          {isAuthenticated && ownedAppCount > 0 && (
             <Link
-              to="/studio"
-              data-testid="topbar-studio"
-              aria-current={isStudio ? 'page' : undefined}
-              style={navStyle(isStudio)}
+              to="/protocol"
+              data-testid="topbar-protocol"
+              aria-current={
+                location.pathname.startsWith('/protocol') ||
+                location.pathname === '/docs'
+                  ? 'page'
+                  : undefined
+              }
+              style={navStyle(
+                location.pathname.startsWith('/protocol') ||
+                  location.pathname === '/docs',
+              )}
             >
-              Studio ({ownedAppCount})
+              Docs
             </Link>
-          )}
-        </nav>
+          </nav>
+        ) : (
+          <div style={{ flex: 1 }} />
         )}
-
-        {isStudio && <div style={{ flex: 1 }} />}
 
         <div
           className="topbar-links topbar-links-desktop"
@@ -264,32 +305,21 @@ export function TopBar({ compact = false }: Props = {}) {
           }}
         >
           {!isAuthenticated && !isLoginPage && (
-            <Link
-              to="/login"
-              data-testid="topbar-signin"
-              style={secondaryCtaStyle}
-            >
-              Sign in
-            </Link>
-          )}
-
-          {!isStudio && !isAuthenticated && (
-            <Link
-              to={deployHref}
-              aria-current={isDeploy ? 'page' : undefined}
-              style={primaryCtaStyle}
-            >
-              Publish an app
-            </Link>
-          )}
-          {isStudio && (
-            <Link
-              to="/"
-              data-testid="topbar-back-to-store"
-              style={secondaryCtaStyle}
-            >
-              ← Store
-            </Link>
+            <>
+              <Link
+                to="/login"
+                data-testid="topbar-signin"
+                style={secondaryCtaStyle}
+              >
+                Sign in
+              </Link>
+              <Link
+                to={deployHref}
+                style={primaryCtaStyle}
+              >
+                Publish an app
+              </Link>
+            </>
           )}
 
           {isAuthenticated && data && (
@@ -343,7 +373,9 @@ export function TopBar({ compact = false }: Props = {}) {
                     {userInitial}
                   </span>
                 )}
-                <span style={{ fontSize: 13, color: 'var(--ink)' }}>{userLabel}</span>
+                <span style={{ fontSize: 13, color: 'var(--ink)' }} className="topbar-user-label">
+                  {userLabel}
+                </span>
               </button>
               {dropOpen && (
                 <div
@@ -369,15 +401,6 @@ export function TopBar({ compact = false }: Props = {}) {
                     style={menuItemStyle}
                   >
                     My dashboard
-                  </Link>
-                  <Link
-                    to="/studio"
-                    onClick={() => setDropOpen(false)}
-                    role="menuitem"
-                    data-testid="topbar-menu-studio"
-                    style={menuItemStyle}
-                  >
-                    {ownedAppCount > 0 ? `Studio (${ownedAppCount})` : 'Open Studio →'}
                   </Link>
                   <Link
                     to="/me/settings"
@@ -472,6 +495,50 @@ export function TopBar({ compact = false }: Props = {}) {
               </button>
             </div>
 
+            {/* Authed users see a compact mode switch up top so the
+                pill has a mobile equivalent. The rest of the drawer
+                mirrors the desktop primary destinations. */}
+            {showPill && (
+              <div
+                role="group"
+                aria-label="Switch mode"
+                style={{
+                  margin: '4px 20px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: 3,
+                  borderRadius: 999,
+                  border: '1px solid var(--line)',
+                  background: 'var(--card)',
+                }}
+              >
+                <Link
+                  to="/apps"
+                  onClick={() => setMenuOpen(false)}
+                  data-testid="topbar-mobile-mode-store"
+                  style={{
+                    ...pillSideStyle(!isStudio),
+                    flex: 1,
+                    padding: '8px 10px',
+                  }}
+                >
+                  Store
+                </Link>
+                <Link
+                  to="/studio"
+                  onClick={() => setMenuOpen(false)}
+                  data-testid="topbar-mobile-mode-studio"
+                  style={{
+                    ...pillSideStyle(isStudio),
+                    flex: 1,
+                    padding: '8px 10px',
+                  }}
+                >
+                  Studio{ownedAppCount > 0 ? ` (${ownedAppCount})` : ''}
+                </Link>
+              </div>
+            )}
+
             {/* Rescue 2026-04-21 (Fix 2): Apps is the primary destination on
                 mobile. Make it the first item, biggest font, with a leading
                 icon so the eye locks onto it immediately. Federico's audit:
@@ -503,16 +570,6 @@ export function TopBar({ compact = false }: Props = {}) {
                 onClick={() => setMenuOpen(false)}
               >
                 Me
-              </Link>
-            )}
-            {isAuthenticated && ownedAppCount > 0 && (
-              <Link
-                to="/studio"
-                className="topbar-mobile-link"
-                role="menuitem"
-                onClick={() => setMenuOpen(false)}
-              >
-                Studio ({ownedAppCount})
               </Link>
             )}
             {isAuthenticated && (

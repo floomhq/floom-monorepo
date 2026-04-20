@@ -16,6 +16,7 @@ import { Logo } from '../Logo';
 import { AppIcon } from '../AppIcon';
 import { useMyApps } from '../../hooks/useMyApps';
 import { useSession } from '../../hooks/useSession';
+import { colors } from '../../lib/design-tokens';
 
 const RAIL_WIDTH = 240;
 
@@ -51,7 +52,7 @@ export function StudioSidebar({
         width: RAIL_WIDTH,
         flexShrink: 0,
         borderRight: '1px solid var(--line)',
-        background: '#F5F5F1',
+        background: colors.sidebarBg,
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
@@ -199,7 +200,7 @@ export function StudioSidebar({
         style={{
           padding: '10px 12px 14px',
           borderTop: '1px solid var(--line)',
-          background: '#F5F5F1',
+          background: colors.sidebarBg,
           display: 'flex',
           flexDirection: 'column',
           gap: 4,
