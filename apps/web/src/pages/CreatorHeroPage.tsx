@@ -23,7 +23,7 @@ import { SectionEyebrow } from '../components/home/SectionEyebrow';
 import * as api from '../api/client';
 import { useSession } from '../hooks/useSession';
 import type { DetectedApp, HubApp } from '../lib/types';
-import { publicHubApps } from '../lib/hub-filter';
+import { qualityHubApps } from '../lib/hub-filter';
 import { LAUNCH_APPS } from '../data/demoData';
 
 interface Stripe {
@@ -161,10 +161,12 @@ export function CreatorHeroPage() {
     api
       .getHub()
       .then((apps) => {
-        // Filter QA/test fixtures so the landing "N apps running right
-        // now" matches the /apps directory header count. Single source
-        // of truth: lib/hub-filter.ts.
-        const visible = publicHubApps(apps);
+        // Keep the landing "N apps running right now" count and the
+        // rotating hero stripe in sync with what a visitor sees on the
+        // /apps directory. `qualityHubApps` is the single source of
+        // truth: it drops QA fixtures and slug-restating stubs whose
+        // descriptions would make a first-time visitor lose trust.
+        const visible = qualityHubApps(apps);
         setHubCount(visible.length);
         if (visible.length > 0) setStripes(pickStripes(visible));
       })
