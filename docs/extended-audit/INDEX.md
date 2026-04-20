@@ -19,4 +19,4 @@ Each **`ax-NN-*.md`** is one background subagent. **Do not edit product code** â
 | 13 | `ax-13-dead-legacy-routes.md` | `/_creator-legacy`, redirects in `main.tsx`; who links; deprecation candidates |
 | 14 | `ax-14-regression-checklist.md` | Post-merge / pre-release checklist: hub-smoke, preview smoke, capture diff |
 
-**Status:** subagents spawned 2026-04-20.
+**Status:** subagents spawned 2026-04-20. Tracks **ax-01**, **ax-03**, and **ax-06** were completed in-repo after the partial merge (same day).
