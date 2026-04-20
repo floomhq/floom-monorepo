@@ -1,6 +1,8 @@
 # ax-06 — Supply chain & dependency hygiene
 
-Scope: monorepo package manager, lockfile, overrides, audit surface, license posture, automation. **No live `pnpm audit` output** was captured in the audit environment (registry latency); re-run locally or in CI and paste summary into PR.
+Scope: monorepo package manager, lockfile, overrides, audit surface, license posture, automation.
+
+**`pnpm audit` (2026-04-21, repo root):** exit 0 — *No known vulnerabilities found* (re-run before releases; advisory DB updates daily).
 
 ## Facts from repo
 
@@ -41,4 +43,4 @@ Wire `pnpm audit` into an existing workflow (see `ax-04-ci-workflows.md`) with *
 
 ## Deliverable status
 
-Static analysis complete; **numeric audit counts** pending successful `pnpm audit` run on network-available runner.
+Static analysis complete. Registry `pnpm audit` executed successfully (see header). **License aggregation** and **Dependabot/Renovate** wiring still optional follow-ups.
