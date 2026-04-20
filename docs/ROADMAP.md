@@ -1,6 +1,6 @@
 # Floom Roadmap
 
-Living document. Snapshot as of **2026-04-17**.
+Living document. Snapshot as of **2026-04-20**.
 
 Floom is pre-1.0. Anything here can shift as we learn from real usage.
 
@@ -32,12 +32,18 @@ Backends land; the UI to drive them is re-enabled incrementally.
 
 ### P0 — Launch blockers
 
-- Async job queue UI (re-enable)
-- Custom renderer upload UI (re-enable)
-- Rate-limit all `/api/*/run` endpoints
-- Legal: imprint, privacy policy, terms, cookie consent
-- Landing + public-page polish (wireframes v13)
+- Landing + public-page polish (wireframes v13) — partial; needs design sign-off
 - **Repo → hosted pipeline** (`packages/runtime` + `packages/detect` + `packages/manifest`). Paste a GitHub URL, Floom clones, detects the runtime, `docker build`s (or generates a Dockerfile), runs a container, and smoke-tests over HTTP — core to the ICP; see [`PRODUCT.md`](./PRODUCT.md). **Library path implemented** (`deployFromGithub` + `Ax41DockerProvider`). **Still to land:** server route (`POST /api/deploy-github` + SSE log), `/build` “host this repo” ramp (distinct from OpenAPI-in-repo discovery), per-user deploy quota, and hardened defaults in `services/docker.ts` for all hosted workloads.
+- Imprint lawyer review before any paid / commercial launch (`ImprintPage.tsx` currently labelled “preliminary draft”)
+
+### Closed P0 — shipped (kept as audit trail)
+
+Previously tracked as launch blockers; now verifiable in `main`. See `docs/product-audit/deep/pd-19-roadmap-p0-execution-gap.md` for evidence paths.
+
+- ✅ Async job queue UI — `apps/web/src/components/runner/{RunSurface,JobProgress}.tsx`
+- ✅ Custom renderer upload UI — `apps/web/src/components/CustomRendererPanel.tsx` used in `BuildPage`, `StudioAppRendererPage`, `CreatorAppPage`
+- ✅ Rate limits on `/api/*/run` — `runRateLimitMiddleware` mounted in `apps/server/src/index.ts` for `/api/run`, `/api/:slug/run`, `/api/:slug/jobs`, `/mcp/app/:slug`
+- ✅ Legal pages + cookie banner — `/imprint`, `/privacy`, `/terms`, `/cookies` + `CookieBanner.tsx` (imprint copy still flagged as preliminary — see open P0 above)
 
 ### P1 — Week one
 
