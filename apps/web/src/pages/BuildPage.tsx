@@ -42,8 +42,12 @@ interface BuildPageProps {
   /** Wrapper component used for the outer layout. Defaults to PageShell
    *  (store surface). Studio wraps with StudioLayout. */
   layout?: React.ComponentType<{ children: React.ReactNode; title?: string }>;
-  /** Where the "Back" breadcrumb links to. Defaults to /creator (store).
-   *  Studio passes /studio. */
+  /** Legacy: used to set the target of an in-page "← Creator dashboard"
+   *  link above the H1. Removed in the 2026-04-20 nav unification — the
+   *  TopBar's Store/Studio pill is now the only mode-switch affordance.
+   *  Prop kept so existing callers (StudioBuildPage) stay type-compatible
+   *  without needing edits; unused inside the component. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   backHref?: string;
   /** Redirect target after publish — Studio sends to /studio/:slug. */
   postPublishHref?: (slug: string) => string;
@@ -51,7 +55,8 @@ interface BuildPageProps {
 
 export function BuildPage({
   layout: Layout = PageShell,
-  backHref = '/creator',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  backHref: _backHref = '/creator',
   postPublishHref,
 }: BuildPageProps = {}) {
   const [searchParams] = useSearchParams();
@@ -436,31 +441,13 @@ export function BuildPage({
   return (
     <Layout title="Publish an app | Floom">
       <div data-testid="build-page" style={{ maxWidth: 1040, margin: '0 auto' }}>
-        {/* Header */}
+        {/* Header.
+            2026-04-20 nav unification: the "← Creator dashboard"
+            breadcrumb that used to live here was killed. /studio/build
+            now only has ONE back affordance: the Store/Studio pill in
+            the TopBar. The old breadcrumb duplicated what the header
+            already communicated. */}
         <div style={{ marginBottom: 32 }}>
-          <Link
-            to={backHref}
-            style={{
-              fontSize: 13,
-              color: 'var(--muted)',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              marginBottom: 12,
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path
-                d="M8 2L4 6l4 4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Creator dashboard
-          </Link>
           <h1
             style={{
               fontSize: 32,
