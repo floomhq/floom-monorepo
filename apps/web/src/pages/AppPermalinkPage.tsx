@@ -27,6 +27,7 @@ import {
   type PermalinkLoadOutcome,
 } from '../lib/publicPermalinks';
 import {
+  consumeJustPublished,
   hasConfettiShown,
   markConfettiShown,
   samplePrefill,
@@ -99,6 +100,12 @@ export function AppPermalinkPage() {
   const [confettiFire, setConfettiFire] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  // Issue #255 (2026-04-21): run completion and publish celebration are
+  // two different moments. The "Your app is live — send to coworkers"
+  // card only fires on PUBLISH (consumed via localStorage). Successful
+  // runs get a quieter "Run complete · Share this run" row instead.
+  const [runCompleteRunId, setRunCompleteRunId] = useState<string | null>(null);
+  const [runShareCopied, setRunShareCopied] = useState(false);
 
   useEffect(() => {
     if (!slug) {
@@ -268,17 +275,30 @@ export function AppPermalinkPage() {
     return { [first.name]: sample };
   }, [app, runIdFromUrl]);
 
-  // Fire confetti on the first successful run the user sees for an app
-  // they haven't celebrated yet. Cap at one per (user, slug) pair via
-  // localStorage — second run same day = no confetti.
+  // Issue #255 (2026-04-21): the celebration card ("Your app is live —
+  // send to coworkers") must only fire for the creator who JUST pressed
+  // Publish, not for every visitor who runs the app. BuildPage writes a
+  // slug-scoped flag on publish success; we consume it here on mount.
+  // Successful runs hit `handleRunResult` and get a quieter inline
+  // "Run complete · Share this run" row anchored near the output.
+  useEffect(() => {
+    if (!app?.slug) return;
+    if (!consumeJustPublished(app.slug)) return;
+    if (!hasConfettiShown(app.slug)) {
+      markConfettiShown(app.slug);
+      setConfettiFire(true);
+    }
+    setCelebrate(true);
+  }, [app?.slug]);
+
   const handleRunResult = useCallback(
     (result: RunSurfaceResult) => {
       if (!app) return;
       if (result.exitCode !== 0) return;
-      if (hasConfettiShown(app.slug)) return;
-      markConfettiShown(app.slug);
-      setConfettiFire(true);
-      setCelebrate(true);
+      // Surface the lightweight run-complete acknowledgement. The publish
+      // celebration is handled separately (see effect above).
+      setRunCompleteRunId(result.runId);
+      setRunShareCopied(false);
     },
     [app],
   );
@@ -983,6 +1003,25 @@ export function AppPermalinkPage() {
                       }
                     }}
                     onDismiss={() => setCelebrate(false)}
+                  />
+                )}
+                {!celebrate && runCompleteRunId && (
+                  <RunCompleteCard
+                    runId={runCompleteRunId}
+                    copied={runShareCopied}
+                    onCopy={() => {
+                      try {
+                        const url = new URL(window.location.href);
+                        url.pathname = buildPublicRunPath(runCompleteRunId);
+                        url.search = '';
+                        navigator.clipboard.writeText(url.toString());
+                        setRunShareCopied(true);
+                        window.setTimeout(() => setRunShareCopied(false), 1800);
+                      } catch {
+                        /* clipboard blocked */
+                      }
+                    }}
+                    onDismiss={() => setRunCompleteRunId(null)}
                   />
                 )}
               </>
@@ -1699,6 +1738,109 @@ function CelebrationCard({
           }}
         >
           Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * RunCompleteCard — quiet acknowledgement after a successful run. This is
+ * intentionally lighter than CelebrationCard: no green accent wash, no
+ * "send it to coworkers" copy (which only belongs to the first-publish
+ * moment per Issue #255). Just "Run complete" + a Share-this-run link.
+ */
+function RunCompleteCard({
+  runId,
+  copied,
+  onCopy,
+  onDismiss,
+}: {
+  runId: string;
+  copied: boolean;
+  onCopy: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      data-testid="run-complete-card"
+      style={{
+        marginTop: 14,
+        padding: '12px 16px',
+        borderRadius: 10,
+        border: '1px solid var(--line, #e5e7eb)',
+        background: 'var(--card, #fff)',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 10,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <strong style={{ fontSize: 13, color: 'var(--ink, #0f172a)' }}>
+          Run complete
+        </strong>
+        <span
+          style={{
+            marginLeft: 8,
+            color: 'var(--muted, #64748b)',
+            fontSize: 12,
+          }}
+        >
+          Share this specific run with a link.
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          data-testid="run-complete-copy"
+          onClick={onCopy}
+          style={{
+            padding: '6px 12px',
+            borderRadius: 8,
+            background: 'var(--card, #fff)',
+            color: 'var(--ink, #0f172a)',
+            border: '1px solid var(--line, #e5e7eb)',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          {copied ? 'Copied!' : 'Share this run'}
+        </button>
+        <Link
+          to={buildPublicRunPath(runId)}
+          data-testid="run-complete-open"
+          style={{
+            padding: '6px 12px',
+            borderRadius: 8,
+            background: 'transparent',
+            color: 'var(--muted, #64748b)',
+            border: '1px solid transparent',
+            fontSize: 12,
+            fontWeight: 500,
+            textDecoration: 'none',
+          }}
+        >
+          Open
+        </Link>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss run complete notice"
+          style={{
+            padding: '6px 8px',
+            borderRadius: 8,
+            background: 'transparent',
+            color: 'var(--muted, #64748b)',
+            border: 'none',
+            fontSize: 12,
+            cursor: 'pointer',
+          }}
+        >
+          ×
         </button>
       </div>
     </div>
