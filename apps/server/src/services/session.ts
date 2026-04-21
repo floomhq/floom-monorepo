@@ -165,12 +165,19 @@ export async function resolveUserContext(c: Context): Promise<SessionContext> {
   // columns coherent on subsequent calls.
   const userId = session.user.id;
   db.prepare(
-    `INSERT INTO users (id, email, name, auth_provider, auth_subject)
-     VALUES (?, ?, ?, 'better-auth', ?)
+    `INSERT INTO users (id, email, name, image, auth_provider, auth_subject)
+     VALUES (?, ?, ?, ?, 'better-auth', ?)
      ON CONFLICT (id) DO UPDATE SET
        email = excluded.email,
-       name = excluded.name`,
-  ).run(userId, session.user.email, session.user.name || null, userId);
+       name = excluded.name,
+       image = excluded.image`,
+  ).run(
+    userId,
+    session.user.email,
+    session.user.name || null,
+    session.user.image || null,
+    userId,
+  );
 
   // Resolve the active workspace. If the user has none yet (brand-new
   // account, no invite accepted, no manual create), bootstrap a default

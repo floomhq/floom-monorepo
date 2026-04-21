@@ -38,7 +38,10 @@ On the Floom host, edit `/opt/floom-mcp-preview/.env` (preview) and/or
 ```bash
 FLOOM_CLOUD_MODE=true
 BETTER_AUTH_SECRET=<openssl rand -hex 32>
+# Backend origin: where Better Auth's endpoints are reachable.
 BETTER_AUTH_URL=https://floom.dev
+# Frontend origin (recommended): the canonical landing page for redirects.
+FLOOM_APP_URL=https://floom.dev
 
 GOOGLE_OAUTH_CLIENT_ID=...
 GOOGLE_OAUTH_CLIENT_SECRET=...
@@ -46,6 +49,11 @@ GOOGLE_OAUTH_CLIENT_SECRET=...
 GITHUB_OAUTH_CLIENT_ID=...
 GITHUB_OAUTH_CLIENT_SECRET=...
 ```
+
+### Local Development Tips
+If you are running the frontend on `localhost:5173` and the backend on `localhost:3051`:
+1. Keep `BETTER_AUTH_URL=http://localhost:3051` so your provider consoles work with the existing callback URLs.
+2. Set `FLOOM_APP_URL=http://localhost:5173` to ensure auth redirects and emails point back to the Vite dev server.
 
 Set only the providers you want. The other button hides itself.
 
