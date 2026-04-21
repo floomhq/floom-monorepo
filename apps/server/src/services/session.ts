@@ -129,7 +129,7 @@ export async function resolveUserContext(c: Context): Promise<SessionContext> {
   // Context exposes the raw Request via `c.req.raw`, which already carries
   // Cookie / Authorization / origin / referer.
   type AuthSession = {
-    user: { id: string; email: string; name?: string | null };
+    user: { id: string; email: string; name?: string | null; image?: string | null };
     session: { id: string };
   };
   let session: AuthSession | null = null;
