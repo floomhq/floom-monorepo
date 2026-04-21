@@ -103,10 +103,25 @@ export function StudioSidebar({
         <section style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <SectionLabel>Your apps {signedOutPreview ? '' : `(${ownedCount})`}</SectionLabel>
           {signedOutPreview ? (
-            <RailHint>
-              Sign in to load the apps you own here, then open their overview,
-              runs, access, secrets, renderer, and analytics from one place.
-            </RailHint>
+            <div style={{ padding: '4px 10px 6px' }}>
+              <Link
+                to="/login?next=%2Fstudio"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '7px 12px',
+                  borderRadius: 8,
+                  background: 'var(--ink)',
+                  color: '#fff',
+                  textDecoration: 'none',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                Sign in to open Studio
+              </Link>
+            </div>
           ) : loading && !apps ? (
             <RailHint>Loading…</RailHint>
           ) : error && !apps ? (
@@ -182,12 +197,6 @@ export function StudioSidebar({
           )}
         </section>
 
-        {signedOutPreview && (
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <SectionLabel>Inside each app</SectionLabel>
-            <PreviewSection />
-          </section>
-        )}
       </div>
 
       <div
@@ -266,68 +275,8 @@ export function StudioSidebar({
             </div>
           </div>
         )}
-        {signedOutPreview && (
-          <RailHint>
-            Sign in before you publish, rotate secrets, or change app access.
-          </RailHint>
-        )}
       </div>
     </aside>
-  );
-}
-
-function PreviewSection() {
-  const items = [
-    'Overview',
-    'Runs',
-    'Secrets',
-    'Access',
-    'Renderer',
-    'Analytics',
-  ];
-
-  return (
-    <div
-      aria-hidden="true"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        padding: '0 8px 2px',
-      }}
-    >
-      {items.map((label) => (
-        <div
-          key={label}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '7px 10px',
-            borderRadius: 8,
-            color: 'var(--muted)',
-            background: 'rgba(255,255,255,0.45)',
-            border: '1px dashed var(--line)',
-            fontSize: 12,
-            fontWeight: 500,
-          }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: 'var(--line)',
-              flexShrink: 0,
-            }}
-          />
-          <span>{label}</span>
-          <span style={{ marginLeft: 'auto', fontSize: 10, textTransform: 'uppercase' }}>
-            Sign in
-          </span>
-        </div>
-      ))}
-    </div>
   );
 }
 
