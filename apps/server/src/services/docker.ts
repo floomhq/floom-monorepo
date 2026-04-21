@@ -7,6 +7,10 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { NormalizedManifest } from '../types.js';
 import { db } from '../db.js';
+import {
+  CONTAINER_INPUTS_DIR,
+  materializeFileInputs,
+} from '../lib/file-inputs.js';
 
 const docker = new Docker();
 
@@ -177,7 +181,24 @@ export async function runAppContainer(opts: {
   const cpus = opts.cpus ?? RUNNER_CPUS;
   const network = opts.network ?? RUNNER_NETWORK;
 
-  const configArg = JSON.stringify({ action: opts.action, inputs: opts.inputs });
+  // Materialize any `{__file, content_b64}` envelopes in `inputs` to
+  // a host temp dir, rewriting the input values to in-container paths
+  // like "/floom/inputs/data.csv". When there are no file envelopes,
+  // this is a zero-cost no-op: hostDir is '' and inputs is returned
+  // unchanged. The mount is added only when files are present so
+  // non-file apps keep their existing bind profile.
+  const materialized = materializeFileInputs(opts.runId, opts.inputs);
+  const binds: string[] = [];
+  if (materialized.hostDir) {
+    // Read-only bind: the app can read but never overwrite its inputs.
+    // This also keeps the host-side envelope off the container FS so a
+    // malicious app can't exfiltrate another run's files by reading /tmp.
+    binds.push(`${materialized.hostDir}:${CONTAINER_INPUTS_DIR}:ro`);
+  }
+  const configArg = JSON.stringify({
+    action: opts.action,
+    inputs: materialized.inputs,
+  });
   const env = Object.entries(opts.secrets).map(([k, v]) => `${k}=${v}`);
 
   let imageName = opts.image;
@@ -188,116 +209,125 @@ export async function runAppContainer(opts: {
     imageName = appRow?.docker_image || imageTag(opts.appId);
   }
 
-  let container;
   try {
-    container = await docker.createContainer({
-      Image: imageName,
-      name: `floom-chat-run-${opts.runId}`,
-      Cmd: [configArg],
-      Env: env,
-      HostConfig: {
-        AutoRemove: false,
-        Memory: memoryBytes,
-        MemorySwap: memoryBytes,
-        NanoCpus: Math.floor(cpus * 1e9),
-        NetworkMode: network,
-        Binds: [],
-        ReadonlyRootfs: false,
-      },
-      AttachStdout: true,
-      AttachStderr: true,
-      Tty: false,
-    });
-  } catch (err) {
-    // Launch blocker fix (2026-04-20): the marketplace-minted seed apps
-    // carry docker_image tags that aren't built on this host (see
-    // services/seed.ts). Dockerode throws `(HTTP code 404) no such
-    // container - No such image: <tag>` which, before this guard, was
-    // bubbling up as a generic Floom-side crash and the /p/:slug runner
-    // surface rendered "Something broke inside Floom". Re-throw as a
-    // tagged error so the upstream classifier can label the run
-    // `app_unavailable` — the creator published a broken image, not us.
-    const msg = (err as Error).message || '';
-    if (/no such image|No such image|HTTP code 404/i.test(msg)) {
-      const e = new Error(
-        `This app's container image "${imageName}" isn't available on this Floom instance. The app creator needs to publish it.`,
-      );
-      (e as Error & { floom_error_class?: string }).floom_error_class =
-        'app_unavailable';
-      throw e;
-    }
-    throw err;
-  }
-
-  const stdoutStream = new PassThrough();
-  const stderrStream = new PassThrough();
-  const stdoutChunks: Buffer[] = [];
-  const stderrChunks: Buffer[] = [];
-  stdoutStream.on('data', (c) => {
-    const buf = Buffer.from(c);
-    stdoutChunks.push(buf);
-    if (opts.onOutput) opts.onOutput(buf.toString('utf8'), 'stdout');
-  });
-  stderrStream.on('data', (c) => {
-    const buf = Buffer.from(c);
-    stderrChunks.push(buf);
-    if (opts.onOutput) opts.onOutput(buf.toString('utf8'), 'stderr');
-  });
-
-  const attachStream = await container.attach({
-    stream: true,
-    stdout: true,
-    stderr: true,
-  });
-  container.modem.demuxStream(attachStream, stdoutStream, stderrStream);
-
-  const startedAt = Date.now();
-  let timedOut = false;
-
-  await container.start();
-
-  const waitPromise = container.wait();
-  const timeoutPromise = new Promise<'timeout'>((resolve) =>
-    setTimeout(() => resolve('timeout'), timeoutMs),
-  );
-
-  const result = await Promise.race([waitPromise, timeoutPromise]);
-
-  if (result === 'timeout') {
-    timedOut = true;
+    let container;
     try {
-      await container.kill();
-    } catch {
-      // container may already be gone
+      container = await docker.createContainer({
+        Image: imageName,
+        name: `floom-chat-run-${opts.runId}`,
+        Cmd: [configArg],
+        Env: env,
+        HostConfig: {
+          AutoRemove: false,
+          Memory: memoryBytes,
+          MemorySwap: memoryBytes,
+          NanoCpus: Math.floor(cpus * 1e9),
+          NetworkMode: network,
+          Binds: binds,
+          ReadonlyRootfs: false,
+        },
+        AttachStdout: true,
+        AttachStderr: true,
+        Tty: false,
+      });
+    } catch (err) {
+      // Launch blocker fix (2026-04-20): the marketplace-minted seed apps
+      // carry docker_image tags that aren't built on this host (see
+      // services/seed.ts). Dockerode throws `(HTTP code 404) no such
+      // container - No such image: <tag>` which, before this guard, was
+      // bubbling up as a generic Floom-side crash and the /p/:slug runner
+      // surface rendered "Something broke inside Floom". Re-throw as a
+      // tagged error so the upstream classifier can label the run
+      // `app_unavailable` — the creator published a broken image, not us.
+      const msg = (err as Error).message || '';
+      if (/no such image|No such image|HTTP code 404/i.test(msg)) {
+        const e = new Error(
+          `This app's container image "${imageName}" isn't available on this Floom instance. The app creator needs to publish it.`,
+        );
+        (e as Error & { floom_error_class?: string }).floom_error_class =
+          'app_unavailable';
+        throw e;
+      }
+      throw err;
     }
+
+    const stdoutStream = new PassThrough();
+    const stderrStream = new PassThrough();
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    stdoutStream.on('data', (c) => {
+      const buf = Buffer.from(c);
+      stdoutChunks.push(buf);
+      if (opts.onOutput) opts.onOutput(buf.toString('utf8'), 'stdout');
+    });
+    stderrStream.on('data', (c) => {
+      const buf = Buffer.from(c);
+      stderrChunks.push(buf);
+      if (opts.onOutput) opts.onOutput(buf.toString('utf8'), 'stderr');
+    });
+
+    const attachStream = await container.attach({
+      stream: true,
+      stdout: true,
+      stderr: true,
+    });
+    container.modem.demuxStream(attachStream, stdoutStream, stderrStream);
+
+    const startedAt = Date.now();
+    let timedOut = false;
+
+    await container.start();
+
+    const waitPromise = container.wait();
+    const timeoutPromise = new Promise<'timeout'>((resolve) =>
+      setTimeout(() => resolve('timeout'), timeoutMs),
+    );
+
+    const result = await Promise.race([waitPromise, timeoutPromise]);
+
+    if (result === 'timeout') {
+      timedOut = true;
+      try {
+        await container.kill();
+      } catch {
+        // container may already be gone
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    let exitCode = -1;
+    let oomKilled = false;
+    try {
+      const info = await container.inspect();
+      exitCode = info.State.ExitCode ?? -1;
+      oomKilled = Boolean(info.State.OOMKilled);
+    } catch {
+      // inspect can fail if the container vanished
+    }
+
+    try {
+      await container.remove({ force: true });
+    } catch {
+      // best-effort
+    }
+
+    return {
+      exitCode,
+      stdout: Buffer.concat(stdoutChunks).toString('utf8'),
+      stderr: Buffer.concat(stderrChunks).toString('utf8'),
+      timedOut,
+      oomKilled,
+      durationMs: Date.now() - startedAt,
+    };
+  } finally {
+    // Always clean up the materialized-inputs temp dir, whether the
+    // container ran to completion, timed out, or failed to even create.
+    // The dir lives under /tmp so the OS would eventually scrub it, but
+    // a long-lived dev server piling up per-run tmp dirs is a real foot-
+    // gun — clean up proactively.
+    materialized.cleanup();
   }
-
-  await new Promise((resolve) => setTimeout(resolve, 50));
-
-  let exitCode = -1;
-  let oomKilled = false;
-  try {
-    const info = await container.inspect();
-    exitCode = info.State.ExitCode ?? -1;
-    oomKilled = Boolean(info.State.OOMKilled);
-  } catch {
-    // inspect can fail if the container vanished
-  }
-
-  try {
-    await container.remove({ force: true });
-  } catch {
-    // best-effort
-  }
-
-  return {
-    exitCode,
-    stdout: Buffer.concat(stdoutChunks).toString('utf8'),
-    stderr: Buffer.concat(stderrChunks).toString('utf8'),
-    timedOut,
-    oomKilled,
-    durationMs: Date.now() - startedAt,
-  };
 }
 
 export async function removeAppImage(appId: string): Promise<void> {
