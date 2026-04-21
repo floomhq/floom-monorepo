@@ -57,9 +57,9 @@ Floom is MIT licensed. Floom.dev is the hosted flagship, but you can run the ful
 
 **Via Docker** (one command):
 ```bash
-docker run -p 3000:3000 \
+docker run -p 3051:3051 \
   -e OPENAI_API_KEY=... \
-  ghcr.io/floomhq/floom:latest
+  ghcr.io/floomhq/floom-monorepo:latest
 ```
 
 **Same runtime on cloud and self-host.** v1 runs Docker everywhere. v1.1 adds Cloud Run scale-to-zero on floom.dev (invisible to creators, manifest format unchanged).

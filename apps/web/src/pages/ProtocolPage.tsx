@@ -74,10 +74,10 @@ function CopyCodeButton({ code }: { code: string }) {
         right: 10,
         fontSize: 11,
         padding: '3px 10px',
-        background: 'rgba(255,255,255,0.1)',
-        border: '1px solid rgba(255,255,255,0.15)',
+        background: 'var(--card)',
+        border: '1px solid var(--line)',
         borderRadius: 6,
-        color: copied ? '#7bffc0' : 'rgba(255,255,255,0.6)',
+        color: copied ? 'var(--accent)' : 'var(--muted)',
         cursor: 'pointer',
         fontFamily: 'inherit',
         transition: 'color 0.15s',
@@ -257,8 +257,8 @@ function ProxiedVsHosted() {
           </div>
           <div style={{ position: 'relative' }}>
             <pre style={{
-              background: 'var(--terminal-bg, #0e0e0c)',
-              color: 'var(--terminal-ink, #d4d4c8)',
+              background: 'var(--bg)',
+              color: 'var(--ink)',
               fontFamily: 'JetBrains Mono, monospace',
               fontSize: 11.5,
               padding: '16px',
@@ -274,10 +274,10 @@ function ProxiedVsHosted() {
               style={{
                 position: 'absolute', top: 8, right: 8,
                 fontSize: 10, padding: '2px 8px',
-                background: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
                 borderRadius: 4,
-                color: copiedLeft ? '#7bffc0' : 'rgba(255,255,255,0.5)',
+                color: copiedLeft ? 'var(--accent)' : 'var(--muted)',
                 cursor: 'pointer', fontFamily: 'inherit', transition: 'color 0.15s',
               }}
             >
@@ -302,8 +302,8 @@ function ProxiedVsHosted() {
           </div>
           <div style={{ position: 'relative' }}>
             <pre style={{
-              background: 'var(--terminal-bg, #0e0e0c)',
-              color: 'var(--terminal-ink, #d4d4c8)',
+              background: 'var(--bg)',
+              color: 'var(--ink)',
               fontFamily: 'JetBrains Mono, monospace',
               fontSize: 11.5,
               padding: '16px',
@@ -319,10 +319,10 @@ function ProxiedVsHosted() {
               style={{
                 position: 'absolute', top: 8, right: 8,
                 fontSize: 10, padding: '2px 8px',
-                background: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
                 borderRadius: 4,
-                color: copiedRight ? '#7bffc0' : 'rgba(255,255,255,0.5)',
+                color: copiedRight ? 'var(--accent)' : 'var(--muted)',
                 cursor: 'pointer', fontFamily: 'inherit', transition: 'color 0.15s',
               }}
             >
@@ -423,8 +423,9 @@ const markdownComponents = {
       <div style={{ position: 'relative', margin: '16px 0' }}>
         <pre
           style={{
-            background: 'var(--terminal-bg, #0e0e0c)',
-            color: 'var(--terminal-ink, #d4d4c8)',
+            background: 'var(--bg)',
+            color: 'var(--ink)',
+            border: '1px solid var(--line)',
             fontFamily: 'JetBrains Mono, monospace',
             fontSize: 12,
             padding: '20px 16px',
@@ -695,17 +696,18 @@ export function ProtocolPage() {
             style={{
               marginTop: 32,
               padding: '16px 20px',
-              background: 'var(--terminal-bg, #0e0e0c)',
-              color: 'var(--terminal-ink, #d4d4c8)',
+              background: 'var(--bg)',
+              color: 'var(--ink)',
+              border: '1px solid var(--line)',
               borderRadius: 10,
               fontFamily: 'JetBrains Mono, monospace',
               fontSize: 12,
               lineHeight: 1.8,
             }}
           >
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}># Self-host Floom</span>
+            <span style={{ color: 'var(--muted)' }}># Self-host Floom</span>
             {'\n'}
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}>$</span> docker run -p 3051:3051 ghcr.io/floomhq/floom-monorepo:latest
+            <span style={{ color: 'var(--muted)' }}>$</span> docker run -p 3051:3051 ghcr.io/floomhq/floom-monorepo:latest
           </div>
         </article>
       </main>
