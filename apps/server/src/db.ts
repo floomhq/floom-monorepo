@@ -289,6 +289,14 @@ db.exec(`
     WHERE auth_subject IS NOT NULL;
 `);
 
+// Migration: add profile image to users if missing.
+const userCols2 = (db.prepare(`PRAGMA table_info(users)`).all() as {
+  name: string;
+}[]).map((r) => r.name);
+if (!userCols2.includes('image')) {
+  db.exec(`ALTER TABLE users ADD COLUMN image TEXT`);
+}
+
 // ---------- workspace_members (user <-> workspace <-> role) ----------
 db.exec(`
   CREATE TABLE IF NOT EXISTS workspace_members (

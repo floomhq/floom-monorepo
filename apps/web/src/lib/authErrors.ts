@@ -99,6 +99,13 @@ const CODE_MAP: Record<string, AuthErrorCopy> = {
       intent: { kind: 'switch-to-signin' },
     },
   },
+  SOCIAL_ACCOUNT_ALREADY_LINKED: {
+    message: 'This email is already linked to another sign-in method.',
+    action: {
+      label: 'Try signing in instead',
+      intent: { kind: 'switch-to-signin' },
+    },
+  },
 };
 
 interface AuthErrorLike {

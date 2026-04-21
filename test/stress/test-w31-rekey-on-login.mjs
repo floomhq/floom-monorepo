@@ -260,12 +260,39 @@ log(
 fakeUser = null;
 const c5 = buildHonoCtx('dev-anon-99');
 const ctx5 = await session.resolveUserContext(c5);
-log(
-  'unauth fallback: workspace_id=local',
-  ctx5.workspace_id === DEFAULT_WORKSPACE_ID,
-);
 log('unauth fallback: user_id=local', ctx5.user_id === DEFAULT_USER_ID);
 log('unauth fallback: is_authenticated=false', ctx5.is_authenticated === false);
+
+// ---- 14. Profile Sync: name/image update on every login ----
+// First auth'd request for Yael synced her name.
+const yael1 = db.prepare('SELECT name, image FROM users WHERE id = ?').get('usr_yael');
+log('yael: initial name synced', yael1.name === 'Yael');
+log('yael: initial image is null', yael1.image === null);
+
+// Second login: name change + image addition.
+fakeUser = {
+  id: 'usr_yael',
+  email: 'yael@floom.dev',
+  name: 'Yael updated',
+  image: 'https://yael.png',
+};
+const c6 = buildHonoCtx('dev-anon-99');
+await session.resolveUserContext(c6);
+const yael2 = db.prepare('SELECT name, image FROM users WHERE id = ?').get('usr_yael');
+log('yael: name updated on second login', yael2.name === 'Yael updated');
+log('yael: image populated on second login', yael2.image === 'https://yael.png');
+
+// Third login: image removal.
+fakeUser = {
+  id: 'usr_yael',
+  email: 'yael@floom.dev',
+  name: 'Yael updated',
+  image: null,
+};
+const c7 = buildHonoCtx('dev-anon-99');
+await session.resolveUserContext(c7);
+const yael3 = db.prepare('SELECT name, image FROM users WHERE id = ?').get('usr_yael');
+log('yael: image cleared on third login', yael3.image === null);
 
 // ---- cleanup ----
 db.close();
