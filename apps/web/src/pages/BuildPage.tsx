@@ -1974,7 +1974,7 @@ function VisibilityChooser({
     {
       id: 'private',
       label: 'Private (just you)',
-      desc: 'Only you (listing hidden, run blocked for others)',
+      desc: 'Only you can run it (hidden from everyone else)',
     },
   ];
   return (
