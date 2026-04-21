@@ -17,6 +17,8 @@ import { CustomRendererPanel } from '../components/CustomRendererPanel';
 import { useSession } from '../hooks/useSession';
 import * as api from '../api/client';
 import type { DetectedApp } from '../lib/types';
+import { normalizeGithubUrl, looksLikeGithubRef } from '../lib/githubUrl';
+import { markJustPublished } from '../lib/onboarding';
 
 type Step = 'ramp' | 'review' | 'publishing' | 'done';
 
@@ -67,7 +69,9 @@ export function BuildPage({
   // ramp; anything else goes in the OpenAPI ramp. The regex matches both
   // the GitHub owner/repo shape and the direct repo URL.
   const heroUrl = ingestUrlParam || legacyOpenapiParam;
-  const heroIsGithub = /github\.com[/:][^/]+\/[^/]+/i.test(heroUrl);
+  // Issue #90: looksLikeGithubRef also matches bare `owner/repo`, not just
+  // fully-qualified github.com URLs. Keeps the canonical URL match intact.
+  const heroIsGithub = looksLikeGithubRef(heroUrl);
 
   // Inputs shared across ramps
   const [githubUrl, setGithubUrl] = useState(heroIsGithub ? heroUrl : '');
@@ -163,9 +167,12 @@ export function BuildPage({
     }
   }, [editSlug]);
 
-  /** Parses a GitHub URL into { owner, repo } or null if it doesn't match. */
+  /** Parses a GitHub URL into { owner, repo } or null if it doesn't match.
+   *  Issue #90: also accepts bare `owner/repo` via normalizeGithubUrl. */
   function parseGithubUrl(raw: string): { owner: string; repo: string } | null {
-    const m = raw.trim().match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?(?:\/|$)/i);
+    const canonical = normalizeGithubUrl(raw);
+    if (!canonical) return null;
+    const m = canonical.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/|$)/i);
     if (!m) return null;
     return { owner: m[1], repo: m[2] };
   }
@@ -403,6 +410,10 @@ export function BuildPage({
       } catch {
         /* ignore */
       }
+      // Issue #255: gate the /p/:slug "Your app is live" celebration
+      // to the publisher. Flag is slug-scoped with a 10-minute TTL so
+      // a stale flag doesn't fire the celebration for a later visitor.
+      markJustPublished(slug);
       setStep('done');
       // Redirect removed on 2026-04-17: give creators a chance to upload
       // a custom renderer (W2.2) before heading to the permalink. The
@@ -461,6 +472,9 @@ export function BuildPage({
       } catch {
         /* ignore */
       }
+      // Issue #255: mark this slug as "just published" so the celebration
+      // on /p/:slug fires for the creator, not for every later visitor.
+      markJustPublished(next);
       setStep('done');
     } catch (err) {
       setStep('review');
@@ -639,11 +653,11 @@ export function BuildPage({
               >
                 <GithubIcon size={14} />
                 <input
-                  type="url"
+                  type="text"
                   value={githubUrl}
                   onChange={(e) => setGithubUrl(e.target.value)}
                   required
-                  placeholder="https://github.com/you/your-repo"
+                  placeholder="owner/repo or https://github.com/owner/repo"
                   data-testid="build-github-url"
                   style={{
                     flex: 1,

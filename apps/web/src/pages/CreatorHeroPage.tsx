@@ -24,6 +24,7 @@ import * as api from '../api/client';
 import { useSession } from '../hooks/useSession';
 import type { DetectedApp, HubApp } from '../lib/types';
 import { publicHubApps } from '../lib/hub-filter';
+import { normalizeGithubUrl } from '../lib/githubUrl';
 import { LAUNCH_APPS } from '../data/demoData';
 
 interface Stripe {
@@ -94,8 +95,12 @@ function normalizeLink(raw: string): string {
 }
 
 function githubCandidates(raw: string): string[] {
-  const normalized = normalizeLink(raw);
-  const m = normalized.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/|$)/i);
+  // Issue #90 (2026-04-21): accept bare `owner/repo` in addition to a
+  // canonical github.com URL. normalizeGithubUrl covers owner/repo,
+  // github.com/owner/repo, https://..., and git@github.com:... shapes.
+  const canonical = normalizeGithubUrl(raw);
+  if (!canonical) return [];
+  const m = canonical.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/|$)/i);
   if (!m) return [];
   const [, owner, repo] = m;
   const bases = [
@@ -209,8 +214,12 @@ export function CreatorHeroPage() {
     // owns the handoff. Moving anon-publish to an inline publish-as-draft
     // card needs a schema change (is_draft + TTL sweeper) that we're not
     // doing in this PR.
+    // Issue #90: hand off the canonical GitHub URL so BuildPage classifies
+    // `owner/repo` as the GitHub ramp instead of routing it through the
+    // OpenAPI ramp (where it would 404).
+    const handoffUrl = normalizeGithubUrl(rawLink) ?? normalizeLink(rawLink);
     const buildTarget =
-      '/studio/build?ingest_url=' + encodeURIComponent(rawLink);
+      '/studio/build?ingest_url=' + encodeURIComponent(handoffUrl);
     const signedOutFallback = '/signup?next=' + encodeURIComponent(buildTarget);
 
     setIsDetecting(true);
@@ -245,6 +254,9 @@ export function CreatorHeroPage() {
         return;
       }
 
+      // If the input resolved to a GitHub canonical URL earlier, it
+      // would have been handled above; anything reaching here is plain
+      // OpenAPI (direct spec URL, docs host, etc.).
       const d = await api.detectApp(normalizeLink(rawLink));
       persistPendingPublish(d, 'openapi');
       if (isAuthenticated) {
@@ -469,7 +481,7 @@ export function CreatorHeroPage() {
                 spellCheck={false}
                 value={sourceLink}
                 onChange={(e) => setSourceLink(e.target.value)}
-                placeholder="github.com/you/api"
+                placeholder="owner/repo or github.com/owner/repo"
                 aria-label="Public GitHub repo with OpenAPI, or direct OpenAPI link"
                 data-testid="hero-input"
                 style={{

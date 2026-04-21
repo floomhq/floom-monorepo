@@ -78,6 +78,13 @@ interface RunState {
   cancelPoll?: () => void;
   run?: RunRecord;
   errorMessage?: string;
+  /**
+   * Issue #256 (2026-04-21): per-input validation errors. Rendered as
+   * inline red ring + small text below the field instead of the old
+   * "Something went wrong / Missing required input: X" panel. Cleared
+   * the moment the user edits the field or flips the action tab.
+   */
+  inputErrors?: Record<string, string>;
 }
 
 /**
@@ -162,6 +169,79 @@ function coerceInputs(
     }
   }
   return out;
+}
+
+/**
+ * Issue #256 (2026-04-21): humanize an input's manifest label for error
+ * copy. Strips a trailing "(optional)" marker and falls back to the
+ * input `name` in Title Case when no label is present. Never returns
+ * empty — callers render it into "Fill in X to run".
+ */
+function humanizeInputLabel(inp: {
+  name: string;
+  label?: string;
+}): string {
+  const raw = (inp.label ?? '').replace(/\s*\(optional\)\s*$/i, '').trim();
+  if (raw) return raw;
+  return inp.name
+    .split(/[_\-\s]+/)
+    .filter(Boolean)
+    .map((p) => (p.length > 0 ? p[0].toUpperCase() + p.slice(1).toLowerCase() : p))
+    .join(' ');
+}
+
+/**
+ * Scan the coerced inputs against the action spec and return an
+ * inline-error map for every required field that's missing. Empty strings
+ * and empty arrays both count as missing. Non-required fields are ignored.
+ */
+function findMissingRequiredInputs(
+  inputs: Record<string, unknown>,
+  spec: ActionSpec,
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const inp of spec.inputs) {
+    if (!inp.required) continue;
+    const value = inputs[inp.name];
+    const isEmpty =
+      value == null ||
+      (typeof value === 'string' && value.trim() === '') ||
+      (Array.isArray(value) && value.length === 0);
+    if (isEmpty) {
+      errors[inp.name] = `Fill in ${humanizeInputLabel(inp)} to run.`;
+    }
+  }
+  return errors;
+}
+
+/**
+ * Parse a server-thrown "Missing required input: <name>" into the same
+ * shape as findMissingRequiredInputs, so the server-side validator and
+ * the client-side pre-check both surface the same inline-error UI.
+ * Returns null when the error doesn't match the pattern.
+ */
+function parseMissingRequiredInput(
+  err: Error,
+  spec: ActionSpec,
+): Record<string, string> | null {
+  const message = typeof err?.message === 'string' ? err.message : '';
+  const m = message.match(/Missing required input:\s*([A-Za-z0-9_\-.]+)/i);
+  if (!m) return null;
+  const name = m[1];
+  const inp = spec.inputs.find((i) => i.name === name);
+  if (!inp) return null;
+  return { [name]: `Fill in ${humanizeInputLabel(inp)} to run.` };
+}
+
+function focusFirstFlaggedField(name: string | undefined): void {
+  if (!name || typeof window === 'undefined') return;
+  requestAnimationFrame(() => {
+    const el = document.getElementById(`run-surface-inp-${name}`);
+    if (el) {
+      el.focus({ preventScroll: false });
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
 }
 
 function jobToRunRecord(job: JobRecord, action: string): RunRecord {
@@ -268,7 +348,16 @@ export function RunSurface({
   });
 
   const handleInputChange = useCallback((name: string, value: unknown) => {
-    setState((s) => ({ ...s, inputs: { ...s.inputs, [name]: value } }));
+    setState((s) => {
+      // Issue #256: editing a flagged field clears its inline error so
+      // the red ring disappears as soon as the user types a valid value.
+      let inputErrors = s.inputErrors;
+      if (inputErrors && inputErrors[name]) {
+        const { [name]: _dropped, ...rest } = inputErrors;
+        inputErrors = Object.keys(rest).length === 0 ? undefined : rest;
+      }
+      return { ...s, inputs: { ...s.inputs, [name]: value }, inputErrors };
+    });
   }, []);
 
   // Upgrade 2: swap to a different action tab. Clears any in-flight
@@ -290,6 +379,7 @@ export function RunSurface({
         job: undefined,
         jobId: undefined,
         errorMessage: undefined,
+        inputErrors: undefined,
       }));
       onResetInitialRun?.();
       setSearchParams(
@@ -336,6 +426,31 @@ export function RunSurface({
     const action = state.action || defaultEntry.action;
     const actionSpec = state.actionSpec.inputs ? state.actionSpec : defaultEntry.spec;
     const inputs = coerceInputs(state.inputs, actionSpec);
+
+    // Issue #256: pre-submit validation for required inputs. Avoids a
+    // round-trip to the backend for the most common bad state (user
+    // forgot to fill in a required field) and lets us render a clean
+    // field-level error instead of the old "Missing required input: X"
+    // panel. Server still validates — this is just a nicer first line
+    // of defense.
+    const missing = findMissingRequiredInputs(inputs, actionSpec);
+    if (Object.keys(missing).length > 0) {
+      setState((s) => ({ ...s, inputErrors: missing, phase: s.phase === 'error' ? 'ready' : s.phase }));
+      // Scroll + focus the first flagged field so the user sees the fix
+      // without hunting for it. Deferred a frame so the red ring has
+      // rendered by the time we focus.
+      const firstName = Object.keys(missing)[0];
+      if (typeof window !== 'undefined') {
+        requestAnimationFrame(() => {
+          const el = document.getElementById(`run-surface-inp-${firstName}`);
+          if (el) {
+            el.focus({ preventScroll: false });
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        });
+      }
+      return;
+    }
 
     // Clear shared-run hydration on explicit re-run.
     onResetInitialRun?.();
@@ -394,6 +509,12 @@ export function RunSurface({
         );
       } catch (err) {
         const e = err as Error;
+        const serverFieldError = parseMissingRequiredInput(e, actionSpec);
+        if (serverFieldError) {
+          setState((s) => ({ ...s, inputErrors: serverFieldError }));
+          focusFirstFlaggedField(Object.keys(serverFieldError)[0]);
+          return;
+        }
         setState((s) => ({
           ...s,
           phase: 'error',
@@ -444,6 +565,12 @@ export function RunSurface({
       });
     } catch (err) {
       const e = err as Error;
+      const serverFieldError = parseMissingRequiredInput(e, actionSpec);
+      if (serverFieldError) {
+        setState((s) => ({ ...s, inputErrors: serverFieldError }));
+        focusFirstFlaggedField(Object.keys(serverFieldError)[0]);
+        return;
+      }
       setState((s) => ({
         ...s,
         phase: 'error',
@@ -654,6 +781,7 @@ export function RunSurface({
             app={appAsPickResult}
             actionSpec={state.actionSpec}
             inputs={state.inputs}
+            inputErrors={state.inputErrors}
             runLabel={runLabel}
             running={state.phase === 'streaming' || state.phase === 'job'}
             onChange={handleInputChange}
@@ -700,6 +828,7 @@ interface InputCardProps {
   app: PickResult;
   actionSpec: ActionSpec;
   inputs: Record<string, unknown>;
+  inputErrors?: Record<string, string>;
   runLabel: string;
   running: boolean;
   hasInputs: boolean;
@@ -712,6 +841,7 @@ function InputCard({
   app,
   actionSpec,
   inputs,
+  inputErrors,
   runLabel,
   running,
   hasInputs,
@@ -761,6 +891,7 @@ function InputCard({
                 value={inputs[inp.name]}
                 onChange={(v) => onChange(inp.name, v)}
                 idPrefix="run-surface-inp"
+                error={inputErrors?.[inp.name]}
               />
             ))}
           </div>
@@ -803,11 +934,21 @@ function InputCard({
                       value={inputs[inp.name]}
                       onChange={(v) => onChange(inp.name, v)}
                       idPrefix="run-surface-inp"
+                      error={inputErrors?.[inp.name]}
                     />
                   ))}
                 </div>
               )}
             </>
+          )}
+          {inputErrors && Object.keys(inputErrors).length > 0 && (
+            <div
+              role="alert"
+              data-testid="run-surface-input-summary"
+              className="run-surface-input-summary"
+            >
+              {Object.values(inputErrors)[0]}
+            </div>
           )}
           <div className="run-surface-actions">
             {/* a11y 2026-04-20: aria-busy + aria-disabled announce "busy"
