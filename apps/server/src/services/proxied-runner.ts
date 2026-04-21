@@ -7,6 +7,11 @@ import type {
   NormalizedManifest,
   ActionSpec,
 } from '../types.js';
+import {
+  isFileEnvelope,
+  decodeEnvelope,
+  type FileEnvelope,
+} from '../lib/file-inputs.js';
 
 // Inputs whose names start with these prefixes route to HTTP headers / cookies
 // instead of to path / query / body. The prefixes are added by openapi-ingest's
@@ -436,13 +441,29 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
         }
 
         if (isMultipart) {
-          // Multipart form body. File fields are expected to arrive as either
-          // a Buffer/Blob or a base64-encoded data URL. We pass everything
-          // else through as form fields.
+          // Multipart form body. File fields can arrive as:
+          //   1. A FileEnvelope — the shape produced by
+          //      apps/web/src/api/serialize-inputs.ts. This is the one
+          //      path both runtimes share. Decode and wrap in a Blob.
+          //   2. A Blob/File — direct object (legacy, used by
+          //      test harnesses that skip the client serializer).
+          //   3. A base64 data URL — pre-envelope legacy path; kept for
+          //      compatibility until we're confident no caller still
+          //      produces it.
+          // Non-file fields pass through as form fields.
           const form = new FormData();
           for (const [k, v] of Object.entries(bodyFieldInputs)) {
             if (k === 'body') continue; // generic textarea fallback, skip
-            if (v instanceof Blob) {
+            if (isFileEnvelope(v)) {
+              // Shared path — same envelope that Docker materializes.
+              const envelope = v as FileEnvelope;
+              const bin = decodeEnvelope(k, envelope);
+              form.append(
+                k,
+                new Blob([bin], { type: envelope.mime_type }),
+                envelope.name,
+              );
+            } else if (v instanceof Blob) {
               form.append(k, v);
             } else if (
               typeof v === 'string' &&
