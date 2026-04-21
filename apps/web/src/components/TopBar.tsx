@@ -296,8 +296,46 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           style={{
             gap: 10,
             marginLeft: 'auto',
+            alignItems: 'center',
           }}
         >
+          {/* #82 + #249 (2026-04-21): Me + Docs as first-class nav peers
+              on the right side. Spec: "Store · Studio (N) · Me · Docs"
+              across every route. "Me" answers Federico's #249 question
+              "where is the runtime where I can actually run my apps?"
+              — /me is the signed-in runtime surface (apps you've run +
+              run history). Docs sits next to it because it's the other
+              always-available destination. Authed users only for Me;
+              Docs is visible to everyone so anonymous visitors can
+              still reach the protocol spec. Hidden on /login + /signup
+              so the auth flow stays quiet. */}
+          {!isLoginPage && isAuthenticated && (
+            <Link
+              to="/me"
+              data-testid="topbar-me"
+              aria-current={location.pathname.startsWith('/me') ? 'page' : undefined}
+              style={{
+                ...navBaseStyle,
+                color: location.pathname.startsWith('/me') ? 'var(--ink)' : 'var(--muted)',
+              }}
+            >
+              Me
+            </Link>
+          )}
+          {!isLoginPage && (
+            <Link
+              to="/protocol"
+              data-testid="topbar-docs"
+              aria-current={location.pathname.startsWith('/protocol') ? 'page' : undefined}
+              style={{
+                ...navBaseStyle,
+                color: location.pathname.startsWith('/protocol') ? 'var(--ink)' : 'var(--muted)',
+              }}
+            >
+              Docs
+            </Link>
+          )}
+
           {!isAuthenticated && !isLoginPage && (
             <>
               <Link
