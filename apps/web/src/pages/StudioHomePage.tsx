@@ -18,7 +18,7 @@ import * as api from '../api/client';
 import { refreshMyApps, useMyApps } from '../hooks/useMyApps';
 import { useSession } from '../hooks/useSession';
 import { formatTime } from '../lib/time';
-import type { CreatorApp } from '../lib/types';
+import type { AppVisibility, CreatorApp } from '../lib/types';
 
 export function StudioHomePage() {
   const { apps, error: loadError } = useMyApps();
@@ -297,8 +297,19 @@ function AppCard({
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 3 }}>
-          {app.name}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 3,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+            {app.name}
+          </div>
+          {app.visibility && <VisibilityBadge value={app.visibility} />}
         </div>
         <div style={{ fontSize: 11.5, fontFamily: 'JetBrains Mono, monospace', color: 'var(--muted)' }}>
           /p/{app.slug}
@@ -403,3 +414,38 @@ const dangerBtnStyle: React.CSSProperties = {
   textAlign: 'center',
   whiteSpace: 'nowrap',
 };
+
+/**
+ * Small text pill showing the app's visibility state. Colours mirror the
+ * existing StudioAppPage VisibilityPill so the two surfaces read the
+ * same. Only the three launch-scope states get a coloured treatment;
+ * any other AppVisibility value (unlisted, invite-only) falls back to
+ * a neutral pill.
+ */
+function VisibilityBadge({ value }: { value: AppVisibility }) {
+  const tones: Record<string, { bg: string; fg: string; label: string }> = {
+    public: { bg: '#e6f4ea', fg: '#1a7f37', label: 'Public' },
+    'auth-required': { bg: '#e0e7ff', fg: '#3730a3', label: 'Signed-in only' },
+    private: { bg: '#fef3c7', fg: '#b45309', label: 'Private' },
+  };
+  const tone = tones[value] || { bg: 'var(--bg)', fg: 'var(--muted)', label: value };
+  return (
+    <span
+      data-testid={`studio-app-card-visibility-${value}`}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '2px 8px',
+        borderRadius: 999,
+        fontSize: 10.5,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        background: tone.bg,
+        color: tone.fg,
+      }}
+    >
+      {tone.label}
+    </span>
+  );
+}
