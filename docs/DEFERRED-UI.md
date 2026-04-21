@@ -32,9 +32,11 @@ checklist noted per feature.
   `apps/web/src/pages/StudioAppRendererPage.tsx`, and
   `apps/web/src/pages/CreatorAppPage.tsx`.
 - **Note:** The default `@floom/renderer` package (text / JSON / table /
-  markdown / image / file / url / 13 input types — file uploads are
-  Floom's differentiator) stays on `main` as the fallback when an app
-  has no custom bundle uploaded.
+  markdown / image / file / url / 13 input types, including
+  fully-working file uploads for CSV / PDF / image / audio on both
+  Docker and proxied runtimes — see `spec/protocol.md` §3.2 for the
+  `file` InputType contract) stays on `main` as the fallback when an
+  app has no custom bundle uploaded.
 
 ## 3. Stripe Connect monetization
 

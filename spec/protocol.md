@@ -88,6 +88,27 @@ Fields: `label` (string, required), `description?` (string), `inputs` (InputSpec
 
 `InputType` is exactly: `text`, `textarea`, `url`, `number`, `enum`, `boolean`, `date`, `file` (see [`types.ts`](../apps/server/src/types.ts)). Servers MUST reject unknown types with a validation error. Types mentioned in some product copy (`email`, `password`, `json`, `list`) are NOT in the validator; `password` is rendered specially by the default web form for any input whose `name` contains `password` or `secret`, but there is no dedicated schema type.
 
+#### File inputs
+
+For `type: "file"`, the wire format is a `FileEnvelope`:
+
+```json
+{
+  "__file": true,
+  "name": "data.csv",
+  "mime_type": "text/csv",
+  "size": 512,
+  "content_b64": "bmFtZSxhZ2UKZmxvb20sMQo="
+}
+```
+
+- The web client produces it via `apps/web/src/api/serialize-inputs.ts` — any `File` object in the `inputs` tree is walked into this shape before `JSON.stringify`. Nested objects and arrays are recursed, so file fields inside object-typed inputs work uniformly.
+- Servers decode `content_b64`, enforce `SERVER_MAX_FILE_BYTES` (6 MB; the client cap is 5 MB with a slack margin), then:
+  - **Docker runtime**: writes the bytes to a host tmp dir and bind-mounts it read-only at `/floom/inputs/` inside the container. The input value is rewritten to the in-container path (e.g. `"/floom/inputs/data.csv"`) before the entrypoint is invoked. Apps receive a path string and read the file with `open(path)` or the language equivalent.
+  - **Proxied runtime**: decodes the envelope and appends a `Blob` to the multipart body under the input's name, preserving `mime_type` and `name`. The upstream API sees a standard multipart file field.
+- Extension resolution: the server prefers the envelope's filename extension, falls back to a MIME-to-extension map (csv, pdf, png, jpg, mp3, etc.), and finally to `.bin`.
+- Size cap errors are raised before base64 encoding (client) or after decode (server), with the keyed path of the offending input so the UI can surface it on the right field.
+
 **`OutputSpec`** — one field in the action's output. Fields: `name`, `label`, `type`, `description?`. Types: `text`, `json`, `table`, `number`, `html`, `markdown`, `pdf`, `image`, `file`.
 
 ### 3.3 `RenderConfig`
