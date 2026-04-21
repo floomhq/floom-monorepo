@@ -14,18 +14,6 @@ const heroStyle: CSSProperties = {
   padding: '28px 28px 24px',
 };
 
-const eyebrowStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 8,
-  fontSize: 11,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-  color: 'var(--accent)',
-  marginBottom: 14,
-};
-
 const ctaRowStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
@@ -65,72 +53,38 @@ const cardStyle: CSSProperties = {
   borderRadius: 12,
   background: 'rgba(255,255,255,0.72)',
   padding: '18px 18px 16px',
-  minHeight: 172,
   display: 'flex',
   flexDirection: 'column',
-  gap: 10,
-};
-
-const pillStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  alignSelf: 'flex-start',
-  padding: '3px 8px',
-  borderRadius: 999,
-  background: 'var(--accent-soft, rgba(16,185,129,0.08))',
-  color: 'var(--accent)',
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
+  gap: 8,
 };
 
 const sectionMap = [
   {
     title: 'Publish',
-    body: 'Start from a repo URL, app URL, or OpenAPI spec. Studio turns it into the store, MCP, and HTTP surfaces.',
-    detail: 'After sign in: publish flow and owned app list',
+    body: 'Start from a repo or OpenAPI spec.',
   },
   {
     title: 'Runs',
-    body: 'Review the latest executions for each app so you can spot failures, timing changes, and what users actually ran.',
-    detail: 'After sign in: per-app overview and runs',
+    body: 'See every execution, who ran it, and timing.',
   },
   {
-    title: 'Secrets + access',
-    body: 'Keep sensitive keys and visibility controls in one place. Public, private, and auth-required stay explicit.',
-    detail: 'After sign in: secrets and access',
+    title: 'Secrets',
+    body: 'Store API keys once, scoped per app.',
   },
   {
-    title: 'Renderer + analytics',
-    body: 'Tune how outputs render and monitor the health of each app without leaving the creator workspace.',
-    detail: 'After sign in: renderer and analytics',
+    title: 'Analytics',
+    body: 'Monitor usage and health.',
   },
 ] as const;
-
-const sections = ['Overview', 'Runs', 'Secrets', 'Access', 'Renderer', 'Analytics'] as const;
 
 export function StudioSignedOutState() {
   return (
     <section
       data-testid="studio-signed-out-shell"
-      aria-label="Studio preview"
+      aria-label="Studio"
       style={wrapStyle}
     >
       <div style={heroStyle}>
-        <div style={eyebrowStyle}>
-          <span
-            aria-hidden="true"
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: 'var(--accent)',
-            }}
-          />
-          Signed-out preview
-        </div>
-
         <h1
           style={{
             fontSize: 30,
@@ -144,16 +98,14 @@ export function StudioSignedOutState() {
         <p
           style={{
             margin: 0,
-            maxWidth: 720,
+            maxWidth: 640,
             fontSize: 15,
             lineHeight: 1.65,
             color: 'var(--muted)',
           }}
         >
-          Studio is the creator workspace for publishing apps, tuning access,
-          inspecting runs, and keeping the web, MCP, and HTTP surfaces aligned.
-          Sign in to load the apps you own and unlock the actions that touch
-          sensitive app data.
+          Publish apps from a repo or OpenAPI spec, manage secrets, and see
+          every run.
         </p>
 
         <div style={ctaRowStyle}>
@@ -169,80 +121,21 @@ export function StudioSignedOutState() {
       <div style={gridStyle}>
         {sectionMap.map((item) => (
           <article key={item.title} style={cardStyle}>
-            <span style={pillStyle}>Reviewable shell</span>
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
               {item.title}
             </div>
             <p
               style={{
                 margin: 0,
                 fontSize: 13,
-                lineHeight: 1.6,
+                lineHeight: 1.55,
                 color: 'var(--muted)',
               }}
             >
               {item.body}
             </p>
-            <div
-              style={{
-                marginTop: 'auto',
-                paddingTop: 10,
-                borderTop: '1px solid var(--line)',
-                fontSize: 12,
-                color: 'var(--ink)',
-                fontWeight: 600,
-              }}
-            >
-              {item.detail}
-            </div>
           </article>
         ))}
-      </div>
-
-      <div
-        style={{
-          border: '1px dashed var(--line)',
-          borderRadius: 12,
-          background: 'rgba(255,255,255,0.68)',
-          padding: '18px 20px',
-        }}
-      >
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            color: 'var(--muted)',
-            marginBottom: 12,
-          }}
-        >
-          Per-app sections
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-          }}
-        >
-          {sections.map((label) => (
-            <span
-              key={label}
-              style={{
-                padding: '7px 10px',
-                borderRadius: 999,
-                border: '1px solid var(--line)',
-                background: 'var(--card)',
-                color: 'var(--ink)',
-                fontSize: 12,
-                fontWeight: 600,
-              }}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
       </div>
     </section>
   );
