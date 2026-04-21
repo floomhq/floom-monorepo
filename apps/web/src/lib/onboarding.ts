@@ -101,6 +101,50 @@ export function markConfettiShown(slug: string): void {
   }
 }
 
+// ── Just-published handoff (Issue #255) ───────────────────────────────
+//
+// The "Your app is live — send to coworkers" celebration must only fire
+// for the creator who JUST pressed Publish, not every visitor who runs
+// the app. BuildPage writes this flag on publish success; AppPermalinkPage
+// reads + clears it on mount. Flag is slug-scoped with a 10-minute TTL
+// so a stale flag doesn't trigger celebration a day later.
+
+const JUST_PUBLISHED_KEY = 'floom:just-published';
+const JUST_PUBLISHED_TTL_MS = 10 * 60 * 1000;
+
+export function markJustPublished(slug: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      JUST_PUBLISHED_KEY,
+      JSON.stringify({ slug, at: Date.now() }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Return true iff a publish-success flag exists for this slug and hasn't
+ * expired. Clears the flag as a side effect so the celebration fires at
+ * most once per publish.
+ */
+export function consumeJustPublished(slug: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = window.localStorage.getItem(JUST_PUBLISHED_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { slug?: string; at?: number };
+    window.localStorage.removeItem(JUST_PUBLISHED_KEY);
+    if (parsed.slug !== slug) return false;
+    if (typeof parsed.at !== 'number') return false;
+    if (Date.now() - parsed.at > JUST_PUBLISHED_TTL_MS) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // -----------------------------------------------------------------------
 // Sample input pre-fill for /p/:slug
 // -----------------------------------------------------------------------

@@ -472,12 +472,35 @@ body:has(.topbar-mobile-menu) {
   font-size: 13px; color: var(--muted); line-height: 1.5;
 }
 
+/* Issue #256 (2026-04-21): soften the non-field error state. Previously
+   this was a rose-tinted panel with a dark-red title that read as a
+   full-page failure even for transient "try again" states. Now matches
+   the rest of the Floom card system (ink border, white background) with
+   a left accent stripe for the "this is the bad thing" visual beat. */
 .run-surface-error-card {
-  background: #fdf4f1; border-color: #e7d0c9;
+  background: var(--card);
+  border-color: var(--line);
+  border-left: 3px solid #c44a2b;
+  padding-left: 18px;
 }
-.run-surface-error-title { margin: 0; font-weight: 600; color: #9a3a19; }
+.run-surface-error-title { margin: 0; font-weight: 600; color: var(--ink); font-size: 14px; }
 .run-surface-error-body {
   margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.5;
+}
+
+/* Inline summary row above the Run button when required fields are
+   missing (Issue #256). Uses the same ink-on-white system, paired with
+   field-level red rings in InputField. */
+.run-surface-input-summary {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #c44a2b;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 /* Past runs disclosure. Closed by default; opens to a compact list. */
