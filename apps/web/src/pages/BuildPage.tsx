@@ -1068,25 +1068,27 @@ export function BuildPage({
               >
                 {firstSentence(description) || 'No description yet. Edit details to add one.'}
               </p>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={handlePublish}
-                  data-testid="build-publish"
-                  disabled={!name || !slug}
-                  style={{
-                    ...primaryButton(!name || !slug),
-                    background: 'var(--accent)',
-                    padding: '12px 22px',
-                    fontSize: 14,
-                  }}
-                >
-                  {visibility === 'private' ? 'Publish as Private' : 'Publish as Public'}
-                </button>
-                <VisibilityToggle
-                  value={visibility === 'auth-required' ? 'public' : visibility}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <VisibilityChooser
+                  value={visibility}
                   onChange={(next) => setVisibility(next)}
                 />
+                <div>
+                  <button
+                    type="button"
+                    onClick={handlePublish}
+                    data-testid="build-publish"
+                    disabled={!name || !slug}
+                    style={{
+                      ...primaryButton(!name || !slug),
+                      background: 'var(--accent)',
+                      padding: '12px 22px',
+                      fontSize: 14,
+                    }}
+                  >
+                    {publishButtonLabel(visibility)}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1411,7 +1413,9 @@ export function BuildPage({
               <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px' }}>
                 {visibility === 'private'
                   ? 'Your app is live. Only you can run it while signed in. You can flip it to Public later if you want to share.'
-                  : 'Your app is live. Share the link or add it to Claude Desktop to start running it.'}
+                  : visibility === 'auth-required'
+                    ? 'Your app is live. Any signed-in Floom user can run it via the link. It is hidden from the public store.'
+                    : 'Your app is live. Share the link or add it to Claude Desktop to start running it.'}
               </p>
               {/* Shareable full URL + copy button. Before this fix the
                   banner only showed "/p/slug" relative path, which is not
@@ -1928,61 +1932,116 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
+type Visibility = 'public' | 'auth-required' | 'private';
+
 /**
- * Compact inline Public/Private toggle for the above-the-fold "Ready
- * to publish" card. One click flips between the two values. Renders
- * the current state next to the Publish button so the creator sees
- * what they're publishing as without a separate form field.
- *
- * The old <VisibilityChooser> (two radio cards + two paragraphs of
- * explainer) still exists below for the Edit details disclosure use
- * case if needed, but the zero-friction flow defaults to this toggle.
+ * Publish-button label for each visibility state. Kept as a pure helper
+ * so the button copy and the chooser stay in sync.
  */
-function VisibilityToggle({
+function publishButtonLabel(v: Visibility): string {
+  if (v === 'private') return 'Publish as Private';
+  if (v === 'auth-required') return 'Publish as Signed-in only';
+  return 'Publish as Public';
+}
+
+/**
+ * 3-way visibility chooser for the "Ready to publish" card. Matches the
+ * radio-card pattern used by /studio/:slug/access (StudioAppAccessPage)
+ * so creators see the same shape in both places.
+ *
+ * Issue #289: the previous binary toggle silently coerced `auth-required`
+ * to `public`, which contradicted the backend (public / auth-required /
+ * private all persist fine through /api/hub/ingest).
+ */
+function VisibilityChooser({
   value,
   onChange,
 }: {
-  value: 'public' | 'private';
-  onChange: (next: 'public' | 'private') => void;
+  value: Visibility;
+  onChange: (next: Visibility) => void;
 }) {
-  const isPublic = value === 'public';
+  const options: Array<{ id: Visibility; label: string; desc: string }> = [
+    {
+      id: 'public',
+      label: 'Public',
+      desc: 'Anyone can run it (shows in the public store)',
+    },
+    {
+      id: 'auth-required',
+      label: 'Signed-in users only',
+      desc: 'Any Floom user can run it, hidden from store',
+    },
+    {
+      id: 'private',
+      label: 'Private (just you)',
+      desc: 'Only you (listing hidden, run blocked for others)',
+    },
+  ];
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={isPublic}
-      aria-label={`Visibility: ${isPublic ? 'Public' : 'Private'}. Click to toggle.`}
-      onClick={() => onChange(isPublic ? 'private' : 'public')}
+    <div
+      role="radiogroup"
+      aria-label="App visibility"
       data-testid="build-visibility"
       data-value={value}
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
+        display: 'grid',
         gap: 8,
-        padding: '8px 12px',
-        background: 'transparent',
-        border: '1px solid var(--line)',
-        borderRadius: 999,
-        fontSize: 12.5,
-        fontWeight: 500,
-        color: 'var(--muted)',
-        cursor: 'pointer',
-        fontFamily: 'inherit',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
       }}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: 999,
-          background: isPublic ? '#1a7f37' : '#b45309',
-        }}
-      />
-      <span style={{ color: 'var(--ink)' }}>{isPublic ? 'Public' : 'Private'}</span>
-      <span style={{ color: 'var(--muted)' }}>·</span>
-      <span>{isPublic ? 'anyone can run it' : 'only you'}</span>
-    </button>
+      {options.map((opt) => {
+        const selected = value === opt.id;
+        return (
+          <label
+            key={opt.id}
+            data-testid={`build-visibility-${opt.id}`}
+            data-selected={selected ? 'true' : 'false'}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+              padding: '12px 14px',
+              border: selected ? '1.5px solid var(--accent)' : '1px solid var(--line)',
+              background: selected ? 'var(--accent-soft, #e6f4ea)' : 'var(--card)',
+              borderRadius: 10,
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="radio"
+                name="build-visibility"
+                value={opt.id}
+                checked={selected}
+                onChange={() => onChange(opt.id)}
+                data-testid={`build-visibility-${opt.id}-input`}
+                style={{ accentColor: 'var(--accent)', margin: 0 }}
+              />
+              <span
+                style={{
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: selected ? 'var(--accent)' : 'var(--ink)',
+                }}
+              >
+                {opt.label}
+              </span>
+            </div>
+            <p
+              style={{
+                margin: 0,
+                paddingLeft: 24,
+                fontSize: 12,
+                color: 'var(--muted)',
+                lineHeight: 1.45,
+              }}
+            >
+              {opt.desc}
+            </p>
+          </label>
+        );
+      })}
+    </div>
   );
 }
 
