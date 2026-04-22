@@ -235,10 +235,11 @@ export function DocsPage() {
               >
                 Pricing
               </Link>
-              <a
-                href="https://github.com/floomhq/floom/blob/main/docs/SELF_HOST.md"
-                target="_blank"
-                rel="noreferrer"
+              {/* PR #408 ripple (2026-04-22): self-host doc is now internal
+                  at /docs/self-host — swap the external GitHub blob link
+                  so readers stay in the app and the sidebar stays in sync. */}
+              <Link
+                to="/docs/self-host"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -253,7 +254,7 @@ export function DocsPage() {
                 }}
               >
                 Self-host guide
-              </a>
+              </Link>
             </div>
           </div>
         </article>
