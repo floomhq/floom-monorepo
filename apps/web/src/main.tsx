@@ -35,6 +35,11 @@ const AboutPage = lazy(() => import('./pages/AboutPage').then(m => ({ default: m
 // commercial-visitor dead-end called out in the product audit (pd-12).
 const PricingPage = lazy(() => import('./pages/PricingPage').then(m => ({ default: m.PricingPage })));
 const BuildPage = lazy(() => import('./pages/BuildPage').then(m => ({ default: m.BuildPage })));
+// 2026-04-22: /docs/prepare-with-claude — import helper that hands users a
+// copy-paste prompt for Claude Code / Cursor / Codex so an agent adds the
+// missing Floom manifest to their repo. Deep-linked from the BuildPage
+// "We couldn't find your app file" error card.
+const PrepareWithClaudePage = lazy(() => import('./pages/PrepareWithClaudePage').then(m => ({ default: m.PrepareWithClaudePage })));
 const CreatorPage = lazy(() => import('./pages/CreatorPage').then(m => ({ default: m.CreatorPage })));
 const CreatorAppPage = lazy(() => import('./pages/CreatorAppPage').then(m => ({ default: m.CreatorAppPage })));
 // Studio context — creator workspace (v16 restructure 2026-04-18). Two
@@ -268,6 +273,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/docs/api-reference" element={<Navigate to="/protocol#api-surface" replace />} />
         <Route path="/docs/rate-limits" element={<Navigate to="/protocol#plumbing-layers-auto-applied" replace />} />
         <Route path="/docs/changelog" element={<ExternalRedirect to="https://github.com/floomhq/floom/releases" />} />
+        {/* 2026-04-22: standalone page, not a /protocol redirect. Must be
+            declared BEFORE the /docs/* catch-all below. */}
+        <Route path="/docs/prepare-with-claude" element={<PrepareWithClaudePage />} />
         {/* Catch-all /docs/* (any other subpath wireframes advertise) falls back to /protocol. */}
         <Route path="/docs/*" element={<Navigate to="/protocol" replace />} />
         <Route path="/self-host" element={<Navigate to="/#self-host" replace />} />

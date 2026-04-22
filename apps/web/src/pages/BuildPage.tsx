@@ -710,8 +710,37 @@ export function BuildPage({
                   {githubError === 'no-openapi' && (
                     <ErrorCard
                       severity="red"
-                      title="We couldn't find your app file"
-                      copy="Floom needs an openapi.yaml (or .json) file in your repo root. Add one, or paste the direct link below. Importing from Docker images and agent wrappers is on the roadmap."
+                      title="Missing a Floom manifest? No problem."
+                      copy={
+                        <>
+                          <div style={{ marginBottom: 6 }}>
+                            Already have OpenAPI? Paste the direct URL below.
+                          </div>
+                          <div>
+                            Have a Dockerfile or script? Run{' '}
+                            <code
+                              style={{
+                                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                                fontSize: '0.9em',
+                                background: 'var(--bg)',
+                                border: '1px solid var(--line)',
+                                borderRadius: 4,
+                                padding: '1px 5px',
+                              }}
+                            >
+                              npx @floom/cli init
+                            </code>{' '}
+                            in your repo, or{' '}
+                            <Link
+                              to="/docs/prepare-with-claude"
+                              data-testid="no-openapi-let-claude"
+                              style={{ color: 'var(--accent)', fontWeight: 500 }}
+                            >
+                              let Claude do it →
+                            </Link>
+                          </div>
+                        </>
+                      }
                     />
                   )}
                   {githubError === 'private' && (
@@ -1579,7 +1608,7 @@ function ErrorCard({
 }: {
   severity: 'amber' | 'red';
   title: string;
-  copy: string;
+  copy: React.ReactNode;
 }) {
   const color = severity === 'amber' ? '#b45309' : '#991b1b';
   const bg = severity === 'amber' ? '#fef3c7' : '#fee2e2';

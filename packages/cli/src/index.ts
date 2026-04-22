@@ -1,11 +1,25 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { runInit, formatResult } from './init.js';
 
 const program = new Command();
 program
   .name('floom')
   .description('Production layer for AI apps that do real work')
   .version('0.1.0');
+
+program
+  .command('init')
+  .description('Scaffold a floom.yaml manifest in the current directory')
+  .option('--force', 'Overwrite an existing floom.yaml', false)
+  .option('--cwd <path>', 'Directory to scaffold in (defaults to current directory)')
+  .action((opts: { force?: boolean; cwd?: string }) => {
+    const result = runInit({ force: opts.force, cwd: opts.cwd });
+    console.log(formatResult(result));
+    // Exit code semantics: 0 when we wrote or skipped cleanly, 1 when we
+    // hit the `exists` case without --force (user still needs to act).
+    if (result.action === 'exists') process.exit(1);
+  });
 
 program
   .command('deploy <repo>')

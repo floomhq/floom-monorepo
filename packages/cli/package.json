@@ -6,7 +6,7 @@
     "floom": "./dist/index.js"
   },
   "scripts": {
-    "build": "echo 'CLI build requires compiled deps — skipping for monorepo build. Use pnpm publish flow.'",
+    "build": "tsc -p tsconfig.build.json && node -e \"require('fs').chmodSync('dist/index.js', 0o755)\"",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit"
   },
