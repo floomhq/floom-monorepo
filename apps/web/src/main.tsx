@@ -27,6 +27,10 @@ const MeInstallPage = lazy(() => import('./pages/MeInstallPage').then(m => ({ de
 // 2026-04-20 (PRR tail cleanup): public /install stub — separate from
 // /me/install which is the authenticated "Install to Claude" flow.
 const InstallPage = lazy(() => import('./pages/InstallPage').then(m => ({ default: m.InstallPage })));
+// v17 install surface: /install-in-claude (generic 4-tab landing) and
+// /install/:slug (per-app wrapper that pre-fills snippets with the slug).
+const InstallInClaudePage = lazy(() => import('./pages/InstallInClaudePage').then(m => ({ default: m.InstallInClaudePage })));
+const InstallAppPage = lazy(() => import('./pages/InstallAppPage').then(m => ({ default: m.InstallAppPage })));
 // 2026-04-20: /about graduated from redirect to a real story page. Tells
 // who Floom is for, why headless, what it isn't, who's behind it. H1
 // "Get that thing off localhost fast." lives alongside the landing H1.
@@ -210,6 +214,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/protocol" element={<ProtocolPage />} />
         {/* 2026-04-20 (PRR tail cleanup): /install public stub */}
         <Route path="/install" element={<InstallPage />} />
+        {/* v17: 4-tab install surface. /install-in-claude is the generic
+            landing (no app pre-selected). /install/:slug is the per-app
+            wrapper — fetches app metadata and pre-fills MCP snippets.
+            Must be listed BEFORE /install so the slug catch doesn't
+            swallow "in-claude" as a slug value. */}
+        <Route path="/install-in-claude" element={<InstallInClaudePage />} />
+        <Route path="/install/:slug" element={<InstallAppPage />} />
         {/* /spec and /spec/* are server-side 308 redirects to /protocol
             (wired in apps/server/src/index.ts). No client route needed
             because crawlers/users never reach the SPA for those paths. */}
