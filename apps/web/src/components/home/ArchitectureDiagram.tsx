@@ -149,13 +149,13 @@ export function ArchitectureDiagram() {
                   minHeight: 78,
                   transition: 'border-color 140ms ease, transform 140ms ease',
                 }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLAnchorElement;
+                onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                  const el = e.currentTarget;
                   el.style.borderColor = 'var(--accent)';
                   el.style.transform = 'translateY(-1px)';
                 }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLAnchorElement;
+                onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                  const el = e.currentTarget;
                   el.style.borderColor = 'var(--line)';
                   el.style.transform = 'translateY(0)';
                 }}

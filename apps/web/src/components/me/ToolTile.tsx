@@ -100,11 +100,11 @@ export function ToolTile({ slug, name, lastUsedAt, badge, testIdSuffix }: Props)
       to={`/p/${slug}`}
       data-testid={`me-tool-tile-${suffix}`}
       style={s.tile}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--accent)';
+      onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
+        e.currentTarget.style.borderColor = 'var(--accent)';
       }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--line)';
+      onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
+        e.currentTarget.style.borderColor = 'var(--line)';
       }}
     >
       <span aria-hidden style={s.iconWrap}>
