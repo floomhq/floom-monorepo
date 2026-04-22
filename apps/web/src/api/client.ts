@@ -940,3 +940,51 @@ export function postFeedback(body: { text: string; email?: string; url?: string 
     body: JSON.stringify(body),
   });
 }
+
+// ---------- Personal API keys (Better Auth api-key plugin) ----------
+//
+// Used for headless integrations: Claude Code skill, CLI, scripts, MCP
+// clients. Keys are shown once at create time, then hashed server-side —
+// the list endpoint never returns the full value again. Sent as
+// `Authorization: Bearer <key>` (or `x-api-key: <key>`) on subsequent
+// calls; the server's custom getter (lib/better-auth.ts) strips the
+// Bearer prefix and feeds the raw key to Better Auth.
+
+/** Shape returned by `/auth/api-key/list` and `/auth/api-key/get`. The full
+ *  `key` field is intentionally omitted — it's only returned on create. */
+export interface ApiKeyRecord {
+  id: string;
+  name: string | null;
+  start: string | null;
+  prefix: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastRequest: string | null;
+  expiresAt: string | null;
+}
+
+/** Shape returned by `/auth/api-key/create`. `key` is the full cleartext
+ *  value — we show it once in a copy-to-clipboard callout and never fetch
+ *  it again. */
+export interface CreatedApiKey extends ApiKeyRecord {
+  key: string;
+}
+
+export function listApiKeys(): Promise<ApiKeyRecord[]> {
+  return request<ApiKeyRecord[]>('/auth/api-key/list');
+}
+
+export function createApiKey(name: string): Promise<CreatedApiKey> {
+  return request<CreatedApiKey>('/auth/api-key/create', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function deleteApiKey(keyId: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>('/auth/api-key/delete', {
+    method: 'POST',
+    body: JSON.stringify({ keyId }),
+  });
+}

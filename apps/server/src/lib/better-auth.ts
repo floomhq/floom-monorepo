@@ -326,9 +326,46 @@ function buildAuthOptions(_overrideBaseURL?: string): any {
         // services/workspaces.ts to (admin, editor, viewer) externally.
       }),
       apiKey({
-        // Programmatic-user keys: the user generates a key in the dashboard,
-        // sends it as `Authorization: Bearer <key>`, and Better Auth resolves
-        // the user automatically. Used for headless integrations with MCP.
+        // Programmatic-user keys: the user generates a key in /me/settings/tokens,
+        // sends it as `Authorization: Bearer <key>` (or `x-api-key: <key>`),
+        // and Better Auth resolves the user automatically. Used for headless
+        // integrations — Claude Code skill, CLI, scripts, MCP clients.
+        //
+        // `enableSessionForAPIKeys: true` makes `auth.api.getSession({ headers })`
+        // mock a session from a valid API key, which is how `resolveUserContext`
+        // picks up bearer-key callers without a separate code path.
+        //
+        // `customAPIKeyGetter` honours both `Authorization: Bearer <key>` (what
+        // the `X-User-Api-Key` header would be confused with otherwise) and the
+        // default `x-api-key` header. We strip the `Bearer ` prefix explicitly
+        // so the stored hash matches the raw key. A plain `authorization` value
+        // without the Bearer prefix is left alone, which is defensive against
+        // older scripts.
+        apiKeyHeaders: ['x-api-key'],
+        requireName: true,
+        maximumNameLength: 64,
+        defaultPrefix: 'floom_',
+        // Store first 8 chars (incl. prefix) so the UI can render `floom_ab…`
+        // identifiers next to each row without ever exposing the full key.
+        startingCharactersConfig: { shouldStore: true, charactersLength: 8 },
+        enableSessionForAPIKeys: true,
+        customAPIKeyGetter: (ctx) => {
+          const headers = ctx.headers;
+          if (!headers) return null;
+          // 1. Explicit x-api-key — default plugin behaviour.
+          const xKey = headers.get('x-api-key');
+          if (xKey && xKey.length > 0) return xKey;
+          // 2. Authorization: Bearer <key> — the shape documented to users.
+          // We intentionally ignore `FLOOM_AUTH_TOKEN` collisions: a request
+          // whose bearer is the self-host admin token will fail the API-key
+          // lookup here (it's not in the apikey table) and fall through to
+          // the session-cookie / FLOOM_AUTH_TOKEN check unchanged.
+          const auth = headers.get('authorization') || headers.get('Authorization');
+          if (!auth) return null;
+          const m = /^Bearer\s+(.+)$/i.exec(auth);
+          if (m && m[1] && m[1].startsWith('floom_')) return m[1];
+          return null;
+        },
         rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 100 },
       }),
     ],
