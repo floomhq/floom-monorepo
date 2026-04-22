@@ -160,3 +160,6 @@ Built in SF by [@federicodeponte](https://github.com/federicodeponte).
 ## License
 
 MIT. See [LICENSE](./LICENSE).
+
+
+<!-- Fix #398 -->
