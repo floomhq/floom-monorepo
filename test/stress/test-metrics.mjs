@@ -12,6 +12,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'floom-metrics-'));
 process.env.DATA_DIR = tmp;
 process.env.FLOOM_DISABLE_JOB_WORKER = 'true';
 process.env.FLOOM_FAST_APPS = 'false';
+process.env.FLOOM_SEED_LAUNCH_DEMOS = 'false';
 // Pick an unusual port to avoid clashing with a live preview instance on
 // 3051 or any of the sibling stress tests.
 process.env.PORT = process.env.PORT || '38517';

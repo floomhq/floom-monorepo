@@ -159,6 +159,7 @@ const floom = spawn(
       FLOOM_DISABLE_JOB_WORKER: 'true',
       // Empty seed + no composio + no stripe so boot is minimal.
       FLOOM_SEED_APPS: 'false',
+      FLOOM_SEED_LAUNCH_DEMOS: 'false',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   },

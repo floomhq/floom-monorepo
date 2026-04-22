@@ -43,6 +43,7 @@ const env = {
   PORT: String(PORT),
   PUBLIC_URL: BASE,
   FLOOM_FAST_APPS: 'false',
+  FLOOM_SEED_LAUNCH_DEMOS: 'false',
   FLOOM_TRIGGERS_POLL_MS: '1500', // 1.5s for fast iteration
   FLOOM_JOB_POLL_MS: '500',
 };
