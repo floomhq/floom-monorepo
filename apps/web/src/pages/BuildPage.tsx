@@ -24,6 +24,18 @@ type Step = 'ramp' | 'review' | 'publishing' | 'done';
 
 type GithubDetect = { attemptedUrls: string[] } | null;
 
+// Private-repo picker state. Lifted to module scope so the
+// <GithubRepoPicker/> helper component can reference it by type name.
+type PickerState =
+  | null
+  | { status: 'loading' }
+  | { status: 'ok'; repos: api.GithubRepoSummary[]; scopes: string[] }
+  | {
+      status: 'needs_reconnect';
+      code: 'scope_upgrade_needed' | 'no_github_account';
+    }
+  | { status: 'error'; message: string };
+
 // localStorage key for persisting a pending detection across the
 // signup redirect so anonymous visitors don't lose their work. Cleared
 // once the publish succeeds or the user manually goes back to ramp.
@@ -95,6 +107,30 @@ export function BuildPage({
   const [error, setError] = useState<{ message: string; details?: string } | null>(null);
   const [githubError, setGithubError] = useState<
     'private' | 'no-openapi' | 'unreachable' | 'repo-not-found' | null
+  >(null);
+
+  // 2026-04-22: private-repo picker state.
+  //
+  // The picker is rendered inline inside the GitHub ramp when the user is
+  // signed in and clicks "Pick from my repos". It replaces the paste-URL
+  // input with a searchable list of the user's owned repos (public +
+  // private). Clicking a repo kicks off detectGithubApp() server-side
+  // with the user's OAuth token, so private openapi.yaml files work.
+  //
+  // Three data states:
+  //   - `null`: picker hasn't been opened yet (default). Show the paste
+  //     input + a "Pick from my repos" button.
+  //   - `{ status: 'loading' }`: fetching /api/github/repos.
+  //   - `{ status: 'ok', repos, scopes }`: picker populated.
+  //   - `{ status: 'needs_reconnect', code }`: user hit a 412. Show the
+  //     Reconnect GitHub CTA.
+  //   - `{ status: 'error', message }`: upstream GitHub / network issue.
+  const [picker, setPicker] = useState<PickerState>(null);
+  const [pickerQuery, setPickerQuery] = useState('');
+  // Set while the detect-from-picker request is in flight so the clicked
+  // repo row can show a spinner without blocking the rest of the list.
+  const [pickerDetectingFullName, setPickerDetectingFullName] = useState<
+    string | null
   >(null);
   // Slug-taken recovery (audit 2026-04-20, Fix 2). When the publish
   // request 409s with `slug_taken`, the server returns three suggestions
@@ -273,6 +309,98 @@ export function BuildPage({
     // the candidate paths. Show the no-openapi hint.
     setGithubError('no-openapi');
     return false;
+  }
+
+  /**
+   * Load the signed-in user's GitHub repos into the picker. Handles the
+   * three 412 codes (no_github_account / scope_upgrade_needed) by
+   * flipping the picker into a "Reconnect GitHub" state that calls
+   * linkSocialForPrivateRepos() on click.
+   */
+  async function openGithubPicker(): Promise<void> {
+    setPicker({ status: 'loading' });
+    setPickerQuery('');
+    try {
+      const res = await api.getGithubRepos(100);
+      setPicker({ status: 'ok', repos: res.repos, scopes: res.scopes });
+    } catch (err) {
+      if (err instanceof api.ApiError && err.status === 412) {
+        const code =
+          err.code === 'no_github_account' ? 'no_github_account' : 'scope_upgrade_needed';
+        setPicker({ status: 'needs_reconnect', code });
+        return;
+      }
+      if (err instanceof api.ApiError && err.status === 401) {
+        // Not signed in. Shouldn't happen from this UI (we only show the
+        // "Pick from my repos" button when isAuthenticated is true), but
+        // surface a clean message instead of a generic error if it does.
+        setPicker({
+          status: 'error',
+          message: 'Sign in to see your GitHub repos.',
+        });
+        return;
+      }
+      setPicker({
+        status: 'error',
+        message:
+          err instanceof Error
+            ? err.message
+            : "We couldn't load your GitHub repos.",
+      });
+    }
+  }
+
+  /**
+   * Detect a private (or public) repo via the server-side, token-authed
+   * /api/github/detect endpoint. On success, jumps to the review step;
+   * on failure, displays an inline error without collapsing the picker.
+   */
+  async function handlePickerSelect(
+    repo: api.GithubRepoSummary,
+  ): Promise<void> {
+    setPickerDetectingFullName(repo.full_name);
+    setError(null);
+    setGithubError(null);
+    try {
+      const detected = await api.detectGithubApp(
+        repo.full_name,
+        repo.default_branch,
+      );
+      setDetected(detected);
+      setName(detected.name);
+      setSlug(detected.slug);
+      setDescription(detected.description);
+      // Pre-fill the paste-URL input so the user can see what was
+      // detected (matches the behavior of the paste-URL ramp).
+      setGithubUrl(repo.full_name);
+      setSource('github');
+      setStep('review');
+    } catch (err) {
+      // 404 no-openapi is the common case; surface the existing
+      // "no-openapi" error card so the messaging matches the paste-URL
+      // ramp.
+      if (err instanceof api.ApiError && err.code === 'no_openapi') {
+        setGithubError('no-openapi');
+        const attempted = (err.payload as { attempted_urls?: string[] })
+          ?.attempted_urls;
+        if (attempted && attempted.length > 0) {
+          setGithubAttempts({ attemptedUrls: attempted });
+        }
+        return;
+      }
+      if (err instanceof api.ApiError && err.status === 412) {
+        // Token was revoked between /repos and /detect. Flip the picker
+        // into reconnect mode.
+        setPicker({ status: 'needs_reconnect', code: 'scope_upgrade_needed' });
+        return;
+      }
+      setError({
+        message: "We couldn't read your repo's openapi.yaml.",
+        details: (err as Error).message,
+      });
+    } finally {
+      setPickerDetectingFullName(null);
+    }
   }
 
   /**
@@ -693,8 +821,74 @@ export function BuildPage({
                 </button>
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                Works with any public repo. Private repos coming soon.
+                {isAuthenticated ? (
+                  <>
+                    Works with any public repo, or{' '}
+                    <button
+                      type="button"
+                      data-testid="build-github-pick"
+                      onClick={() => {
+                        // Toggle: if the picker is already open, close it
+                        // so the user can drop back to the paste input.
+                        if (picker) {
+                          setPicker(null);
+                        } else {
+                          void openGithubPicker();
+                        }
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        font: 'inherit',
+                        color: 'var(--accent)',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      pick one of your repos
+                    </button>{' '}
+                    (public or private).
+                  </>
+                ) : (
+                  <>
+                    Works with any public repo.{' '}
+                    <Link
+                      to="/login"
+                      style={{ color: 'var(--accent)', textDecoration: 'underline' }}
+                    >
+                      Sign in
+                    </Link>{' '}
+                    to import from your private repos.
+                  </>
+                )}
               </div>
+
+              {/* 2026-04-22: private-repo picker. Rendered inline so
+                  creators never leave the /studio/build surface. */}
+              {picker && (
+                <GithubRepoPicker
+                  state={picker}
+                  query={pickerQuery}
+                  onQueryChange={setPickerQuery}
+                  detectingFullName={pickerDetectingFullName}
+                  onSelect={(r) => void handlePickerSelect(r)}
+                  onReconnect={() => {
+                    void api
+                      .linkSocialForPrivateRepos('/studio/build')
+                      .catch((err) => {
+                        setPicker({
+                          status: 'error',
+                          message:
+                            err instanceof Error
+                              ? err.message
+                              : "We couldn't start the GitHub re-consent flow.",
+                        });
+                      });
+                  }}
+                  onClose={() => setPicker(null)}
+                />
+              )}
 
               {/* Error states */}
               {githubError && (
@@ -1620,6 +1814,264 @@ function ErrorCard({
         {title}
       </div>
       <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55 }}>{copy}</div>
+    </div>
+  );
+}
+
+// Private-repo picker UI. Renders inline inside the GitHub import ramp
+// once the user clicks "Pick from my repos". Five states:
+//   - null: parent short-circuits and doesn't render us (handled at call
+//     site via `{picker && <GithubRepoPicker .../>}`).
+//   - loading: spinner.
+//   - ok: scrollable list of repos with a search box + per-row click.
+//   - needs_reconnect: user's token lacks `repo` scope. Big CTA that
+//     calls /auth/link-social via onReconnect().
+//   - error: short message + retry affordance (via onClose → the user
+//     can reopen the picker).
+function GithubRepoPicker({
+  state,
+  query,
+  onQueryChange,
+  detectingFullName,
+  onSelect,
+  onReconnect,
+  onClose,
+}: {
+  state: Exclude<PickerState, null>;
+  query: string;
+  onQueryChange: (q: string) => void;
+  detectingFullName: string | null;
+  onSelect: (repo: api.GithubRepoSummary) => void;
+  onReconnect: () => void;
+  onClose: () => void;
+}) {
+  const shell: React.CSSProperties = {
+    marginTop: 12,
+    background: 'var(--card)',
+    border: '1px solid var(--line)',
+    borderRadius: 12,
+    padding: 14,
+  };
+  const header: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  };
+  const headerTitle: React.CSSProperties = {
+    fontSize: 13,
+    fontWeight: 600,
+    color: 'var(--ink)',
+  };
+  const closeBtn: React.CSSProperties = {
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--muted)',
+    cursor: 'pointer',
+    fontSize: 18,
+    lineHeight: 1,
+    padding: 4,
+  };
+
+  if (state.status === 'loading') {
+    return (
+      <div style={shell} data-testid="github-repo-picker-loading">
+        <div style={header}>
+          <div style={headerTitle}>Your GitHub repos</div>
+          <button type="button" onClick={onClose} style={closeBtn} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>
+          Loading your repos…
+        </div>
+      </div>
+    );
+  }
+
+  if (state.status === 'error') {
+    return (
+      <div style={shell} data-testid="github-repo-picker-error">
+        <div style={header}>
+          <div style={headerTitle}>Your GitHub repos</div>
+          <button type="button" onClick={onClose} style={closeBtn} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--danger, #c0392b)', padding: '6px 0' }}>
+          {state.message}
+        </div>
+      </div>
+    );
+  }
+
+  if (state.status === 'needs_reconnect') {
+    const copy =
+      state.code === 'no_github_account'
+        ? 'Sign in with GitHub to see your repos.'
+        : 'Your GitHub sign-in predates private-repo support. Reconnect to enable private repo imports — we only request read access to your code.';
+    return (
+      <div style={shell} data-testid="github-repo-picker-reconnect">
+        <div style={header}>
+          <div style={headerTitle}>Reconnect GitHub</div>
+          <button type="button" onClick={onClose} style={closeBtn} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 12 }}>
+          {copy}
+        </div>
+        <button
+          type="button"
+          onClick={onReconnect}
+          data-testid="github-reconnect-btn"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 14px',
+            background: 'var(--ink)',
+            color: 'var(--card)',
+            border: 'none',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Re-authenticate with GitHub
+        </button>
+      </div>
+    );
+  }
+
+  // status === 'ok'
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? state.repos.filter(
+        (r) =>
+          r.full_name.toLowerCase().includes(q) ||
+          (r.description ?? '').toLowerCase().includes(q),
+      )
+    : state.repos;
+
+  return (
+    <div style={shell} data-testid="github-repo-picker">
+      <div style={header}>
+        <div style={headerTitle}>Your GitHub repos</div>
+        <button type="button" onClick={onClose} style={closeBtn} aria-label="Close">
+          ×
+        </button>
+      </div>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        placeholder="Search repos…"
+        aria-label="Search repos"
+        style={{
+          width: '100%',
+          padding: '8px 10px',
+          border: '1px solid var(--line)',
+          borderRadius: 8,
+          fontSize: 13,
+          background: 'var(--bg)',
+          color: 'var(--ink)',
+          marginBottom: 10,
+        }}
+      />
+      {filtered.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>
+          {state.repos.length === 0
+            ? 'No repos found on your GitHub account.'
+            : 'No repos match that search.'}
+        </div>
+      ) : (
+        <div
+          role="list"
+          style={{
+            maxHeight: 320,
+            overflowY: 'auto',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+          }}
+        >
+          {filtered.map((repo) => {
+            const detecting = detectingFullName === repo.full_name;
+            const anyDetecting = detectingFullName !== null;
+            return (
+              <button
+                key={repo.full_name}
+                type="button"
+                role="listitem"
+                disabled={anyDetecting}
+                onClick={() => onSelect(repo)}
+                data-testid={`github-repo-row-${repo.full_name}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '10px 12px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: '1px solid var(--line)',
+                  color: 'var(--ink)',
+                  cursor: anyDetecting ? 'default' : 'pointer',
+                  opacity: anyDetecting && !detecting ? 0.5 : 1,
+                }}
+              >
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 2,
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{repo.full_name}</span>
+                    {repo.private && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.4,
+                          padding: '2px 6px',
+                          border: '1px solid var(--line)',
+                          borderRadius: 4,
+                          color: 'var(--muted)',
+                        }}
+                      >
+                        Private
+                      </span>
+                    )}
+                  </div>
+                  {repo.description && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: 'var(--muted)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {repo.description}
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0 }}>
+                  {detecting ? 'Detecting…' : repo.default_branch}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

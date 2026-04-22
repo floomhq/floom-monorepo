@@ -23,6 +23,7 @@ import { stripeRouter } from './routes/stripe.js';
 import { reviewsRouter } from './routes/reviews.js';
 import { feedbackRouter } from './routes/feedback.js';
 import { meAppsRouter } from './routes/me_apps.js';
+import { githubRouter } from './routes/github.js';
 import { metricsRouter } from './routes/metrics.js';
 import { ogRouter } from './routes/og.js';
 import { db } from './db.js';
@@ -221,6 +222,10 @@ app.route('/api/hub', hubTriggersRouter);
 app.route('/hook', webhookRouter);
 app.route('/api/apps', reviewsRouter);
 app.route('/api/feedback', feedbackRouter);
+// 2026-04-22: user-scoped GitHub helpers. Today just GET /repos for the
+// /studio/build private-repo picker; post-launch this surface expands
+// to cover branch picking + webhook registration for continuous-deploy.
+app.route('/api/github', githubRouter);
 
 // W3.1: when FLOOM_CLOUD_MODE=true, mount the Better Auth handler on /auth/*.
 // In OSS mode (the default), `getAuth()` returns null and this block is a

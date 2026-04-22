@@ -888,12 +888,18 @@ function isPrivateIp(ip: string): boolean {
   return false;
 }
 
-export async function fetchSpec(url: string): Promise<OpenApiSpec> {
+export async function fetchSpec(
+  url: string,
+  extraHeaders?: Record<string, string>,
+): Promise<OpenApiSpec> {
   if (!(await isSafeUrl(url))) {
     throw new Error(`Invalid or disallowed OpenAPI URL: ${url}`);
   }
   const res = await fetch(url, {
-    headers: { Accept: 'application/json, application/yaml, text/plain' },
+    headers: {
+      Accept: 'application/json, application/yaml, text/plain',
+      ...(extraHeaders || {}),
+    },
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
@@ -1271,8 +1277,9 @@ export async function detectAppFromUrl(
   openapi_url: string,
   requested_slug?: string,
   requested_name?: string,
+  extraHeaders?: Record<string, string>,
 ): Promise<DetectedApp> {
-  const spec = await fetchSpec(openapi_url);
+  const spec = await fetchSpec(openapi_url, extraHeaders);
   const derefed = await dereferenceSpec(spec);
   const info = (derefed as { info?: { title?: string; description?: string } })
     .info || {};

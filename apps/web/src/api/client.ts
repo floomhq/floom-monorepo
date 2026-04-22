@@ -929,3 +929,95 @@ export function postFeedback(body: { text: string; email?: string; url?: string 
     body: JSON.stringify(body),
   });
 }
+
+// ---------- 2026-04-22: GitHub private-repo import ----------
+
+/** One row in the private-repo picker. Shape matches what the server
+ *  trims down from GitHub's /user/repos response. */
+export interface GithubRepoSummary {
+  name: string;
+  full_name: string;
+  private: boolean;
+  default_branch: string;
+  description: string | null;
+  html_url: string;
+  updated_at: string;
+}
+
+/** Success body from GET /api/github/repos. */
+export interface GithubReposOk {
+  repos: GithubRepoSummary[];
+  scopes: string[];
+}
+
+/** Typed 412 payload. The UI shows a "Reconnect GitHub" CTA that calls
+ *  `linkSocialForPrivateRepos()` to kick off the OAuth re-consent. */
+export interface GithubScopeUpgradeNeeded {
+  error: string;
+  code: 'scope_upgrade_needed' | 'no_github_account';
+  current_scopes: string[];
+}
+
+/**
+ * Fetch the signed-in user's owned GitHub repos (public + private).
+ *
+ * Throws ApiError on 401/412/502. The /studio/build picker distinguishes
+ * 412 via `err.code` and calls `linkSocialForPrivateRepos()` from the
+ * reconnect CTA.
+ */
+export function getGithubRepos(perPage = 50): Promise<GithubReposOk> {
+  return request<GithubReposOk>(`/api/github/repos?per_page=${perPage}`);
+}
+
+/**
+ * Detect an app from a GitHub repo using the caller's OAuth token. Works
+ * for private repos; the server does the token-authed raw.githubusercontent.com
+ * fetch so the client never sees the token. Returns the same DetectedApp
+ * shape as the paste-URL ramp (plus `attempted_urls` for the error panel).
+ */
+export function detectGithubApp(
+  full_name: string,
+  branch?: string,
+): Promise<DetectedApp & { attempted_urls?: string[] }> {
+  return request<DetectedApp & { attempted_urls?: string[] }>(
+    '/api/github/detect',
+    {
+      method: 'POST',
+      body: JSON.stringify({ full_name, ...(branch ? { branch } : {}) }),
+    },
+  );
+}
+
+/**
+ * Kick off the GitHub OAuth re-consent flow to upgrade the stored token
+ * to include the `repo` scope. Mirrors `signInWithSocial` but uses Better
+ * Auth's `/auth/link-social` endpoint (which requires an active session
+ * and updates the existing account row instead of creating a new user).
+ *
+ * Returns after top-level-navigating the browser; the caller never sees
+ * the resolved promise.
+ */
+export async function linkSocialForPrivateRepos(
+  callbackURL = '/studio/build',
+): Promise<void> {
+  const res = await request<{ url?: string; redirect?: boolean }>(
+    '/auth/link-social',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        provider: 'github',
+        callbackURL,
+        scopes: ['repo'],
+      }),
+    },
+  );
+  if (!res?.url) {
+    throw new ApiError(
+      'GitHub re-consent did not return a redirect URL',
+      500,
+      'oauth_no_url',
+      res,
+    );
+  }
+  window.location.assign(res.url);
+}

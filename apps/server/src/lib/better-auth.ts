@@ -94,11 +94,31 @@ function buildAuthOptions(): any {
     process.env.PUBLIC_URL ||
     `http://localhost:${process.env.PORT || 3051}`;
 
-  const socialProviders: Record<string, { clientId: string; clientSecret: string }> = {};
+  const socialProviders: Record<
+    string,
+    { clientId: string; clientSecret: string; scope?: string[] }
+  > = {};
   if (process.env.GITHUB_OAUTH_CLIENT_ID && process.env.GITHUB_OAUTH_CLIENT_SECRET) {
     socialProviders.github = {
       clientId: process.env.GITHUB_OAUTH_CLIENT_ID,
       clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET,
+      // 2026-04-22: request `repo` so creators can import from their
+      // private GitHub repos via /studio/build. Better Auth appends this
+      // to the default `read:user` + `user:email`, so the identity flow
+      // stays identical — `repo` is purely additive.
+      //
+      // Unlocks:
+      //   GET  https://api.github.com/user/repos?visibility=all  (private + public)
+      //   GET  https://raw.githubusercontent.com/... with Authorization header
+      //        (read a private repo's openapi.yaml without forking)
+      //
+      // Users who signed up before this change don't have `repo` yet.
+      // /studio/build shows a "Reconnect GitHub for private repos" CTA
+      // that hits `/auth/link-social { provider: 'github', scopes: ['repo'] }`
+      // to trigger a re-consent round-trip. Better Auth updates the
+      // stored scope + access_token on callback by default
+      // (`updateAccountOnSignIn !== false`), so one round-trip is enough.
+      scope: ['repo'],
     };
   }
   if (process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
