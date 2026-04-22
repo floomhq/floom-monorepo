@@ -26,7 +26,11 @@ import { useSession } from '../hooks/useSession';
 import { track } from '../lib/posthog';
 import type { DetectedApp, HubApp } from '../lib/types';
 import { publicHubApps } from '../lib/hub-filter';
-import { normalizeGithubUrl } from '../lib/githubUrl';
+import {
+  buildGithubSpecCandidates,
+  formatGithubCandidate,
+  normalizeGithubUrl,
+} from '../lib/githubUrl';
 
 interface Stripe {
   slug: string;
@@ -95,27 +99,6 @@ function normalizeLink(raw: string): string {
   return `https://${trimmed}`;
 }
 
-function githubCandidates(raw: string): string[] {
-  // Issue #90 (2026-04-21): accept bare `owner/repo` in addition to a
-  // canonical github.com URL. normalizeGithubUrl covers owner/repo,
-  // github.com/owner/repo, https://..., and git@github.com:... shapes.
-  const canonical = normalizeGithubUrl(raw);
-  if (!canonical) return [];
-  const m = canonical.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/|$)/i);
-  if (!m) return [];
-  const [, owner, repo] = m;
-  const bases = [
-    `https://raw.githubusercontent.com/${owner}/${repo}/main`,
-    `https://raw.githubusercontent.com/${owner}/${repo}/master`,
-  ];
-  const paths = ['openapi.yaml', 'openapi.yml', 'openapi.json', 'docs/openapi.yaml', 'api/openapi.yaml'];
-  const urls: string[] = [];
-  for (const base of bases) {
-    for (const path of paths) urls.push(`${base}/${path}`);
-  }
-  return urls;
-}
-
 function persistPendingPublish(detected: DetectedApp, source: 'github' | 'openapi') {
   const pending: PendingPublish = {
     detected,
@@ -147,10 +130,11 @@ function pickStripes(apps: HubApp[]): Stripe[] {
 
 export function CreatorHeroPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useSession();
+  const { data: sessionData, isAuthenticated, loading: sessionLoading } = useSession();
   const [sourceLink, setSourceLink] = useState('');
   const [heroError, setHeroError] = useState('');
   const [isDetecting, setIsDetecting] = useState(false);
+  const [heroDetectStatus, setHeroDetectStatus] = useState('');
   const [stripes, setStripes] = useState<Stripe[]>(FALLBACK_STRIPES);
   const [hubCount, setHubCount] = useState<number | null>(null);
   // Friction-reduction 2026-04-20: signed-in users see the detect result
@@ -159,7 +143,9 @@ export function CreatorHeroPage() {
   // "Customize" path) so the signup prompt can present the full form.
   const [detected, setDetected] = useState<DetectedApp | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [publishStatus, setPublishStatus] = useState('');
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+  const cloudMode = sessionData?.cloud_mode === true;
 
   useEffect(() => {
     document.title = 'Ship AI apps fast · Floom';
@@ -185,9 +171,11 @@ export function CreatorHeroPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (sessionLoading) return;
     setHeroError('');
     setDetected(null);
     setPublishedSlug(null);
+    setHeroDetectStatus('');
 
     const rawLink = sourceLink.trim();
     // Analytics (launch-infra #4): fire publish_clicked on every hero
@@ -227,6 +215,11 @@ export function CreatorHeroPage() {
       '/studio/build?ingest_url=' + encodeURIComponent(handoffUrl);
     const signedOutFallback = '/signup?next=' + encodeURIComponent(buildTarget);
 
+    if (cloudMode && !isAuthenticated) {
+      navigate(signedOutFallback);
+      return;
+    }
+
     setIsDetecting(true);
     try {
       window.localStorage.removeItem(PENDING_KEY);
@@ -235,10 +228,11 @@ export function CreatorHeroPage() {
     }
 
     try {
-      const candidates = githubCandidates(rawLink);
+      const candidates = buildGithubSpecCandidates(rawLink);
       if (candidates.length > 0) {
         for (const candidate of candidates) {
           try {
+            setHeroDetectStatus(`Trying ${formatGithubCandidate(candidate)}…`);
             const d = await api.detectApp(candidate);
             persistPendingPublish(d, 'github');
             if (isAuthenticated) {
@@ -262,6 +256,7 @@ export function CreatorHeroPage() {
       // If the input resolved to a GitHub canonical URL earlier, it
       // would have been handled above; anything reaching here is plain
       // OpenAPI (direct spec URL, docs host, etc.).
+      setHeroDetectStatus('Fetching the OpenAPI file…');
       const d = await api.detectApp(normalizeLink(rawLink));
       persistPendingPublish(d, 'openapi');
       if (isAuthenticated) {
@@ -283,6 +278,7 @@ export function CreatorHeroPage() {
       navigate(isAuthenticated ? buildTarget : signedOutFallback);
     } finally {
       setIsDetecting(false);
+      setHeroDetectStatus('');
     }
   };
 
@@ -292,7 +288,9 @@ export function CreatorHeroPage() {
   // visibility with the full form.
   async function handleInlinePublish() {
     if (!detected) return;
+    let published = false;
     setIsPublishing(true);
+    setPublishStatus('Creating the app page…');
     setHeroError('');
     try {
       const res = await api.ingestApp({
@@ -309,6 +307,8 @@ export function CreatorHeroPage() {
         /* ignore */
       }
       setPublishedSlug(res.slug);
+      published = true;
+      setPublishStatus(`Live at /p/${res.slug}`);
       // Navigate straight to /p/:slug — that's the "app is live" proof.
       navigate(`/p/${res.slug}`);
     } catch (err) {
@@ -330,6 +330,7 @@ export function CreatorHeroPage() {
       );
     } finally {
       setIsPublishing(false);
+      if (!published) setPublishStatus('');
     }
   }
 
@@ -531,6 +532,21 @@ export function CreatorHeroPage() {
               </button>
             </form>
 
+            {isDetecting && heroDetectStatus && (
+              <p
+                data-testid="hero-detect-status"
+                style={{
+                  maxWidth: 620,
+                  margin: '12px auto 0',
+                  color: 'var(--muted)',
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                {heroDetectStatus}
+              </p>
+            )}
+
             {heroError && (
               <p
                 data-testid="hero-error"
@@ -665,6 +681,18 @@ export function CreatorHeroPage() {
                     Public · floom.dev/p/{detected.slug}
                   </span>
                 </div>
+                {isPublishing && publishStatus && (
+                  <div
+                    data-testid="hero-publish-status"
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--muted)',
+                      marginTop: 10,
+                    }}
+                  >
+                    {publishStatus}
+                  </div>
+                )}
               </div>
             )}
 

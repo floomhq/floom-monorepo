@@ -573,10 +573,21 @@ export function signUpWithPassword(
   email: string,
   password: string,
   name?: string,
+  callbackURL?: string,
 ): Promise<unknown> {
   return request('/auth/sign-up/email', {
     method: 'POST',
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({ email, password, name, callbackURL }),
+  });
+}
+
+export function sendVerificationEmail(
+  email: string,
+  callbackURL?: string,
+): Promise<{ status: boolean }> {
+  return request('/auth/send-verification-email', {
+    method: 'POST',
+    body: JSON.stringify({ email, callbackURL }),
   });
 }
 

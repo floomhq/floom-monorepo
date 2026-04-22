@@ -35,7 +35,13 @@ import { ingestOpenApiApps } from './services/openapi-ingest.js';
 import { startFastApps } from './services/fast-apps-sidecar.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
 import { globalAuthMiddleware } from './lib/auth.js';
-import { getAuth, isCloudMode, runAuthMigrations } from './lib/better-auth.js';
+import {
+  getAuth,
+  isCloudMode,
+  purgeUnverifiedAuthSessions,
+  runAuthMigrations,
+} from './lib/better-auth.js';
+import { sanitizeAuthResponse } from './lib/auth-response.js';
 import { runRateLimitMiddleware } from './lib/rate-limit.js';
 import { resolveUserContext } from './services/session.js';
 import { startJobWorker } from './services/worker.js';
@@ -244,7 +250,7 @@ if (isCloudMode()) {
     app.on(
       ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
       '/auth/*',
-      (c) => auth.handler(c.req.raw),
+      async (c) => sanitizeAuthResponse(c.req.raw, await auth.handler(c.req.raw)),
     );
     console.log('[auth] FLOOM_CLOUD_MODE=true — Better Auth mounted at /auth/*');
   }
@@ -1074,6 +1080,10 @@ async function boot(): Promise<void> {
   if (isCloudMode()) {
     try {
       await runAuthMigrations();
+      const purgedSessions = purgeUnverifiedAuthSessions();
+      if (purgedSessions > 0) {
+        console.log(`[auth] purged ${purgedSessions} unverified auth session(s)`);
+      }
     } catch (err) {
       console.error('[auth] migration failed — refusing to boot in cloud mode:', err);
       process.exit(1);

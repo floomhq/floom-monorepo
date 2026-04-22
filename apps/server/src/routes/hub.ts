@@ -101,6 +101,9 @@ const IngestBody = z.object({
 });
 
 hubRouter.post('/detect', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
   let body: unknown;
   try {
     body = await c.req.json();

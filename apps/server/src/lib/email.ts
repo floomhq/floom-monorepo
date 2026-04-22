@@ -196,6 +196,44 @@ export function renderResetPasswordEmail(input: ResetPasswordTemplateInput): {
   return { subject, html: baseLayout(body), text };
 }
 
+export interface VerificationTemplateInput {
+  name?: string | null;
+  verifyUrl: string;
+}
+
+export function renderVerificationEmail(input: VerificationTemplateInput): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const subject = 'Verify your Floom email';
+  const greeting = input.name ? `Hi ${escapeHtml(input.name)},` : 'Hi,';
+  const safeUrl = escapeHtml(input.verifyUrl);
+
+  const body = `
+<p style="font-size:15px;line-height:1.55;margin:0 0 16px;">${greeting}</p>
+<p style="font-size:15px;line-height:1.55;margin:0 0 20px;">Click the button below to verify your email and finish setting up your Floom account.</p>
+<p style="margin:24px 0;"><a href="${safeUrl}" style="display:inline-block;background:#111;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;">Verify email</a></p>
+<p style="font-size:13px;line-height:1.55;margin:0 0 16px;color:#44413a;">Or paste this link into your browser:<br><a href="${safeUrl}" style="color:#44413a;word-break:break-all;">${safeUrl}</a></p>
+<p style="font-size:12px;line-height:1.55;margin:16px 0 0;color:#77736a;">If you did not create this account, you can ignore this email.</p>
+`;
+
+  const text = [
+    input.name ? `Hi ${input.name},` : 'Hi,',
+    '',
+    'Verify your email to finish setting up your Floom account:',
+    '',
+    input.verifyUrl,
+    '',
+    'If you did not create this account, you can ignore this email.',
+    '',
+    'Floom, Inc. · Wilmington, DE',
+    'hello@floom.dev',
+  ].join('\n');
+
+  return { subject, html: baseLayout(body), text };
+}
+
 export interface WelcomeTemplateInput {
   name?: string | null;
   publicUrl: string;

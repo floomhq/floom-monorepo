@@ -17,12 +17,19 @@ import { CustomRendererPanel } from '../components/CustomRendererPanel';
 import { useSession } from '../hooks/useSession';
 import * as api from '../api/client';
 import type { DetectedApp } from '../lib/types';
-import { normalizeGithubUrl, looksLikeGithubRef } from '../lib/githubUrl';
+import {
+  buildGithubSpecCandidates,
+  formatGithubCandidate,
+  looksLikeGithubRef,
+  normalizeGithubUrl,
+  parseGithubRepoRef,
+} from '../lib/githubUrl';
 import { markJustPublished } from '../lib/onboarding';
 
 type Step = 'ramp' | 'review' | 'publishing' | 'done';
 
 type GithubDetect = { attemptedUrls: string[] } | null;
+type DetectKind = 'github' | 'openapi';
 
 // localStorage key for persisting a pending detection across the
 // signup redirect so anonymous visitors don't lose their work. Cleared
@@ -62,7 +69,7 @@ export function BuildPage({
   const ingestUrlParam = searchParams.get('ingest_url') ?? '';
   const legacyOpenapiParam = searchParams.get('openapi') ?? '';
   const navigate = useNavigate();
-  const { isAuthenticated } = useSession();
+  const { data: sessionData, isAuthenticated, loading: sessionLoading } = useSession();
   const [signupPrompt, setSignupPrompt] = useState(false);
 
   // Classify the hero-provided URL. A github.com URL goes in the GitHub
@@ -89,6 +96,9 @@ export function BuildPage({
   // Detection result
   const [detected, setDetected] = useState<DetectedApp | null>(null);
   const [githubAttempts, setGithubAttempts] = useState<GithubDetect>(null);
+  const [detecting, setDetecting] = useState<DetectKind | null>(null);
+  const [detectStatus, setDetectStatus] = useState('');
+  const [detectSlow, setDetectSlow] = useState(false);
 
   // State machine
   const [step, setStep] = useState<Step>('ramp');
@@ -122,6 +132,7 @@ export function BuildPage({
   // from the ramp page, so only docker remains as a coming-soon modal
   // target.
   const [comingSoon, setComingSoon] = useState<'docker' | null>(null);
+  const cloudMode = sessionData?.cloud_mode === true;
 
   // Pre-fill if we got here via /build?edit=slug
   useEffect(() => {
@@ -167,29 +178,21 @@ export function BuildPage({
     }
   }, [editSlug]);
 
+  useEffect(() => {
+    if (!detecting) {
+      setDetectSlow(false);
+      return;
+    }
+    const id = window.setTimeout(() => setDetectSlow(true), 3000);
+    return () => window.clearTimeout(id);
+  }, [detecting]);
+
   /** Parses a GitHub URL into { owner, repo } or null if it doesn't match.
    *  Issue #90: also accepts bare `owner/repo` via normalizeGithubUrl. */
   function parseGithubUrl(raw: string): { owner: string; repo: string } | null {
-    const canonical = normalizeGithubUrl(raw);
-    if (!canonical) return null;
-    const m = canonical.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/|$)/i);
-    if (!m) return null;
-    return { owner: m[1], repo: m[2] };
-  }
-
-  /** Transforms a GitHub repo URL into candidate raw OpenAPI URLs. */
-  function githubCandidates(raw: string): string[] {
-    const parsed = parseGithubUrl(raw);
-    if (!parsed) return [];
-    const { owner, repo } = parsed;
-    const bases = [
-      `https://raw.githubusercontent.com/${owner}/${repo}/main`,
-      `https://raw.githubusercontent.com/${owner}/${repo}/master`,
-    ];
-    const paths = ['openapi.yaml', 'openapi.yml', 'openapi.json', 'docs/openapi.yaml', 'api/openapi.yaml'];
-    const urls: string[] = [];
-    for (const b of bases) for (const p of paths) urls.push(`${b}/${p}`);
-    return urls;
+    const parsed = parseGithubRepoRef(raw);
+    if (!parsed) return null;
+    return { owner: parsed.owner, repo: parsed.repo };
   }
 
   /**
@@ -209,17 +212,26 @@ export function BuildPage({
   async function checkGithubRepoExists(
     owner: string,
     repo: string,
-  ): Promise<'exists' | 'not-found' | 'unknown'> {
+  ): Promise<{ state: 'exists' | 'not-found' | 'unknown'; defaultBranch: string | null }> {
     try {
       const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
         method: 'GET',
         headers: { Accept: 'application/vnd.github+json' },
       });
-      if (res.status === 404) return 'not-found';
-      if (res.ok) return 'exists';
-      return 'unknown';
+      if (res.status === 404) return { state: 'not-found', defaultBranch: null };
+      if (res.ok) {
+        let defaultBranch: string | null = null;
+        try {
+          const payload = (await res.json()) as { default_branch?: string };
+          defaultBranch = payload.default_branch || null;
+        } catch {
+          defaultBranch = null;
+        }
+        return { state: 'exists', defaultBranch };
+      }
+      return { state: 'unknown', defaultBranch: null };
     } catch {
-      return 'unknown';
+      return { state: 'unknown', defaultBranch: null };
     }
   }
 
@@ -238,9 +250,13 @@ export function BuildPage({
   async function runGithubDetect(inputUrl: string): Promise<boolean> {
     setError(null);
     setGithubError(null);
+    setDetecting('github');
+    setDetectStatus('Checking GitHub repo…');
     const parsed = parseGithubUrl(inputUrl);
     if (!parsed) {
       setGithubError('unreachable');
+      setDetecting(null);
+      setDetectStatus('');
       return false;
     }
 
@@ -248,15 +264,20 @@ export function BuildPage({
     // unknowns fall through to the openapi probe so flaky rate-limits
     // don't break happy-path detection.
     const existence = await checkGithubRepoExists(parsed.owner, parsed.repo);
-    if (existence === 'not-found') {
+    if (existence.state === 'not-found') {
       setGithubError('repo-not-found');
+      setDetecting(null);
+      setDetectStatus('');
       return false;
     }
 
-    const candidates = githubCandidates(inputUrl);
+    const candidates = buildGithubSpecCandidates(inputUrl, {
+      defaultBranch: existence.defaultBranch,
+    });
     setGithubAttempts({ attemptedUrls: candidates });
     for (const candidate of candidates) {
       try {
+        setDetectStatus(`Trying ${formatGithubCandidate(candidate)}…`);
         const result = await api.detectApp(candidate);
         setDetected(result);
         setName(result.name);
@@ -264,6 +285,8 @@ export function BuildPage({
         setDescription(result.description);
         setSource('github');
         setStep('review');
+        setDetecting(null);
+        setDetectStatus('');
         return true;
       } catch {
         // try next
@@ -272,6 +295,8 @@ export function BuildPage({
     // Repo confirmed to exist (or unknown) but no OpenAPI spec at any of
     // the candidate paths. Show the no-openapi hint.
     setGithubError('no-openapi');
+    setDetecting(null);
+    setDetectStatus('');
     return false;
   }
 
@@ -288,6 +313,8 @@ export function BuildPage({
    */
   async function runOpenapiDetect(inputUrl: string): Promise<boolean> {
     setError(null);
+    setDetecting('openapi');
+    setDetectStatus('Fetching the OpenAPI file…');
     try {
       const result = await api.detectApp(inputUrl, name || undefined, slug || undefined);
       setDetected(result);
@@ -296,6 +323,8 @@ export function BuildPage({
       setDescription(result.description);
       setSource('openapi');
       setStep('review');
+      setDetecting(null);
+      setDetectStatus('');
       return true;
     } catch (err) {
       const apiErr = err instanceof api.ApiError ? err : null;
@@ -322,17 +351,36 @@ export function BuildPage({
         message,
         details: (err as Error).message || undefined,
       });
+      setDetecting(null);
+      setDetectStatus('');
       return false;
     }
   }
 
+  function redirectToDetectLogin(rawUrl: string): void {
+    const handoff = normalizeGithubUrl(rawUrl) ?? rawUrl.trim();
+    const next =
+      '/studio/build?ingest_url=' + encodeURIComponent(handoff);
+    navigate('/signup?next=' + encodeURIComponent(next));
+  }
+
   async function handleGithubDetect(e: React.FormEvent) {
     e.preventDefault();
+    if (sessionLoading) return;
+    if (cloudMode && !isAuthenticated) {
+      redirectToDetectLogin(githubUrl);
+      return;
+    }
     await runGithubDetect(githubUrl);
   }
 
   async function handleOpenapiDetect(e: React.FormEvent) {
     e.preventDefault();
+    if (sessionLoading) return;
+    if (cloudMode && !isAuthenticated) {
+      redirectToDetectLogin(openapiUrl);
+      return;
+    }
     await runOpenapiDetect(openapiUrl);
   }
 
@@ -353,6 +401,8 @@ export function BuildPage({
     if (editSlug) return;
     if (!heroUrl) return;
     if (heroAutoDetected) return;
+    if (sessionLoading) return;
+    if (cloudMode && !isAuthenticated) return;
     // Defer the detect until the next tick so any localStorage-hydrate
     // effect above has a chance to set heroAutoDetected first.
     let cancelled = false;
@@ -368,8 +418,7 @@ export function BuildPage({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editSlug, heroUrl, heroIsGithub]);
+  }, [cloudMode, editSlug, heroAutoDetected, heroIsGithub, heroUrl, isAuthenticated, sessionLoading]);
 
   async function handlePublish() {
     if (!detected) return;
@@ -557,6 +606,24 @@ export function BuildPage({
         {/* Ramp selection (initial state) */}
         {step === 'ramp' && (
           <div data-testid="build-step-ramp">
+            {cloudMode && !isAuthenticated && (
+              <div
+                data-testid="build-auth-required"
+                style={{
+                  background: '#fff8e6',
+                  border: '1px solid #f4e0a5',
+                  color: '#755a00',
+                  borderRadius: 12,
+                  padding: '14px 16px',
+                  marginBottom: 16,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                }}
+              >
+                Sign in to inspect and publish apps in cloud mode. Your pasted URL stays here after you come back.
+              </div>
+            )}
+
             {/* RAMP 1 — GitHub import (PRIMARY) */}
             <form
               onSubmit={handleGithubDetect}
@@ -674,7 +741,7 @@ export function BuildPage({
                 <button
                   type="submit"
                   data-testid="build-github-detect"
-                  disabled={!githubUrl}
+                  disabled={!githubUrl || sessionLoading || detecting !== null}
                   style={{
                     padding: '8px 14px',
                     background: 'var(--accent)',
@@ -683,15 +750,25 @@ export function BuildPage({
                     borderRadius: 8,
                     fontSize: 12,
                     fontWeight: 600,
-                    cursor: githubUrl ? 'pointer' : 'not-allowed',
-                    opacity: githubUrl ? 1 : 0.55,
+                    cursor:
+                      !githubUrl || sessionLoading || detecting !== null ? 'not-allowed' : 'pointer',
+                    opacity: !githubUrl || sessionLoading || detecting !== null ? 0.55 : 1,
                     fontFamily: 'inherit',
                     flexShrink: 0,
                   }}
                 >
-                  Detect
+                  {detecting === 'github' ? 'Detecting…' : 'Detect'}
                 </button>
               </div>
+              {detecting === 'github' && (
+                <div
+                  data-testid="build-github-progress"
+                  style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}
+                >
+                  {detectStatus}
+                  {detectSlow ? ' Still looking, this can take up to 10 seconds.' : ''}
+                </div>
+              )}
               <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
                 Works with any public repo. Private repos coming soon.
               </div>
@@ -711,7 +788,7 @@ export function BuildPage({
                     <ErrorCard
                       severity="red"
                       title="We couldn't find your app file"
-                      copy="Floom needs an openapi.yaml (or .json) file in your repo root. Add one, or paste the direct link below. Importing from Docker images and agent wrappers is on the roadmap."
+                      copy="Floom needs a public openapi.yaml, openapi.yml, openapi.json, or swagger file. Paste the direct file link if it lives in a subfolder."
                     />
                   )}
                   {githubError === 'private' && (
@@ -759,7 +836,7 @@ export function BuildPage({
                         }}
                       >
                         {githubAttempts.attemptedUrls.map((u) => (
-                          <li key={u}>{u.replace('https://raw.githubusercontent.com/', '')}</li>
+                          <li key={u}>{formatGithubCandidate(u)}</li>
                         ))}
                       </ul>
                     </details>
@@ -867,11 +944,20 @@ export function BuildPage({
               <button
                 type="submit"
                 data-testid="build-detect"
-                disabled={!openapiUrl}
-                style={primaryButton(!openapiUrl)}
+                disabled={!openapiUrl || sessionLoading || detecting !== null}
+                style={primaryButton(!openapiUrl || sessionLoading || detecting !== null)}
               >
-                Find it
+                {detecting === 'openapi' ? 'Finding…' : 'Find it'}
               </button>
+              {detecting === 'openapi' && (
+                <div
+                  data-testid="build-openapi-progress"
+                  style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10 }}
+                >
+                  {detectStatus}
+                  {detectSlow ? ' Still looking, this can take up to 10 seconds.' : ''}
+                </div>
+              )}
             </form>
 
             {/* More-ways footer — single collapsed disclosure after the

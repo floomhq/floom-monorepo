@@ -41,6 +41,7 @@ export function LoginPage() {
   const [name, setName] = useState('');
   const [state, setState] = useState<'idle' | 'submitting' | 'error'>('idle');
   const [errorCopy, setErrorCopy] = useState<AuthErrorCopy | null>(null);
+  const [noticeCopy, setNoticeCopy] = useState<AuthErrorCopy | null>(null);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
 
   const nextPath = searchParams.get('next') || '/me';
@@ -85,23 +86,42 @@ export function LoginPage() {
     e.preventDefault();
     setState('submitting');
     setErrorCopy(null);
+    setNoticeCopy(null);
     try {
+      let session = null;
       if (mode === 'signin') {
         await api.signInWithPassword(email, password);
+        session = await refreshSession();
+        if (!session || session.user.is_local) {
+          throw new api.ApiError('Failed to establish a session', 500, 'session_missing');
+        }
+        identifyFromSession(session);
+        navigate(nextPath, { replace: true });
+        return;
       } else {
-        await api.signUpWithPassword(email, password, name || undefined);
+        await api.signUpWithPassword(email, password, name || undefined, nextPath);
+        session = await refreshSession();
+        if (session && !session.user.is_local) {
+          identifyFromSession(session);
+          track('signup_completed');
+          navigate(nextPath, { replace: true });
+          return;
+        }
+        setMode('signin');
+        setPassword('');
+        setState('idle');
+        setNoticeCopy({
+          message: 'Check your email — the verification link will sign you in.',
+          action: {
+            label: 'Resend link',
+            intent: { kind: 'resend-verification' },
+          },
+        });
+        return;
       }
-      const session = await refreshSession();
-      // Analytics (launch-infra #4): rebind identity to the just-authed
-      // user, then fire signup_completed for the /signup branch only.
-      // Sign-in is out of the tracked-events set.
-      identifyFromSession(session);
-      if (mode === 'signup') {
-        track('signup_completed');
-      }
-      navigate(nextPath, { replace: true });
     } catch (err) {
       setState('error');
+      setNoticeCopy(null);
       setErrorCopy(friendlyAuthError(err as api.ApiError, mode));
     }
   }
@@ -109,10 +129,11 @@ export function LoginPage() {
   // Wire error-recovery CTAs (e.g. "Sign in instead" after a duplicate
   // signup attempt) to real UI behavior. Keeps the email the user already
   // typed so they don't re-enter it on the other tab.
-  function handleErrorAction(action: AuthErrorAction) {
+  async function handleErrorAction(action: AuthErrorAction) {
     if (action.kind === 'switch-to-signin') {
       setMode('signin');
       setErrorCopy(null);
+      setNoticeCopy(null);
       setPassword('');
       setState('idle');
       return;
@@ -120,19 +141,29 @@ export function LoginPage() {
     if (action.kind === 'switch-to-signup') {
       setMode('signup');
       setErrorCopy(null);
+      setNoticeCopy(null);
       setPassword('');
       setState('idle');
       return;
     }
     if (action.kind === 'resend-verification') {
-      // No dedicated resend endpoint on the client yet; send the user to
-      // the support mailer as a graceful fallback. When Better Auth's
-      // email-verification plugin lands we can hit it directly.
-      window.location.href =
-        'mailto:team@floom.dev?subject=' +
-        encodeURIComponent('Resend Floom verification email') +
-        '&body=' +
-        encodeURIComponent(`Please resend verification for ${email}.`);
+      const targetEmail = email.trim();
+      if (!targetEmail) {
+        setState('error');
+        setErrorCopy({ message: 'Enter your email address first.' });
+        return;
+      }
+      setState('submitting');
+      setErrorCopy(null);
+      try {
+        await api.sendVerificationEmail(targetEmail, nextPath);
+        setState('idle');
+        setNoticeCopy({ message: 'We sent another verification link.' });
+      } catch (err) {
+        setState('error');
+        setNoticeCopy(null);
+        setErrorCopy(friendlyAuthError(err as api.ApiError, 'signin'));
+      }
     }
   }
 
@@ -233,6 +264,45 @@ export function LoginPage() {
             Create account
           </button>
         </div>
+
+        {noticeCopy && (
+          <div
+            data-testid="auth-notice"
+            style={{
+              margin: '0 0 12px',
+              padding: '10px 12px',
+              background: '#ecfdf5',
+              border: '1px solid #b7ebd3',
+              borderRadius: 8,
+              fontSize: 13,
+              color: '#0f5132',
+              lineHeight: 1.5,
+            }}
+          >
+            <div>{noticeCopy.message}</div>
+            {noticeCopy.action && (
+              <button
+                type="button"
+                data-testid="auth-notice-action"
+                onClick={() => void handleErrorAction(noticeCopy.action!.intent)}
+                style={{
+                  marginTop: 6,
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent)',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  padding: 0,
+                  textDecoration: 'underline',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {noticeCopy.action.label}
+              </button>
+            )}
+          </div>
+        )}
 
         {!cloudMode && (
           <div
@@ -391,7 +461,7 @@ export function LoginPage() {
                 <button
                   type="button"
                   data-testid="auth-error-action"
-                  onClick={() => handleErrorAction(errorCopy.action!.intent)}
+                  onClick={() => void handleErrorAction(errorCopy.action!.intent)}
                   style={{
                     marginTop: 6,
                     background: 'none',

@@ -848,6 +848,7 @@ export function specToManifest(
 
 interface FetchSpecOptions {
   allowPrivateNetwork?: boolean;
+  redirectsRemaining?: number;
 }
 
 async function isSafeUrl(
@@ -904,10 +905,29 @@ export async function fetchSpec(
   if (!(await isSafeUrl(url, options))) {
     throw new Error(`Invalid or disallowed OpenAPI URL: ${url}`);
   }
+  const redirectsRemaining = options.redirectsRemaining ?? 3;
   const res = await fetch(url, {
     headers: { Accept: 'application/json, application/yaml, text/plain' },
     signal: AbortSignal.timeout(30_000),
+    redirect: 'manual',
   });
+  if (res.status >= 300 && res.status < 400) {
+    if (redirectsRemaining <= 0) {
+      throw new Error(`Too many redirects while fetching OpenAPI spec from ${url}`);
+    }
+    const location = res.headers.get('location');
+    if (!location) {
+      throw new Error(`Redirected OpenAPI spec from ${url} without a location header`);
+    }
+    const nextUrl = new URL(location, url).toString();
+    if (!(await isSafeUrl(nextUrl, options))) {
+      throw new Error(`Invalid or disallowed OpenAPI redirect target: ${nextUrl}`);
+    }
+    return fetchSpec(nextUrl, {
+      ...options,
+      redirectsRemaining: redirectsRemaining - 1,
+    });
+  }
   if (!res.ok) {
     throw new Error(`Failed to fetch OpenAPI spec from ${url}: HTTP ${res.status}`);
   }
@@ -937,6 +957,7 @@ export async function dereferenceSpec(spec: OpenApiSpec): Promise<OpenApiSpec> {
     // Deep clone so we don't mutate the cached original.
     const clone = JSON.parse(JSON.stringify(spec));
     const derefed = await $RefParser.dereference(clone, {
+      resolve: { external: false },
       dereference: { circular: 'ignore' },
     });
     return derefed as unknown as OpenApiSpec;

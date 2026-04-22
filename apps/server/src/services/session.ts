@@ -126,7 +126,7 @@ export async function resolveUserContext(c: Context): Promise<SessionContext> {
   // Context exposes the raw Request via `c.req.raw`, which already carries
   // Cookie / Authorization / origin / referer.
   type AuthSession = {
-    user: { id: string; email: string; name?: string | null };
+    user: { id: string; email: string; name?: string | null; emailVerified?: boolean };
     session: { id: string };
   };
   let session: AuthSession | null = null;
@@ -150,6 +150,10 @@ export async function resolveUserContext(c: Context): Promise<SessionContext> {
     // every existing scoped query keeps working for "browsing
     // anonymously" — the cloud build wires admin routes to also check
     // is_authenticated before mutating anything sensitive.
+    return ossCtx;
+  }
+
+  if (session.user.emailVerified === false) {
     return ossCtx;
   }
 
