@@ -157,6 +157,15 @@ function StudioSlugRedirect({ subpath }: { subpath?: string }) {
   return <Navigate to={`/studio/${slug ?? ''}${tail}`} replace />;
 }
 
+// Design-audit fix 2026-04-22: /apps/:slug and /store/:slug funnel into the
+// canonical app permalink at /p/:slug. The top-nav "Store" label and the
+// "Try on Floom" CTAs on app cards point at these URLs, so the redirect
+// keeps deep links from external pages (wireframes, shared links) alive.
+function AppSlugToPermalinkRedirect() {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/p/${slug ?? ''}`} replace />;
+}
+
 // Hard redirect to an external URL (e.g. /docs/changelog → GitHub Releases).
 // React Router's <Navigate> only handles in-app routes; for off-site targets
 // we swap the browser location directly so the URL bar and back button work.
@@ -188,6 +197,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             Nav-polish 2026-04-20: URL no longer drifts from the label. */}
         <Route path="/apps" element={<AppsDirectoryPage />} />
         <Route path="/store" element={<AppsDirectoryPage />} />
+        {/* Design-audit fix 2026-04-22: /apps/:slug and /store/:slug are
+            the "Try on Floom" destinations shown on app cards and in the
+            top nav. Both funnel into the canonical /p/:slug permalink
+            so there's one real app-detail surface. */}
+        <Route path="/apps/:slug" element={<AppSlugToPermalinkRedirect />} />
+        <Route path="/store/:slug" element={<AppSlugToPermalinkRedirect />} />
         {/* Standalone app permalink */}
         <Route path="/p/:slug" element={<AppPermalinkPage />} />
         <Route path="/r/:runId" element={<PublicRunPermalinkPage />} />
@@ -210,6 +225,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         {/* W4-minimal: user dashboard */}
         <Route path="/me" element={<MePage />} />
         <Route path="/me/install" element={<MeInstallPage />} />
+        {/* Design-audit fix 2026-04-22: /me/runs was advertised by the
+            user-surface nav but never had a page. The full run history
+            already lives on /me (Recent runs section), so redirect there
+            with a #recent-runs anchor so the section scrolls into view. */}
+        <Route path="/me/runs" element={<Navigate to="/me#recent-runs" replace />} />
         <Route path="/me/runs/:runId" element={<MeRunDetailPage />} />
         <Route path="/me/settings" element={<MeSettingsPage />} />
         {/* v16 studio restructure 2026-04-18: creator-context pages moved
@@ -235,6 +255,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             Auth-gated via StudioLayout. */}
         <Route path="/studio" element={<StudioHomePage />} />
         <Route path="/studio/build" element={<StudioBuildPage />} />
+        {/* Design-audit fix 2026-04-22: /studio/new is the create-new-app
+            entry point shown in wireframe v17. Funnel it to /studio/build
+            (the paste-repo flow). Must be listed before /studio/:slug or
+            react-router matches "new" as an app slug and 404s. */}
+        <Route path="/studio/new" element={<Navigate to="/studio/build" replace />} />
         <Route path="/studio/settings" element={<StudioSettingsPage />} />
         <Route path="/studio/:slug" element={<StudioAppPage />} />
         <Route path="/studio/:slug/runs" element={<StudioAppRunsPage />} />
