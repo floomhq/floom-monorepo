@@ -81,6 +81,10 @@ echo '{"action":"analyze","inputs":{...}}' \
   | docker run --rm -i -e GEMINI_API_KEY=... floom/competitor-analyzer:latest
 ```
 
+Output follows the normal Floom docker-entrypoint contract: the final stdout
+line is prefixed with `__FLOOM_RESULT__` and contains either
+`{"ok": true, "outputs": ...}` or `{"ok": false, "error": ...}`.
+
 ## Concurrency, retries, failure mode
 
 - `ThreadPoolExecutor`, up to 8 workers. Each URL is one Gemini call; URLs are independent.

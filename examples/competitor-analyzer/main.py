@@ -19,6 +19,9 @@ Emits one JSON object on stdout:
     "meta": { "analyzed": N, "failed": M, "dry_run": bool }
   }
 
+Floom runner contract:
+  stdout last line: __FLOOM_RESULT__{"ok": true, "outputs": {...}}
+
 Runs each URL concurrently (ThreadPoolExecutor, 8 workers) against Gemini 3
 with the URL-context tool + Google Search grounding. No Claude, no OpenAI,
 no Gemini 2.x. If GEMINI_API_KEY is unset, emits a mock payload for UI demos.
@@ -39,6 +42,12 @@ from urllib.parse import urlparse
 DEFAULT_MODEL = "gemini-3-flash-preview"
 MAX_WORKERS = 8
 RETRIES_PER_URL = 1  # one retry on top of the initial attempt
+
+
+def _emit(payload: dict[str, Any]) -> None:
+    """Write the single-line Floom result the runner parses."""
+    sys.stdout.write("__FLOOM_RESULT__" + json.dumps(payload) + "\n")
+    sys.stdout.flush()
 
 
 def _resolve_model() -> str:
@@ -301,7 +310,7 @@ def main() -> int:
     try:
         payload = _read_payload()
     except json.JSONDecodeError as exc:
-        print(json.dumps({"error": f"invalid JSON: {exc}"}))
+        _emit({"ok": False, "error": f"invalid JSON: {exc}", "error_type": "runtime_error"})
         return 2
 
     inputs = payload.get("inputs") or {}
@@ -309,10 +318,22 @@ def main() -> int:
     your_product = (inputs.get("your_product") or "").strip()
 
     if not isinstance(urls_raw, list) or not urls_raw:
-        print(json.dumps({"error": "inputs.urls must be a non-empty array"}))
+        _emit(
+            {
+                "ok": False,
+                "error": "inputs.urls must be a non-empty array",
+                "error_type": "runtime_error",
+            }
+        )
         return 2
     if not your_product:
-        print(json.dumps({"error": "inputs.your_product is required"}))
+        _emit(
+            {
+                "ok": False,
+                "error": "inputs.your_product is required",
+                "error_type": "runtime_error",
+            }
+        )
         return 2
 
     # Normalize: strip, dedupe, keep order, require http(s).
@@ -332,7 +353,13 @@ def main() -> int:
         urls.append(u2)
 
     if not urls:
-        print(json.dumps({"error": "no valid URLs after normalization"}))
+        _emit(
+            {
+                "ok": False,
+                "error": "no valid URLs after normalization",
+                "error_type": "runtime_error",
+            }
+        )
         return 2
 
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -351,7 +378,7 @@ def main() -> int:
                 "model": model,
             },
         }
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        _emit({"ok": True, "outputs": result})
         return 0
 
     competitors: list[dict[str, Any]] = [None] * len(urls)  # type: ignore[list-item]
@@ -373,7 +400,7 @@ def main() -> int:
                     }
     except Exception:  # noqa: BLE001
         traceback.print_exc(file=sys.stderr)
-        print(json.dumps({"error": "internal_error"}))
+        _emit({"ok": False, "error": "internal_error", "error_type": "runtime_error"})
         return 1
 
     failed = sum(1 for c in competitors if c.get("error"))
@@ -390,7 +417,7 @@ def main() -> int:
             "model": model,
         },
     }
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    _emit({"ok": True, "outputs": result})
     return 0
 
 
