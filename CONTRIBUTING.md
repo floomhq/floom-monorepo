@@ -9,6 +9,13 @@ Thanks for taking the time. Floom is small, moves fast, and every contribution g
 - **Fix a bug or ship a small feature.** Look for issues tagged `good first issue` or `help wanted`.
 - **Improve docs.** Anything under [`docs/`](./docs) and [`spec/`](./spec) is fair game.
 
+## Public repo boundary
+
+- `floomhq/floom` is the public OSS repo.
+- Product code, examples, specs, public docs, and redacted sample config belong here.
+- Internal strategy, GTM plans, interview notes, private app backlogs, stash archives, local asset inventories, and ops notes do not belong in this repo.
+- Do not add `docs/internal/` to this repo.
+
 ## Local setup
 
 ```bash

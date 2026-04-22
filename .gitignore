@@ -18,3 +18,6 @@ WORKPLAN-*.md
 
 # Greenlight / audit screenshot artifacts
 screenshots-greenlight/
+
+# Internal planning / stash / ops material does not belong in this public repo.
+docs/internal/
