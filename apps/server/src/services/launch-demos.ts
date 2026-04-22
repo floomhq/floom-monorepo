@@ -21,8 +21,9 @@
 //   inconsistent shapes (v2 multi-action, v1 single-action, and
 //   array-input variants) that the server-side manifest.ts validator
 //   rejects. Hand-normalizing here keeps the seeder deterministic.
-// - Fully idempotent: skips the insert if the slug already exists, skips
-//   the build if the tag is already present on the Docker daemon.
+// - Fully idempotent: content-addressed image tags rebuild only when the
+//   demo context changes, and existing DB rows are refreshed in place so
+//   preview keeps serving the repo's current launch demos.
 //
 // Gating: FLOOM_SEED_LAUNCH_DEMOS=false to opt out (default: on).
 // Requires /var/run/docker.sock mounted into the container (same as the
@@ -30,7 +31,8 @@
 // throwing so boot still succeeds on non-docker dev environments.
 
 import Docker from 'dockerode';
-import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '../db.js';
@@ -50,8 +52,6 @@ interface LaunchDemo {
   author: string | null;
   /** Directory (relative to repo root) with Dockerfile + source. */
   contextDir: string;
-  /** Tag assigned to the built image. Must be unique per demo. */
-  imageTag: string;
   manifest: NormalizedManifest;
 }
 
@@ -65,7 +65,6 @@ const DEMOS: LaunchDemo[] = [
     icon: null,
     author: 'floom',
     contextDir: 'examples/lead-scorer',
-    imageTag: 'floom-demo-lead-scorer:v1',
     manifest: {
       name: 'Lead Scorer',
       description:
@@ -122,7 +121,6 @@ const DEMOS: LaunchDemo[] = [
     icon: null,
     author: 'floom',
     contextDir: 'examples/competitor-analyzer',
-    imageTag: 'floom-demo-competitor-analyzer:v1',
     manifest: {
       name: 'Competitor Analyzer',
       description:
@@ -175,7 +173,6 @@ const DEMOS: LaunchDemo[] = [
     icon: null,
     author: 'floom',
     contextDir: 'examples/resume-screener',
-    imageTag: 'floom-demo-resume-screener:v1',
     manifest: {
       name: 'Resume Screener',
       description:
@@ -254,6 +251,54 @@ async function imageExists(docker: Docker, tag: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+const IGNORED_CONTEXT_NAMES = new Set([
+  '.git',
+  '.DS_Store',
+  '__pycache__',
+  '.pytest_cache',
+  'node_modules',
+]);
+
+function walkContextFiles(contextPath: string, relDir = ''): string[] {
+  const absDir = relDir ? resolve(contextPath, relDir) : contextPath;
+  const entries = readdirSync(absDir, { withFileTypes: true })
+    .filter((entry) => !IGNORED_CONTEXT_NAMES.has(entry.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const files: string[] = [];
+  for (const entry of entries) {
+    const relPath = relDir ? `${relDir}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      files.push(...walkContextFiles(contextPath, relPath));
+      continue;
+    }
+    if (entry.isFile()) {
+      files.push(relPath);
+      continue;
+    }
+    const absPath = resolve(contextPath, relPath);
+    if (lstatSync(absPath).isFile()) files.push(relPath);
+  }
+  return files;
+}
+
+export function fingerprintDemoContext(contextPath: string): string {
+  const hash = createHash('sha256');
+  for (const relPath of walkContextFiles(contextPath)) {
+    hash.update(relPath);
+    hash.update('\0');
+    hash.update(readFileSync(resolve(contextPath, relPath)));
+    hash.update('\0');
+  }
+  return hash.digest('hex').slice(0, 16);
+}
+
+export function imageTagForDemo(
+  demo: Pick<LaunchDemo, 'slug'>,
+  contextPath: string,
+): string {
+  return `floom-demo-${demo.slug}:ctx-${fingerprintDemoContext(contextPath)}`;
 }
 
 async function buildDemoImage(
@@ -337,10 +382,26 @@ export async function seedLaunchDemos(): Promise<{
     return { apps_added: 0, apps_existing: 0, apps_failed: 0 };
   }
 
-  const existsBySlug = db.prepare('SELECT id FROM apps WHERE slug = ?');
+  const existsBySlug = db.prepare(
+    'SELECT id, docker_image FROM apps WHERE slug = ?',
+  );
   const insertApp = db.prepare(
     `INSERT INTO apps (id, slug, name, description, manifest, status, docker_image, code_path, category, author, icon)
      VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+  );
+  const updateApp = db.prepare(
+    `UPDATE apps
+       SET name = ?,
+           description = ?,
+           manifest = ?,
+           status = 'active',
+           docker_image = ?,
+           code_path = ?,
+           category = ?,
+           author = ?,
+           icon = ?,
+           updated_at = datetime('now')
+     WHERE id = ?`,
   );
 
   let added = 0;
@@ -357,16 +418,18 @@ export async function seedLaunchDemos(): Promise<{
       continue;
     }
 
+    const imageTag = imageTagForDemo(demo, contextPath);
+    const codePath = `reused:launch-demo:${demo.slug}:${imageTag.split(':')[1]}`;
+    const manifestJson = JSON.stringify(demo.manifest);
+
     // Build the image if it's not already on the local daemon.
-    if (!(await imageExists(docker, demo.imageTag))) {
+    if (!(await imageExists(docker, imageTag))) {
       console.log(
-        `[launch-demos] ${demo.slug}: building image ${demo.imageTag} from ${contextPath}`,
+        `[launch-demos] ${demo.slug}: building image ${imageTag} from ${contextPath}`,
       );
       try {
-        await buildDemoImage(docker, contextPath, demo.imageTag);
-        console.log(
-          `[launch-demos] ${demo.slug}: built ${demo.imageTag}`,
-        );
+        await buildDemoImage(docker, contextPath, imageTag);
+        console.log(`[launch-demos] ${demo.slug}: built ${imageTag}`);
       } catch (err) {
         console.error(
           `[launch-demos] ${demo.slug}: build failed:`,
@@ -377,13 +440,36 @@ export async function seedLaunchDemos(): Promise<{
       }
     } else {
       console.log(
-        `[launch-demos] ${demo.slug}: image ${demo.imageTag} already present`,
+        `[launch-demos] ${demo.slug}: image ${imageTag} already present`,
       );
     }
 
-    // Insert the DB row if missing.
-    const row = existsBySlug.get(demo.slug) as { id: string } | undefined;
+    // Insert the DB row if missing. Existing launch demos are refreshed in
+    // place so preview picks up current manifests + image tags after deploy.
+    const row = existsBySlug.get(demo.slug) as
+      | { id: string; docker_image: string | null }
+      | undefined;
     if (row) {
+      updateApp.run(
+        demo.name,
+        demo.description,
+        manifestJson,
+        imageTag,
+        codePath,
+        demo.category,
+        demo.author,
+        demo.icon,
+        row.id,
+      );
+      if (row.docker_image !== imageTag) {
+        console.log(
+          `[launch-demos] ${demo.slug}: refreshed existing app to ${imageTag}`,
+        );
+      } else {
+        console.log(
+          `[launch-demos] ${demo.slug}: refreshed existing app metadata`,
+        );
+      }
       existing++;
       continue;
     }
@@ -393,9 +479,9 @@ export async function seedLaunchDemos(): Promise<{
       demo.slug,
       demo.name,
       demo.description,
-      JSON.stringify(demo.manifest),
-      demo.imageTag,
-      `reused:launch-demo:${demo.slug}`,
+      manifestJson,
+      imageTag,
+      codePath,
       demo.category,
       demo.author,
       demo.icon,
