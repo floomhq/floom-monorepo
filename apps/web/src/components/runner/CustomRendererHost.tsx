@@ -52,6 +52,8 @@ interface Props {
 
 const DEFAULT_HEIGHT = 240;
 const READY_TIMEOUT_MS = 4000;
+const RENDER_TIMEOUT_MS = 2500;
+const INIT_RETRY_MS = 300;
 
 export function CustomRendererHost({
   slug,
@@ -96,6 +98,24 @@ export function CustomRendererHost({
     const readyTimer = window.setTimeout(() => {
       setFailed(true);
     }, READY_TIMEOUT_MS);
+    let renderTimer: number | null = null;
+    let initRetryTimer: number | null = null;
+    let rendered = false;
+
+    const clearDeliveryTimers = () => {
+      if (renderTimer !== null) {
+        window.clearTimeout(renderTimer);
+        renderTimer = null;
+      }
+      if (initRetryTimer !== null) {
+        window.clearInterval(initRetryTimer);
+        initRetryTimer = null;
+      }
+    };
+
+    const postInit = () => {
+      iframeRef.current?.contentWindow?.postMessage(initPayload, '*');
+    };
 
     function onMessage(ev: MessageEvent) {
       // Only accept messages from the iframe's own contentWindow. A
@@ -113,12 +133,23 @@ export function CustomRendererHost({
       if (msg.type === 'ready') {
         window.clearTimeout(readyTimer);
         setReady(true);
-        // Ship the init payload. postMessage targets the iframe's window
-        // regardless of origin; the iframe script validates shape.
-        iframeRef.current.contentWindow?.postMessage(initPayload, '*');
+        // The frame can occasionally acknowledge `ready` before the first
+        // init delivery actually sticks. Re-send until we get `rendered`,
+        // then fall back to the default output panel if the custom renderer
+        // never paints.
+        clearDeliveryTimers();
+        postInit();
+        initRetryTimer = window.setInterval(() => {
+          if (!rendered) postInit();
+        }, INIT_RETRY_MS);
+        renderTimer = window.setTimeout(() => {
+          if (!rendered) setFailed(true);
+        }, RENDER_TIMEOUT_MS);
         return;
       }
       if (msg.type === 'rendered') {
+        rendered = true;
+        clearDeliveryTimers();
         setHeight(clampIframeHeight(msg.height) || DEFAULT_HEIGHT);
         return;
       }
@@ -133,6 +164,7 @@ export function CustomRendererHost({
     window.addEventListener('message', onMessage);
     return () => {
       window.clearTimeout(readyTimer);
+      clearDeliveryTimers();
       window.removeEventListener('message', onMessage);
     };
   }, [ok, frameUrl, slug, initPayload]);
