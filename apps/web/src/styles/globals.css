@@ -283,6 +283,25 @@ body:has(.topbar-mobile-menu) {
   filter: brightness(1.05);
 }
 
+.topbar-publish-label-tablet {
+  display: none;
+}
+
+@media (min-width: 641px) and (max-width: 899px) {
+  .topbar {
+    --topbar-right-gap: 8px;
+    --topbar-publish-padding: 9px 14px;
+  }
+
+  .topbar-publish-label-full {
+    display: none;
+  }
+
+  .topbar-publish-label-tablet {
+    display: inline;
+  }
+}
+
 /* ── Mobile responsive ───────────────────────────────────────────────── */
 @media (max-width: 640px) {
   /* Reduce main padding so content fits within 375px */

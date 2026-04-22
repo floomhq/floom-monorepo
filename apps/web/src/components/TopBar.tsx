@@ -55,7 +55,7 @@ const secondaryCtaStyle: CSSProperties = {
 // matches the hero "Publish your app" submit button exactly.
 const primaryCtaStyle: CSSProperties = {
   ...navBaseStyle,
-  padding: '9px 16px',
+  padding: 'var(--topbar-publish-padding, 9px 16px)',
   background: 'var(--accent)',
   color: '#fff',
   border: '1px solid var(--accent)',
@@ -324,7 +324,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
         <div
           className="topbar-links topbar-links-desktop"
           style={{
-            gap: 10,
+            gap: 'var(--topbar-right-gap, 10px)',
             marginLeft: 'auto',
             alignItems: 'center',
           }}
@@ -379,7 +379,8 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                 to={deployHref}
                 style={primaryCtaStyle}
               >
-                Publish an app
+                <span className="topbar-publish-label-full">Publish an app</span>
+                <span className="topbar-publish-label-tablet">Publish</span>
               </Link>
             </>
           )}
