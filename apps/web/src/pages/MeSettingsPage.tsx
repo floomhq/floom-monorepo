@@ -500,12 +500,48 @@ export function MeSettingsPage() {
         {activeTab === 'studio' && (
           <>
             <SettingsCard id="settings-card-studio-keys">
-              <SectionHeading>Creator API keys</SectionHeading>
-              <StubPanel
-                label="Coming v1.1"
-                title="Personal access tokens"
-                desc="Publish + manage apps from CI or the Floom CLI. Until then, use your browser session or the self-host API token."
-              />
+              <SectionHeading>API keys</SectionHeading>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: 'var(--muted)',
+                  margin: '0 0 14px',
+                  lineHeight: 1.55,
+                }}
+              >
+                Use these to call Floom from the CLI, the Claude Code skill,
+                or any MCP client. Send as{' '}
+                <code
+                  style={{
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: 12,
+                    background: 'var(--bg)',
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                    border: '1px solid var(--line)',
+                  }}
+                >
+                  Authorization: Bearer &lt;key&gt;
+                </code>
+                .
+              </p>
+              <Link
+                to="/me/settings/tokens"
+                data-testid="settings-tokens-link"
+                style={{
+                  display: 'inline-flex',
+                  padding: '8px 14px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--ink)',
+                  background: 'var(--card)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 8,
+                  textDecoration: 'none',
+                }}
+              >
+                Manage API keys →
+              </Link>
             </SettingsCard>
 
             <SettingsCard id="settings-card-studio-billing">

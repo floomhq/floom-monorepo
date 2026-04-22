@@ -25,6 +25,7 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(m 
 const MePage = lazy(() => import('./pages/MePage').then(m => ({ default: m.MePage })));
 const MeRunDetailPage = lazy(() => import('./pages/MeRunDetailPage').then(m => ({ default: m.MeRunDetailPage })));
 const MeSettingsPage = lazy(() => import('./pages/MeSettingsPage').then(m => ({ default: m.MeSettingsPage })));
+const MeSettingsTokensPage = lazy(() => import('./pages/MeSettingsTokensPage').then(m => ({ default: m.MeSettingsTokensPage })));
 // MeAppPage + MeAppSecretsPage still live on disk for shared component
 // exports (AppHeader, TabBar) used by the Studio pages; the routes that
 // mounted them directly now redirect into /studio/*.
@@ -253,6 +254,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/me/runs" element={<Navigate to="/me#recent-runs" replace />} />
         <Route path="/me/runs/:runId" element={<MeRunDetailPage />} />
         <Route path="/me/settings" element={<MeSettingsPage />} />
+        <Route path="/me/settings/tokens" element={<MeSettingsTokensPage />} />
         {/* v16 studio restructure 2026-04-18: creator-context pages moved
             to /studio/*. Legacy /me/apps/:slug (owner context) redirects
             to the new Studio tree. MeAppRunPage stays under /me/apps/:slug/run
