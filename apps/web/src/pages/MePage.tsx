@@ -613,8 +613,9 @@ export function MePage() {
         {/* Recent runs — full history of past runs. Rows include a short
             run-id tag so two runs of the same app within the same relative
             window read as distinct events (fixes the "UUID Generator · v4 ·
-            3h ago" duplication Federico flagged). */}
-        <section data-testid="me-runs-section" aria-label="Recent runs">
+            3h ago" duplication Federico flagged). id="recent-runs" lets
+            /me/runs redirect to /me#recent-runs and scroll straight here. */}
+        <section id="recent-runs" data-testid="me-runs-section" aria-label="Recent runs">
           <header
             style={{
               display: 'flex',
