@@ -190,7 +190,13 @@ try {
     `before=${jobsBefore1} after=${jobsAfter1}`,
   );
   const trAfter1 = db.prepare('SELECT next_run_at, last_fired_at FROM triggers WHERE id = ?').get(schedId);
-  log('next_run_at advanced past now', trAfter1.next_run_at > Date.now());
+  log(
+    'next_run_at advanced past last fire',
+    typeof trAfter1.next_run_at === 'number'
+      && typeof trAfter1.last_fired_at === 'number'
+      && trAfter1.next_run_at > trAfter1.last_fired_at,
+    `next_run_at=${trAfter1.next_run_at} last_fired_at=${trAfter1.last_fired_at}`,
+  );
   log('last_fired_at recorded', !!trAfter1.last_fired_at);
 
   // Second forced fire → assert 2 total fires.

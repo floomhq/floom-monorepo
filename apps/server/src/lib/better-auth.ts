@@ -90,7 +90,7 @@ function buildAuthOptions(): any {
         'Generate with: openssl rand -hex 32',
     );
   }
-  const baseURL =
+  const staticBaseURL =
     process.env.BETTER_AUTH_URL ||
     process.env.PUBLIC_URL ||
     `http://localhost:${process.env.PORT || 3051}`;
@@ -123,6 +123,19 @@ function buildAuthOptions(): any {
   // Floom production hosts so cookie-bearing auth POSTs work from any of
   // them regardless of which one the BETTER_AUTH_URL env var points at.
   const isDev = process.env.NODE_ENV !== 'production';
+  const port = process.env.PORT || 3051;
+  const allowedAuthHosts = Array.from(
+    new Set(
+      [
+        'floom.dev',
+        'preview.floom.dev',
+        'app.floom.dev',
+        `localhost:${port}`,
+        `127.0.0.1:${port}`,
+        ...(isDev ? ['localhost:5173', '127.0.0.1:5173'] : []),
+      ].filter(Boolean),
+    ),
+  );
   const trustedOrigins = [
     'https://floom.dev',
     'https://preview.floom.dev',
@@ -134,7 +147,15 @@ function buildAuthOptions(): any {
   return {
     appName: 'Floom',
     secret,
-    baseURL,
+    // Dynamic baseURL resolves social callback URLs from the incoming host
+    // instead of pinning everything to BETTER_AUTH_URL. This keeps floom.dev
+    // and preview.floom.dev on the correct host even when the same container
+    // serves both.
+    baseURL: {
+      allowedHosts: allowedAuthHosts,
+      fallback: staticBaseURL,
+      protocol: 'auto',
+    },
     trustedOrigins,
     // Better Auth owns its own /auth/* prefix when mounted via Hono. The
     // `basePath` here matches the mount point in apps/server/src/index.ts.
