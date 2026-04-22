@@ -23,7 +23,7 @@
 // router handles them without a full page reload.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams, Navigate } from 'react-router-dom';
+import { Link, useLocation, Navigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { TopBar } from '../components/TopBar';
@@ -287,11 +287,19 @@ const markdownComponents = {
 // ── DocsPage ───────────────────────────────────────────────────────────────
 
 export function DocsPage() {
-  const { slug } = useParams<{ slug?: string }>();
-  const activeSlug = (slug as DocsSlug | undefined) ?? 'getting-started';
+  // Routes are declared per-slug in main.tsx (`/docs/protocol`, `/docs/deploy`,
+  // etc.) rather than as a wildcard, so `useParams` yields no `slug`. Parse
+  // the pathname instead — this keeps the per-slug routes (which SEO / prerender
+  // can tree-shake per page) and still lets one component render them all.
+  const { pathname } = useLocation();
+  const slugFromPath = pathname.replace(/^\/docs\/?/, '').replace(/\/.*$/, '') || 'getting-started';
+  const activeSlug: DocsSlug =
+    slugFromPath in PAGES ? (slugFromPath as DocsSlug) : 'getting-started';
 
-  // Unknown slug → redirect to the index.
-  if (slug && !(slug in PAGES)) {
+  // Unknown slug → redirect to the index. (Mostly unreachable: main.tsx
+  // already declares a `/docs/*` catch-all Navigate, but kept here as a
+  // defence-in-depth in case routes diverge in future.)
+  if (slugFromPath && !(slugFromPath in PAGES)) {
     return <Navigate to="/docs/getting-started" replace />;
   }
 

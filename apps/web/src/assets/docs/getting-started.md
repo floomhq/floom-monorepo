@@ -1,83 +1,87 @@
 # Getting started
 
-Five minutes from never-heard-of-Floom to a live, shareable app.
+Floom is a **protocol + runtime for agentic work**. You describe what a task needs - inputs, secrets, output shape - in one file, and Floom gives you a web form, an MCP tool for agents, and an HTTP endpoint. Same app, three surfaces.
 
-Floom turns an **OpenAPI spec** (the standard way APIs describe themselves) into three things at once: a web form your teammates can fill in, an MCP tool your agent can call, and an HTTP endpoint your code can hit. One manifest, three surfaces.
+This page gets you from zero to a running app in two steps: run one, then publish one.
 
-## What you need
+## Run your first app (30 seconds)
 
-- A browser.
-- An OpenAPI spec URL (any REST API with a published spec — Stripe, Resend, OpenAI, GitHub, your own). Floom ships a public directory of 100+ pre-wired apps if you just want to try one.
-- A Floom account on [floom.dev](https://floom.dev) (free during beta).
+Open [floom.dev/apps/lead-scorer](https://floom.dev/apps/lead-scorer). Fill in a CSV of leads and a one-line ICP description. Hit **Run**.
 
-That's it. No CLI install. No Docker on your laptop. No YAML to hand-write.
+That's it. You just used a Floom hosted app - a Python script running in a sandboxed container, calling Gemini with web search, returning a ranked table. Five free runs per IP per 24 hours on Floom's key; after that you paste your own Gemini key. See [Limits](./limits).
 
-## Step 1. Browse or build
+Other launch apps you can try right now:
 
-Go to [floom.dev](https://floom.dev) and either:
+- [competitor-analyzer](https://floom.dev/apps/competitor-analyzer) - feature + pricing comparison across 3-10 competitors.
+- [resume-screener](https://floom.dev/apps/resume-screener) - rank a zip of PDF CVs against a job description.
+- [jwt-decode](https://floom.dev/apps/jwt-decode), [json-format](https://floom.dev/apps/json-format), [uuid](https://floom.dev/apps/uuid), [password](https://floom.dev/apps/password) - zero-click utilities, no keys needed.
 
-- **Browse** — pick something from the app store at [floom.dev/apps](https://floom.dev/apps). You get an instant form to run it from.
-- **Build** — head to [floom.dev/studio/build](https://floom.dev/studio/build) and paste an OpenAPI spec URL. Floom reads it, generates a form per operation, and gives you a permalink.
+Every app has a permalink (`floom.dev/p/<slug>`), an MCP server (`floom.dev/mcp/app/<slug>`), and an HTTP endpoint (`floom.dev/api/<slug>/run`). See [Protocol](./protocol).
 
-### Paste-an-OpenAPI example
+## Publish your first app (5 minutes)
 
-```
-https://raw.githubusercontent.com/resend/resend-openapi/main/resend.yaml
-```
+You have two starting points: a public API with an OpenAPI spec, or a GitHub repo with code + a `floom.yaml`.
 
-Paste that URL into the build form and hit **Detect**. Floom scans the spec, shows you the operations it found (send email, list audiences, etc.), and lets you publish in one click.
+### Option A. Wrap an existing API (proxied)
 
-## Step 2. Add your secret
+If the service you want to expose already publishes an OpenAPI spec, Floom wraps it. No code to write.
 
-If the app calls an API that needs a key (most do), Floom asks for it once, stores it encrypted per-user, and injects it at run time. You never paste keys into forms, URLs, or the front-end.
+1. Go to [floom.dev/studio/build](https://floom.dev/studio/build).
+2. Paste the spec URL, for example:
+   ```
+   https://raw.githubusercontent.com/resend/resend-openapi/main/resend.yaml
+   ```
+3. Hit **Detect**. Floom scans the spec, lists the operations, generates a form per operation.
+4. Paste the service's API key into the **Secrets** tab. Floom encrypts it per-user and injects it at run time. You never ship keys to the browser.
+5. Hit **Publish**. Done. You get a `floom.dev/p/<slug>` URL to share.
 
-Go to your app's **Secrets** tab inside [floom.dev/studio](https://floom.dev/studio) and paste your key. Floom's vault holds it; no one else sees it.
+### Option B. Ship your own code (hosted)
 
-## Step 3. Run it
+Write a Python or Node script. Declare its inputs + outputs + secrets in a `floom.yaml`. Push to a public GitHub repo. Paste the repo URL into `/studio/build` and Floom does the rest - auto-detects the runtime, builds a container, smoke-tests the entrypoint, publishes.
 
-Three ways to run the same app:
-
-### From the browser
-
-Every app has a permalink at `floom.dev/p/<slug>`. Open it, fill the form, hit **Run**. The output renders inline. Share the result URL — it's a read-only snapshot anyone can open.
-
-### From an agent (MCP)
-
-Each app exposes an **MCP server** — the protocol Claude, Cursor, and other agents speak natively. Point your agent at:
+Minimum repo layout:
 
 ```
-https://floom.dev/mcp/app/<slug>
+my-app/
+├── floom.yaml         # manifest: name, action, inputs, outputs, secrets
+├── main.py            # your code
+└── requirements.txt   # deps
 ```
 
-Your agent now has the app's operations as callable tools, with inputs and outputs typed the way the OpenAPI spec described them. No glue code.
+Minimum `floom.yaml`:
 
-Want to install it in Claude Desktop? Each app has an **Install** button that generates the right config snippet. See [Claude Desktop setup](https://github.com/floomhq/floom/blob/main/docs/CLAUDE_DESKTOP_SETUP.md).
-
-### From code (HTTP)
-
-```bash
-curl -X POST https://floom.dev/api/<slug>/run \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-floom-api-key>" \
-  -d '{"action": "send", "inputs": {"to": "you@example.com", "subject": "hi"}}'
+```yaml
+name: My App
+slug: my-app
+description: What it does, one sentence.
+runtime: python
+python_dependencies:
+  - requests==2.32.0
+secrets_needed:
+  - MY_API_KEY
+actions:
+  run:
+    label: Run
+    inputs:
+      - name: query
+        type: textarea
+        required: true
+    outputs:
+      - name: result
+        type: markdown
+manifest_version: "2.0"
 ```
 
-You get back `{ "run_id": "...", "status": "pending" }`. Poll `GET /api/run/<run_id>` or stream logs over Server-Sent Events at `GET /api/run/<run_id>/stream`.
+Your script reads the run config from `argv[1]`, does its work, and prints one line starting with `__FLOOM_RESULT__`. That's the protocol. Full shape on the [Protocol](./protocol) page.
 
-## Step 4. Share
+Working examples in the monorepo: [lead-scorer](https://github.com/floomhq/floom/tree/main/examples/lead-scorer), [competitor-analyzer](https://github.com/floomhq/floom/tree/main/examples/competitor-analyzer), [resume-screener](https://github.com/floomhq/floom/tree/main/examples/resume-screener).
 
-Every run has a public permalink at `floom.dev/r/<run_id>`. Paste it in Slack, a PR comment, a tweet. The reader sees the same inputs and outputs the runner saw, no login needed (for public apps).
+## Share the result
 
-Public apps show up in [floom.dev/apps](https://floom.dev/apps). Private apps don't.
+Every run has a public permalink at `floom.dev/r/<run_id>`. Drop it in Slack, a PR comment, anywhere. The reader sees the same inputs and outputs you saw. No login needed for public apps.
 
-## What about hosted-mode apps?
+## Where to go next
 
-The examples above are **proxied** apps — Floom wraps an existing API you already trust. Floom also supports **hosted** apps — you write a Python or Node script, declare it in a `floom.yaml`, and Floom runs it inside a sandbox with your secrets injected. This is how the launch-day demos ([lead-scorer](https://github.com/floomhq/floom/tree/main/examples/lead-scorer), [competitor-analyzer](https://github.com/floomhq/floom/tree/main/examples/competitor-analyzer), [resume-screener](https://github.com/floomhq/floom/tree/main/examples/resume-screener)) work.
-
-Hosted mode gets its own write-up on the [Protocol](./protocol) page.
-
-## Next
-
-- [Protocol](./protocol) — the full shape of a Floom manifest and what each surface does.
-- [Deploy](./deploy) — run Floom yourself (self-host) or pick the hosted tier.
-- [Limits](./limits) — the hard numbers (runtime, memory, rate limits, file sizes) before you build on top of us.
+- **[Protocol](./protocol)** - what's in `floom.yaml`, the `__FLOOM_RESULT__` output contract, file uploads, HTTP/MCP surface.
+- **[Deploy](./deploy)** - GitHub import vs proxied, publishing states, self-host via Docker.
+- **[Limits](./limits)** - hard numbers for runtime, memory, file size, rate limits, BYOK.
