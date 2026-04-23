@@ -110,12 +110,19 @@ export function LandingV17Page() {
       <TopBar />
 
       <main id="main" style={{ display: 'block' }}>
-        {/* HERO — wireframe: .hero-shell > .hero */}
+        {/* HERO — wireframe: .hero-shell > .hero
+            Cursor-style layout (Federico 2026-04-23 — "the visual demo
+            doesn't have to fit on the hero in full"). Above the fold at
+            1440x900: eyebrow + H1 + sub + CTA + top ~120-150px of the
+            HeroDemo canvas. The rest of the demo extends below the fold and
+            reveals on scroll — no min-height:100vh forcing fit, no squished
+            demo. Top padding trimmed (40 -> 24) to give the canvas more room
+            inside the first viewport. */}
         <section
           data-testid="hero"
           style={{
             position: 'relative',
-            padding: '40px 24px 40px',
+            padding: '24px 24px 40px',
             borderBottom: '1px solid var(--line)',
             background:
               'linear-gradient(180deg, var(--card) 0%, var(--bg) 100%)',
@@ -223,9 +230,10 @@ export function LandingV17Page() {
           </div>
 
           {/* Hero demo — interactive 3-state build/deploy/use loop.
-              Sits directly under the CTAs so it's visible above the fold
-              (Federico 2026-04-23 — "not visible on hero" was caused by the
-              CLI reference block pushing the demo below the fold). */}
+              Sits directly under the CTAs. Sized to 580px (Cursor-style,
+              Federico 2026-04-23): top ~120-150px is visible above the fold
+              at 1440x900, rest scrolls into view. Bigger canvas = more
+              cinematic, no squishing to fit the viewport. */}
           <HeroDemo />
         </section>
 
