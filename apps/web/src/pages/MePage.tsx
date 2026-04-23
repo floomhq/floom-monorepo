@@ -981,12 +981,15 @@ function RunRow({
   // Re-render on an interval so relative time always uses a fresh
   // `Date.now()` vs `started_at` (issue #102 — not frozen at first paint).
   const [, setRelTimeTick] = useState(0);
+  const [rowHover, setRowHover] = useState(false);
   useEffect(() => {
     const id = window.setInterval(() => setRelTimeTick((n) => n + 1), 30_000);
     return () => clearInterval(id);
   }, []);
   const appName = run.app_name || run.app_slug || 'App';
   const summary = runSummary(run);
+  const outPreview = runOutputPreviewLine(run);
+  const previewLine = [summary, outPreview].filter(Boolean).join(' → ');
   const tooltip = runRowTooltip(run, summary);
   const time = formatTime(run.started_at);
   const runTag = runIdShort(run.id);
@@ -998,6 +1001,8 @@ function RunRow({
       disabled={disabled}
       data-testid={`me-run-row-${run.id}`}
       title={tooltip}
+      onMouseEnter={() => setRowHover(true)}
+      onMouseLeave={() => setRowHover(false)}
       style={{
         width: '100%',
         display: 'flex',
@@ -1007,14 +1012,15 @@ function RunRow({
         minHeight: 56,
         border: 'none',
         borderBottom: isLast ? 'none' : '1px solid var(--line)',
-        background: 'transparent',
+        background: rowHover && !disabled ? 'color-mix(in srgb, var(--line) 32%, transparent)' : 'transparent',
+        transition: 'background 0.12s ease',
         textAlign: 'left',
         cursor: disabled ? 'default' : 'pointer',
         fontFamily: 'inherit',
         color: 'var(--ink)',
       }}
     >
-      <StatusDot status={run.status} />
+      <MeRunStatusPill status={run.status} />
       {run.app_slug && (
         <span aria-hidden style={s.appIconWrap}>
           <AppIcon slug={run.app_slug} size={14} />
@@ -1027,6 +1033,8 @@ function RunRow({
             alignItems: 'baseline',
             gap: 8,
             fontSize: 14,
+            minWidth: 0,
+            width: '100%',
           }}
         >
           <span
@@ -1036,12 +1044,13 @@ function RunRow({
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
-              maxWidth: 200,
+              maxWidth: 'min(200px, 40%)',
+              flexShrink: 0,
             }}
           >
             {appName}
           </span>
-          {summary && (
+          {previewLine ? (
             <span
               style={{
                 color: 'var(--muted)',
@@ -1053,9 +1062,9 @@ function RunRow({
                 fontFamily: 'inherit',
               }}
             >
-              {summary}
+              {previewLine}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
       <span
@@ -1099,26 +1108,100 @@ function runIdShort(id: string | null | undefined): string {
   return trimmed.slice(0, 8);
 }
 
-function StatusDot({ status }: { status: RunStatus }) {
-  const color =
-    status === 'success'
-      ? 'var(--accent)'
-      : status === 'error' || status === 'timeout'
-        ? '#c2321f'
-        : 'var(--muted)';
+/**
+ * Compact status label for the runs list (issue #92). Uses the same
+ * success/error colors as the prior StatusDot.
+ */
+function MeRunStatusPill({ status }: { status: RunStatus }) {
+  if (status === 'success') {
+    return (
+      <span
+        aria-label="Status: success"
+        style={{
+          flexShrink: 0,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase' as const,
+          padding: '3px 6px',
+          borderRadius: 4,
+          background: 'rgba(4, 120, 87, 0.12)',
+          color: 'var(--accent, #047857)',
+        }}
+      >
+        OK
+      </span>
+    );
+  }
+  if (status === 'error' || status === 'timeout') {
+    return (
+      <span
+        aria-label={`Status: ${status}`}
+        style={{
+          flexShrink: 0,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase' as const,
+          padding: '3px 6px',
+          borderRadius: 4,
+          background: '#fdecea',
+          color: '#c2321f',
+        }}
+      >
+        Error
+      </span>
+    );
+  }
   return (
     <span
       aria-label={`Status: ${status}`}
       style={{
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        background: color,
         flexShrink: 0,
-        display: 'inline-block',
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: '0.03em',
+        textTransform: 'uppercase' as const,
+        padding: '3px 6px',
+        borderRadius: 4,
+        background: 'color-mix(in srgb, var(--muted) 12%, transparent)',
+        color: 'var(--muted)',
       }}
-    />
+    >
+      {status === 'running' ? 'Run' : '…'}
+    </span>
   );
+}
+
+/** One-line output snippet for the runs list (issue #92). */
+function runOutputPreviewLine(run: MeRunSummary): string | null {
+  const o = run.outputs;
+  if (o == null || o === '') return null;
+  if (typeof o === 'string') {
+    const t = o.replace(/\s+/g, ' ').trim();
+    return t ? truncate(t, 72) : null;
+  }
+  if (typeof o === 'object' && o !== null && !Array.isArray(o)) {
+    const rec = o as Record<string, unknown>;
+    const direct =
+      typeof rec['text'] === 'string'
+        ? rec['text']
+        : typeof rec['message'] === 'string'
+          ? rec['message']
+          : typeof rec['result'] === 'string'
+            ? rec['result']
+            : null;
+    if (direct && String(direct).trim()) {
+      return truncate(String(direct).replace(/\s+/g, ' ').trim(), 72);
+    }
+  }
+  try {
+    const raw = JSON.stringify(o);
+    if (raw.length <= 80) return raw;
+    return `${raw.slice(0, 77)}…`;
+  } catch {
+    return null;
+  }
 }
 
 function runSummary(run: MeRunSummary): string | null {
