@@ -228,7 +228,7 @@ const EXAMPLE_MANIFEST_LINKS = [
   'blast-radius',
   'claude-wrapped',
   'dep-check',
-  'flyfast',
+  'openpaper',
   'hook-stats',
   'session-recall',
 ] as const;

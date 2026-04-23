@@ -44,16 +44,6 @@ export function IconSprite() {
       </symbol>
 
       {/* App glyphs, Lucide style */}
-      <symbol id="app-flyfast" viewBox="0 0 24 24">
-        <path
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M21 3L3 10.5l7 2 2 7L21 3zM10 12.5l3.5-3.5"
-        />
-      </symbol>
       <symbol id="app-openslides" viewBox="0 0 24 24">
         <rect x="3" y="5" width="18" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" />
         <rect x="3" y="11" width="18" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -503,7 +493,6 @@ function hashSlug(slug: string): number {
 // unknown slug rendered app-default, making the /apps grid unskimmable).
 export function iconForSlug(slug: string): string {
   const map: Record<string, string> = {
-    flyfast: 'app-flyfast',
     openslides: 'app-openslides',
     openblog: 'app-openblog',
     opendraft: 'app-opendraft',
