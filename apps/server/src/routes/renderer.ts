@@ -95,9 +95,13 @@ rendererRouter.get('/:slug/bundle.js', (c) => {
     headers: {
       'content-type': 'application/javascript; charset=utf-8',
       'cache-control': 'public, max-age=60, must-revalidate',
-      // `X-Content-Type-Options: nosniff` is set centrally by
-      // `middleware/security.ts` (pentest LOW #383 — single source of
-      // truth). Don't emit it here too.
+      // Pentest LOW #383 — middleware is the canonical source of truth
+      // for nosniff, but Hono's `c.res.headers.set()` in a post-`next()`
+      // hook does not reliably reach responses built via `new Response()`
+      // (the renderer routes return raw Response objects so they can
+      // emit binary bundle bytes). Emit explicitly here; the middleware's
+      // `if (!headers.get(...))` guard keeps this dedup-safe.
+      'x-content-type-options': 'nosniff',
       'x-floom-renderer-hash': bundle.sourceHash,
       'x-floom-renderer-shape': bundle.outputShape,
     },
@@ -160,9 +164,11 @@ rendererRouter.get('/:slug/frame.html', (c) => {
       //
       // `Referrer-Policy: no-referrer` is stricter than the top-level
       // default; the middleware respects route-set values after pentest
-      // LOW #383. `X-Content-Type-Options: nosniff` is emitted by the
-      // middleware — we don't duplicate it.
+      // LOW #383. nosniff is emitted here too (not just the middleware)
+      // because responses built via `new Response()` don't reliably
+      // receive post-`next()` header mutations in Hono.
       'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
     },
   });
 });
