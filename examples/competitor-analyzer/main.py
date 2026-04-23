@@ -28,12 +28,14 @@ no Gemini 2.x. If GEMINI_API_KEY is unset, emits a mock payload for UI demos.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import sys
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -42,6 +44,12 @@ from urllib.parse import urlparse
 DEFAULT_MODEL = "gemini-3-flash-preview"
 MAX_WORKERS = 8
 RETRIES_PER_URL = 1  # one retry on top of the initial attempt
+
+# Sample-input cache: if the canonical input hash matches an entry in
+# sample-cache.json, return the frozen golden (generated with
+# gemini-3.1-pro-preview) in <500ms. Any other input falls through to a
+# live Flash call. See canonical_input() below for the hashing contract.
+SAMPLE_CACHE_PATH = Path(__file__).parent / "sample-cache.json"
 
 
 def _emit(payload: dict[str, Any]) -> None:
@@ -133,6 +141,75 @@ def _strip_code_fences(text: str) -> str:
     t = text.strip()
     fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", t, flags=re.DOTALL)
     return fence.group(1).strip() if fence else t
+
+
+def _normalize_urls(urls_raw: Any) -> list[str]:
+    """Same normalization main() applies before the run. Extracted so the
+    cache key and the runner see the exact same URL list.
+
+    Rules:
+      - accept list or newline/comma-separated string
+      - strip whitespace, add https:// if missing
+      - dedupe, preserve first-occurrence order
+    """
+    if isinstance(urls_raw, str):
+        urls_raw = [p.strip() for p in re.split(r"[,\n]+", urls_raw) if p.strip()]
+    elif urls_raw is None:
+        urls_raw = []
+    if not isinstance(urls_raw, list):
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for u in urls_raw:
+        if not isinstance(u, str):
+            continue
+        u2 = u.strip()
+        if not u2:
+            continue
+        if not u2.startswith(("http://", "https://")):
+            u2 = "https://" + u2
+        if u2 in seen:
+            continue
+        seen.add(u2)
+        out.append(u2)
+    return out
+
+
+def canonical_input(urls: Any, your_product: str) -> str:
+    """Deterministic string representation of the inputs.
+
+    Contract:
+      - URLs are normalized via _normalize_urls (lowercase scheme + host is
+        NOT forced; competitors often care about path e.g. /enterprise).
+        Order is preserved from first occurrence so the canonical is stable
+        whether the textarea is "a\\nb" or "a, b".
+      - your_product is stripped + internal whitespace runs collapsed to
+        single spaces (typo-indifferent canonicalization; Flash runs on
+        small edits anyway).
+      - JSON-encoded with sort_keys=True.
+    """
+    normalized_urls = _normalize_urls(urls)
+    normalized_product = re.sub(r"\s+", " ", your_product.strip())
+    payload = {"urls": normalized_urls, "your_product": normalized_product}
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _input_hash(urls: Any, your_product: str) -> str:
+    return hashlib.sha256(canonical_input(urls, your_product).encode("utf-8")).hexdigest()
+
+
+def _load_sample_cache() -> dict[str, Any]:
+    """Load the frozen golden cache, or {} if the file is missing."""
+    if not SAMPLE_CACHE_PATH.is_file():
+        return {}
+    try:
+        with open(SAMPLE_CACHE_PATH, encoding="utf-8") as f:
+            raw = json.load(f)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[competitor-analyzer] sample-cache.json unreadable ({exc}); ignoring", flush=True)
+        return {}
+    entries = raw.get("entries") if isinstance(raw, dict) else None
+    return entries or {}
 
 
 def _mock_competitor(url: str, your_product: str) -> dict[str, Any]:
@@ -334,14 +411,12 @@ def main() -> int:
     # manifest v2.0 has no native array type. The web UI splits that string
     # client-side (see apps/web/src/components/runner/InputField.tsx's
     # ARRAY_INPUT_NAMES), but direct API/MCP callers send the raw string.
-    # Accept both shapes here so the app works end-to-end regardless of
-    # caller.
-    if isinstance(urls_raw, str):
-        urls_raw = [part.strip() for part in re.split(r"[,\n]+", urls_raw) if part.strip()]
-    elif urls_raw is None:
-        urls_raw = []
-
-    if not isinstance(urls_raw, list) or not urls_raw:
+    # _normalize_urls() handles both shapes and also dedupes + https://-
+    # prefixes. Kept as a helper so the sample-cache canonicalizer sees the
+    # exact same URL list the runner does.
+    if urls_raw is None or (isinstance(urls_raw, str) and not urls_raw.strip()) or (
+        isinstance(urls_raw, list) and not urls_raw
+    ):
         _emit(
             {
                 "ok": False,
@@ -360,22 +435,7 @@ def main() -> int:
         )
         return 2
 
-    # Normalize: strip, dedupe, keep order, require http(s).
-    seen: set[str] = set()
-    urls: list[str] = []
-    for u in urls_raw:
-        if not isinstance(u, str):
-            continue
-        u2 = u.strip()
-        if not u2:
-            continue
-        if not u2.startswith(("http://", "https://")):
-            u2 = "https://" + u2
-        if u2 in seen:
-            continue
-        seen.add(u2)
-        urls.append(u2)
-
+    urls = _normalize_urls(urls_raw)
     if not urls:
         _emit(
             {
@@ -385,6 +445,22 @@ def main() -> int:
             }
         )
         return 2
+
+    # Fast path: exact-match sample input returns the baked-in golden in
+    # <500ms. The golden was produced with gemini-3.1-pro-preview (richer
+    # reasoning than live Flash). Any other input falls through.
+    cache = _load_sample_cache()
+    h = _input_hash(urls_raw, your_product)
+    if h in cache:
+        print(f"[competitor-analyzer] cache hit for input_hash={h[:12]}...", flush=True)
+        cached = dict(cache[h])
+        meta = dict(cached.get("meta") or {})
+        meta["cache_hit"] = True
+        meta["dry_run"] = False
+        meta.setdefault("model", "gemini-3.1-pro-preview (cached)")
+        cached["meta"] = meta
+        _emit({"ok": True, "outputs": cached})
+        return 0
 
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     dry_run = not api_key
@@ -399,6 +475,7 @@ def main() -> int:
                 "analyzed": len(competitors),
                 "failed": 0,
                 "dry_run": True,
+                "cache_hit": False,
                 "model": model,
             },
         }
@@ -438,6 +515,7 @@ def main() -> int:
             "analyzed": analyzed,
             "failed": failed,
             "dry_run": False,
+            "cache_hit": False,
             "model": model,
         },
     }

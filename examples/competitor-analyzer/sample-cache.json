@@ -1,0 +1,94 @@
+{
+  "_comment": "Pre-generated golden responses for the /p/competitor-analyzer demo sample inputs. If the user submits the exact sample (canonical hash below matches), main.py returns this blob in <500ms. Any other input falls through to a live Gemini Flash call. Regenerate with `python3 scripts/gen-demo-cache.py` after changing the sample assets or canonical_input().",
+  "generated_with": "gemini-3.1-pro-preview",
+  "entries": {
+    "18f9ce559bc2a352c0728adaad2e9c5997eeccd689c0b4d1e97baf04c9ff6be6": {
+      "competitors": [
+        {
+          "url": "https://linear.app",
+          "company": "Linear",
+          "positioning": "The product development system for teams and agents, purpose-built for planning and building products.",
+          "pricing": "Free + $10/user/mo Basic + $16/user/mo Business + Enterprise (custom)",
+          "target_market": "Software engineering and product development teams, from startups to enterprises.",
+          "strengths": [
+            "Deeply entrenched in engineering workflows with native integrations for developer tools like GitHub and GitLab.",
+            "Lightning-fast, keyboard-centric interface optimized specifically for technical users and developers.",
+            "Advanced AI agent ecosystem designed for product development tasks like automated PR reviews and issue triage.",
+            "Strong bottom-up adoption driven by a generous free tier and predictable per-seat pricing."
+          ],
+          "weaknesses": [
+            "Zero focus on go-to-market workflows, making it entirely unsuitable for B2B sales automation.",
+            "Lacks native integrations with major CRMs like Salesforce and HubSpot.",
+            "Rigid per-seat pricing charges full price for guest accounts, making it less flexible than a usage-based model for cross-functional teams.",
+            "Not tailored to the EU mid-market, lacking specific regional localization or dedicated EU sales compliance features."
+          ],
+          "source_citations": [
+            "https://linear.app",
+            "https://linear.app/pricing"
+          ]
+        },
+        {
+          "url": "https://notion.so",
+          "company": "Notion Labs, Inc.",
+          "positioning": "The AI workspace that works for you.",
+          "pricing": "Free + $10/user/mo Plus + $15/user/mo Business + Enterprise (contact sales). Notion AI is an $8-$10/user/mo add-on.",
+          "target_market": "Knowledge workers, SMBs, and Enterprise teams across engineering, product, design, and marketing.",
+          "strengths": [
+            "Highly flexible, all-in-one workspace (docs, wikis, projects) that consolidates multiple tools across an organization.",
+            "Broad, horizontal AI capabilities (custom agents, enterprise search, writing) applicable to any department.",
+            "Massive community and template ecosystem with over 100M users globally.",
+            "Low barrier to entry with a freemium model and affordable per-seat pricing."
+          ],
+          "weaknesses": [
+            "Not purpose-built for B2B sales automation; lacks specialized out-of-the-box sales workflows.",
+            "Relies on rigid per-seat pricing rather than flexible, value-aligned usage-based pricing.",
+            "Requires heavy manual configuration and template building to function as a CRM or sales tool.",
+            "Lacks deep, native, bi-directional integrations with Salesforce and HubSpot optimized specifically for mid-market sales teams.",
+            "Broad horizontal focus means it lacks specific EU mid-market sales localization and compliance specializations."
+          ],
+          "source_citations": [
+            "https://www.notion.so"
+          ]
+        },
+        {
+          "url": "https://asana.com",
+          "company": "Asana, Inc.",
+          "positioning": "Supercharge your teams with AI that gets work done.",
+          "pricing": "Free Personal plan + Starter ($10.99/user/mo) + Advanced ($24.99/user/mo) + Enterprise (contact sales).",
+          "target_market": "Cross-functional knowledge workers, project managers, and operations teams across SMBs to large enterprises.",
+          "strengths": [
+            "Broad, cross-functional project and portfolio management capabilities suitable for entire organizations, not just sales.",
+            "Massive integration ecosystem with over 300+ apps, allowing it to connect with almost any enterprise tool.",
+            "Advanced enterprise-grade security, governance, and compliance features (including Asana Gov).",
+            "Highly flexible AI Studio and workflow builder that can automate a wide variety of general business processes."
+          ],
+          "weaknesses": [
+            "Not purpose-built for B2B sales; lacks native CRM, lead tracking, and dedicated sales pipeline automation.",
+            "Rigid per-user pricing model that becomes expensive as teams scale, unlike flexible usage-based pricing.",
+            "Steep learning curve for setting up complex rules and workflows, which can frustrate new users.",
+            "General-purpose AI features focus on task management and summaries rather than specialized sales intelligence and outreach."
+          ],
+          "source_citations": [
+            "https://asana.com",
+            "https://www.forbes.com/advisor/business/software/asana-pricing/",
+            "https://www.g2.com/products/asana/reviews",
+            "https://www.bitrix24.com/alternatives/asana.php"
+          ]
+        }
+      ],
+      "summary": "While Linear, Notion, and Asana all provide powerful AI-enhanced productivity tools, they share a common reliance on rigid per-seat pricing models and broad, horizontal workflows rather than specialized sales functions. This generic approach leaves a massive white-space opportunity for your product to capture the EU mid-market by delivering purpose-built B2B sales automation with flexible usage-based pricing and native Salesforce and HubSpot integrations. Because these competitors require heavy manual configuration to manage pipelines, your out-of-the-box sales focus provides immediate, specialized value. However, Asana represents the strongest threat to watch due to its massive ecosystem of over 300 integrations and highly flexible AI workflow builders, which resourceful teams might use to construct their own customized sales automation systems.",
+      "meta": {
+        "analyzed": 3,
+        "failed": 0,
+        "dry_run": false,
+        "cache_hit": false,
+        "model": "gemini-3.1-pro-preview"
+      },
+      "cache_hit": false,
+      "model": "gemini-3.1-pro-preview"
+    }
+  },
+  "_debug": {
+    "canonical": "{\"urls\":[\"https://linear.app\",\"https://notion.so\",\"https://asana.com\"],\"your_product\":\"We sell B2B sales automation software to EU mid-market teams. AI-native, usage-based pricing, integrates with Salesforce and HubSpot.\"}"
+  }
+}

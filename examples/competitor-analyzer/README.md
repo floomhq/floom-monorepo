@@ -18,7 +18,11 @@ Every row cites the source URLs Gemini actually fetched, so you can verify claim
 ### Picking the model
 
 - Default: `gemini-3-flash-preview` (fast, high free-tier quota, good enough for homepage reads).
-- Paid tier or deep reasoning: set `GEMINI_MODEL=gemini-3-pro-preview` or `gemini-3.1-pro-preview`.
+- Paid tier or deep reasoning: set `GEMINI_MODEL=gemini-3.1-pro-preview` for richer analyses.
+
+### Instant sample responses
+
+The baked-in `sample-cache.json` returns a pre-generated Pro-quality response in under 500ms when the user submits the exact sample shown on `/p/competitor-analyzer`. Any other input hits Flash live. See [cache regeneration](#regenerating-the-sample-cache).
 
 ### Free-tier escape hatch
 
@@ -123,6 +127,18 @@ Manifest lists `GEMINI_API_KEY` under `secrets_needed`. Floom injects it as an e
     }
   ],
   "summary": "Both competitors cluster around seat-based pricing in the $8-$18/user/mo range with free tiers for discovery. The clearest opening for an agent-native issue tracker is programmatic / API-first workflows, which Linear has only partially and Notion lacks. The strongest threat is Linear's velocity and brand heat in the software-team ICP.",
-  "meta": { "analyzed": 2, "failed": 0, "dry_run": false, "model": "gemini-3-pro-preview" }
+  "meta": { "analyzed": 2, "failed": 0, "dry_run": false, "cache_hit": false, "model": "gemini-3-flash-preview" }
 }
 ```
+
+## Regenerating the sample cache
+
+`sample-cache.json` freezes a Pro-quality response for the exact pre-filled sample on `/p/competitor-analyzer`. When the user submits that exact input (same URLs + same product description), the app returns the cached blob in <500ms instead of calling Gemini.
+
+Regenerate after changing the sample URLs or `your_product` in `apps/web/src/lib/app-examples.ts`:
+
+```bash
+GEMINI_API_KEY=... python3 scripts/gen-demo-cache.py competitor-analyzer
+```
+
+The canonical contract lives in `canonical_input()` in `main.py`: URLs are normalized (https:// prefix + dedupe + preserve order), `your_product` whitespace-collapsed, JSON-encoded with sorted keys.
