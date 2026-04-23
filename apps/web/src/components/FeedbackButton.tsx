@@ -84,28 +84,53 @@ export function FeedbackButton() {
 
   return (
     <>
-      {/* Pre-launch: feedback must be reachable on mobile too. We previously
-          hid the trigger on ≤640px to avoid overlapping hero CTAs. Keep it
-          visible but shrink it to a compact icon-only pill in the
-          bottom-left corner so it doesn't cover the viewport-centered
-          CTAs. On desktop it remains the full bottom-right labelled pill. */}
+      {/* Subtle, icon-only trigger. Near-invisible at rest (muted icon on a
+          transparent surface with a hairline border), brand accent only on
+          hover / focus. Keeps a 32px visual size but guarantees a ≥44px
+          hit area via an invisible ::before expansion so it stays tappable
+          on mobile and accessible via keyboard. */}
       <style>{`
+        [data-testid="feedback-trigger"] {
+          position: fixed;
+          bottom: 16px;
+          right: 16px;
+          z-index: 900;
+          width: 32px;
+          height: 32px;
+          padding: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: transparent;
+          color: var(--muted, #8a8a8a);
+          border: 1px solid var(--line, rgba(0,0,0,0.12));
+          border-radius: 999px;
+          cursor: pointer;
+          font-family: inherit;
+          opacity: 0.6;
+          transition: opacity 120ms ease, color 120ms ease,
+            border-color 120ms ease, background 120ms ease;
+        }
+        [data-testid="feedback-trigger"]::before {
+          content: '';
+          position: absolute;
+          inset: -6px;
+        }
+        [data-testid="feedback-trigger"]:hover,
+        [data-testid="feedback-trigger"]:focus-visible {
+          opacity: 1;
+          color: var(--accent, #1a7f37);
+          border-color: var(--accent, #1a7f37);
+          background: var(--card, rgba(255,255,255,0.85));
+        }
+        [data-testid="feedback-trigger"]:focus-visible {
+          outline: 2px solid var(--accent, #1a7f37);
+          outline-offset: 2px;
+        }
         @media (max-width: 640px) {
           [data-testid="feedback-trigger"] {
-            bottom: 12px !important;
-            right: auto !important;
-            left: 12px !important;
-            display: inline-flex !important;
-            min-width: 44px !important;
-            min-height: 44px !important;
-            padding: 10px 12px !important;
-            font-size: 12px !important;
-            box-sizing: border-box !important;
-            justify-content: center !important;
-            align-items: center !important;
-          }
-          [data-testid="feedback-trigger"] .feedback-trigger-label {
-            display: none;
+            bottom: 12px;
+            right: 12px;
           }
         }
       `}</style>
@@ -114,25 +139,7 @@ export function FeedbackButton() {
         onClick={() => setOpen(true)}
         data-testid="feedback-trigger"
         aria-label="Send feedback"
-        style={{
-          position: 'fixed',
-          bottom: 20,
-          right: 20,
-          zIndex: 900,
-          padding: '10px 16px',
-          background: 'var(--ink)',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 999,
-          fontSize: 13,
-          fontWeight: 600,
-          fontFamily: 'inherit',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-        }}
+        title="Send feedback"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path
@@ -142,7 +149,6 @@ export function FeedbackButton() {
             strokeLinejoin="round"
           />
         </svg>
-        <span className="feedback-trigger-label">Feedback</span>
       </button>
 
       {open && (
