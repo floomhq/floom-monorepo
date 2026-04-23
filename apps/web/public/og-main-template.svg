@@ -25,10 +25,10 @@
     <text x="72" y="40" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="36" fill="#0e0e0c">Floom</text>
   </g>
 
-  <!-- Hero copy -->
-  <text x="80" y="330" font-family="'DM Serif Display', Georgia, serif" font-size="96" fill="#0e0e0c">Ship AI apps fast.</text>
-  <text x="80" y="400" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="30" fill="#585550">The protocol + runtime for agentic work.</text>
-  <text x="80" y="455" font-family="'JetBrains Mono', Menlo, monospace" font-size="20" fill="#047857" font-weight="600">Vibe-coding speed. Production-grade safety.</text>
+  <!-- Hero copy — mirrors LandingV17Page h1 + hero-sub (2026-04-27 waitlist pick). -->
+  <text x="80" y="290" font-family="'DM Serif Display', Georgia, serif" font-size="68" fill="#0e0e0c">AI apps you can <tspan fill="#047857">ship</tspan></text>
+  <text x="80" y="370" font-family="'DM Serif Display', Georgia, serif" font-size="68" fill="#0e0e0c">as easily as you write a prompt.</text>
+  <text x="80" y="425" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="26" fill="#585550">The protocol and runtime for agentic work.</text>
 
   <!-- Works-with row -->
   <text x="80" y="548" font-family="'JetBrains Mono', Menlo, monospace" font-size="14" fill="#585550" letter-spacing="2" font-weight="600">WORKS WITH</text>
