@@ -786,63 +786,55 @@ export function AppPermalinkPage() {
                   </>
                 )}
               </span>
-              {app.author && sessionUserId && app.author === sessionUserId && (
-                <Link
-                  to={`/studio/${app.slug}/triggers`}
-                  data-testid="cta-schedule"
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid var(--line)',
-                    borderRadius: 10,
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: 'var(--ink)',
-                    background: 'var(--card)',
-                    textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Schedule
-                </Link>
-              )}
               <button
                 type="button"
                 data-testid="cta-share"
                 aria-label="Share link"
                 onClick={() => {
-                  // Same share logic as before: if ?run=<id> is in the URL,
-                  // opt the run public via shareRun() and copy the /r/:id
-                  // permalink; otherwise copy the bare app page URL. Keeps
-                  // anon-viewer share-link flow intact.
                   const copyUrl = (url: string) => {
                     void navigator.clipboard.writeText(url).then(() => {
                       setShareToast(true);
                       window.setTimeout(() => setShareToast(false), 1800);
                     });
                   };
-                  try {
-                    const currentUrl = new URL(window.location.href);
-                    const currentRunId = currentUrl.searchParams.get('run');
-                    if (!currentRunId) {
-                      copyUrl(currentUrl.toString());
-                      return;
+                  const shareOrCopy = async (url: string) => {
+                    if (typeof navigator !== 'undefined' && navigator.share) {
+                      try {
+                        await navigator.share({
+                          url,
+                          title: app.name,
+                        });
+                        return;
+                      } catch (e) {
+                        const name = e && typeof e === 'object' && 'name' in e ? String((e as { name?: string }).name) : '';
+                        if (name === 'AbortError') return;
+                        // UserSharePermissionDeniedError / missing share target — fall back
+                      }
                     }
-                    void shareRun(currentRunId)
-                      .then(() => {
-                        copyUrl(
+                    copyUrl(url);
+                  };
+                  const run = async () => {
+                    try {
+                      const currentUrl = new URL(window.location.href);
+                      const currentRunId = currentUrl.searchParams.get('run');
+                      if (!currentRunId) {
+                        await shareOrCopy(currentUrl.toString());
+                        return;
+                      }
+                      try {
+                        await shareRun(currentRunId);
+                        await shareOrCopy(
                           `${window.location.origin}${buildPublicRunPath(currentRunId)}`,
                         );
-                      })
-                      .catch(() => {
+                      } catch {
                         currentUrl.searchParams.delete('run');
-                        copyUrl(currentUrl.toString());
-                      });
-                  } catch {
-                    /* ignore */
-                  }
+                        await shareOrCopy(currentUrl.toString());
+                      }
+                    } catch {
+                      /* ignore */
+                    }
+                  };
+                  void run();
                 }}
                 style={{
                   padding: '8px 12px',
@@ -1225,7 +1217,7 @@ export function AppPermalinkPage() {
               letterSpacing: '-0.01em',
             }}
           >
-            Add to your tools
+            MCP connection
           </h2>
           <div
             style={{
