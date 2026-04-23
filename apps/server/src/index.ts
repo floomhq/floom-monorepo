@@ -1292,6 +1292,12 @@ if (webDist) {
       /<meta property="og:url" content="[^"]*"/,
       `<meta property="og:url" content="${siteOrigin}/p/${slug}"`,
     );
+    // #324: ensure the larger preview card (same as other public routes) even if
+    // the baked index only ever set og:image + twitter image.
+    out = out.replace(
+      /<meta name="twitter:card" content="[^"]*"/,
+      `<meta name="twitter:card" content="summary_large_image"`,
+    );
     return out;
   }
 

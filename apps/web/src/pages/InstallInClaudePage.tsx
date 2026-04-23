@@ -6,9 +6,10 @@
 // Each tab renders 4 steps + a copy-to-clipboard code block + a
 // "Connected" success panel so users know what to look for.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
+import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -645,6 +646,22 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
   const pageTitle = app
     ? `Install ${app.name} in Claude · Floom`
     : 'Install in Claude · Floom';
+
+  useEffect(() => {
+    if (app) {
+      applyPublicMarketingMeta({
+        ogTitle: 'Install this app in Claude · Floom',
+        description:
+          'One-click install for Claude Desktop, Claude Code, Cursor, and other MCP clients. Copy the snippet, drop it in your config, done.',
+      });
+    } else {
+      applyPublicMarketingMeta({
+        ogTitle: 'Install in Claude · Floom',
+        description:
+          'Add Floom to Claude Desktop, Claude Code, Cursor, or any MCP client. Four steps, copy-paste snippets, MCP-native.',
+      });
+    }
+  }, [app]);
 
   return (
     <PageShell title={pageTitle} contentStyle={{ padding: 0, maxWidth: '100%' }}>

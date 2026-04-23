@@ -5,8 +5,10 @@
 // repo for the authoritative source. When a real CLI ships, the steps
 // below get upgraded in-place without changing the URL surface.
 
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
+import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 
 const codeBlockStyle: React.CSSProperties = {
   background: 'var(--surface-2, #0d0f14)',
@@ -22,6 +24,14 @@ const codeBlockStyle: React.CSSProperties = {
 };
 
 export function InstallPage() {
+  useEffect(() => {
+    applyPublicMarketingMeta({
+      ogTitle: 'Install the Floom CLI',
+      description:
+        'One command to install the Floom CLI. Publish apps, run them locally, and link them to Claude in seconds.',
+    });
+  }, []);
+
   return (
     <PageShell title="Install the Floom CLI · Floom">
       <main
