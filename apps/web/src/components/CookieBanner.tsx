@@ -1,14 +1,12 @@
 // Cookie consent banner.
 //
-// Desktop/tablet: fixed bottom-right pill, ~420px max-width, Accept / Essential
-// buttons inline. Behaves like a small corner toast.
+// Desktop / tablet (≥768px, #342): full-width bottom strip (Linear / Vercel
+// style) — does not float as a card over primary content. Content gets
+// `padding-bottom` on the root while the banner is visible so the fold
+// stays readable.
 //
-// Mobile (< 640px, issue #104 from 2026-04-20 audit): the desktop layout
-// ate ~30% of a 375x812 iPhone viewport and overlapped the hero CTAs
-// ("Publish your app" / "Browse live apps"). On mobile we now render a
-// small bottom-left pill (link-style, ~92px wide) that says "Cookies"
-// and expands on tap. Nothing below the fold until the user chooses to
-// open it, so the hero is never blocked.
+// Mobile (<768px, #104): small bottom-left "Cookies" pill; tap expands to
+// the same strip treatment with a close control.
 //
 // Storage + consent lives in `lib/consent.ts` (so the telemetry modules
 // can read the choice without importing React). This component calls
@@ -22,7 +20,11 @@ import { getConsent, setConsent, type Consent } from '../lib/consent';
 import { initBrowserSentry, closeBrowserSentry } from '../lib/sentry';
 import { initPostHog, closePostHog } from '../lib/posthog';
 
-const MOBILE_BREAKPOINT = 640;
+/** Viewport width below this uses the collapsed mobile pill first. */
+const MOBILE_BREAKPOINT = 768;
+
+/** Reserve space on the document root so content isn’t hidden behind the strip. */
+const STRIP_RESERVE_PX = 84;
 
 function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(false);
@@ -46,27 +48,35 @@ export function CookieBanner() {
     if (getConsent() === null) setVisible(true);
   }, []);
 
+  const showStrip = visible && (!isMobile || expanded);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (showStrip) {
+      document.documentElement.style.paddingBottom = `${STRIP_RESERVE_PX}px`;
+      return () => {
+        document.documentElement.style.paddingBottom = '';
+      };
+    }
+    document.documentElement.style.paddingBottom = '';
+    return undefined;
+  }, [showStrip]);
+
   if (!visible) return null;
 
   const accept = (choice: Consent) => {
     const previous = getConsent();
     setConsent(choice);
-    // Apply the choice to the telemetry SDKs in the same session.
     if (choice === 'all') {
-      // Upgrade: light up Sentry + PostHog now that we have consent.
       initBrowserSentry();
       initPostHog();
     } else if (previous === 'all') {
-      // Downgrade: flush + stop both SDKs. Anything already in flight
-      // at the network layer can't be recalled — documented on /cookies.
       closeBrowserSentry();
       closePostHog();
     }
     setVisible(false);
   };
 
-  // Mobile collapsed pill — bottom-left, ~92px, doesn't touch the
-  // viewport centre where CTAs live. Tap expands to the full banner.
   if (isMobile && !expanded) {
     return (
       <button
@@ -78,7 +88,7 @@ export function CookieBanner() {
           position: 'fixed',
           left: 12,
           bottom: 12,
-          zIndex: 1000,
+          zIndex: 950,
           padding: '7px 12px',
           background: 'var(--card)',
           border: '1px solid var(--line)',
@@ -99,17 +109,8 @@ export function CookieBanner() {
     );
   }
 
-  // Desktop banner (and expanded mobile banner). On mobile, the
-  // expanded variant is centred with a close button so the user can
-  // collapse back to the pill.
   const isExpandedMobile = isMobile && expanded;
 
-  // Audit 2026-04-22: the banner used to sit bottom-centre, which the
-  // design audit flagged as "covers the fold on every page". Later
-  // (#104, 2026-04-24) desktop was moved to bottom-left: bottom-right
-  // at 1440px sat over the hero / HeroDemo "try" affordances and the
-  // feedback trigger; a left-anchored toast keeps the right edge clear.
-  // Mobile expanded variant still spans the bottom with its close button.
   return (
     <div
       role="dialog"
@@ -118,40 +119,65 @@ export function CookieBanner() {
       data-testid="cookie-banner"
       style={{
         position: 'fixed',
-        right: isExpandedMobile ? 12 : 'auto',
-        left: isExpandedMobile ? 12 : 16,
-        bottom: 16,
-        zIndex: 1000,
-        maxWidth: 420,
-        padding: '12px 14px',
-        background: 'var(--card)',
-        border: '1px solid var(--line)',
-        borderRadius: 12,
-        boxShadow: '0 10px 30px rgba(14, 14, 12, 0.12)',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 950,
+        paddingLeft: 'max(16px, env(safe-area-inset-left, 0px))',
+        paddingRight: 'max(16px, env(safe-area-inset-right, 0px))',
+        paddingTop: 12,
+        paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
+        minHeight: 56,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
         display: 'flex',
-        flexWrap: 'wrap',
+        flexDirection: 'row',
+        flexWrap: isExpandedMobile ? 'wrap' : 'nowrap',
         alignItems: 'center',
-        gap: 10,
+        gap: 12,
+        background: 'var(--bg)',
+        backdropFilter: 'blur(12px) saturate(1.06)',
+        WebkitBackdropFilter: 'blur(12px) saturate(1.06)',
+        borderTop: '1px solid var(--line)',
+        borderRadius: 0,
+        boxShadow: '0 -4px 24px rgba(15, 23, 42, 0.08)',
         fontSize: 12.5,
         color: 'var(--ink)',
       }}
     >
-      {/* a11y 2026-04-20: labelledby target for the dialog. */}
-      <p id="cookie-banner-title" style={{ margin: 0, flex: '1 1 240px', lineHeight: 1.45 }}>
+      <p
+        id="cookie-banner-title"
+        style={{
+          margin: 0,
+          flex: '1 1 0',
+          minWidth: 0,
+          lineHeight: 1.45,
+        }}
+      >
         Floom uses essential cookies for sign-in and preferences. Choose
-        "Accept all" to also help us with anonymised analytics and error
+        &quot;Accept all&quot; to also help us with anonymised analytics and error
         reporting. See the{' '}
         <Link to="/cookies" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
           cookie policy
         </Link>
         .
       </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          flexShrink: 0,
+          marginLeft: isExpandedMobile ? 0 : 'auto',
+        }}
+      >
         <button
           type="button"
           onClick={() => accept('essential')}
           style={{
-            padding: '7px 12px',
+            padding: '8px 14px',
+            minHeight: 44,
             borderRadius: 8,
             border: '1px solid var(--line)',
             background: 'transparent',
@@ -160,6 +186,7 @@ export function CookieBanner() {
             fontFamily: 'inherit',
             fontSize: 12.5,
             fontWeight: 600,
+            boxSizing: 'border-box',
           }}
         >
           Essential only
@@ -168,7 +195,8 @@ export function CookieBanner() {
           type="button"
           onClick={() => accept('all')}
           style={{
-            padding: '7px 12px',
+            padding: '8px 14px',
+            minHeight: 44,
             borderRadius: 8,
             border: '1px solid var(--accent)',
             background: 'var(--accent)',
@@ -177,6 +205,7 @@ export function CookieBanner() {
             fontFamily: 'inherit',
             fontSize: 12.5,
             fontWeight: 600,
+            boxSizing: 'border-box',
           }}
         >
           Accept all
@@ -187,7 +216,8 @@ export function CookieBanner() {
             onClick={() => setExpanded(false)}
             aria-label="Close"
             style={{
-              padding: '7px 10px',
+              padding: '8px 12px',
+              minHeight: 44,
               borderRadius: 8,
               border: '1px solid var(--line)',
               background: 'transparent',
@@ -197,6 +227,7 @@ export function CookieBanner() {
               fontSize: 14,
               fontWeight: 600,
               lineHeight: 1,
+              boxSizing: 'border-box',
             }}
           >
             ×
