@@ -787,9 +787,8 @@ if (webDist) {
     /\/$/,
     '',
   );
-  // #316 + PR #400: default raster for social cards is named /og-image.png. The
-  // on-disk /og-main.png is kept for older links; both files are identical.
-  const defaultOgImage = `${siteOrigin}/og-image.png`;
+  // #316: default raster for social cards — /og-main.png (legacy /og-image.png kept in infra for old links).
+  const defaultOgImage = `${siteOrigin}/og-main.png`;
 
   /** Strip trailing slash (except root), /index.html → /, and map /store → /apps. */
   function canonicalPathForSeo(pathname: string): string {
