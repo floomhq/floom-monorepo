@@ -97,7 +97,7 @@ export function normalizeGithubUrl(raw: string): string | null {
  * URL to the GitHub ramp vs the OpenAPI ramp.
  */
 export function looksLikeGithubRef(raw: string): boolean {
-  return normalizeGithubUrl(raw) !== null;
+  return parseGithubRepoRef(raw) !== null;
 }
 
 export function parseGithubRepoRef(raw: string): GithubRepoRef | null {
