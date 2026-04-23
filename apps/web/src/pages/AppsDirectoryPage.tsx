@@ -237,167 +237,179 @@ export function AppsDirectoryPage() {
       <TopBar />
 
       <main>
-        {/* HEADER · mono-tag + serif H1 + subhead */}
+        {/* HEADER · v17 store.html alignment (2026-04-25).
+            Previously a huge centered hero (72px top padding, 48px serif H1
+            "Apps on Floom", 640px search pill). The v17 wireframe calls for
+            a tight 1180px-wide container, 34px left-aligned H1, short sub,
+            and a single inline toolbar row (chips + search) — not two
+            stacked blocks. This reads more like a real store/catalog and
+            matches the density of the 4-col grid below. */}
         <section
-          style={{
-            padding: '72px 24px 36px',
-            background:
-              'radial-gradient(ellipse 800px 360px at 50% 30%, rgba(5,150,105,0.05), transparent 70%)',
-          }}
+          data-testid="apps-header"
+          style={{ padding: '40px 28px 16px' }}
         >
-          <div style={{ maxWidth: 900, margin: '0 auto', textAlign: 'center' }}>
-            <span
-              style={{
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                fontSize: 11,
-                color: 'var(--muted)',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                fontWeight: 500,
-              }}
-            >
-              PUBLIC DIRECTORY ·{' '}
-              {loading || hubError ? '—' : `${appCount} APP${appCount === 1 ? '' : 'S'}`}
-            </span>
-
+          <div style={{ maxWidth: 1180, margin: '0 auto' }}>
             <h1
               className="apps-headline"
               style={{
                 fontFamily: 'var(--font-display)',
-                fontWeight: 800,
-                fontSize: 48,
+                fontWeight: 400,
+                fontSize: 34,
                 lineHeight: 1.1,
                 letterSpacing: '-0.02em',
                 color: 'var(--ink)',
-                margin: '18px 0 12px',
+                margin: '0 0 8px',
               }}
             >
-              Apps on Floom
+              {loading || hubError || appCount === 0
+                ? 'AI apps, free to run.'
+                : `${appCount} AI app${appCount === 1 ? '' : 's'}, free to run.`}
             </h1>
             <p
               style={{
-                fontSize: 16,
+                fontSize: 15,
                 color: 'var(--muted)',
-                margin: '0 0 36px',
-                lineHeight: 1.6,
+                margin: 0,
+                lineHeight: 1.55,
+                maxWidth: 560,
               }}
             >
-              Run them. Fork them. Or build your own.
+              Real AI doing real work. Score leads, triage tickets, screen
+              CVs. Install in Claude, Cursor, ChatGPT, or run from your
+              browser.
             </p>
-
-            {/* Google-style search pill */}
-            <form
-              role="search"
-              onSubmit={handleSearchSubmit}
-              style={{
-                background: 'var(--card)',
-                border: '1.5px solid var(--line)',
-                borderRadius: 999,
-                padding: '8px 8px 8px 22px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                maxWidth: 640,
-                margin: '0 auto',
-                transition: 'border-color 140ms ease, box-shadow 140ms ease',
-              }}
-              onFocus={(e) => {
-                const el = e.currentTarget;
-                el.style.borderColor = 'var(--ink)';
-                el.style.boxShadow = '0 4px 0 var(--ink)';
-              }}
-              onBlur={(e) => {
-                const el = e.currentTarget;
-                el.style.borderColor = 'var(--line)';
-                el.style.boxShadow = 'none';
-              }}
-            >
-              <Search
-                size={18}
-                aria-hidden="true"
-                style={{ color: 'var(--muted)', flexShrink: 0 }}
-              />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={rawSearch}
-                onChange={(e) => setRawSearch(e.target.value)}
-                placeholder="Search apps…"
-                aria-label="Search apps"
-                data-testid="apps-search"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  border: 0,
-                  outline: 'none',
-                  padding: '14px 0',
-                  fontSize: 15,
-                  background: 'transparent',
-                  color: 'var(--ink)',
-                }}
-              />
-              <button
-                type="submit"
-                data-testid="apps-search-submit"
-                style={{
-                  background: 'var(--ink)',
-                  color: '#fff',
-                  border: 0,
-                  borderRadius: 999,
-                  padding: '11px 20px',
-                  fontWeight: 600,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-              >
-                Search
-              </button>
-            </form>
-
-            {/* Category chip strip.
-                CLS fix (2026-04-18): reserve min-height so the strip does not
-                pop in once hub data loads. Chip buttons are ~36px tall; the
-                28px marginTop + strip height rounds to ~64px. Loading /
-                single-category states render an invisible placeholder of the
-                same height. */}
-            <div
-              style={{
-                minHeight: 64,
-                marginTop: 28,
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'center',
-                gap: 8,
-                flexWrap: 'wrap',
-              }}
-              data-testid="apps-chips"
-              aria-hidden={categories.length <= 1 ? 'true' : undefined}
-            >
-              {categories.length > 1 &&
-                categories.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    data-testid={`chip-${cat}`}
-                    onClick={() => setActiveCategory(cat)}
-                    style={chipStyle(activeCategory === cat)}
-                  >
-                    <span>{labelForCategory(cat)}</span>
-                    <span
-                      style={{
-                        fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                        fontSize: 11,
-                        opacity: 0.7,
-                      }}
-                    >
-                      {categoryCounts.get(cat) ?? 0}
-                    </span>
-                  </button>
-                ))}
-            </div>
           </div>
         </section>
+
+        {/* TOOLBAR · chip row + inline search (v17 store.html).
+            One horizontal row, border-bottom separates it from the grid.
+            Chip count pills shrink visual weight. Search is a tight 260px
+            inline input, not a giant 640px pill. */}
+        <div
+          data-testid="apps-toolbar"
+          className="apps-toolbar"
+          style={{
+            maxWidth: 1180,
+            margin: '0 auto',
+            padding: '18px 28px',
+            borderBottom: '1px solid var(--line)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* Chip row.
+              CLS note: keep the row mounted even while loading or when only
+              a single category exists so the toolbar height stays stable
+              across fetch. */}
+          <div
+            data-testid="apps-chips"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
+              minHeight: 34,
+            }}
+            aria-hidden={categories.length <= 1 ? 'true' : undefined}
+          >
+            {categories.length > 1 &&
+              categories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  data-testid={`chip-${cat}`}
+                  onClick={() => setActiveCategory(cat)}
+                  style={chipStyle(activeCategory === cat)}
+                >
+                  <span>{labelForCategory(cat)}</span>
+                  <span
+                    style={{
+                      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                      fontSize: 10,
+                      opacity: 0.7,
+                      marginLeft: 2,
+                    }}
+                  >
+                    {categoryCounts.get(cat) ?? 0}
+                  </span>
+                </button>
+              ))}
+          </div>
+
+          {/* Search — inline, 260px min.
+              Keeps the existing submit/blur/scroll handler for mobile
+              keyboards. Debounced filter runs on every keystroke via the
+              controlled input. Submit button is visually hidden (SR-only)
+              because the live filter is the real interaction. */}
+          <form
+            role="search"
+            onSubmit={handleSearchSubmit}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '7px 12px',
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderRadius: 10,
+              minWidth: 260,
+              transition: 'border-color 140ms ease, box-shadow 140ms ease',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = 'var(--ink)';
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15,23,42,.06)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = 'var(--line)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <Search
+              size={14}
+              aria-hidden="true"
+              style={{ color: 'var(--muted)', flexShrink: 0 }}
+            />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={rawSearch}
+              onChange={(e) => setRawSearch(e.target.value)}
+              placeholder="Search apps…"
+              aria-label="Search apps"
+              data-testid="apps-search"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                border: 0,
+                outline: 'none',
+                background: 'transparent',
+                fontSize: 13,
+                fontFamily: 'inherit',
+                color: 'var(--ink)',
+              }}
+            />
+            <button
+              type="submit"
+              data-testid="apps-search-submit"
+              aria-label="Search"
+              style={{
+                position: 'absolute',
+                width: 1,
+                height: 1,
+                padding: 0,
+                margin: -1,
+                overflow: 'hidden',
+                clip: 'rect(0,0,0,0)',
+                border: 0,
+              }}
+            >
+              Search
+            </button>
+          </form>
+        </div>
 
         {/* APP LIST · 4-column thumbnail grid (v17 store.html).
             CLS fix (2026-04-18): reserve vertical space for the list area so
@@ -534,17 +546,18 @@ export function AppsDirectoryPage() {
 
       <style>{`
         @media (max-width: 640px) {
-          .apps-headline { font-size: 30px !important; }
-          /* Directory hero: tighten padding on mobile so the search
-             pill isn't pushed below the fold. Also bump the input
-             font-size to 16px so iOS Safari stops auto-zooming when
-             the field gains focus (it zooms anything <16px). */
-          [data-testid="apps-directory"] main > section:first-of-type { padding: 40px 16px 24px !important; }
-          [data-testid="apps-search"] { font-size: 16px !important; }
-          /* Category chip strip: tighter gap, still wraps. */
+          /* v17 store.html: compact header on mobile.
+             Keep h1 at 28px so the wireframe's "34px" feels right on
+             desktop without crushing on phones. iOS-zoom guard: bump
+             search input to 16px+ on focus-able viewports (Safari
+             auto-zooms inputs <16px). */
+          .apps-headline { font-size: 28px !important; }
+          [data-testid="apps-header"] { padding: 28px 16px 12px !important; }
+          [data-testid="apps-toolbar"] { padding: 14px 16px !important; gap: 10px !important; }
           [data-testid="apps-chips"] { gap: 6px !important; }
+          [data-testid="apps-search"] { font-size: 16px !important; }
           /* Results section: smaller gutter, smaller bottom padding. */
-          [data-testid="apps-directory"] main > section:nth-of-type(2) { padding: 0 16px 48px !important; }
+          [data-testid="apps-directory"] main > section:last-of-type { padding: 0 16px 48px !important; }
         }
         /* Mirror AppGrid breakpoints so the loading skeleton collapses the
            same way as the real grid: 4 → 3 → 2 → 1. Keeps grid shape stable
@@ -568,20 +581,22 @@ export function AppsDirectoryPage() {
 }
 
 function chipStyle(active: boolean): CSSProperties {
+  // Sizing aligned to v17 store.html: 6px/12px padding, 12.5px text, 600 when
+  // active (ink-on-white is the strongest affordance in the toolbar).
   return {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '9px 16px',
+    gap: 6,
+    padding: '6px 12px',
     borderRadius: 999,
     border: `1px solid ${active ? 'var(--ink)' : 'var(--line)'}`,
     background: active ? 'var(--ink)' : 'var(--card)',
-    color: active ? '#fff' : 'var(--ink)',
-    fontSize: 13.5,
-    fontWeight: 500,
+    color: active ? '#fff' : 'var(--muted)',
+    fontSize: 12.5,
+    fontWeight: active ? 600 : 500,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    transition: 'all 140ms ease',
+    transition: 'all 120ms ease',
   };
 }
 
