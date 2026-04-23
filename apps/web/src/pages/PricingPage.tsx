@@ -7,12 +7,12 @@
 // Self-host + later-plans + FAQ kept, already clean.
 // Palette: bg #fafaf8, ink #0e0e0c, accent #047857.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
+import { PageHead } from '../components/PageHead';
 import { readDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
-import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 
 // ---------------------------------------------------------------------------
 // Palette tokens (inline — matches v17 wireframe variables)
@@ -277,13 +277,6 @@ export function PricingPage() {
     [deployEnabled],
   );
 
-  useEffect(() => {
-    applyPublicMarketingMeta({
-      ogTitle: 'Pricing · Floom',
-      description: 'Free during beta. Self-host free forever. Paid cloud plans coming soon.',
-    });
-  }, []);
-
   return (
     <PageShell
       title="Pricing · Floom"
@@ -293,6 +286,12 @@ export function PricingPage() {
         background: '#fafaf8',
       }}
     >
+      <PageHead
+        title="Pricing · Floom"
+        ogTitle="Pricing · Floom"
+        description="Free during beta. Self-host free forever. Paid cloud plans coming soon."
+        pathname="/pricing"
+      />
       {/* ------------------------------------------------------------------ */}
       {/* HERO                                                                 */}
       {/* ------------------------------------------------------------------ */}

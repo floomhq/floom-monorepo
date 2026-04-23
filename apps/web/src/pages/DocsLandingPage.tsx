@@ -12,14 +12,14 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import type { CSSProperties } from 'react';
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
 import { FeedbackButton } from '../components/FeedbackButton';
+import { PageHead } from '../components/PageHead';
 import { DocsSidebar, DOCS_SIDEBAR_GROUPS } from '../components/docs/DocsSidebar';
 import { DocsPublishWaitlistBanner } from '../components/docs/DocsPublishWaitlistBanner';
 import { readDeployEnabled } from '../lib/flags';
-import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 import { DOCS_HUB_DESCRIPTION } from '../seo/docsSeoClient';
 
 // ── Styles ────────────────────────────────────────────────────────────────
@@ -279,19 +279,14 @@ export function DocsLandingPage() {
   const { pathname } = useLocation();
   const deployEnabled = useMemo(() => readDeployEnabled(), []);
 
-  useEffect(() => {
-    document.title = 'Floom docs';
-    applyPublicMarketingMeta({
-      ogTitle: 'Floom docs',
-      description: DOCS_HUB_DESCRIPTION,
-    });
-    return () => {
-      document.title = 'Floom: production layer for AI apps';
-    };
-  }, []);
-
   return (
     <div className="page-root" data-testid="docs-landing-page">
+      <PageHead
+        title="Floom docs"
+        ogTitle="Floom docs"
+        description={DOCS_HUB_DESCRIPTION}
+        pathname="/docs"
+      />
       <TopBar />
       <DocsPublishWaitlistBanner />
 

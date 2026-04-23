@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -7,7 +7,7 @@ import { Footer } from '../components/Footer';
 import { FeedbackButton } from '../components/FeedbackButton';
 // Import the protocol markdown at build time via Vite ?raw
 import protocolMd from '../assets/protocol.md?raw';
-import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
+import { PageHead } from '../components/PageHead';
 
 // ── Markdown rendering ─────────────────────────────────────────────────────
 // Uses `react-markdown` (CSP-safe, no HTML injection) with custom
@@ -464,20 +464,14 @@ export function ProtocolPage() {
   const toc = useRef<TocItem[]>(extractToc(protocolMd));
   const [tocOpen, setTocOpen] = useState(false);
 
-  useEffect(() => {
-    document.title = 'The Floom Protocol · Floom';
-    applyPublicMarketingMeta({
-      ogTitle: 'The Floom Protocol',
-      description:
-        'The open protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Read the spec.',
-    });
-    return () => {
-      document.title = 'Floom: production layer for AI apps';
-    };
-  }, []);
-
   return (
     <div className="page-root" data-testid="protocol-page">
+      <PageHead
+        title="The Floom Protocol · Floom"
+        ogTitle="The Floom Protocol"
+        description="The open protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Read the spec."
+        pathname="/protocol"
+      />
       <TopBar />
 
       <main

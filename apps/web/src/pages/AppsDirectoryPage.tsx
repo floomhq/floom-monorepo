@@ -8,13 +8,13 @@ import {
 } from 'react';
 import { Search } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
+import { PageHead } from '../components/PageHead';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { AppGrid } from '../components/public/AppGrid';
 import { FeedbackButton } from '../components/FeedbackButton';
 import { getHub } from '../api/client';
 import type { HubApp } from '../lib/types';
 import { isPubliclyListed } from '../lib/hub-filter';
-import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 
 const ALL = 'all';
 
@@ -99,12 +99,6 @@ export function AppsDirectoryPage() {
   }, []);
 
   useEffect(() => {
-    document.title = 'Apps · Floom';
-    applyPublicMarketingMeta({
-      ogTitle: 'Apps · Floom',
-      description:
-        'Browse AI apps built on Floom. Run them in your browser, install them into Claude, or fork and publish your own.',
-    });
     loadHub();
   }, [loadHub]);
 
@@ -177,6 +171,12 @@ export function AppsDirectoryPage() {
       data-testid="apps-directory"
       style={{ minHeight: '100vh', background: 'var(--bg)' }}
     >
+      <PageHead
+        title="Apps · Floom"
+        ogTitle="Apps · Floom"
+        description="Browse AI apps built on Floom. Run them in your browser, install them into Claude, or fork and publish your own."
+        pathname="/apps"
+      />
       <TopBar />
 
       <main>

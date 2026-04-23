@@ -21,12 +21,12 @@
 //   5. Who's behind it: Federico + Floom Inc + OSS commitment
 //   + Footer CTA band: "Paste your thing" → /studio/build
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
+import { PageHead } from '../components/PageHead';
 import { readDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
-import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 
 // ── Shared styles ─────────────────────────────────────────────────────────
 
@@ -79,19 +79,17 @@ export function AboutPage() {
   const deployEnabled = useMemo(() => readDeployEnabled(), []);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    applyPublicMarketingMeta({
-      ogTitle: 'About Floom',
-      description:
-        'Floom turns the thing you built on localhost into a real app with a real URL so other people can actually use it.',
-    });
-  }, []);
-
   return (
     <PageShell
       title="About Floom · Get that thing off localhost fast"
       contentStyle={{ padding: '24px 24px 80px', maxWidth: 960 }}
     >
+      <PageHead
+        title="About Floom · Get that thing off localhost fast"
+        ogTitle="About Floom"
+        description="Floom turns the thing you built on localhost into a real app with a real URL so other people can actually use it."
+        pathname="/about"
+      />
       {/* 1. Hero */}
       <section
         data-testid="about-hero"

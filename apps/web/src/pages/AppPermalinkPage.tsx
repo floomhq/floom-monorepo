@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
+import { PageHead } from '../components/PageHead';
 import { Footer } from '../components/Footer';
 import { RunSurface, type RunSurfaceResult } from '../components/runner/RunSurface';
 import { AppIcon } from '../components/AppIcon';
@@ -43,6 +44,7 @@ import {
   markConfettiShown,
   samplePrefill,
 } from '../lib/onboarding';
+import { absoluteCanonicalUrl, absolutePublicAssetUrl } from '../lib/seoPath';
 // Launch-hardening 2026-04-23: the 3 hero demo apps (lead-scorer,
 // competitor-analyzer, resume-screener) get a richer per-slug prefill
 // so the public landing experience on floom.dev isn't an empty form.
@@ -337,30 +339,9 @@ export function AppPermalinkPage() {
     [app],
   );
 
-  // SEO meta
+  // JSON-LD (meta tags use <PageHead />)
   useEffect(() => {
-    if (!app) return;
-    document.title = `${app.name} | Floom`;
-    const setMeta = (name: string, content: string, prop = false) => {
-      const attr = prop ? 'property' : 'name';
-      let el = document.querySelector(`meta[${attr}="${name}"]`);
-      if (!el) {
-        el = document.createElement('meta');
-        el.setAttribute(attr, name);
-        document.head.appendChild(el);
-      }
-      el.setAttribute('content', content);
-    };
-    setMeta('description', app.description);
-    setMeta('og:title', `${app.name} | Floom`, true);
-    setMeta('og:description', app.description, true);
-    setMeta('og:url', `${window.location.origin}/p/${app.slug}`, true);
-    setMeta('og:type', 'website', true);
-    // Per-app dynamic OG card (served by /og/:slug.svg on the same origin).
-    setMeta('og:image', `${window.location.origin}/og/${app.slug}.svg`, true);
-    setMeta('twitter:image', `${window.location.origin}/og/${app.slug}.svg`);
-    setMeta('twitter:title', `${app.name} | Floom`);
-    setMeta('twitter:description', app.description);
+    if (!app) return undefined;
 
     const existing = document.getElementById('jsonld-app');
     if (existing) existing.remove();
@@ -373,7 +354,7 @@ export function AppPermalinkPage() {
       name: app.name,
       description: app.description,
       applicationCategory: app.category || 'UtilitiesApplication',
-      url: `${window.location.origin}/p/${app.slug}`,
+      url: absoluteCanonicalUrl(`/p/${app.slug}`),
       author: {
         '@type': 'Person',
         name: app.author_display || app.author || 'floomhq',
@@ -382,7 +363,6 @@ export function AppPermalinkPage() {
     document.head.appendChild(script);
 
     return () => {
-      document.title = 'Floom: production layer for AI apps';
       const s = document.getElementById('jsonld-app');
       if (s) s.remove();
     };
@@ -598,6 +578,13 @@ export function AppPermalinkPage() {
 
   return (
     <div className="page-root">
+      <PageHead
+        title={`${app.name} | Floom`}
+        ogTitle={`${app.name} | Floom`}
+        description={app.description}
+        pathname={`/p/${app.slug}`}
+        ogImageAbsoluteUrl={absolutePublicAssetUrl(`/og/${app.slug}.svg`)}
+      />
       <TopBar compact={topBarCompact} />
 
       <Confetti fire={confettiFire} onDone={() => setConfettiFire(false)} />

@@ -22,7 +22,7 @@
  *   /root/floom-internal/launch/v17-preview-delta-2026-04-22.md
  */
 import { useEffect, useState } from 'react';
-import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
+import { PageHead } from '../components/PageHead';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
@@ -98,14 +98,6 @@ export function LandingV17Page() {
   const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   useEffect(() => {
-    document.title = 'Ship AI apps fast · Floom';
-    applyPublicMarketingMeta({
-      ogTitle: 'Ship AI apps fast · Floom',
-      description:
-        'Ship AI apps fast. The protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Paste your app link and get a Claude tool, a page to share, a command-line, and a clean URL your teammates can hit. Sign-in, history, and all the boring stuff are handled.',
-      socialDescription:
-        'The protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Works with Claude, Cursor, ChatGPT, Codex CLI, and any MCP client.',
-    });
     api
       .getHub()
       .then((apps) => {
@@ -123,6 +115,14 @@ export function LandingV17Page() {
       data-testid="landing-v17"
       style={{ minHeight: '100vh', background: 'var(--bg)' }}
     >
+      <PageHead
+        title="Ship AI apps fast · Floom"
+        ogTitle="Ship AI apps fast · Floom"
+        description="Ship AI apps fast. The protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Paste your app link and get a Claude tool, a page to share, a command-line, and a clean URL your teammates can hit. Sign-in, history, and all the boring stuff are handled."
+        socialDescription="The protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Works with Claude, Cursor, ChatGPT, Codex CLI, and any MCP client."
+        pathname="/"
+        resetTitleOnUnmount={null}
+      />
       <TopBar />
 
       <main id="main" style={{ display: 'block' }}>

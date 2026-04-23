@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
 import { FeedbackButton } from '../components/FeedbackButton';
+import { PageHead } from '../components/PageHead';
 import {
   extractToc,
   markdownComponents,
 } from '../components/docs/markdown';
 import { DocsSidebar, DOCS_SIDEBAR_GROUPS } from '../components/docs/DocsSidebar';
 import { DocsPublishWaitlistBanner } from '../components/docs/DocsPublishWaitlistBanner';
-import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 import { DOCS_HUB_DESCRIPTION, DOCS_SEO } from '../seo/docsSeoClient';
 import limitsMd from '../assets/docs/limits.md?raw';
 import securityMd from '../assets/docs/security.md?raw';
@@ -58,19 +58,6 @@ export function DocsPage() {
   const doc = DOCS.find((entry) => entry.slug === slug) as DocEntry | undefined;
   const [tocOpen, setTocOpen] = useState(false);
 
-  useEffect(() => {
-    if (!doc) return undefined;
-    document.title = `${doc.label} · Floom Docs`;
-    const ent = DOCS_SEO[doc.slug];
-    applyPublicMarketingMeta({
-      ogTitle: ent?.ogTitle ?? doc.label,
-      description: ent?.description ?? DOCS_HUB_DESCRIPTION,
-    });
-    return () => {
-      document.title = 'Floom: production layer for AI apps';
-    };
-  }, [doc]);
-
   const toc = useMemo(() => (doc ? extractToc(doc.markdown) : []), [doc]);
 
   if (!doc) {
@@ -78,8 +65,16 @@ export function DocsPage() {
     return <Navigate to="/docs" replace />;
   }
 
+  const ent = DOCS_SEO[doc.slug];
+
   return (
     <div className="page-root" data-testid={`docs-${doc.slug}-page`}>
+      <PageHead
+        title={`${doc.label} · Floom Docs`}
+        ogTitle={ent?.ogTitle ?? doc.label}
+        description={ent?.description ?? DOCS_HUB_DESCRIPTION}
+        pathname={`/docs/${doc.slug}`}
+      />
       <TopBar />
       <DocsPublishWaitlistBanner />
 
