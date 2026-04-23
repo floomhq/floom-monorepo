@@ -35,6 +35,7 @@ import {
   renderWelcomeEmail,
   sendEmail,
 } from './email.js';
+import { provisionPersonalWorkspace } from '../services/workspaces.js';
 
 // Better Auth's `Auth` type is generic over its options. Inferring the exact
 // concrete type would couple every consumer to the full plugin tuple shape,
@@ -124,17 +125,33 @@ function buildAuthOptions(_overrideBaseURL?: string): any {
     process.env.PUBLIC_URL ||
     `http://localhost:${process.env.PORT || 3051}`;
 
-  const socialProviders: Record<string, { clientId: string; clientSecret: string }> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const socialProviders: Record<string, any> = {};
   if (process.env.GITHUB_OAUTH_CLIENT_ID && process.env.GITHUB_OAUTH_CLIENT_SECRET) {
     socialProviders.github = {
       clientId: process.env.GITHUB_OAUTH_CLIENT_ID,
       clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET,
+      // Update the user's name and avatar from GitHub on EVERY login,
+      // not just on first sign-up. This is the official Better Auth flag
+      // that triggers internalAdapter.updateUser() inside handleOAuthUserInfo.
+      overrideUserInfoOnSignIn: true,
+      mapProfile: async (profile: any) => ({
+        name: profile.name || profile.login,
+        email: profile.email,
+        image: profile.avatar_url || profile.image || null,
+      }),
     };
   }
   if (process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
     socialProviders.google = {
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
       clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+      overrideUserInfoOnSignIn: true,
+      mapProfile: async (profile: any) => ({
+        name: profile.name || profile.displayName,
+        email: profile.email,
+        image: profile.picture || profile.image || null,
+      }),
     };
   }
 
@@ -293,7 +310,24 @@ function buildAuthOptions(_overrideBaseURL?: string): any {
       cookiePrefix: 'floom',
       defaultCookieAttributes: {
         sameSite: 'strict',
-        secure: true,
+        // Secure is determined by the serving hostname, not NODE_ENV.
+        // This means a local HTTPS tunnel (ngrok, etc.) gets Secure=true
+        // automatically, and the flag stays false only when the host is
+        // literally localhost/127.0.0.1 where browsers waive the requirement.
+        // OAuth state cookies (see `cookies` block below) override sameSite
+        // to `lax` so the cross-site provider callback still carries them.
+        secure: (() => {
+          const host =
+            process.env.BETTER_AUTH_URL ||
+            process.env.PUBLIC_URL ||
+            'http://localhost';
+          try {
+            const { hostname } = new URL(host);
+            return hostname !== 'localhost' && hostname !== '127.0.0.1';
+          } catch {
+            return false;
+          }
+        })(),
         httpOnly: true,
       },
       cookies: {
@@ -369,6 +403,71 @@ function buildAuthOptions(_overrideBaseURL?: string): any {
         rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 100 },
       }),
     ],
+    databaseHooks: {
+      user: {
+        create: {
+          // Fires after a new user row is committed (email+password signup
+          // or social OAuth). Sends a minimal welcome email. Best-effort:
+          // a delivery failure MUST NOT roll back the user, so we swallow
+          // errors and only log. Also a no-op in stdout-fallback mode —
+          // the sendEmail helper handles that transparently.
+          after: async (user: {
+            id: string;
+            email: string;
+            name?: string | null;
+          }): Promise<void> => {
+            // W3.1 cleanup: provision the Floom-side user row and a default
+            // workspace immediately on creation. This ensures following
+            // requests (or hooks like welcome email) can rely on the user
+            // record existing in the Floom tables.
+            try {
+              // Priority 1: Mirror user into Floom's users table.
+              // auth_provider 'better-auth' identifies these as cloud-managed accounts.
+              db.prepare(
+                `INSERT INTO users (id, email, name, auth_provider, auth_subject)
+                 VALUES (?, ?, ?, 'better-auth', ?)
+                 ON CONFLICT (id) DO UPDATE SET
+                   email = excluded.email,
+                   name = excluded.name`,
+              ).run(user.id, user.email, user.name || null, user.id);
+
+              // Priority 2: Provision the personal workspace.
+              // provisionPersonalWorkspace is idempotent: if the user somehow
+              // already has a workspace membership, it just returns it.
+              provisionPersonalWorkspace(user.id, user.email, user.name);
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.error(
+                `[auth] critical: failed to provision user/workspace for ${user.email}:`,
+                err,
+              );
+              // We don't throw here — we want the user to land on the UI where
+              // session.ts resolveUserContext has a second-chance bootstrap.
+            }
+
+            try {
+              const isDev = process.env.NODE_ENV !== 'production';
+              const publicUrl =
+                process.env.FLOOM_APP_URL ||
+                process.env.PUBLIC_URL ||
+                (isDev ? 'http://localhost:5173' : 'https://floom.dev');
+
+              const { subject, html, text } = renderWelcomeEmail({
+                name: user.name ?? null,
+                publicUrl,
+              });
+              await sendEmail({ to: user.email, subject, html, text });
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.error(
+                `[auth] welcome email failed for ${user.email}:`,
+                err,
+              );
+            }
+          },
+        },
+      },
+    },
     user: {
       // W4-minimal gap close: enable the POST /auth/delete-user endpoint so
       // /me/settings can delete an account without operator intervention.

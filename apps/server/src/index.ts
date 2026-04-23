@@ -249,7 +249,27 @@ app.route('/api/feedback', feedbackRouter);
 // `baseURL` matches the caller's origin (floom.dev vs preview.floom.dev)
 // so verify-email and OAuth callbacks stay on the origin host.
 if (isCloudMode()) {
-  if (getAuth()) {
+  const auth = getAuth();
+  if (auth) {
+    // OAuth error bridge: when the user denies the OAuth consent screen or
+    // the provider returns an error, Better Auth redirects to
+    // <baseURL>/auth/error?error=<code>. Without this handler the user sees
+    // the raw backend response (plain text / Better Auth's built-in page),
+    // not Floom's branded UI. Bridge it to the frontend login page.
+    app.get('/auth/error', (c) => {
+      const error = c.req.query('error') || 'unknown';
+      const isDev = process.env.NODE_ENV !== 'production';
+      const frontendOrigin =
+        process.env.FLOOM_APP_URL ||
+        (isDev ? 'http://localhost:5173' : '');
+      if (frontendOrigin) {
+        return c.redirect(
+          `${frontendOrigin}/login?error=${encodeURIComponent(error)}`,
+        );
+      }
+      return c.json({ error: 'auth_failed', code: error }, 400);
+    });
+
     // Hono `app.on(...)` accepts a method list + path. Better Auth's
     // `handler` consumes the raw `Request` and returns a `Response`, which
     // is exactly what `c.req.raw` and `c.body()` provide. We wrap the

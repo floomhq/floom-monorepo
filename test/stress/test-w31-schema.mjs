@@ -125,6 +125,12 @@ const userIdx = db
   .map((r) => r.name);
 log('users has an email index', userIdx.some((n) => /email/.test(n)));
 
+const userCols = db
+  .prepare(`PRAGMA table_info(users)`)
+  .all()
+  .map((r) => r.name);
+log('users.image column present', userCols.includes('image'));
+
 // ---- pragma user_version ----
 const uv = db.prepare('PRAGMA user_version').get().user_version;
 log(`pragma user_version >= 6 (got ${uv})`, uv >= 6);
