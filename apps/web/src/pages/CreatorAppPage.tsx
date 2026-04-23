@@ -166,7 +166,17 @@ export function CreatorAppPage() {
             }}
           >
             <div>
-              <h1 style={{ fontSize: 26, fontWeight: 700, margin: '0 0 6px', color: 'var(--ink)' }}>
+              <h1
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 26,
+                  fontWeight: 700,
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.15,
+                  margin: '0 0 6px',
+                  color: 'var(--ink)',
+                }}
+              >
                 {appInfo.name}
               </h1>
               <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, maxWidth: 540 }}>

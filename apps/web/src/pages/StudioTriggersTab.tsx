@@ -90,7 +90,17 @@ export function StudioTriggersTab() {
           }}
         >
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: 'var(--ink)' }}>
+            <h1
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 20,
+                fontWeight: 700,
+                letterSpacing: '-0.015em',
+                lineHeight: 1.2,
+                margin: 0,
+                color: 'var(--ink)',
+              }}
+            >
               Triggers
             </h1>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>

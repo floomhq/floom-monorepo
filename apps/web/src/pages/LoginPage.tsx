@@ -222,8 +222,11 @@ export function LoginPage() {
             it's a separate visual unit. */}
         <h1
           style={{
+            fontFamily: 'var(--font-display)',
             fontSize: 28,
             fontWeight: 700,
+            letterSpacing: '-0.02em',
+            lineHeight: 1.15,
             margin: '0 0 8px',
             color: 'var(--ink)',
             textAlign: 'center',
@@ -569,8 +572,10 @@ export function LoginPage() {
       >
         <h2
           style={{
+            fontFamily: 'var(--font-display)',
             fontSize: 22,
             fontWeight: 700,
+            letterSpacing: '-0.02em',
             lineHeight: 1.3,
             margin: '0 0 12px',
             color: 'var(--ink)',

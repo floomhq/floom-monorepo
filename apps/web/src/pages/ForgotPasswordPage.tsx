@@ -59,8 +59,11 @@ export function ForgotPasswordPage() {
       >
         <h1
           style={{
+            fontFamily: 'var(--font-display)',
             fontSize: 28,
             fontWeight: 700,
+            letterSpacing: '-0.02em',
+            lineHeight: 1.15,
             margin: '0 0 8px',
             color: 'var(--ink)',
             textAlign: 'center',

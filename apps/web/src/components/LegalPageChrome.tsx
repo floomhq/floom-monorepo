@@ -68,7 +68,17 @@ export function LegalPageHeader({ title, updated, lang }: HeaderProps) {
 
   return (
     <header style={{ marginBottom: 32 }}>
-      <h1 style={{ fontSize: 40, fontWeight: 700, margin: '0 0 8px', color: 'var(--ink)' }}>
+      <h1
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 40,
+          fontWeight: 800,
+          letterSpacing: '-0.025em',
+          lineHeight: 1.1,
+          margin: '0 0 8px',
+          color: 'var(--ink)',
+        }}
+      >
         {title}
       </h1>
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 16px' }}>
@@ -110,8 +120,11 @@ export function LegalSection({ id, title, children }: SectionProps) {
     >
       <h2
         style={{
+          fontFamily: 'var(--font-display)',
           fontSize: 20,
           fontWeight: 700,
+          letterSpacing: '-0.015em',
+          lineHeight: 1.2,
           margin: '0 0 12px',
           color: 'var(--ink)',
           scrollMarginTop: 80,

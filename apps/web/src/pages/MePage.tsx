@@ -101,7 +101,8 @@ const s: Record<string, CSSProperties> = {
   greetingName: {
     fontFamily: 'var(--font-display)',
     fontSize: 22,
-    fontWeight: 500,
+    fontWeight: 700,
+    letterSpacing: '-0.02em',
     lineHeight: 1.2,
     color: 'var(--ink)',
     overflow: 'hidden',
@@ -116,7 +117,8 @@ const s: Record<string, CSSProperties> = {
   sectionH2: {
     fontFamily: 'var(--font-display)',
     fontSize: 20,
-    fontWeight: 500,
+    fontWeight: 700,
+    letterSpacing: '-0.015em',
     lineHeight: 1.2,
     margin: 0,
     color: 'var(--ink)',

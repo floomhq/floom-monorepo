@@ -356,9 +356,12 @@ function ProxiedVsHosted() {
 
 const mdHeadingStyle = (level: number): React.CSSProperties => {
   const sizes: Record<number, number> = { 1: 32, 2: 22, 3: 16 };
+  const isDisplay = level <= 2;
   return {
+    fontFamily: isDisplay ? 'var(--font-display)' : undefined,
     fontSize: sizes[level] ?? 18,
     fontWeight: 700,
+    letterSpacing: isDisplay ? '-0.02em' : undefined,
     color: 'var(--ink)',
     margin: `${level === 1 ? '0 0 16px' : '32px 0 12px'}`,
     lineHeight: 1.25,
