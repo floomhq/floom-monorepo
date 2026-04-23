@@ -304,8 +304,10 @@ function ConnectedPanel({ appName }: { appName: string }) {
           </div>
           <div
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontFamily: 'var(--font-display)',
               fontSize: 20,
+              fontWeight: 600,
+              letterSpacing: '-0.015em',
               lineHeight: 1.2,
               color: 'var(--ink,#0f172a)',
             }}
@@ -710,9 +712,9 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
 
           <h1
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontFamily: 'var(--font-display)',
               fontSize: 36,
-              fontWeight: 400,
+              fontWeight: 700,
               letterSpacing: '-0.02em',
               lineHeight: 1.1,
               color: 'var(--ink,#0f172a)',

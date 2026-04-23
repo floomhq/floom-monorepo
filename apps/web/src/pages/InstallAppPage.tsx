@@ -122,9 +122,9 @@ export function InstallAppPage() {
 
           <h1
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontFamily: 'var(--font-display)',
               fontSize: 28,
-              fontWeight: 400,
+              fontWeight: 700,
               color: 'var(--ink,#0f172a)',
               margin: '0 0 12px',
             }}

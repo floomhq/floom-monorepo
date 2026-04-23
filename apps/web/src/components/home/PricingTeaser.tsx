@@ -42,10 +42,11 @@ const MONO_TAG_STYLE: CSSProperties = {
 };
 
 const AMT_STYLE: CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
+  fontFamily: 'var(--font-display)',
+  fontWeight: 800,
   fontSize: 56,
   lineHeight: 1,
-  letterSpacing: '-0.025em',
+  letterSpacing: '-0.04em',
   margin: '4px 0 10px',
 };
 
@@ -94,8 +95,8 @@ export function PricingTeaser() {
         <SectionEyebrow>Pricing</SectionEyebrow>
         <h2
           style={{
-            fontFamily: "'DM Serif Display', Georgia, serif",
-            fontWeight: 400,
+            fontFamily: 'var(--font-display)',
+            fontWeight: 700,
             fontSize: 28,
             lineHeight: 1.1,
             letterSpacing: '-0.02em',

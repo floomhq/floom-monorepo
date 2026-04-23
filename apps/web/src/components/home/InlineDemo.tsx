@@ -213,8 +213,8 @@ export function InlineDemo() {
           </SectionEyebrow>
           <h2
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
-              fontWeight: 400,
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
               fontSize: 40,
               lineHeight: 1.1,
               letterSpacing: '-0.02em',

@@ -30,8 +30,8 @@ const EYEBROW_STYLE: React.CSSProperties = {
 };
 
 const H1_STYLE: React.CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
-  fontWeight: 400,
+  fontFamily: 'var(--font-display)',
+  fontWeight: 800,
   fontSize: 52,
   lineHeight: 1.08,
   letterSpacing: '-0.025em',

@@ -67,7 +67,7 @@ const EXAMPLE_ITEMS: Item[] = [
 ];
 
 // Small eyebrow row, sits ABOVE the H1. maxWidth tuned to stay inside the
-// visible width of the H1 below (64px DM Serif Display, ~460px rendered) so
+// visible width of the H1 below (72px Inter 800 tight-tracked, ~460px rendered) so
 // the belt never runs wider than the headline.
 const WRAP_STYLE: CSSProperties = {
   maxWidth: 520,

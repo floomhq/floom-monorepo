@@ -74,7 +74,7 @@ function renderSvg(copy: OgCopy): string {
     <path d="M0 0 L44 0 L44 46 L22 34 L0 46 Z" fill="url(#accent)"/>
     <text x="64" y="32" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="30" fill="${ink}">Floom</text>
   </g>
-  <text x="80" y="322" font-family="'DM Serif Display', Georgia, serif" font-size="84" fill="${ink}">${title}</text>
+  <text x="80" y="322" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="84" letter-spacing="-2.5" fill="${ink}">${title}</text>
   <text x="80" y="400" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="28" fill="${muted}">${description}</text>
   <g transform="translate(80, ${HEIGHT - 60})">
     <text x="0" y="0" font-family="'JetBrains Mono', 'Menlo', monospace" font-size="20" fill="${ink}">${author}</text>
@@ -112,7 +112,7 @@ function renderMainSvg(): string {
     </g>
     <text x="72" y="40" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="36" fill="${ink}">Floom</text>
   </g>
-  <text x="80" y="330" font-family="'DM Serif Display', Georgia, serif" font-size="96" fill="${ink}">Ship AI apps fast.</text>
+  <text x="80" y="330" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="96" letter-spacing="-3" fill="${ink}">Ship AI apps fast.</text>
   <text x="80" y="400" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="30" fill="${muted}">The protocol + runtime for agentic work.</text>
   <text x="80" y="455" font-family="'JetBrains Mono', 'Menlo', monospace" font-size="20" fill="${accent}" font-weight="600">Vibe-coding speed. Production-grade safety.</text>
   <text x="80" y="548" font-family="'JetBrains Mono', 'Menlo', monospace" font-size="14" fill="${muted}" letter-spacing="2" font-weight="600">WORKS WITH</text>

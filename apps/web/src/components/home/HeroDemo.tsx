@@ -1356,10 +1356,10 @@ const RUN_HEADER: CSSProperties = {
 };
 
 const RUN_TITLE: CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
+  fontFamily: 'var(--font-display)',
   fontSize: 22,
-  fontWeight: 400,
-  letterSpacing: '-0.01em',
+  fontWeight: 600,
+  letterSpacing: '-0.02em',
   color: '#0e0e0c',
   lineHeight: 1.1,
 };
@@ -1449,10 +1449,10 @@ const SCORE_ROW: CSSProperties = {
 };
 
 const SCORE_BIG: CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
+  fontFamily: 'var(--font-display)',
   fontSize: 44,
   lineHeight: 1,
-  fontWeight: 400,
+  fontWeight: 700,
   color: '#0e0e0c',
   fontVariantNumeric: 'tabular-nums',
   letterSpacing: '-0.02em',

@@ -92,9 +92,9 @@ export function StudioHomePage() {
         >
           <h1
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontFamily: 'var(--font-display)',
               fontSize: 28,
-              fontWeight: 400,
+              fontWeight: 700,
               letterSpacing: '-0.02em',
               lineHeight: 1.1,
               margin: 0,
