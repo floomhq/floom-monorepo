@@ -4,6 +4,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from './Logo';
 import { useSession, clearSession } from '../hooks/useSession';
 import * as api from '../api/client';
+import { useDeployEnabled } from '../lib/flags';
+import { waitlistHref } from '../lib/waitlistCta';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface Props {
@@ -99,6 +101,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const { data, isAuthenticated, refresh } = useSession();
+  const deployEnabled = useDeployEnabled();
   const navigate = useNavigate();
   const location = useLocation();
   const dropRef = useRef<HTMLDivElement>(null);
@@ -163,6 +166,13 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
     location.pathname.startsWith('/docs');
   const isStudio = location.pathname.startsWith('/studio');
   const isMe = location.pathname.startsWith('/me');
+  const isPublishNav =
+    location.pathname === '/studio/build' || location.pathname === '/deploy';
+
+  function goWaitlistPublish(source: string) {
+    // TODO(Agent 9): open WaitlistModal instead of routing.
+    navigate(waitlistHref(source));
+  }
 
   return (
     <header
@@ -262,6 +272,31 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
             >
               Docs
             </Link>
+            {deployEnabled ? (
+              <Link
+                to="/studio/build"
+                data-testid="topbar-deploy"
+                aria-current={isPublishNav ? 'page' : undefined}
+                style={navLinkStyle(isPublishNav)}
+              >
+                Deploy
+              </Link>
+            ) : (
+              <button
+                type="button"
+                data-testid="topbar-publish-waitlist"
+                onClick={() => goWaitlistPublish('topbar-publish')}
+                style={{
+                  ...navLinkStyle(false),
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Publish
+              </button>
+            )}
             {/* Changelog demoted to footer 2026-04-23 (nav declutter). */}
             {/* Logged-in only: Studio + Me */}
             {isAuthenticated && (
@@ -547,6 +582,41 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
             >
               Docs
             </Link>
+
+            {deployEnabled ? (
+              <Link
+                to="/studio/build"
+                className="topbar-mobile-link"
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+                data-testid="topbar-mobile-deploy"
+                aria-current={isPublishNav ? 'page' : undefined}
+              >
+                Deploy
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="topbar-mobile-link"
+                role="menuitem"
+                data-testid="topbar-mobile-publish-waitlist"
+                onClick={() => {
+                  setMenuOpen(false);
+                  goWaitlistPublish('topbar-publish-mobile');
+                }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  font: 'inherit',
+                  color: 'inherit',
+                }}
+              >
+                Publish
+              </button>
+            )}
 
             {/* Changelog demoted to footer 2026-04-23 (nav declutter). */}
 
