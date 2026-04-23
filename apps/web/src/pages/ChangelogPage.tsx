@@ -106,6 +106,59 @@ export function ChangelogPage() {
             Join Discord
           </a>
         </div>
+
+        <section
+          style={{
+            ...SECTION_STYLE,
+            paddingTop: 8,
+            textAlign: 'left',
+            maxWidth: 640,
+            marginLeft: 'auto',
+            marginRight: 'auto',
+          }}
+          data-testid="changelog-launch-2026-04-24"
+        >
+          <p
+            style={{
+              ...EYEBROW_STYLE,
+              textAlign: 'left',
+            }}
+          >
+            2026-04-24
+          </p>
+          <h2
+            style={{
+              ...H1_STYLE,
+              fontSize: 28,
+              textAlign: 'left',
+            }}
+          >
+            Launch week
+          </h2>
+          <p
+            style={{
+              ...SUB_STYLE,
+              textAlign: 'left',
+              maxWidth: 'none',
+            }}
+          >
+            Public floom.dev with catalog apps, MCP installs, and sign-in. Publishing
+            to the hosted cloud opens from the waitlist first. Full release notes ship
+            on GitHub Releases on launch day.
+          </p>
+          <p
+            style={{
+              ...SUB_STYLE,
+              textAlign: 'left',
+              maxWidth: 'none',
+              fontSize: 15,
+              fontStyle: 'italic',
+              marginTop: 16,
+            }}
+          >
+            Detailed bullets: coming soon — GitHub Releases stays authoritative.
+          </p>
+        </section>
       </section>
     </PageShell>
   );

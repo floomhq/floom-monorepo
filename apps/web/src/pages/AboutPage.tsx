@@ -21,8 +21,10 @@
 //   5. Who's behind it: Federico + Floom Inc + OSS commitment
 //   + Footer CTA band: "Paste your thing" → /studio/build
 
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
+import { useDeployEnabled } from '../lib/flags';
+import { waitlistHref } from '../lib/waitlistCta';
 
 // ── Shared styles ─────────────────────────────────────────────────────────
 
@@ -72,6 +74,9 @@ const MUTED_BODY_STYLE: React.CSSProperties = {
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export function AboutPage() {
+  const deployEnabled = useDeployEnabled();
+  const navigate = useNavigate();
+
   return (
     <PageShell
       title="About Floom · Get that thing off localhost fast"
@@ -134,11 +139,21 @@ export function AboutPage() {
             tag="Vibecoders"
             title="People who build real tools with Cursor, Lovable, ChatGPT."
             body={
-              <>
-                You have something useful running on your laptop. Your
-                coworkers cannot use it because your coworkers cannot run
-                Python. Floom gives your thing a real URL.
-              </>
+              deployEnabled ? (
+                <>
+                  You have something useful running on your laptop. Your
+                  coworkers cannot use it because your coworkers cannot run
+                  Python. Floom gives your thing a real URL.
+                </>
+              ) : (
+                <>
+                  You have something useful running on your laptop. Your
+                  coworkers cannot use it if they cannot run your stack. On
+                  floom.dev you can run apps and wire them into Claude via MCP
+                  today. Publishing your own app to our hosted runtime is
+                  waitlist-only; self-host is always open.
+                </>
+              )
             }
           />
           <WhoCard
@@ -183,7 +198,11 @@ export function AboutPage() {
           />
           <Triad
             label="Faster to go live"
-            body="You ship a spec, not a UI. The page draws itself from your fields. Publish, share the link, done."
+            body={
+              deployEnabled
+                ? 'You ship a spec, not a UI. The page draws itself from your fields. Publish, share the link, done.'
+                : 'You ship a spec, not a UI. The page draws itself from your fields. When you have publish access on floom.dev (or on your self-hosted instance), share the link and you are done.'
+            }
           />
           <Triad
             label="Less ambiguity"
@@ -255,7 +274,7 @@ export function AboutPage() {
         }}
       >
         <h2 style={{ ...H2_STYLE, margin: '0 0 12px' }}>
-          Paste your thing. Share the link.
+          {deployEnabled ? 'Paste your thing. Share the link.' : 'Paste your thing. Run it everywhere.'}
         </h2>
         <p
           style={{
@@ -264,26 +283,64 @@ export function AboutPage() {
             margin: '0 auto 24px',
           }}
         >
-          Point Floom at an OpenAPI spec or a GitHub repo. You get a live
-          URL, auth, logs, and a page your colleagues can actually open.
+          {deployEnabled ? (
+            <>
+              Point Floom at an OpenAPI spec or a GitHub repo. You get a live
+              URL, auth, logs, and a page your colleagues can actually open.
+            </>
+          ) : (
+            <>
+              Point Floom at an OpenAPI spec or a GitHub repo to publish when
+              your account has access on floom.dev, or run without limits on
+              your own hardware. Until publish opens for you here, run catalog
+              apps, use MCP, and self-host your own.
+            </>
+          )}
         </p>
-        <Link
-          to="/studio/build"
-          data-testid="about-cta-build"
-          style={{
-            display: 'inline-block',
-            padding: '14px 26px',
-            background: 'var(--accent)',
-            color: '#0a0a0a',
-            fontWeight: 600,
-            fontSize: 15,
-            borderRadius: 10,
-            textDecoration: 'none',
-            letterSpacing: '-0.005em',
-          }}
-        >
-          Paste your thing → Studio
-        </Link>
+        {deployEnabled ? (
+          <Link
+            to="/studio/build"
+            data-testid="about-cta-build"
+            style={{
+              display: 'inline-block',
+              padding: '14px 26px',
+              background: 'var(--accent)',
+              color: '#0a0a0a',
+              fontWeight: 600,
+              fontSize: 15,
+              borderRadius: 10,
+              textDecoration: 'none',
+              letterSpacing: '-0.005em',
+            }}
+          >
+            Paste your thing → Studio
+          </Link>
+        ) : (
+          <button
+            type="button"
+            data-testid="about-cta-waitlist"
+            onClick={() => {
+              // TODO(Agent 9): open WaitlistModal instead of routing.
+              navigate(waitlistHref('about-footer'));
+            }}
+            style={{
+              display: 'inline-block',
+              padding: '14px 26px',
+              background: 'var(--accent)',
+              color: '#0a0a0a',
+              fontWeight: 600,
+              fontSize: 15,
+              borderRadius: 10,
+              textDecoration: 'none',
+              letterSpacing: '-0.005em',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Join the publish waitlist
+          </button>
+        )}
       </section>
     </PageShell>
   );

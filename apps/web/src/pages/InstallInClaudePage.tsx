@@ -33,6 +33,9 @@ interface InstallInClaudePageProps {
 
 const MCP_BASE = 'https://mcp.floom.dev';
 
+// Launch MCP slugs (copy-paste audit): lead-scorer, competitor-analyzer,
+// resume-screener → `${MCP_BASE}/app/<slug>` in every tab snippet.
+
 function desktopSnippet(slug: string | null): string {
   const serverKey = slug ?? 'floom';
   const url = slug ? `${MCP_BASE}/app/${slug}` : `${MCP_BASE}/search`;
@@ -647,6 +650,7 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
     <PageShell title={pageTitle} contentStyle={{ padding: 0, maxWidth: '100%' }}>
       <main
         id="main"
+        className="install-in-claude-main"
         data-testid="install-in-claude-page"
         style={{ maxWidth: 900, margin: '0 auto', padding: '40px 24px 80px' }}
       >
@@ -736,9 +740,10 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
         <div
           role="tablist"
           aria-label="MCP client"
+          className="install-mcp-tablist"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(4,1fr)',
+            gridTemplateColumns: 'repeat(4, 1fr)',
             gap: 10,
             marginBottom: 24,
           }}
@@ -901,6 +906,24 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
             Done, open My apps →
           </Link>
         </div>
+
+        <style>{`
+          @media (max-width: 720px) {
+            .install-in-claude-main {
+              padding-left: 16px !important;
+              padding-right: 16px !important;
+            }
+          }
+          @media (max-width: 640px) {
+            .install-mcp-tablist {
+              grid-template-columns: 1fr 1fr !important;
+              gap: 8px !important;
+            }
+            .install-mcp-tablist button {
+              padding: 12px 12px !important;
+            }
+          }
+        `}</style>
       </main>
     </PageShell>
   );

@@ -17,6 +17,8 @@ import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
 import { FeedbackButton } from '../components/FeedbackButton';
 import { DocsSidebar, DOCS_SIDEBAR_GROUPS } from '../components/docs/DocsSidebar';
+import { DocsPublishWaitlistBanner } from '../components/docs/DocsPublishWaitlistBanner';
+import { useDeployEnabled } from '../lib/flags';
 
 // ── Styles ────────────────────────────────────────────────────────────────
 
@@ -273,6 +275,7 @@ const discordFootStyle: CSSProperties = {
 
 export function DocsLandingPage() {
   const { pathname } = useLocation();
+  const deployEnabled = useDeployEnabled();
 
   useEffect(() => {
     document.title = 'Floom docs';
@@ -284,6 +287,7 @@ export function DocsLandingPage() {
   return (
     <div className="page-root" data-testid="docs-landing-page">
       <TopBar />
+      <DocsPublishWaitlistBanner />
 
       <main style={shellStyle}>
         <DocsSidebar groups={DOCS_SIDEBAR_GROUPS} currentPath={pathname} />
@@ -298,8 +302,18 @@ export function DocsLandingPage() {
 
           <h1 style={h1Style}>Floom docs.</h1>
           <p style={ledeStyle}>
-            The protocol and runtime for agentic work. Write a manifest, ship an app,
-            let users (or agents) run it.
+            {deployEnabled ? (
+              <>
+                The protocol and runtime for agentic work. Write a manifest, ship an
+                app, let users (or agents) run it.
+              </>
+            ) : (
+              <>
+                The protocol and runtime for agentic work. Write a manifest, run apps
+                today (MCP, CLI, web). Ship to the floom.dev cloud when publishing is
+                open for your account, or self-host with no waitlist.
+              </>
+            )}
           </p>
 
           <div style={quickStartStyle}>
@@ -394,9 +408,10 @@ curl -X POST https://api.floom.dev/api/lead-scorer/run \\
           <p style={pStyle}>
             Every Floom app is a ready-to-use MCP tool at{' '}
             <code>mcp.floom.dev/app/&lt;slug&gt;</code>. Point your agent at that URL
-            and it can call the app like any other tool. There's also a discovery
+            and it can call the app like any other tool. There&apos;s also a discovery
             endpoint so agents can find apps on their own, and a web Studio for
-            managing the apps you own.
+            managing the apps you own
+            {deployEnabled ? '.' : ' (new publishes to floom.dev are waitlist-only).'}
           </p>
 
           <div style={surfaceGridStyle}>
@@ -422,7 +437,15 @@ curl -X POST https://api.floom.dev/api/lead-scorer/run \\
               <span style={surfaceNameStyle}>Manage</span>
               <div style={surfaceTitleStyle}>Your apps</div>
               <p style={{ ...pStyle, fontSize: 12.5, margin: 0 }}>
-                Create, update, rotate secrets. Web UI, not an MCP endpoint.
+                {deployEnabled ? (
+                  <>Create, update, rotate secrets. Web UI, not an MCP endpoint.</>
+                ) : (
+                  <>
+                    Create, update, rotate secrets when your account can publish on
+                    floom.dev (waitlist during launch). Self-host has no such gate.
+                    Web UI, not an MCP endpoint.
+                  </>
+                )}
               </p>
               <span style={surfaceToolStyle}>floom.dev/studio</span>
             </div>

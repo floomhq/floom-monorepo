@@ -10,6 +10,7 @@ import {
   markdownComponents,
 } from '../components/docs/markdown';
 import { DocsSidebar, DOCS_SIDEBAR_GROUPS } from '../components/docs/DocsSidebar';
+import { DocsPublishWaitlistBanner } from '../components/docs/DocsPublishWaitlistBanner';
 import limitsMd from '../assets/docs/limits.md?raw';
 import securityMd from '../assets/docs/security.md?raw';
 import observabilityMd from '../assets/docs/observability.md?raw';
@@ -70,6 +71,7 @@ export function DocsPage() {
   return (
     <div className="page-root" data-testid={`docs-${doc.slug}-page`}>
       <TopBar />
+      <DocsPublishWaitlistBanner />
 
       <main
         style={{
