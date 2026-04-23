@@ -1,7 +1,7 @@
 // #317: client-side <head> updates for public marketing pages (Vite dev + post-SPA
 // navigation) so in-browser “View source” after client nav matches what SSR ships.
 
-import { absoluteCanonicalUrl } from './seoPath';
+import { absoluteCanonicalUrl, absolutePublicAssetUrl } from './seoPath';
 
 const ATTR = (isProp: boolean) => (isProp ? 'property' : 'name');
 
@@ -16,7 +16,7 @@ function upsertMeta(isProp: boolean, key: string, content: string) {
   el.setAttribute('content', content);
 }
 
-/** #316: default static OG/Twitter image on marketing routes. */
+/** #316: default static OG/Twitter image on marketing routes (see also SSR `defaultOgImage`). */
 export const DEFAULT_OG_PATH = '/og-image.png';
 
 /**
@@ -31,11 +31,18 @@ export function applyPublicMarketingMeta(opts: {
   ogTitle: string;
   /** Open Graph + Twitter body; defaults to `description` */
   socialDescription?: string;
+  /**
+   * Pathname only (no query) for canonical / og:url. Defaults to `location.pathname`.
+   */
+  pathname?: string;
+  /** Full absolute image URL. Defaults to `${PUBLIC_SITE_ORIGIN}${DEFAULT_OG_PATH}`. */
+  ogImageAbsoluteUrl?: string;
 }): void {
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
-  const { origin, pathname } = window.location;
-  const pageUrl = absoluteCanonicalUrl(origin, pathname);
-  const image = `${origin}${DEFAULT_OG_PATH}`;
+  const pathOnly = opts.pathname ?? window.location.pathname;
+  const pageUrl = absoluteCanonicalUrl(pathOnly);
+  const image =
+    opts.ogImageAbsoluteUrl ?? absolutePublicAssetUrl(DEFAULT_OG_PATH);
   const body = opts.socialDescription ?? opts.description;
 
   upsertMeta(false, 'description', opts.description);

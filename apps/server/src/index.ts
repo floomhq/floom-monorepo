@@ -801,15 +801,24 @@ if (webDist) {
   }
 
   function rewriteCanonicalLink(html: string, href: string): string {
-    const relFirst = html.replace(
+    let out = html.replace(
       /<link rel="canonical" href="[^"]*"/,
       `<link rel="canonical" href="${href}"`,
     );
-    if (relFirst !== html) return relFirst;
-    return html.replace(
+    if (out !== html) return out;
+    out = html.replace(
       /<link href="[^"]*" rel="canonical"/,
       `<link href="${href}" rel="canonical"`,
     );
+    if (out !== html) return out;
+    out = html.replace(
+      /<link rel='canonical' href='[^']*'/,
+      `<link rel="canonical" href="${href}"`,
+    );
+    if (out !== html) return out;
+    // #172: if the template has no matching canonical tag, inject one so SSR
+    // never falls back to the baked homepage-only href for deep routes.
+    return html.replace(/<\/head>/i, `<link rel="canonical" href="${href}" />\n  </head>`);
   }
 
   // 2026-04-20 (P2 #149): SSR title drift. Previously every route returned

@@ -21,7 +21,7 @@ export function SeoClientCanonicalSync() {
 
   useEffect(() => {
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
-    const href = absoluteCanonicalUrl(window.location.origin, pathname);
+    const href = absoluteCanonicalUrl(pathname);
     let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!link) {
       link = document.createElement('link');
