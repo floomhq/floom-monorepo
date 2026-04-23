@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from './Logo';
 import { useSession, clearSession } from '../hooks/useSession';
 import { useMyApps } from '../hooks/useMyApps';
 import * as api from '../api/client';
-import { readDeployEnabled } from '../lib/flags';
+import { useDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
+import { GitHubStarsBadge } from './GitHubStarsBadge';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface Props {
@@ -103,7 +104,18 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
   const [dropOpen, setDropOpen] = useState(false);
   const { data, isAuthenticated, refresh } = useSession();
   const { apps: myApps } = useMyApps();
-  const deployEnabled = useMemo(() => readDeployEnabled(), []);
+  // 2026-04-24 prod/preview split: read the flag from the live session
+  // payload so prod (DEPLOY_ENABLED=false) hides Sign in / Sign up even
+  // when the Vite build had VITE_DEPLOY_ENABLED=true baked in. Same
+  // Docker image serves both environments.
+  const deployEnabledFlag = useDeployEnabled();
+  // While the session is loading (`deployEnabledFlag === null`), hide
+  // auth-y chrome to avoid the flash of "Sign in / Sign up + Publish"
+  // that Federico flagged on preview. Treat null as "don't know yet,
+  // show nothing auth-related" — Sign in re-appears as soon as we know
+  // we're on preview (deploy_enabled=true).
+  const deployEnabled = deployEnabledFlag === true;
+  const waitlistMode = deployEnabledFlag === false;
   const studioNavLabel =
     isAuthenticated && myApps && myApps.length > 0
       ? `Studio (${myApps.length})`
@@ -278,6 +290,17 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
             >
               Docs
             </Link>
+            {/* Self-host — deep-links to the landing band. Federico
+                2026-04-24: "make self-hosting prominent". Keeping it
+                in the centre nav (not the footer) so commercial
+                evaluators can see it from any page. */}
+            <Link
+              to="/#self-host"
+              data-testid="topbar-selfhost"
+              style={navLinkStyle(false)}
+            >
+              Self-host
+            </Link>
             {deployEnabled ? (
               <Link
                 to="/studio/build"
@@ -287,7 +310,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               >
                 Deploy
               </Link>
-            ) : (
+            ) : waitlistMode ? (
               <button
                 type="button"
                 data-testid="topbar-publish-waitlist"
@@ -302,7 +325,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               >
                 Publish
               </button>
-            )}
+            ) : null}
             {/* Changelog demoted to footer 2026-04-23 (nav declutter). */}
             {/* Logged-in only: Studio + Me */}
             {isAuthenticated && (
@@ -337,7 +360,18 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
             alignItems: 'center',
           }}
         >
-          {!isAuthenticated && !isLoginPage && (
+          {/* GitHub stars badge — always on so social proof is visible
+              whether or not the viewer is logged in. Placed before the
+              auth pills so the hierarchy stays Sign-up > GH on preview,
+              and GH becomes the single rightmost affordance on
+              waitlist-prod (where Sign in / Sign up are hidden). */}
+          <GitHubStarsBadge compact dataTestId="topbar-gh-stars" />
+
+          {/* Sign in / Sign up. Hidden in waitlist mode (floom.dev) and
+              while session is still loading (prevents the "Sign in +
+              Join waitlist" contradiction Federico saw on preview on
+              2026-04-24). Shown on preview.floom.dev (deployEnabled). */}
+          {!isAuthenticated && !isLoginPage && deployEnabled && (
             <>
               <Link
                 to="/login"
@@ -354,6 +388,20 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                 Sign up
               </Link>
             </>
+          )}
+
+          {/* Waitlist CTA in place of Sign in / Sign up on prod. Single
+              pill — don't double up with the centre-nav Publish button,
+              this one speaks to visitors who don't want to Publish per
+              se but do want the beta. */}
+          {!isAuthenticated && !isLoginPage && waitlistMode && (
+            <Link
+              to={waitlistHref('topbar-waitlist')}
+              data-testid="topbar-waitlist"
+              style={signUpStyle}
+            >
+              Join waitlist
+            </Link>
           )}
 
           {isAuthenticated && data && (
@@ -589,6 +637,16 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               Docs
             </Link>
 
+            <Link
+              to="/#self-host"
+              className="topbar-mobile-link"
+              role="menuitem"
+              onClick={() => setMenuOpen(false)}
+              data-testid="topbar-mobile-selfhost"
+            >
+              Self-host
+            </Link>
+
             {deployEnabled ? (
               <Link
                 to="/studio/build"
@@ -600,7 +658,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               >
                 Deploy
               </Link>
-            ) : (
+            ) : waitlistMode ? (
               <button
                 type="button"
                 className="topbar-mobile-link"
@@ -622,7 +680,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               >
                 Publish
               </button>
-            )}
+            ) : null}
 
             {/* Changelog demoted to footer 2026-04-23 (nav declutter). */}
 
@@ -668,7 +726,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               </>
             )}
 
-            {!isAuthenticated && !isLoginPage && (
+            {!isAuthenticated && !isLoginPage && deployEnabled && (
               <Link
                 to="/login"
                 className="topbar-mobile-link"
@@ -680,7 +738,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               </Link>
             )}
 
-            {!isAuthenticated && (
+            {!isAuthenticated && deployEnabled && (
               <Link
                 to="/signup"
                 className="topbar-mobile-cta"
@@ -689,6 +747,18 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                 data-testid="topbar-mobile-signup"
               >
                 Sign up
+              </Link>
+            )}
+
+            {!isAuthenticated && waitlistMode && (
+              <Link
+                to={waitlistHref('topbar-mobile-waitlist')}
+                className="topbar-mobile-cta"
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+                data-testid="topbar-mobile-waitlist"
+              >
+                Join waitlist
               </Link>
             )}
 

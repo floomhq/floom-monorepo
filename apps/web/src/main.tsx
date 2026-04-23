@@ -84,6 +84,7 @@ const WaitlistPage = lazy(() => import('./pages/WaitlistPage').then(m => ({ defa
 import { IconSprite } from './components/IconSprite';
 import { CookieBanner } from './components/CookieBanner';
 import { RouteLoading } from './components/RouteLoading';
+import { WaitlistGuard } from './components/WaitlistGuard';
 import { primeSession, refreshSession } from './hooks/useSession';
 import { initPostHog, identifyFromSession, track } from './lib/posthog';
 import { initBrowserSentry } from './lib/sentry';
@@ -216,31 +217,36 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         {/* /spec and /spec/* are server-side 308 redirects to /protocol
             (wired in apps/server/src/index.ts). No client route needed
             because crawlers/users never reach the SPA for those paths. */}
-        {/* W4-minimal: auth pages */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<LoginPage />} />
+        {/* W4-minimal: auth pages. 2026-04-24: gated by WaitlistGuard
+            on floom.dev (DEPLOY_ENABLED=false). On prod the form is
+            unreachable — visitors land on /waitlist instead. On preview
+            (DEPLOY_ENABLED=true) this renders normally. */}
+        <Route path="/login" element={<WaitlistGuard source="login"><LoginPage /></WaitlistGuard>} />
+        <Route path="/signup" element={<WaitlistGuard source="signup"><LoginPage /></WaitlistGuard>} />
         {/* Pre-launch P0: real password-reset flow. Replaces the old
             mailto link that dropped into Federico's inbox. Better Auth's
             `sendResetPassword` hook emails the reset link; this page
             handles the form side. */}
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        {/* W4-minimal: user dashboard */}
-        <Route path="/me" element={<MePage />} />
-        <Route path="/me/install" element={<MeInstallPage />} />
+        <Route path="/forgot-password" element={<WaitlistGuard source="forgot-password"><ForgotPasswordPage /></WaitlistGuard>} />
+        <Route path="/reset-password" element={<WaitlistGuard source="reset-password"><ResetPasswordPage /></WaitlistGuard>} />
+        {/* W4-minimal: user dashboard. WaitlistGuard keeps /me* + /studio*
+            and /build unreachable on floom.dev (waitlist-only) while
+            leaving the public landing, /apps, /p/:slug, and /docs open. */}
+        <Route path="/me" element={<WaitlistGuard source="me"><MePage /></WaitlistGuard>} />
+        <Route path="/me/install" element={<WaitlistGuard source="me"><MeInstallPage /></WaitlistGuard>} />
         {/* Design-audit fix 2026-04-22: /me/runs was advertised by the
             user-surface nav but never had a page. The full run history
             already lives on /me (Recent runs section), so redirect there
             with a #recent-runs anchor so the section scrolls into view. */}
         <Route path="/me/runs" element={<Navigate to="/me#recent-runs" replace />} />
-        <Route path="/me/runs/:runId" element={<MeRunDetailPage />} />
-        <Route path="/me/settings" element={<MeSettingsPage />} />
+        <Route path="/me/runs/:runId" element={<WaitlistGuard source="me"><MeRunDetailPage /></WaitlistGuard>} />
+        <Route path="/me/settings" element={<WaitlistGuard source="me"><MeSettingsPage /></WaitlistGuard>} />
         {/* /me/api-keys — canonical location for personal API keys
             (Fede 2026-04-23: "API keys shouldn't sit in studio"). Keys are
             account-scoped: users need them for both building and running.
             /me/settings/tokens kept as a redirect so existing links/docs
             still resolve. The underlying MeSettingsTokensPage is unchanged. */}
-        <Route path="/me/api-keys" element={<MeSettingsTokensPage />} />
+        <Route path="/me/api-keys" element={<WaitlistGuard source="me"><MeSettingsTokensPage /></WaitlistGuard>} />
         <Route
           path="/me/settings/tokens"
           element={<Navigate to="/me/api-keys" replace />}
@@ -256,7 +262,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/me/apps" element={<Navigate to="/me" replace />} />
         <Route path="/me/apps/:slug" element={<StudioSlugRedirect />} />
         <Route path="/me/apps/:slug/secrets" element={<StudioSlugRedirect subpath="secrets" />} />
-        <Route path="/me/apps/:slug/run" element={<MeAppRunPage />} />
+        <Route path="/me/apps/:slug/run" element={<WaitlistGuard source="me"><MeAppRunPage /></WaitlistGuard>} />
         {/* Legacy /me/a/:slug redirects (preserve old bookmarks). The
             /secrets and /run variants keep the existing hop to the
             /me/apps/:slug* chain, which then funnels to /studio/*. */}
@@ -265,22 +271,24 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/me/a/:slug/run" element={<MeAppRunRedirect />} />
         {/* Studio context (v16 restructure 2026-04-18). Creator workspace:
             manage every app you own, publish new ones, upload renderers.
-            Auth-gated via StudioLayout. */}
-        <Route path="/studio" element={<StudioHomePage />} />
-        <Route path="/studio/build" element={<StudioBuildPage />} />
+            Auth-gated via StudioLayout; additionally waitlist-gated so
+            floom.dev redirects into /waitlist instead of asking for a
+            login that doesn't lead anywhere (DEPLOY_ENABLED=false). */}
+        <Route path="/studio" element={<WaitlistGuard source="studio"><StudioHomePage /></WaitlistGuard>} />
+        <Route path="/studio/build" element={<WaitlistGuard source="studio"><StudioBuildPage /></WaitlistGuard>} />
         {/* Design-audit fix 2026-04-22: /studio/new is the create-new-app
             entry point shown in wireframe v17. Funnel it to /studio/build
             (the paste-repo flow). Must be listed before /studio/:slug or
             react-router matches "new" as an app slug and 404s. */}
         <Route path="/studio/new" element={<Navigate to="/studio/build" replace />} />
-        <Route path="/studio/settings" element={<StudioSettingsPage />} />
-        <Route path="/studio/:slug" element={<StudioAppPage />} />
-        <Route path="/studio/:slug/runs" element={<StudioAppRunsPage />} />
-        <Route path="/studio/:slug/secrets" element={<StudioAppSecretsPage />} />
-        <Route path="/studio/:slug/access" element={<StudioAppAccessPage />} />
-        <Route path="/studio/:slug/renderer" element={<StudioAppRendererPage />} />
-        <Route path="/studio/:slug/analytics" element={<StudioAppAnalyticsPage />} />
-        <Route path="/studio/:slug/triggers" element={<StudioTriggersTab />} />
+        <Route path="/studio/settings" element={<WaitlistGuard source="studio"><StudioSettingsPage /></WaitlistGuard>} />
+        <Route path="/studio/:slug" element={<WaitlistGuard source="studio"><StudioAppPage /></WaitlistGuard>} />
+        <Route path="/studio/:slug/runs" element={<WaitlistGuard source="studio"><StudioAppRunsPage /></WaitlistGuard>} />
+        <Route path="/studio/:slug/secrets" element={<WaitlistGuard source="studio"><StudioAppSecretsPage /></WaitlistGuard>} />
+        <Route path="/studio/:slug/access" element={<WaitlistGuard source="studio"><StudioAppAccessPage /></WaitlistGuard>} />
+        <Route path="/studio/:slug/renderer" element={<WaitlistGuard source="studio"><StudioAppRendererPage /></WaitlistGuard>} />
+        <Route path="/studio/:slug/analytics" element={<WaitlistGuard source="studio"><StudioAppAnalyticsPage /></WaitlistGuard>} />
+        <Route path="/studio/:slug/triggers" element={<WaitlistGuard source="studio"><StudioTriggersTab /></WaitlistGuard>} />
         {/* Legacy creator-context redirects into Studio (preserve old links). */}
         <Route path="/build" element={<Navigate to="/studio/build" replace />} />
         <Route path="/creator" element={<Navigate to="/studio" replace />} />

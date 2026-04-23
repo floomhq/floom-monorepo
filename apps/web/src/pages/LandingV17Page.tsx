@@ -40,6 +40,7 @@ import { HeroDemo } from '../components/home/HeroDemo';
 import { SectionEyebrow } from '../components/home/SectionEyebrow';
 import { TryTheseApps } from '../components/home/TryTheseApps';
 import { ManifestoBand } from '../components/landing/ManifestoBand';
+import { SelfHostSection } from '../components/home/SelfHostSection';
 
 import * as api from '../api/client';
 import type { HubApp } from '../lib/types';
@@ -324,6 +325,14 @@ export function LandingV17Page() {
             it works" narrative, so the page delivers a usable product (not
             a promise) in the first scroll. 2026-04-27 launch-strategy pivot. */}
         <TryTheseApps />
+
+        {/* SELF-HOST — dedicated band. Federico 2026-04-24: "make self-
+            hosting prominent". Commercial evaluators landing on floom.dev
+            should see within one scroll that waiting for the beta is
+            optional: the OSS image is shipped today, one docker run away.
+            Keeps the launch page honest about what's available without
+            hiding the hosted story. */}
+        <SelfHostSection />
 
         {/* Compact CLI reference strip below the hero. Docs/informational —
             not an action CTA, so it stays put regardless of DEPLOY_ENABLED

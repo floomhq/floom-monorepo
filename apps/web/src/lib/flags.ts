@@ -1,15 +1,20 @@
-import { useSession } from '../hooks/useSession';
+import { getCachedSession, useSession } from '../hooks/useSession';
 
 /**
  * Landing / launch-day feature flags.
  *
- * `DEPLOY_ENABLED` gates static marketing sections that key off the build-time
- * Vite env only (see LandingV17Page showcase + final CTA). Evaluated once at
- * module load so tree-shaking and SSR stay predictable.
+ * 2026-04-24 prod/preview split: the single source of truth is the SERVER's
+ * DEPLOY_ENABLED env var, exposed via GET /api/session/me. The Docker image
+ * for prod (floom.dev) and preview (preview.floom.dev) is the same, so the
+ * build-time Vite flag cannot distinguish them — only the server's per-deploy
+ * env can. `readDeployEnabled()` therefore reads the cached session payload
+ * first, and only falls back to `VITE_DEPLOY_ENABLED` when the session hasn't
+ * primed yet (first paint) or when `window.__FLOOM__.deployEnabled` is set
+ * for test/fixture overrides.
  *
- * For runtime chrome (TopBar, docs banners, etc.) use `readDeployEnabled()` or
- * `useMemo(() => readDeployEnabled(), [])` so `window.__FLOOM__.deployEnabled`
- * can override the build.
+ * Static marketing sections that must decide at module load use the legacy
+ * `DEPLOY_ENABLED` constant (Vite build-time) — fine for truly static copy,
+ * but runtime chrome (TopBar, banners, CTAs) should use `useDeployEnabled()`.
  */
 type Env = { VITE_DEPLOY_ENABLED?: string };
 
@@ -30,12 +35,14 @@ export function deployOrWaitlistCopy<T>(opts: { deploy: T; waitlist: T }): T {
 }
 
 /**
- * Client-side publish/deploy hint: `window.__FLOOM__.deployEnabled` when set,
- * otherwise build-time `VITE_DEPLOY_ENABLED === 'true'` (strict — matches the
- * former `flags.ts` env read, distinct from `DEPLOY_ENABLED`'s 1/yes aliases).
+ * Sync read of the deploy flag for code paths that can't use a hook
+ * (event handlers, route guards). Order of precedence:
+ *   1. `window.__FLOOM__.deployEnabled` (test/fixture override)
+ *   2. Cached `/api/session/me.deploy_enabled` (server-driven — the real flag)
+ *   3. Build-time `VITE_DEPLOY_ENABLED === 'true'` (first-paint fallback only)
  *
- * Prefer `useMemo(() => readDeployEnabled(), [])` in components that should
- * match this hint without waiting for `/api/session/me`.
+ * The cached session is primed on boot (see main.tsx `primeSession()`), so
+ * after the first async resolve this is accurate for the live runtime.
  */
 export function readDeployEnabled(): boolean {
   if (typeof window !== 'undefined') {
@@ -44,6 +51,10 @@ export function readDeployEnabled(): boolean {
       return w.__FLOOM__.deployEnabled;
     }
   }
+  const cached = getCachedSession();
+  if (cached && typeof cached.deploy_enabled === 'boolean') {
+    return cached.deploy_enabled;
+  }
   const env = (import.meta as { env?: Env }).env;
   return env?.VITE_DEPLOY_ENABLED === 'true';
 }
@@ -51,15 +62,30 @@ export function readDeployEnabled(): boolean {
 /**
  * Launch feature flag from GET /api/session/me (`deploy_enabled`).
  *
- * Semantics (unchanged from former `hooks/useSession`):
- *   - `true`  → full Deploy / Publish CTAs
- *   - `false` → waitlist mode
+ * Semantics:
+ *   - `true`  → full Deploy / Publish CTAs (preview.floom.dev)
+ *   - `false` → waitlist mode (floom.dev)
  *   - `null`  → session not yet loaded (or no payload yet); avoid flicker
+ *
+ * If /api/session/me errors out (self-host without the server boot, dev
+ * without the API up), fall back to `window.__FLOOM__.deployEnabled`
+ * then the build-time Vite env, matching `readDeployEnabled()`. This
+ * keeps the UI coherent in failure modes instead of flipping everything
+ * into waitlist just because a single fetch timed out.
  */
 export function useDeployEnabled(): boolean | null {
   const { data, loading, error } = useSession();
   if (loading && !data) return null;
-  if (error) return false;
+  if (error) {
+    if (typeof window !== 'undefined') {
+      const w = window as Window & { __FLOOM__?: { deployEnabled?: boolean } };
+      if (typeof w.__FLOOM__?.deployEnabled === 'boolean') {
+        return w.__FLOOM__.deployEnabled;
+      }
+    }
+    const env = (import.meta as { env?: Env }).env;
+    return env?.VITE_DEPLOY_ENABLED === 'true';
+  }
   if (!data) return null;
   return data.deploy_enabled === true;
 }
