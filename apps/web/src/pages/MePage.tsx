@@ -978,6 +978,13 @@ function RunRow({
   onOpen: (run: MeRunSummary) => void;
   isLast: boolean;
 }) {
+  // Re-render on an interval so relative time always uses a fresh
+  // `Date.now()` vs `started_at` (issue #102 — not frozen at first paint).
+  const [, setRelTimeTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setRelTimeTick((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
   const appName = run.app_name || run.app_slug || 'App';
   const summary = runSummary(run);
   const tooltip = runRowTooltip(run, summary);
