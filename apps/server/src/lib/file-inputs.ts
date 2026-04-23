@@ -40,12 +40,60 @@ export const CONTAINER_INPUTS_DIR = '/floom/inputs';
  */
 export const SERVER_MAX_FILE_BYTES = 6 * 1024 * 1024;
 
+/**
+ * Default CSV row cap for file inputs (abuse-prevention, 2026-04-25).
+ *
+ * Why cap rows and not just bytes: the 6 MB cap is trivially satisfied by
+ * a CSV containing 200,000 rows of 30-byte records — enough to burn an
+ * hour of container CPU and exhaust the Floom-funded Gemini quota in one
+ * request. A row cap is the only guard that actually tracks "units of
+ * LLM work performed", which is what our abuse vector is about.
+ *
+ * 1,000 is chosen to (a) cover every documented demo use case (the
+ * lead-scorer walkthroughs top out at ~200 rows), (b) still catch the
+ * 1M-row DoS without false positives on real spreadsheets, and (c) give
+ * a user with a larger batch a clean "split into 1,000-row chunks"
+ * ergonomics path. Override with FLOOM_CSV_MAX_ROWS for self-hosters
+ * who run their own Gemini budget and don't want the cap.
+ */
+export const DEFAULT_CSV_MAX_ROWS = 1000;
+
+export function getCsvMaxRows(): number {
+  const raw = process.env.FLOOM_CSV_MAX_ROWS;
+  if (!raw) return DEFAULT_CSV_MAX_ROWS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_CSV_MAX_ROWS;
+  return Math.floor(n);
+}
+
 export class FileEnvelopeError extends Error {
   field: string;
   constructor(field: string, message: string) {
     super(`File input "${field}": ${message}`);
     this.name = 'FileEnvelopeError';
     this.field = field;
+  }
+}
+
+export class CsvRowCapExceededError extends Error {
+  field: string;
+  observed: number;
+  limit: number;
+  constructor(field: string, observed: number, limit: number) {
+    // Friendly, user-facing — gets echoed straight through to the UI's
+    // run-start error surface via ManifestError.message (see run.ts
+    // catch(err as ManifestError)). Numbers are locale-formatted so
+    // "15,420 rows" reads naturally. The CTA mentions BYOK only when
+    // relevant to the abuse path — splitting the file always works.
+    super(
+      `This app accepts up to ${limit.toLocaleString('en-US')} rows per run. ` +
+        `Your file has ${observed.toLocaleString('en-US')} rows — split it into ` +
+        `smaller batches, or bring your own Gemini key for larger runs.`,
+    );
+    this.name = 'CsvRowCapExceededError';
+    this.field = field;
+    this.observed = observed;
+    this.limit = limit;
   }
 }
 
@@ -109,6 +157,59 @@ export function assertFileEnvelope(
     size: typeof v.size === 'number' ? v.size : 0,
     content_b64: v.content_b64,
   };
+}
+
+/**
+ * Duck-type: is this envelope a CSV upload? We look at two signals —
+ * either is sufficient:
+ *   1. The filename extension is .csv (case-insensitive).
+ *   2. The MIME type is text/csv (exact) or application/csv (legacy).
+ *
+ * We deliberately do NOT sniff the body. Sniffing every envelope would
+ * require decoding the base64 twice (once here, once in decodeEnvelope),
+ * and a hostile client can always lie about MIME — the row-cap check
+ * itself does the real work. A user who renames `.csv` to `.txt` to
+ * dodge the cap just hits the generic 6 MB byte cap at a much larger
+ * boundary, which is acceptable fallback.
+ */
+export function isCsvEnvelope(envelope: FileEnvelope): boolean {
+  const name = envelope.name?.toLowerCase() || '';
+  if (name.endsWith('.csv')) return true;
+  const mime = envelope.mime_type?.toLowerCase() || '';
+  return mime === 'text/csv' || mime === 'application/csv';
+}
+
+/**
+ * Count logical CSV rows (excluding the header) in a decoded buffer,
+ * short-circuiting as soon as we cross `limit + 1`. We count newline
+ * bytes rather than parsing the CSV because:
+ *
+ *   - Streaming full CSV parsing for 6 MB is ~40 ms in the hot path and
+ *     would need a dependency (csv-parse or papaparse) for a single
+ *     gate. Newline counting gets us within ±1 for every well-formed
+ *     file and is a strict upper bound for the malformed ones (quoted
+ *     newlines inflate the count, which FAILS-CLOSED — safer than a
+ *     false-negative that lets a 2M-row file through).
+ *   - The abuse vector is "user pastes a 1M-row CSV" — the exact line
+ *     count matters less than "is this >> 1,000?".
+ *
+ * Subtracts 1 for the header row if the buffer is non-empty. A
+ * completely empty buffer returns 0.
+ */
+export function countCsvRowsFast(buf: Buffer, limit: number): number {
+  if (buf.length === 0) return 0;
+  const cap = limit + 2;
+  let count = 0;
+  for (let i = 0; i < buf.length; i++) {
+    if (buf[i] === 0x0a) {
+      count++;
+      if (count >= cap) break;
+    }
+  }
+  // If the file doesn't end with a newline, the last line is still a row.
+  if (buf[buf.length - 1] !== 0x0a) count++;
+  // Subtract the header row (conventionally the first line of a CSV).
+  return Math.max(0, count - 1);
 }
 
 /**

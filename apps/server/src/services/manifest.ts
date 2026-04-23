@@ -10,7 +10,12 @@ import type {
 } from '../types.js';
 import {
   assertFileEnvelope,
+  countCsvRowsFast,
+  CsvRowCapExceededError,
+  decodeEnvelope,
   FileEnvelopeError,
+  getCsvMaxRows,
+  isCsvEnvelope,
   isFileEnvelope,
 } from '../lib/file-inputs.js';
 
@@ -353,8 +358,31 @@ export function validateInputs(
         cleaned[spec.name] = value;
       } else if (isFileEnvelope(value)) {
         try {
-          cleaned[spec.name] = assertFileEnvelope(spec.name, value);
+          const envelope = assertFileEnvelope(spec.name, value);
+          // Abuse-prevention gate (2026-04-25): for CSV uploads, reject
+          // bodies whose row count exceeds the configured cap BEFORE the
+          // runner ever starts a container. Non-CSV files are untouched
+          // so PDFs / images / audio flow through unchanged. See
+          // lib/file-inputs.ts::countCsvRowsFast for the cost model.
+          if (isCsvEnvelope(envelope)) {
+            const limit = getCsvMaxRows();
+            // decodeEnvelope also enforces SERVER_MAX_FILE_BYTES; a CSV
+            // that is oversized on bytes gets the size error instead,
+            // which is strictly more informative for that case.
+            const buf = decodeEnvelope(spec.name, envelope);
+            const observed = countCsvRowsFast(buf, limit);
+            if (observed > limit) {
+              throw new CsvRowCapExceededError(spec.name, observed, limit);
+            }
+          }
+          cleaned[spec.name] = envelope;
         } catch (err) {
+          if (err instanceof CsvRowCapExceededError) {
+            // ManifestError flows through run.ts's 400 handler with
+            // {error, field}. Message is already user-friendly (with
+            // locale-formatted numbers and a concrete CTA).
+            throw new ManifestError(err.message, err.field);
+          }
           if (err instanceof FileEnvelopeError) {
             throw new ManifestError(err.message, err.field);
           }

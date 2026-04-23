@@ -27,7 +27,9 @@ import { serializeInputs } from './serialize-inputs';
 export {
   serializeInputs,
   FileInputTooLargeError,
+  CsvRowCapExceededError,
   DEFAULT_MAX_FILE_BYTES,
+  DEFAULT_MAX_CSV_ROWS,
 } from './serialize-inputs';
 
 const API_BASE = '';

@@ -30,11 +30,17 @@ import {
   FileEnvelopeError,
   CONTAINER_INPUTS_DIR,
   SERVER_MAX_FILE_BYTES,
+  isCsvEnvelope,
+  countCsvRowsFast,
+  getCsvMaxRows,
+  DEFAULT_CSV_MAX_ROWS,
 } from '../../apps/server/src/lib/file-inputs.ts';
 import {
   serializeInputs,
   DEFAULT_MAX_FILE_BYTES,
+  DEFAULT_MAX_CSV_ROWS,
   FileInputTooLargeError,
+  CsvRowCapExceededError as ClientCsvRowCapExceededError,
 } from '../../apps/web/src/api/serialize-inputs.ts';
 
 let passed = 0;
@@ -291,6 +297,151 @@ console.log('server decodeEnvelope');
     log('over-server-cap envelope rejected', false, 'did not throw');
   } catch (err) {
     log('over-server-cap envelope rejected', err instanceof FileEnvelopeError);
+  }
+}
+
+// -------------------------------------------------------------
+// 5. CSV row-cap (abuse prevention, 2026-04-25)
+// -------------------------------------------------------------
+console.log('CSV row-cap gate');
+
+function makeCsvBuffer(rowCount) {
+  // header + rowCount data rows, comma-separated, LF line endings
+  const header = 'a,b,c\n';
+  const row = 'x,y,z\n';
+  return Buffer.from(header + row.repeat(rowCount), 'utf8');
+}
+
+{
+  // Defaults stay in lockstep across client + server.
+  log('client default row cap === server default',
+    DEFAULT_MAX_CSV_ROWS === DEFAULT_CSV_MAX_ROWS && DEFAULT_CSV_MAX_ROWS === 1000);
+}
+
+{
+  // Row counter: fast newline scan excludes the header.
+  const buf = makeCsvBuffer(10);
+  const n = countCsvRowsFast(buf, 100);
+  log('countCsvRowsFast: 10 data rows reported', n === 10, `got ${n}`);
+}
+
+{
+  // Row counter short-circuits once `limit+2` newlines are seen.
+  const buf = makeCsvBuffer(5000);
+  const n = countCsvRowsFast(buf, 1000);
+  log('countCsvRowsFast: short-circuits over cap', n > 1000, `got ${n}`);
+}
+
+{
+  // MIME / extension detection.
+  log('isCsvEnvelope: .csv name', isCsvEnvelope({
+    __file: true, name: 'data.csv', mime_type: 'application/octet-stream', size: 1, content_b64: '',
+  }) === true);
+  log('isCsvEnvelope: text/csv MIME', isCsvEnvelope({
+    __file: true, name: 'data.txt', mime_type: 'text/csv', size: 1, content_b64: '',
+  }) === true);
+  log('isCsvEnvelope: pdf rejected', isCsvEnvelope({
+    __file: true, name: 'report.pdf', mime_type: 'application/pdf', size: 1, content_b64: '',
+  }) === false);
+}
+
+{
+  // Env override is picked up.
+  const prev = process.env.FLOOM_CSV_MAX_ROWS;
+  process.env.FLOOM_CSV_MAX_ROWS = '42';
+  const limit = getCsvMaxRows();
+  if (prev === undefined) delete process.env.FLOOM_CSV_MAX_ROWS;
+  else process.env.FLOOM_CSV_MAX_ROWS = prev;
+  log('getCsvMaxRows: honors FLOOM_CSV_MAX_ROWS env', limit === 42, `got ${limit}`);
+}
+
+{
+  // Server validator throws a ManifestError for an oversized CSV envelope.
+  const bigCsv = makeCsvBuffer(DEFAULT_CSV_MAX_ROWS + 50);
+  const envelopeOver = {
+    __file: true,
+    name: 'big.csv',
+    mime_type: 'text/csv',
+    size: bigCsv.length,
+    content_b64: bigCsv.toString('base64'),
+  };
+  try {
+    validateInputs(fileAction, { data: envelopeOver });
+    log('server validateInputs rejects oversized CSV', false, 'did not throw');
+  } catch (err) {
+    log(
+      'server validateInputs rejects oversized CSV',
+      err instanceof ManifestError &&
+        /accepts up to 1,000 rows/i.test(err.message) &&
+        err.field === 'data',
+      err?.message,
+    );
+  }
+}
+
+{
+  // Server validator accepts a CSV right under the cap.
+  const smallCsv = makeCsvBuffer(100);
+  const envelopeSmall = {
+    __file: true,
+    name: 'small.csv',
+    mime_type: 'text/csv',
+    size: smallCsv.length,
+    content_b64: smallCsv.toString('base64'),
+  };
+  try {
+    const cleaned = validateInputs(fileAction, { data: envelopeSmall });
+    log('server validateInputs accepts under-cap CSV', cleaned.data?.__file === true);
+  } catch (err) {
+    log('server validateInputs accepts under-cap CSV', false, err?.message);
+  }
+}
+
+{
+  // Non-CSV file is untouched even if very "rowy" in bytes.
+  const fakePdfBytes = Buffer.from('%PDF-1.4\n' + '\n'.repeat(5000));
+  const fakePdf = {
+    __file: true,
+    name: 'report.pdf',
+    mime_type: 'application/pdf',
+    size: fakePdfBytes.length,
+    content_b64: fakePdfBytes.toString('base64'),
+  };
+  try {
+    const cleaned = validateInputs(fileAction, { data: fakePdf });
+    log('server validateInputs: PDFs bypass CSV cap', cleaned.data?.__file === true);
+  } catch (err) {
+    log('server validateInputs: PDFs bypass CSV cap', false, err?.message);
+  }
+}
+
+{
+  // Client serializer: oversized CSV throws pre-encoding with a keyed path.
+  const bigCsvFile = new File([makeCsvBuffer(DEFAULT_MAX_CSV_ROWS + 10)], 'big.csv', {
+    type: 'text/csv',
+  });
+  try {
+    await serializeInputs({ data: bigCsvFile });
+    log('client serializeInputs rejects oversized CSV', false, 'did not throw');
+  } catch (err) {
+    log(
+      'client serializeInputs rejects oversized CSV',
+      err instanceof ClientCsvRowCapExceededError &&
+        err.path === 'inputs.data' &&
+        /accepts up to 1,000 rows/i.test(err.message),
+      err?.message,
+    );
+  }
+}
+
+{
+  // Client serializer: under-cap CSV passes through cleanly.
+  const okCsvFile = new File([makeCsvBuffer(500)], 'ok.csv', { type: 'text/csv' });
+  try {
+    const out = await serializeInputs({ data: okCsvFile });
+    log('client serializeInputs accepts under-cap CSV', out.data?.__file === true);
+  } catch (err) {
+    log('client serializeInputs accepts under-cap CSV', false, err?.message);
   }
 }
 

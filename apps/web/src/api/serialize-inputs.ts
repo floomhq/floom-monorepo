@@ -40,6 +40,16 @@ export interface FileEnvelope {
  * base64-encoding OOM. Override per call. */
 export const DEFAULT_MAX_FILE_BYTES = 5 * 1024 * 1024;
 
+/**
+ * Default CSV row cap (abuse-prevention, 2026-04-25). Must stay in sync
+ * with DEFAULT_CSV_MAX_ROWS in apps/server/src/lib/file-inputs.ts — the
+ * server is the authoritative gate, this client-side check just gives
+ * the user a faster, friendlier error without a network round trip. A
+ * client that skips this check still gets rejected server-side with the
+ * same message.
+ */
+export const DEFAULT_MAX_CSV_ROWS = 1000;
+
 export class FileInputTooLargeError extends Error {
   /** Key path where the oversized file was found (e.g. "inputs.data"
    * or "inputs.attachments[2]"), so the UI can point the user at the
@@ -56,6 +66,99 @@ export class FileInputTooLargeError extends Error {
     this.size = size;
     this.limit = limit;
   }
+}
+
+/**
+ * Thrown from `serializeInputs` when a CSV upload has more rows than the
+ * configured cap. Caught in RunSurface's handleRun to surface as an
+ * inline field error instead of a generic run-start failure.
+ */
+export class CsvRowCapExceededError extends Error {
+  path: string;
+  observed: number;
+  limit: number;
+  constructor(path: string, observed: number, limit: number) {
+    super(
+      `This app accepts up to ${limit.toLocaleString('en-US')} rows per run. ` +
+        `Your file has ${observed.toLocaleString('en-US')} rows — split it into ` +
+        `smaller batches, or bring your own Gemini key for larger runs.`,
+    );
+    this.name = 'CsvRowCapExceededError';
+    this.path = path;
+    this.observed = observed;
+    this.limit = limit;
+  }
+}
+
+/**
+ * Duck-type: is this File a CSV upload? Checks name extension first
+ * (most reliable — browsers frequently ship text/csv as text/plain or
+ * application/vnd.ms-excel, depending on OS and File System Access API
+ * version), MIME type as a fallback signal.
+ */
+function isCsvFile(file: File): boolean {
+  const name = file.name?.toLowerCase() || '';
+  if (name.endsWith('.csv')) return true;
+  const mime = file.type?.toLowerCase() || '';
+  return mime === 'text/csv' || mime === 'application/csv';
+}
+
+/**
+ * Count logical rows in a CSV File (excluding header). Short-circuits
+ * as soon as `limit + 1` is reached. Uses the File.stream() API to
+ * avoid loading the whole file into memory a second time — the encode
+ * pass that follows will stream the bytes into the base64 buffer
+ * independently.
+ *
+ * Mirrors apps/server/src/lib/file-inputs.ts::countCsvRowsFast: naive
+ * newline-counting rather than full CSV parsing. Quoted newlines inflate
+ * the count (fails closed, which is the correct bias for abuse detection).
+ */
+async function countCsvRowsInFile(file: File, limit: number): Promise<number> {
+  const cap = limit + 2;
+  let count = 0;
+  // The WhatWG streams API gives us ReadableStream<Uint8Array> chunks
+  // directly — no base64 round-trip, no decoder overhead. If File.stream
+  // isn't available (older browsers, tests that polyfill File without
+  // it), fall back to arrayBuffer() for correctness.
+  if (typeof file.stream === 'function') {
+    const reader = file.stream().getReader();
+    let trailingByte = -1;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      trailingByte = value[value.length - 1] ?? trailingByte;
+      for (let i = 0; i < value.length; i++) {
+        if (value[i] === 0x0a) {
+          count++;
+          if (count >= cap) {
+            try {
+              reader.cancel();
+            } catch {
+              // ignore — we have what we need
+            }
+            return Math.max(0, count - 1 + (trailingByte === 0x0a ? 0 : 0));
+          }
+        }
+      }
+    }
+    if (trailingByte !== -1 && trailingByte !== 0x0a) count++;
+    return Math.max(0, count - 1);
+  }
+  // Fallback path: load the whole buffer once. Still bounded by the 5 MB
+  // byte cap so memory is safe.
+  const buf = new Uint8Array(await file.arrayBuffer());
+  if (buf.length === 0) return 0;
+  for (let i = 0; i < buf.length; i++) {
+    if (buf[i] === 0x0a) {
+      count++;
+      if (count >= cap) break;
+    }
+  }
+  if (buf[buf.length - 1] !== 0x0a) count++;
+  return Math.max(0, count - 1);
 }
 
 function formatBytes(n: number): string {
@@ -93,6 +196,12 @@ async function fileToEnvelope(file: File): Promise<FileEnvelope> {
 export interface SerializeOptions {
   /** Per-file byte cap. Defaults to DEFAULT_MAX_FILE_BYTES. */
   maxBytesPerFile?: number;
+  /**
+   * Row cap for CSV files (name ending in .csv OR MIME text/csv).
+   * Non-CSV files are not affected. Defaults to DEFAULT_MAX_CSV_ROWS
+   * (1,000) to match the server cap.
+   */
+  maxCsvRows?: number;
 }
 
 /**
@@ -109,6 +218,7 @@ export async function serializeInputs(
   options: SerializeOptions = {},
 ): Promise<Record<string, unknown>> {
   const limit = options.maxBytesPerFile ?? DEFAULT_MAX_FILE_BYTES;
+  const rowLimit = options.maxCsvRows ?? DEFAULT_MAX_CSV_ROWS;
 
   const walk = async (value: unknown, path: string): Promise<unknown> => {
     // File check first — File extends Blob, so this branch also catches
@@ -117,6 +227,16 @@ export async function serializeInputs(
     if (typeof File !== 'undefined' && value instanceof File) {
       if (value.size > limit) {
         throw new FileInputTooLargeError(path, value.size, limit);
+      }
+      // CSV row-cap gate (2026-04-25). Only touches files that look like
+      // CSVs; everything else flows straight to fileToEnvelope. We count
+      // BEFORE base64 encoding so a 1M-row CSV throws immediately
+      // instead of blocking the main thread on the encode.
+      if (isCsvFile(value)) {
+        const rows = await countCsvRowsInFile(value, rowLimit);
+        if (rows > rowLimit) {
+          throw new CsvRowCapExceededError(path, rows, rowLimit);
+        }
       }
       return fileToEnvelope(value);
     }

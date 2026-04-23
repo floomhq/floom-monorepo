@@ -41,7 +41,7 @@ import { StreamingTerminal } from './StreamingTerminal';
 import { ARRAY_INPUT_NAMES, InputField, maybePrependHttps } from './InputField';
 import { useSession } from '../../hooks/useSession';
 import * as api from '../../api/client';
-import { ApiError } from '../../api/client';
+import { ApiError, CsvRowCapExceededError, FileInputTooLargeError } from '../../api/client';
 import { buildPublicRunPath, getRunStartErrorMessage } from '../../lib/publicPermalinks';
 import { BYOKModal } from '../BYOKModal';
 import { FreeRunsStrip, useFreeRunsRefresher } from './FreeRunsStrip';
@@ -267,6 +267,28 @@ function parseMissingRequiredInput(
   const inp = spec.inputs.find((i) => i.name === name);
   if (!inp) return null;
   return { [name]: `Fill in ${humanizeInputLabel(inp)} to run.` };
+}
+
+/**
+ * Translate a client-side serialization error (oversized file or
+ * CSV row-cap) into an `inputErrors` entry keyed on the input name, so
+ * the UI shows the message inline on the offending field instead of as
+ * a top-level "Run failed to start" banner.
+ *
+ * The error's `path` is shaped like `inputs.<name>` or
+ * `inputs.<name>[2]` (array-valued inputs). We strip the `inputs.`
+ * prefix and any trailing `[n]` index to recover the declared input
+ * name from the manifest.
+ */
+function parseClientFileError(err: Error): Record<string, string> | null {
+  if (!(err instanceof CsvRowCapExceededError) && !(err instanceof FileInputTooLargeError)) {
+    return null;
+  }
+  const rawPath = err.path || '';
+  const stripped = rawPath.replace(/^inputs\./, '');
+  const name = stripped.replace(/\[\d+\].*$/, '');
+  if (!name) return null;
+  return { [name]: err.message };
 }
 
 function focusFirstFlaggedField(name: string | undefined): void {
@@ -569,6 +591,12 @@ export function RunSurface({
         );
       } catch (err) {
         const e = err as Error;
+        const clientFieldError = parseClientFileError(e);
+        if (clientFieldError) {
+          setState((s) => ({ ...s, inputErrors: clientFieldError, phase: 'ready' }));
+          focusFirstFlaggedField(Object.keys(clientFieldError)[0]);
+          return;
+        }
         const serverFieldError = parseMissingRequiredInput(e, actionSpec);
         if (serverFieldError) {
           setState((s) => ({ ...s, inputErrors: serverFieldError }));
@@ -639,6 +667,12 @@ export function RunSurface({
         setByokMode('exhausted');
         setByokOpen(true);
         setState((s) => ({ ...s, phase: s.hasRun ? 'done' : 'ready' }));
+        return;
+      }
+      const clientFieldError = parseClientFileError(e);
+      if (clientFieldError) {
+        setState((s) => ({ ...s, inputErrors: clientFieldError, phase: 'ready' }));
+        focusFirstFlaggedField(Object.keys(clientFieldError)[0]);
         return;
       }
       const serverFieldError = parseMissingRequiredInput(e, actionSpec);
