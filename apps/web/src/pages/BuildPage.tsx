@@ -1295,12 +1295,14 @@ export function BuildPage({
                     style={{
                       display: 'flex',
                       gap: 8,
-                      opacity: 0.85,
+                      opacity: 0.5,
                       flexWrap: 'wrap',
+                      pointerEvents: 'none',
                     }}
                   >
                     <input
                       disabled
+                      tabIndex={-1}
                       placeholder="ghcr.io/you/app:latest"
                       style={{
                         flex: '2 1 220px',
@@ -1312,10 +1314,12 @@ export function BuildPage({
                         color: 'var(--muted)',
                         fontFamily: 'JetBrains Mono, monospace',
                         boxSizing: 'border-box',
+                        cursor: 'not-allowed',
                       }}
                     />
                     <input
                       disabled
+                      tabIndex={-1}
                       placeholder="/openapi.yaml"
                       style={{
                         flex: '1 1 140px',
@@ -1327,6 +1331,7 @@ export function BuildPage({
                         color: 'var(--muted)',
                         fontFamily: 'JetBrains Mono, monospace',
                         boxSizing: 'border-box',
+                        cursor: 'not-allowed',
                       }}
                     />
                   </div>
