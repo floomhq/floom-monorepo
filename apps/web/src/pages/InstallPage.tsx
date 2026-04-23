@@ -39,7 +39,17 @@ export function InstallPage() {
         data-testid="install-page"
         style={{ maxWidth: 720, margin: '40px auto', padding: '0 24px' }}
       >
-        <h1 style={{ fontSize: 34, margin: '0 0 12px', lineHeight: 1.2 }}>
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 34,
+            fontWeight: 700,
+            letterSpacing: '-0.025em',
+            lineHeight: 1.1,
+            margin: '0 0 12px',
+            color: 'var(--ink)',
+          }}
+        >
           Install the Floom CLI
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: 16, margin: '0 0 28px' }}>

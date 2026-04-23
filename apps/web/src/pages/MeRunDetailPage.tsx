@@ -90,8 +90,11 @@ export function MeRunDetailPage() {
               >
                 <h1
                   style={{
+                    fontFamily: 'var(--font-display)',
                     fontSize: 24,
                     fontWeight: 700,
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1.2,
                     margin: 0,
                     color: 'var(--ink)',
                   }}

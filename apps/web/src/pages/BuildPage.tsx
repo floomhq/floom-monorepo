@@ -834,11 +834,13 @@ export function BuildPage({
         <div style={{ marginBottom: 32 }}>
           <h1
             style={{
+              fontFamily: 'var(--font-display)',
               fontSize: 32,
               fontWeight: 700,
+              letterSpacing: '-0.025em',
+              lineHeight: 1.1,
               margin: '0 0 8px',
               color: 'var(--ink)',
-              letterSpacing: '-0.02em',
             }}
           >
             {editSlug ? `Edit ${editSlug}` : 'Publish a Floom app'}
