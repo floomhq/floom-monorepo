@@ -117,6 +117,38 @@ function getDefaultActionSpec(app: AppDetail): { action: string; spec: ActionSpe
   return { action, spec };
 }
 
+/** Slugs for deterministic one-shot apps; Refine is hidden even if mis-declared. (#86) */
+const NON_REFINABLE_SLUGS = new Set([
+  'uuid',
+  'hash',
+  'sha256',
+  'sha512',
+  'md5',
+  'checksum',
+]);
+
+/**
+ * Issue #86: suppress Refine for uuid/hash-style apps, non-textual outputs, or
+ * explicit `render.refinable: false` (using existing manifest fields only).
+ */
+function isRefineSuppressedForApp(app: AppDetail): boolean {
+  if (app.manifest?.render?.refinable === false) return true;
+  if (NON_REFINABLE_SLUGS.has(app.slug)) return true;
+  const def = getDefaultActionSpec(app);
+  if (!def) return false;
+  for (const o of def.spec.outputs ?? []) {
+    if (o.type === 'image' || o.type === 'pdf' || o.type === 'file') return true;
+  }
+  if (def.spec.outputs?.length === 1) {
+    const o = def.spec.outputs[0];
+    const hint = `${o.name} ${o.label}`.toLowerCase();
+    if (/\b(uuid|ulid|hash|sha-?256|sha-?512|md5|checksum|digest)\b/.test(hint)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Upgrade 2 (2026-04-19): pick the entry action on mount. Honors an
  * optional `?action=<name>` URL param so multi-action apps can be linked
@@ -654,7 +686,8 @@ export function RunSurface({
   // bottom "Iterate" free-text composer on OutputPanel. Apps that are
   // deterministic one-shots (uuid, hash, password, …) correctly stay
   // stuck on "Run" and hide the iterate box. Fix 2 (2026-04-19).
-  const refinable = app.manifest?.render?.refinable === true;
+  const refinable =
+    app.manifest?.render?.refinable === true && !isRefineSuppressedForApp(app);
   const runLabel = state.hasRun && refinable ? 'Refine' : 'Run';
 
   const hasInputs = (state.actionSpec?.inputs?.length ?? 0) > 0;
@@ -1399,17 +1432,21 @@ function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
           // Clicking navigates to /p/:slug?run=<id> which hydrates via
           // the shared-run path.
           <ul className="run-surface-past-list" data-testid="run-surface-past-list">
-            {runs.slice(0, 5).map((r) => (
+            {runs.slice(0, 5).map((r) => {
+              const inputPeek = summarizeInputs(r.inputs);
+              const outputPeek = summarizeOutputs(r.outputs, r.status, r.error);
+              const oneLine = `Input: ${inputPeek || '—'} · Output: ${outputPeek || '—'}`;
+              return (
               <li key={r.id}>
                 <Link
                   to={buildPublicRunPath(r.id)}
                   data-testid={`run-surface-past-row-${r.id}`}
                   className="run-surface-past-row"
+                  title={oneLine}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12,
-                    flexWrap: 'wrap',
+                    gap: 10,
                     padding: '10px 12px',
                     borderBottom: '1px solid var(--line)',
                     textDecoration: 'none',
@@ -1430,29 +1467,11 @@ function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
                     }}
                   />
                   <span
-                    className="run-surface-past-input"
+                    className="run-surface-past-preview-line"
                     style={{
-                      fontSize: 13,
+                      fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                      fontSize: 12,
                       color: 'var(--ink)',
-                      maxWidth: 260,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {summarizeInputs(r.inputs)}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    style={{ color: 'var(--muted)', fontSize: 12 }}
-                  >
-                    &rarr;
-                  </span>
-                  <span
-                    className="run-surface-past-output"
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--muted)',
                       flex: 1,
                       minWidth: 0,
                       overflow: 'hidden',
@@ -1460,14 +1479,13 @@ function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {summarizeOutputs(r.outputs, r.status, r.error)}
+                    {oneLine}
                   </span>
                   <span
                     className="run-surface-past-when"
                     style={{
                       fontSize: 11,
                       color: 'var(--muted)',
-                      marginLeft: 'auto',
                       flexShrink: 0,
                     }}
                   >
@@ -1475,7 +1493,8 @@ function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
                   </span>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>
@@ -1586,12 +1605,14 @@ function summarizeInputs(inputs: Record<string, unknown> | null | undefined): st
 export function deriveRunLabel(args: {
   hasRun: boolean;
   refinable: boolean | undefined;
+  /** When set (e.g. uuid/hash heuristics), keep the button on "Run". */
+  refineSuppressed?: boolean;
 }): 'Run' | 'Refine' {
   // Refine is opt-in: only flips on when the creator explicitly sets
   // `render.refinable: true` in the manifest. Default (undefined or false)
   // keeps the primary button on "Run" forever — desirable for one-shot
   // apps like uuid/hash where there's nothing to refine.
-  const refinable = args.refinable === true;
+  const refinable = args.refinable === true && !args.refineSuppressed;
   return args.hasRun && refinable ? 'Refine' : 'Run';
 }
 

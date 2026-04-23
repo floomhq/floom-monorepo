@@ -433,6 +433,58 @@ export function AppPermalinkPage() {
     return formatRelativeTime(app.published_at);
   }, [app]);
 
+  /** Truthy manifest / hub fields as compact chips (Issue #284). */
+  const capabilityChips = useMemo(() => {
+    if (!app) return [] as Array<{ key: string; label: string }>;
+    const out: Array<{ key: string; label: string }> = [];
+    const seen = new Set<string>();
+    const add = (key: string, label: string) => {
+      const t = label.trim();
+      if (!t || seen.has(t)) return;
+      seen.add(t);
+      out.push({ key, label: t });
+    };
+    const titleCaseWords = (s: string) =>
+      s
+        .replace(/[_-]+/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((w) => w[0]!.toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+    const m = app.manifest as unknown as Record<string, unknown>;
+    const caps = m?.capabilities;
+    if (caps && typeof caps === 'object' && !Array.isArray(caps)) {
+      for (const [k, v] of Object.entries(caps as Record<string, unknown>)) {
+        if (v === true) {
+          if (k === 'web_search' || k === 'network' || k === 'web') {
+            add(`cap-${k}`, 'Web search');
+          } else {
+            add(`cap-${k}`, titleCaseWords(k));
+          }
+        } else if (typeof v === 'string' && v.trim()) {
+          add(`cap-${k}`, `${titleCaseWords(k)}: ${v.trim()}`);
+        } else if (typeof v === 'number' && v !== 0) {
+          add(`cap-${k}`, `${titleCaseWords(k)}: ${v}`);
+        }
+      }
+    }
+    const rt = (app.runtime && app.runtime.trim()) || (typeof m.runtime === 'string' ? m.runtime.trim() : '');
+    if (rt) {
+      add('runtime', `Runtime: ${rt}`);
+    }
+    for (const s of app.manifest.secrets_needed ?? []) {
+      if (typeof s === 'string' && s.trim()) {
+        add(`sec-${s}`, `Secrets: ${s.trim()}`);
+      }
+    }
+    if (app.is_async) add('async', 'Async jobs');
+    if (app.upstream_host?.trim()) {
+      add('upstream', `API: ${app.upstream_host.trim()}`);
+    }
+    if (app.renderer) add('custom-renderer', 'Custom output UI');
+    return out;
+  }, [app]);
+
   if (loading) {
     // CLS fix (carried over from 2026-04-18, v17 refactor 2026-04-23):
     // the skeleton mirrors the v17 frame layout above-the-fold so that
@@ -735,6 +787,40 @@ export function AppPermalinkPage() {
                   {headerDescription}
                 </p>
               )}
+              {capabilityChips.length > 0 && (
+                <div
+                  data-testid="permalink-capability-chips"
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 6,
+                    marginTop: 8,
+                    alignItems: 'center',
+                  }}
+                >
+                  {capabilityChips.map((c) => (
+                    <span
+                      key={c.key}
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        padding: '3px 9px',
+                        borderRadius: 999,
+                        border: '1px solid var(--line)',
+                        color: 'var(--muted)',
+                        background: 'var(--bg)',
+                        letterSpacing: '0.02em',
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {c.label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div
               className="permalink-hero-actions"
@@ -761,7 +847,45 @@ export function AppPermalinkPage() {
                   flexWrap: 'wrap',
                 }}
               >
-                <span data-testid="hero-version">v{app.version ?? '0.1.0'}</span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    textTransform: 'none',
+                    letterSpacing: 0,
+                  }}
+                >
+                  <span
+                    title="Published release of this app"
+                    style={{
+                      padding: '2px 7px',
+                      borderRadius: 999,
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      color: 'var(--muted)',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--line)',
+                      fontFamily:
+                        'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+                    }}
+                  >
+                    App version
+                  </span>
+                  <span
+                    data-testid="hero-version"
+                    style={{
+                      fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                      fontSize: 10.5,
+                      color: 'var(--muted)',
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    v{app.version ?? '0.1.0'}
+                  </span>
+                </span>
                 <span aria-hidden="true">·</span>
                 <span data-testid="hero-version-status">{app.version_status ?? 'stable'}</span>
                 {heroHandle && (
@@ -786,63 +910,55 @@ export function AppPermalinkPage() {
                   </>
                 )}
               </span>
-              {app.author && sessionUserId && app.author === sessionUserId && (
-                <Link
-                  to={`/studio/${app.slug}/triggers`}
-                  data-testid="cta-schedule"
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid var(--line)',
-                    borderRadius: 10,
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: 'var(--ink)',
-                    background: 'var(--card)',
-                    textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Schedule
-                </Link>
-              )}
               <button
                 type="button"
                 data-testid="cta-share"
                 aria-label="Share link"
                 onClick={() => {
-                  // Same share logic as before: if ?run=<id> is in the URL,
-                  // opt the run public via shareRun() and copy the /r/:id
-                  // permalink; otherwise copy the bare app page URL. Keeps
-                  // anon-viewer share-link flow intact.
                   const copyUrl = (url: string) => {
                     void navigator.clipboard.writeText(url).then(() => {
                       setShareToast(true);
                       window.setTimeout(() => setShareToast(false), 1800);
                     });
                   };
-                  try {
-                    const currentUrl = new URL(window.location.href);
-                    const currentRunId = currentUrl.searchParams.get('run');
-                    if (!currentRunId) {
-                      copyUrl(currentUrl.toString());
-                      return;
+                  const shareOrCopy = async (url: string) => {
+                    if (typeof navigator !== 'undefined' && navigator.share) {
+                      try {
+                        await navigator.share({
+                          url,
+                          title: app.name,
+                        });
+                        return;
+                      } catch (e) {
+                        const name = e && typeof e === 'object' && 'name' in e ? String((e as { name?: string }).name) : '';
+                        if (name === 'AbortError') return;
+                        // UserSharePermissionDeniedError / missing share target — fall back
+                      }
                     }
-                    void shareRun(currentRunId)
-                      .then(() => {
-                        copyUrl(
+                    copyUrl(url);
+                  };
+                  const run = async () => {
+                    try {
+                      const currentUrl = new URL(window.location.href);
+                      const currentRunId = currentUrl.searchParams.get('run');
+                      if (!currentRunId) {
+                        await shareOrCopy(currentUrl.toString());
+                        return;
+                      }
+                      try {
+                        await shareRun(currentRunId);
+                        await shareOrCopy(
                           `${window.location.origin}${buildPublicRunPath(currentRunId)}`,
                         );
-                      })
-                      .catch(() => {
+                      } catch {
                         currentUrl.searchParams.delete('run');
-                        copyUrl(currentUrl.toString());
-                      });
-                  } catch {
-                    /* ignore */
-                  }
+                        await shareOrCopy(currentUrl.toString());
+                      }
+                    } catch {
+                      /* ignore */
+                    }
+                  };
+                  void run();
                 }}
                 style={{
                   padding: '8px 12px',
@@ -1225,7 +1341,7 @@ export function AppPermalinkPage() {
               letterSpacing: '-0.01em',
             }}
           >
-            Add to your tools
+            MCP connection
           </h2>
           <div
             style={{
