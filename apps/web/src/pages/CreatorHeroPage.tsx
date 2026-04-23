@@ -416,8 +416,8 @@ export function CreatorHeroPage() {
             <h1
               className="hero-headline"
               style={{
-                fontFamily: "'DM Serif Display', Georgia, serif",
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                fontWeight: 800,
                 fontSize: 72,
                 lineHeight: 1.02,
                 letterSpacing: '-0.03em',
@@ -797,8 +797,8 @@ export function CreatorHeroPage() {
               >
                 <h2
                   style={{
-                    fontFamily: "'DM Serif Display', Georgia, serif",
-                    fontWeight: 400,
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
                     fontSize: 34,
                     lineHeight: 1.1,
                     letterSpacing: '-0.02em',
@@ -869,8 +869,8 @@ export function CreatorHeroPage() {
             </SectionEyebrow>
             <h2
               style={{
-                fontFamily: "'DM Serif Display', Georgia, serif",
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
                 fontSize: 36,
                 lineHeight: 1.1,
                 letterSpacing: '-0.02em',

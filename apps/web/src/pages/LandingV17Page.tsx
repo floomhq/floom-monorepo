@@ -122,7 +122,7 @@ export function LandingV17Page() {
       style={{ minHeight: '100vh', background: 'var(--bg)' }}
     >
       <PageHead
-        title="AI apps you can ship as easily as you write a prompt · Floom"
+        title="Ship AI apps fast · Floom"
         description="Floom is the protocol and runtime for agentic work. Paste your app's link and get a Claude tool, a page to share, a command-line, and a clean URL your teammates can hit."
       />
       <TopBar />
@@ -157,62 +157,58 @@ export function LandingV17Page() {
                 (Federico 2026-04-23 — "like we had before"). */}
             <WorksWithBelt />
 
-            {/* H1 — "AI apps you can ship as easily as you write a prompt."
-                (2026-04-27 waitlist-reality pick, see PR body for rationale).
-                The old "Ship AI apps fast." is still true on preview but on
-                prod the ship-verb needs softening when Deploy is gated; this
-                reframe keeps the excitement ("as easily as you write a
-                prompt") while letting the page tell the whole truth below. */}
+            {/* H1 — "Ship AI apps fast." (Federico 2026-04-24 —
+                restored the original punchy two-word-verb headline that
+                preview used to carry. The 2026-04-27 waitlist-reality
+                rewrite "AI apps you can ship as easily as you write a
+                prompt." softened the verb to account for a gated Deploy,
+                but on the actual page that full sentence read unclear
+                — too many clauses, "ship" fighting "write a prompt" for
+                the sentence's centre of gravity. We'd rather keep the
+                hero short and let the subtitle carry the nuance; that's
+                also how Cursor/Linear/Vercel structure their own launch
+                heroes. Waitlist gating is communicated unambiguously by
+                the CTA row below (primary "Try an app", secondary
+                "Join the waitlist to build your own") and by the
+                publish-waitlist banner on /docs and /apps. Font swap at
+                the same time: DM Serif Display out, Inter 800 with
+                tight tracking in — see wireframe.css rationale on
+                --font-display. */}
             <h1
               className="hero-headline"
               style={{
-                fontFamily: "'DM Serif Display', Georgia, serif",
-                fontWeight: 400,
-                fontSize: 64,
-                lineHeight: 1.02,
-                letterSpacing: '-0.025em',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 800,
+                fontSize: 72,
+                lineHeight: 1.0,
+                letterSpacing: '-0.04em',
                 color: 'var(--ink)',
-                margin: '0 0 16px',
+                margin: '0 0 18px',
                 textWrap: 'balance' as unknown as 'balance',
               }}
             >
-              AI apps you can <span style={{ color: 'var(--accent)' }}>ship</span>
-              {' '}as easily as you write a prompt.
+              Ship AI apps fast.
             </h1>
 
+            {/* Subtitle. Single line. The old hero carried a second
+                "For founders, solo devs, and small teams" line underneath
+                this one; Federico 2026-04-24 asked to drop it — one
+                subtitle is enough, and the protocol-runtime framing
+                covers the intended audience implicitly. */}
             <p
               className="hero-sub"
               data-testid="hero-sub-positioning"
               style={{
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 19,
+                fontFamily: 'var(--font-sans)',
+                fontSize: 20,
                 lineHeight: 1.45,
                 fontWeight: 400,
                 color: 'var(--muted)',
                 maxWidth: 640,
-                margin: '0 auto 12px',
+                margin: '0 auto 32px',
               }}
             >
               The protocol and runtime for agentic work.
-            </p>
-            {/* Target-user line (#297). Placed under the subhead so the hero
-                answers "who is this for" without muddying the protocol tagline
-                above. Exact copy from Federico's spec — do not rewrite. */}
-            <p
-              className="hero-target"
-              data-testid="hero-target-audience"
-              style={{
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 14,
-                lineHeight: 1.4,
-                fontWeight: 500,
-                color: 'var(--muted)',
-                maxWidth: 560,
-                margin: '0 auto 28px',
-                opacity: 0.85,
-              }}
-            >
-              For founders, solo devs, and small teams building internal AI tools.
             </p>
 
             {/* CTA — waitlist-reality pair.
@@ -318,11 +314,11 @@ export function LandingV17Page() {
           <SectionEyebrow>How it works</SectionEyebrow>
           <h2
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
-              fontWeight: 400,
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
               fontSize: 34,
               lineHeight: 1.1,
-              letterSpacing: '-0.02em',
+              letterSpacing: '-0.03em',
               textAlign: 'center',
               margin: '0 auto 28px',
               maxWidth: 760,
@@ -413,11 +409,11 @@ export function LandingV17Page() {
             <SectionEyebrow>Showcase</SectionEyebrow>
             <h2
               style={{
-                fontFamily: "'DM Serif Display', Georgia, serif",
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
                 fontSize: 34,
                 lineHeight: 1.1,
-                letterSpacing: '-0.02em',
+                letterSpacing: '-0.03em',
                 textAlign: 'center',
                 margin: '0 auto 10px',
                 maxWidth: 760,
@@ -476,11 +472,11 @@ export function LandingV17Page() {
         >
           <h2
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
-              fontWeight: 400,
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
               fontSize: 26,
               lineHeight: 1.1,
-              letterSpacing: '-0.02em',
+              letterSpacing: '-0.025em',
               margin: '0 0 8px',
             }}
           >
@@ -599,8 +595,8 @@ export function LandingV17Page() {
           .landing-v17 main > section { padding-top: 48px !important; padding-bottom: 48px !important; }
           .landing-v17 [data-testid="hero"] { padding-top: 24px !important; padding-bottom: 28px !important; }
           .landing-v17 [data-testid="cli-reference-section"] { padding-top: 24px !important; padding-bottom: 8px !important; }
-          /* Serif H2 across the page: scale down so long headlines don't
-             overflow on narrow screens. 34->26, 28->24. */
+          /* Display H2 across the page: scale down so long headlines
+             don't overflow on narrow screens. 34->26, 28->24. */
           .landing-v17 main > section h2 { font-size: 26px !important; letter-spacing: -0.015em !important; }
           .landing-v17 [data-testid="pricing-teaser"] h2 { font-size: 24px !important; }
           /* Pricing card padding tightens so the $0 number stays centered. */
@@ -708,11 +704,11 @@ const DEPLOY_TILE_TEXT = {
 };
 
 const DEPLOY_TILE_STRONG = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
+  fontFamily: 'var(--font-display)',
   fontSize: 18,
-  fontWeight: 400,
+  fontWeight: 600,
   color: 'var(--ink)',
-  letterSpacing: '-0.01em',
+  letterSpacing: '-0.015em',
 };
 
 const DEPLOY_TILE_MUTED = {

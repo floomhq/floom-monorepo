@@ -31,9 +31,15 @@ const MONO: React.CSSProperties = {
   fontFamily: "'JetBrains Mono', ui-monospace, monospace",
 };
 
+// Display (formerly SERIF — pre-2026-04-24 the display family was
+// DM Serif Display; swapped to Inter 800 tight-tracked, see the
+// --font-display token in wireframe.css). Keeping the exported name
+// to avoid churning the ~40 call sites in this file for a cosmetic
+// rename.
 const SERIF: React.CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
-  fontWeight: 400,
+  fontFamily: 'var(--font-display)',
+  fontWeight: 700,
+  letterSpacing: '-0.02em',
 };
 
 const EYEBROW: React.CSSProperties = {

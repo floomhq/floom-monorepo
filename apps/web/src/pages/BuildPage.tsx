@@ -3088,9 +3088,9 @@ function BuildPageWaitlistPanel() {
     >
       <h1
         style={{
-          fontFamily: "'DM Serif Display', Georgia, serif",
+          fontFamily: 'var(--font-display)',
           fontSize: 32,
-          fontWeight: 400,
+          fontWeight: 700,
           letterSpacing: '-0.02em',
           lineHeight: 1.15,
           margin: '0 0 12px',

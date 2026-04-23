@@ -51,8 +51,8 @@ const EYEBROW_STYLE: React.CSSProperties = {
 };
 
 const H2_STYLE: React.CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
-  fontWeight: 400,
+  fontFamily: 'var(--font-display)',
+  fontWeight: 700,
   fontSize: 32,
   lineHeight: 1.2,
   letterSpacing: '-0.02em',
@@ -92,8 +92,8 @@ export function AboutPage() {
         <p style={{ ...EYEBROW_STYLE, textAlign: 'center' }}>About Floom</p>
         <h1
           style={{
-            fontFamily: "'DM Serif Display', Georgia, serif",
-            fontWeight: 400,
+            fontFamily: 'var(--font-display)',
+            fontWeight: 800,
             fontSize: 52,
             lineHeight: 1.08,
             letterSpacing: '-0.025em',

@@ -227,8 +227,8 @@ export function AppsDirectoryPage() {
             <h1
               className="apps-headline"
               style={{
-                fontFamily: "'DM Serif Display', Georgia, serif",
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                fontWeight: 800,
                 fontSize: 48,
                 lineHeight: 1.1,
                 letterSpacing: '-0.02em',

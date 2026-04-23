@@ -67,8 +67,8 @@ const EYEBROW_STYLE: CSSProperties = {
 };
 
 const H3_STYLE: CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
-  fontWeight: 400,
+  fontFamily: 'var(--font-display)',
+  fontWeight: 700,
   fontSize: 26,
   lineHeight: 1.1,
   margin: 0,
@@ -188,8 +188,8 @@ export function DualAudiences(_: DualAudiencesProps = {}) {
       <SectionEyebrow testid="dual-eyebrow">Who it&rsquo;s for</SectionEyebrow>
       <h2
         style={{
-          fontFamily: "'DM Serif Display', Georgia, serif",
-          fontWeight: 400,
+          fontFamily: 'var(--font-display)',
+          fontWeight: 700,
           fontSize: 34,
           lineHeight: 1.1,
           letterSpacing: '-0.02em',

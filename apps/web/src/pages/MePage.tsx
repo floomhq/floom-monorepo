@@ -99,7 +99,7 @@ const s: Record<string, CSSProperties> = {
     lineHeight: 1.2,
   },
   greetingName: {
-    fontFamily: "'DM Serif Display', Georgia, serif",
+    fontFamily: 'var(--font-display)',
     fontSize: 22,
     fontWeight: 500,
     lineHeight: 1.2,
@@ -114,7 +114,7 @@ const s: Record<string, CSSProperties> = {
     margin: 0,
   },
   sectionH2: {
-    fontFamily: "'DM Serif Display', Georgia, serif",
+    fontFamily: 'var(--font-display)',
     fontSize: 20,
     fontWeight: 500,
     lineHeight: 1.2,
@@ -1315,8 +1315,10 @@ function EmptyRuns({
     >
       <div
         style={{
-          fontFamily: "'DM Serif Display', Georgia, serif",
+          fontFamily: 'var(--font-display)',
           fontSize: 20,
+          fontWeight: 600,
+          letterSpacing: '-0.015em',
           color: 'var(--ink)',
           marginBottom: 8,
         }}

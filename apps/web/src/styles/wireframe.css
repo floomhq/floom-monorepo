@@ -25,6 +25,27 @@
   --radius-pill: 8px;
   --radius-chip: 6px;
   --radius-button: 10px;
+
+  /* Type tokens.
+     --font-display — used for hero headlines + large section titles.
+       We shipped DM Serif Display through the v17 launch prep, but
+       Federico called it in the 2026-04-24 audit: the serif reads
+       editorial/magazine-y, not like the modern tech voice we want
+       ("doesn't fit… like Cursor wouldn't use such a font"). Swapped
+       to Inter at a heavy weight with tight tracking applied per-
+       usage — that's the same typographic move Cursor / Linear /
+       Vercel use on their marketing hero pages, and it keeps us on
+       a single webfont family (we already ship Inter 400/500/600/
+       700/800). DM Serif Display was removed from the Google Fonts
+       bundle at the same time, so the old fallback would've read
+       as plain Georgia. Keeping the stack consistent across every
+       display surface avoids that cliff.
+     --font-sans — default body + UI copy. Same Inter family, lighter
+       weights.
+     --font-mono — code blocks, kbd, terminal chrome. */
+  --font-display: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* ── Reset ───────────────────────────────────────────────── */
@@ -210,16 +231,17 @@ input { font-family: inherit; }
 }
 
 /* ── Typography ──────────────────────────────────────────── */
-/* Display font (DM Serif Display) matches landing.floom.dev. Used
-   on hero headlines and major section titles so preview + landing
-   render identically. Loaded via apps/web/index.html Google Fonts link. */
+/* Display surfaces (hero headline, major section titles). Weight 800
+   + tight tracking gives the Cursor/Linear/Vercel modern-grotesk feel
+   Federico asked for on 2026-04-24, and stays on the one webfont
+   family we already load (Inter). */
 .headline {
-  font-family: 'DM Serif Display', Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display);
   font-size: 56px;
-  font-weight: 400;
+  font-weight: 800;
   color: var(--ink);
-  line-height: 1.05;
-  letter-spacing: -0.02em;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
   margin: 0 0 20px;
 }
 
@@ -228,12 +250,12 @@ input { font-family: inherit; }
 }
 
 .section-title-display {
-  font-family: 'DM Serif Display', Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display);
   font-size: 32px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--ink);
-  line-height: 1.15;
-  letter-spacing: -0.015em;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
   margin: 0 0 12px;
 }
 

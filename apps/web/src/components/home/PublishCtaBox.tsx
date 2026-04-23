@@ -36,8 +36,8 @@ const EYEBROW_STYLE: CSSProperties = {
 };
 
 const H3_STYLE: CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
-  fontWeight: 400,
+  fontFamily: 'var(--font-display)',
+  fontWeight: 700,
   fontSize: 26,
   lineHeight: 1.15,
   margin: '0 0 6px',

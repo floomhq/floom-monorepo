@@ -164,8 +164,8 @@ function TryAppCard({ app }: { app: TryAppCardData }) {
 // Styles
 // ---------------------------------------------------------------------------
 const H2_STYLE: CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
-  fontWeight: 400,
+  fontFamily: 'var(--font-display)',
+  fontWeight: 700,
   fontSize: 34,
   lineHeight: 1.1,
   letterSpacing: '-0.02em',
@@ -241,9 +241,9 @@ const CARD_BODY: CSSProperties = {
 // main truncates to "Res..." / "Lea..." / "Co..." which is what this
 // section exists to NOT do. wordBreak + whiteSpace explicit.
 const NAME_STYLE: CSSProperties = {
-  fontFamily: "'DM Serif Display', Georgia, serif",
+  fontFamily: 'var(--font-display)',
   fontSize: 22,
-  fontWeight: 400,
+  fontWeight: 600,
   lineHeight: 1.15,
   letterSpacing: '-0.01em',
   color: 'var(--ink)',
