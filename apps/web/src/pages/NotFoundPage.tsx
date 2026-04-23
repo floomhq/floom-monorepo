@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { Logo } from '../components/Logo';
 import { PublicFooter } from '../components/public/PublicFooter';
+import { useDeployEnabled } from '../lib/flags';
+import { waitlistHref } from '../lib/waitlistCta';
 
 /**
  * Imperatively append a `<meta name="robots" content="noindex,nofollow">`
@@ -42,6 +44,9 @@ function useNoIndexMeta() {
 
 export function NotFoundPage() {
   useNoIndexMeta();
+  const navigate = useNavigate();
+  const deployEnabled = useDeployEnabled();
+
   return (
     <div className="page-root" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <TopBar />
@@ -98,14 +103,40 @@ export function NotFoundPage() {
           <div
             className="pills"
             data-testid="not-found-pills"
-            style={{ justifyContent: 'center', position: 'relative', zIndex: 2 }}
+            style={{
+              justifyContent: 'center',
+              position: 'relative',
+              zIndex: 2,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 10,
+            }}
           >
             <Link to="/" className="pill" data-testid="not-found-pill-home" style={{ textDecoration: 'none' }}>
               Back to home
             </Link>
             <Link to="/apps" className="pill" data-testid="not-found-pill-apps" style={{ textDecoration: 'none' }}>
-              Browse apps
+              Try apps
             </Link>
+            {!deployEnabled && (
+              <button
+                type="button"
+                className="pill"
+                data-testid="not-found-pill-waitlist"
+                onClick={() => {
+                  // TODO(Agent 9): open WaitlistModal instead of routing.
+                  navigate(waitlistHref('404'));
+                }}
+                style={{
+                  textDecoration: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  font: 'inherit',
+                }}
+              >
+                Join waitlist
+              </button>
+            )}
           </div>
         </div>
       </main>

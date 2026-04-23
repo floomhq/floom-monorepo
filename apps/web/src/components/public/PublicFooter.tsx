@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { useDeployEnabled } from '../../lib/flags';
+import { waitlistHref } from '../../lib/waitlistCta';
 
 // Landing visual audit 2026-04-18 finding: PublicFooter only had Docs +
 // Imprint, so cold public visitors from HN/PH had no path to Privacy,
@@ -36,6 +38,8 @@ function FootLink({ children, to, href }: { children: React.ReactNode; to?: stri
 }
 
 export function PublicFooter() {
+  const deployEnabled = useDeployEnabled();
+
   return (
     <footer
       data-testid="public-footer"
@@ -58,6 +62,26 @@ export function PublicFooter() {
       >
         Get that thing off localhost fast.
       </div>
+      {!deployEnabled && (
+        <div
+          data-testid="footer-waitlist-strip"
+          style={{
+            fontSize: 12,
+            color: 'var(--muted)',
+            margin: '0 0 12px',
+            lineHeight: 1.5,
+          }}
+        >
+          Publishing new apps on floom.dev is waitlist-only.{' '}
+          <Link
+            to={waitlistHref('public-footer')}
+            style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+          >
+            Join the waitlist
+          </Link>
+          {/* TODO(Agent 9): swap Link for WaitlistModal trigger. */}
+        </div>
+      )}
       <div
         style={{
           display: 'inline-flex',

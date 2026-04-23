@@ -7,9 +7,11 @@
 // Self-host + later-plans + FAQ kept, already clean.
 // Palette: bg #fafaf8, ink #0e0e0c, accent #047857.
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
+import { useDeployEnabled } from '../lib/flags';
+import { waitlistHref } from '../lib/waitlistCta';
 
 // ---------------------------------------------------------------------------
 // Palette tokens (inline — matches v17 wireframe variables)
@@ -179,11 +181,27 @@ const FAQS: FaqItem[] = [
     q: 'Do you take a cut of revenue my app makes?',
     a: "No. Floom is the platform. If your app charges end users (it doesn't have to), that's yours. We don't see it, touch it, or take a percentage.",
   },
-  {
-    q: 'Who owns the apps I publish?',
-    a: "You do. Apps stay under your account, exportable any time. Floom doesn't claim rights to your code or your runs.",
-  },
 ];
+
+function ownershipFaq(deployEnabled: boolean): FaqItem {
+  if (deployEnabled) {
+    return {
+      q: 'Who owns the apps I publish?',
+      a: "You do. Apps stay under your account, exportable any time. Floom doesn't claim rights to your code or your runs.",
+    };
+  }
+  return {
+    q: 'Who owns the apps I publish?',
+    a: (
+      <>
+        You do. Apps stay under your account, exportable any time. Floom
+        doesn&apos;t claim rights to your code or your runs. Publishing new apps
+        to the floom.dev cloud is waitlist-only during launch; self-host has no
+        such gate.
+      </>
+    ),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // FaqEntry — collapsible row
@@ -252,6 +270,12 @@ function FaqEntry({ q, a }: FaqItem) {
 // Main page
 // ---------------------------------------------------------------------------
 export function PricingPage() {
+  const deployEnabled = useDeployEnabled();
+  const faqs = useMemo(
+    () => [...FAQS, ownershipFaq(deployEnabled)],
+    [deployEnabled],
+  );
+
   return (
     <PageShell
       title="Pricing · Floom"
@@ -308,8 +332,20 @@ export function PricingPage() {
             maxWidth: 620,
           }}
         >
-          Every app on Floom runs for free on our Gemini key. When you hit the
-          limit, paste your own key for unlimited. Paid tiers come after launch.
+          {deployEnabled ? (
+            <>
+              Every app on Floom runs for free on our Gemini key. When you hit
+              the limit, paste your own key for unlimited. Paid tiers come after
+              launch.
+            </>
+          ) : (
+            <>
+              Runs on floom.dev stay free on our Gemini key (fair-use limits
+              apply). When you hit the limit, paste your own key for unlimited.
+              Publishing new apps to floom.dev is waitlist-only; self-host
+              includes publish with no waitlist. Paid tiers come after launch.
+            </>
+          )}
         </p>
       </section>
 
@@ -361,8 +397,18 @@ export function PricingPage() {
               maxWidth: 560,
             }}
           >
-            Run any of the 22 live apps. Publish your own. No credit card, no
-            trial timer.
+            {deployEnabled ? (
+              <>
+                Run any of the live apps. Publish your own. No credit card, no
+                trial timer.
+              </>
+            ) : (
+              <>
+                Run any of the live apps on floom.dev. Publishing your own app to
+                our cloud is waitlist-only; self-host is unrestricted. No credit
+                card, no trial timer.
+              </>
+            )}
           </p>
 
           {/* Pricing rows — stacked list, not nested cards. Simpler hierarchy. */}
@@ -485,6 +531,25 @@ export function PricingPage() {
             >
               Read the docs &rarr;
             </Link>
+            {!deployEnabled && (
+              <>
+                {/* TODO(Agent 9): swap for WaitlistModal trigger. */}
+                <Link
+                  to={waitlistHref('pricing-footer')}
+                  data-testid="pricing-cta-waitlist"
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: ACCENT,
+                    textDecoration: 'none',
+                    borderBottom: `1px solid rgba(4,120,87,0.35)`,
+                    paddingBottom: 2,
+                  }}
+                >
+                  Join publish waitlist &rarr;
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Fine print */}
@@ -628,7 +693,7 @@ export function PricingPage() {
         >
           Questions, answered.
         </h2>
-        {FAQS.map((faq) => (
+        {faqs.map((faq) => (
           <FaqEntry key={faq.q} q={faq.q} a={faq.a} />
         ))}
       </section>

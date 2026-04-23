@@ -24,6 +24,7 @@ import {
   type AuthErrorAction,
 } from '../lib/authErrors';
 import { track, identifyFromSession } from '../lib/posthog';
+import { useDeployEnabled } from '../lib/flags';
 
 type Mode = 'signin' | 'signup';
 
@@ -34,6 +35,7 @@ export function LoginPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { data, isAuthenticated } = useSession();
+  const deployEnabled = useDeployEnabled();
   const routeMode = getModeFromLocation(location.pathname, searchParams);
   const [mode, setMode] = useState<Mode>(routeMode);
   const [email, setEmail] = useState('');
@@ -210,7 +212,9 @@ export function LoginPage() {
         <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 24px', textAlign: 'center' }}>
           {mode === 'signin'
             ? 'Use your email and password.'
-            : 'One account. Run apps, connect tools, publish your own.'}
+            : deployEnabled
+              ? 'One account. Run apps, connect tools, publish your own.'
+              : 'One account. Run apps, save history, and manage runs.'}
         </p>
 
         {hasSavedDraft && (
@@ -550,7 +554,7 @@ export function LoginPage() {
             color: 'var(--ink)',
           }}
         >
-          Ship AI apps fast.
+          {deployEnabled ? 'Ship AI apps fast.' : 'Run AI apps from one account.'}
         </h2>
         <p
           style={{
@@ -560,7 +564,14 @@ export function LoginPage() {
             margin: 0,
           }}
         >
-          Paste a GitHub link. Get a runnable app in 30 seconds.
+          {deployEnabled ? (
+            <>Paste a GitHub link. Get a runnable app in 30 seconds.</>
+          ) : (
+            <>
+              Try catalog apps, MCP, and your dashboard on floom.dev. Publishing to
+              our cloud is waitlist-only; self-host stays unrestricted.
+            </>
+          )}
         </p>
       </aside>
       </div>
