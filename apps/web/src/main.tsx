@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 // Landing is eager (LCP path). Everything else is lazy so the initial
 // bundle only carries the homepage React tree. Trimmed initial JS from
 // 427 KB (118 KB gzip) to the landing slice; other pages stream in on
@@ -160,7 +160,8 @@ function StudioSlugRedirect({ subpath }: { subpath?: string }) {
 // keeps deep links from external pages (wireframes, shared links) alive.
 function AppSlugToPermalinkRedirect() {
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/p/${slug ?? ''}`} replace />;
+  const { search } = useLocation();
+  return <Navigate to={`/p/${slug ?? ''}${search}`} replace />;
 }
 
 // Hard redirect to an external URL (e.g. /docs/changelog → GitHub Releases).
