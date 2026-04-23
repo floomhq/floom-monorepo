@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
 import { PublicFooter } from '../components/public/PublicFooter';
@@ -63,7 +64,29 @@ export function AppsDirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [hubError, setHubError] = useState<string | null>(null);
   const [rawSearch, setRawSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string>(ALL);
+  // Category filter is URL-backed so browser back/forward and shared URLs
+  // restore the filtered view (#100). ALL is the implicit default — we
+  // only write `?category=<slug>` to the URL when the user picks a
+  // non-default chip so the canonical /apps URL stays clean.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeCategory = searchParams.get('category') || ALL;
+  const setActiveCategory = useCallback(
+    (cat: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (cat === ALL) {
+            next.delete('category');
+          } else {
+            next.set('category', cat);
+          }
+          return next;
+        },
+        { replace: false },
+      );
+    },
+    [setSearchParams],
+  );
 
   const search = useDebounced(rawSearch, 150);
 
