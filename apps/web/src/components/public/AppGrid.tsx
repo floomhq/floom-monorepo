@@ -138,6 +138,24 @@ function formatRuns(n: number): string {
   return String(n);
 }
 
+/**
+ * Per-slug output-preview snippets — small taste of what the app returns.
+ *
+ * Added 2026-04-24 after the browser audit flagged cards as "not sexy":
+ * plain icon + title + description gave no preview of the actual output.
+ * Hardcoded for the 3 launch showcase apps; any app without an entry
+ * falls through to a null (no preview row), which keeps unknown apps
+ * looking clean rather than fake.
+ *
+ * When the backend grows an `output_preview` field on HubApp this map
+ * becomes the fallback and the API value wins.
+ */
+const OUTPUT_PREVIEWS: Record<string, string> = {
+  'lead-scorer': '87/100 · Strong fit',
+  'resume-screener': '92/100 · Top candidate',
+  'competitor-analyzer': '3 strengths, 2 gaps',
+};
+
 export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
   // HERO badge is pure visual noise when EVERY visible card is a hero —
   // the tag stops signalling "this one's featured" and just clutters
@@ -149,12 +167,25 @@ export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
   const heroCount = apps.reduce((n, a) => n + (a.hero ? 1 : 0), 0);
   const suppressHeroBadge = apps.length > 1 && heroCount === apps.length;
 
+  // Grid layout (2026-04-24): switched from fixed `repeat(4, 1fr)` to
+  // `auto-fit` so the directory doesn't leave a dead empty column when
+  // the app count is smaller than 4. At launch there are 3 showcase apps
+  // in the prod curation, which previously rendered as 3 cards + one
+  // ~400px hole on the right (audit screenshot `apps-prod.png`). With
+  // auto-fit the 3 cards now expand to fill the 1180px container. When
+  // the directory grows past 4 apps the layout naturally settles back to
+  // a tight 4-col grid.
+  const gridColumns =
+    apps.length <= 3
+      ? `repeat(${Math.max(1, apps.length)}, minmax(240px, 1fr))`
+      : 'repeat(auto-fill, minmax(260px, 1fr))';
+
   return (
     <div
       data-testid="apps-grid"
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+        gridTemplateColumns: gridColumns,
         gap: 16,
       }}
       className="app-grid"
@@ -169,7 +200,7 @@ export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
       ))}
       <style>{`
         @media (max-width: 1024px) {
-          .app-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+          .app-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important; }
         }
         @media (max-width: 760px) {
           .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
@@ -208,6 +239,14 @@ function AppGridCard({
   const isFeatured = variant === 'featured';
   const thumbHeight = isFeatured ? 140 : 120;
   const titleSize = isFeatured ? 16 : 15;
+  // 2026-04-24 polish: hide the "0 stars" meta while the product has no
+  // users — it reads as noise ("⭐ 0"). Show only when the count is > 0.
+  // The "hot" accent still triggers at >= 100 through `isHot`.
+  const showStars = stars > 0;
+  // Per-slug output preview (what the app returns) — small taste below
+  // the description so the card isn't purely name + blurb. Hardcoded
+  // for the 3 launch apps; null for everything else (no fake preview).
+  const outputPreview = OUTPUT_PREVIEWS[app.slug] ?? null;
 
   return (
     <Link
@@ -226,10 +265,14 @@ function AppGridCard({
         transition: 'border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease',
       }}
       onMouseEnter={(e) => {
+        // 2026-04-24 polish: slightly stronger lift + border highlight so
+        // the hover feels responsive rather than cosmetic. Still subtle —
+        // 2px lift, no glow, no animation beyond the 140ms transition set
+        // on the base style.
         const el = e.currentTarget as HTMLAnchorElement;
         el.style.borderColor = 'var(--ink)';
-        el.style.transform = 'translateY(-1px)';
-        el.style.boxShadow = '0 4px 16px rgba(15,23,42,0.06)';
+        el.style.transform = 'translateY(-2px)';
+        el.style.boxShadow = '0 10px 24px -16px rgba(14,14,12,0.25)';
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLAnchorElement;
@@ -239,8 +282,11 @@ function AppGridCard({
       }}
     >
       {/* THUMBNAIL. Gradient tile + centered AppIcon (or real PNG when
-          we have one). HERO badge floats in the top-right corner of
-          the thumbnail so it never collides with the stats row. */}
+          we have one). Top-right corner hosts the category chip so the
+          card footer can stay clean (2026-04-24 audit: chip previously
+          sat bottom-left and competed with the "Run →" CTA). HERO badge
+          — when present — sits on the top-left so it never collides
+          with the category chip. */}
       <div
         data-testid={`app-grid-thumb-${app.slug}`}
         style={{
@@ -280,13 +326,42 @@ function AppGridCard({
           </div>
         )}
 
+        {/* Category chip — top-right inside the pastel band. Moved here
+            from the footer (2026-04-24 polish). Keeps the colored-per-
+            category signal but out of the CTA row. */}
+        {app.category && (
+          <span
+            data-testid={`app-grid-category-${app.slug}`}
+            data-category={app.category}
+            style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              fontSize: 10,
+              color: badge ? badge.fg : 'var(--muted)',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              padding: '3px 8px',
+              border: `1px solid ${badge ? badge.border : 'var(--line)'}`,
+              borderRadius: 4,
+              background: badge ? badge.bg : 'rgba(255,255,255,0.92)',
+              fontWeight: 600,
+              boxShadow: '0 1px 2px rgba(15,23,42,0.06)',
+              backdropFilter: 'saturate(1.2)',
+            }}
+          >
+            {labelForCategory(app.category)}
+          </span>
+        )}
+
         {hero && (
           <span
             data-testid={`app-grid-hero-${app.slug}`}
             style={{
               position: 'absolute',
               top: 10,
-              right: 10,
+              left: 10,
               fontFamily: "'JetBrains Mono', ui-monospace, monospace",
               fontSize: 10,
               color: 'var(--accent, #047857)',
@@ -353,7 +428,10 @@ function AppGridCard({
 
       {/* STATS ROW: stands on its own so HERO / title / runs never
           collide. tabular-nums so counts align; flex-wrap in case a
-          narrow mobile column is tighter than expected. */}
+          narrow mobile column is tighter than expected.
+          2026-04-24 polish: hide the star glyph + count while the app
+          has 0 stars (reads as noise pre-launch). Reappears naturally
+          when stars > 0. */}
       <div
         data-testid={`app-grid-stats-${app.slug}`}
         style={{
@@ -371,26 +449,30 @@ function AppGridCard({
           marginBottom: 8,
         }}
       >
-        <span
-          data-testid={`app-grid-stars-${app.slug}`}
-          data-hot={isHot ? 'true' : 'false'}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 3,
-            color: isHot ? 'var(--accent, #047857)' : 'var(--muted)',
-            fontWeight: isHot ? 600 : 500,
-          }}
-          aria-label={`${stars} stars${isHot ? ' (hot)' : ''}`}
-        >
-          <Star
-            size={11}
-            fill={isHot ? 'currentColor' : 'none'}
-            strokeWidth={1.75}
-          />
-          {stars}
-        </span>
-        <span aria-hidden="true" style={{ color: 'var(--line)' }}>·</span>
+        {showStars && (
+          <>
+            <span
+              data-testid={`app-grid-stars-${app.slug}`}
+              data-hot={isHot ? 'true' : 'false'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                color: isHot ? 'var(--accent, #047857)' : 'var(--muted)',
+                fontWeight: isHot ? 600 : 500,
+              }}
+              aria-label={`${stars} stars${isHot ? ' (hot)' : ''}`}
+            >
+              <Star
+                size={11}
+                fill={isHot ? 'currentColor' : 'none'}
+                strokeWidth={1.75}
+              />
+              {stars}
+            </span>
+            <span aria-hidden="true" style={{ color: 'var(--line)' }}>·</span>
+          </>
+        )}
         <span data-testid={`app-grid-runs-${app.slug}`}>
           {formatRuns(runs7d)} runs
         </span>
@@ -414,7 +496,7 @@ function AppGridCard({
           WebkitLineClamp: 3,
           WebkitBoxOrient: 'vertical',
           minHeight: 'calc(13px * 1.5 * 3)',
-          marginBottom: 12,
+          marginBottom: outputPreview ? 10 : 12,
         }}
       >
         <DescriptionMarkdown
@@ -430,40 +512,68 @@ function AppGridCard({
         />
       </div>
 
-      {/* FOOTER: category pill (colored per bucket) + Run → */}
+      {/* OUTPUT PREVIEW — small taste of what the app returns (e.g.
+          "87/100 · Strong fit" for Lead Scorer). Only rendered when we
+          have a curated snippet for the slug; keeps unknown apps
+          looking intentional rather than showing a fake placeholder. */}
+      {outputPreview && (
+        <div
+          data-testid={`app-grid-preview-${app.slug}`}
+          style={{
+            margin: '0 14px 12px',
+            padding: '8px 10px',
+            borderRadius: 8,
+            background: tint.bg,
+            boxShadow: 'inset 0 0 0 1px rgba(15,23,42,0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontSize: 11.5,
+            color: tint.fg,
+            fontWeight: 600,
+            letterSpacing: '0.01em',
+            minWidth: 0,
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: tint.fg,
+              flexShrink: 0,
+              opacity: 0.7,
+            }}
+          />
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+            }}
+          >
+            {outputPreview}
+          </span>
+        </div>
+      )}
+
+      {/* FOOTER: Run → CTA, right-aligned. Category pill moved to the
+          thumbnail band (2026-04-24 polish), so this row is now a single
+          action affordance — no competition. */}
       <div
         style={{
           marginTop: 'auto',
           padding: '10px 14px 14px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           gap: 8,
           minHeight: 44,
         }}
       >
-        {app.category ? (
-          <span
-            data-testid={`app-grid-category-${app.slug}`}
-            data-category={app.category}
-            style={{
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-              fontSize: 10,
-              color: badge ? badge.fg : 'var(--muted)',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              padding: '3px 8px',
-              border: `1px solid ${badge ? badge.border : 'var(--line)'}`,
-              borderRadius: 4,
-              background: badge ? badge.bg : 'var(--bg)',
-              fontWeight: 600,
-            }}
-          >
-            {labelForCategory(app.category)}
-          </span>
-        ) : (
-          <span />
-        )}
         <span
           className="app-grid-cta"
           style={{
