@@ -49,7 +49,14 @@ webhookRouter.post('/:path', async (c) => {
   const body = await c.req.text();
   const sig = c.req.header('x-floom-signature') || c.req.header('X-Floom-Signature') || null;
   if (!verifyWebhookSignature(trigger.webhook_secret, body, sig)) {
-    return c.json({ error: 'Invalid signature', code: 'bad_signature' }, 401);
+    return c.json(
+      {
+        error: 'Invalid signature',
+        code: 'bad_signature',
+        hint: 'Compute the HMAC signature of the raw body with the shared secret and send it in the X-Floom-Signature header.',
+      },
+      401,
+    );
   }
 
   if (trigger.enabled !== 1) {

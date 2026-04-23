@@ -31,7 +31,11 @@ import {
 } from '../services/docker-image-ingest.js';
 import { resolveUserContext } from '../services/session.js';
 import { isCloudMode } from '../lib/better-auth.js';
-import { checkAppVisibility } from '../lib/auth.js';
+import {
+  AUTH_DOCS_URL,
+  AUTH_HINT_CLOUD,
+  checkAppVisibility,
+} from '../lib/auth.js';
 import { checkMcpIngestLimit, extractIp } from '../lib/rate-limit.js';
 import { filterTestFixtures } from '../lib/hub-filter.js';
 import { recordMcpToolCall } from '../lib/metrics-counters.js';
@@ -512,8 +516,11 @@ function createAdminMcpServer({ ctx, ip, baseUrl }: AdminToolContext): McpServer
               text: JSON.stringify(
                 {
                   error: 'auth_required',
+                  code: 'auth_required',
                   message:
                     'Authentication required. Sign in (or supply a valid session cookie / bearer token) and retry.',
+                  hint: AUTH_HINT_CLOUD,
+                  docs_url: AUTH_DOCS_URL,
                 },
                 null,
                 2,

@@ -112,7 +112,12 @@ metricsRouter.get('/', (c) => {
   const match = /^Bearer\s+(.+)$/.exec(header);
   const presented = match ? match[1] : '';
   if (!presented || !constantTimeEqual(presented, expected)) {
-    return c.text('Unauthorized', 401);
+    // Prometheus scrape path: keep response short and plain-text. Hint
+    // points the operator at the env var they need to align on both sides.
+    return c.text(
+      'Unauthorized. Set METRICS_TOKEN on the server and present it via Authorization: Bearer <token>.',
+      401,
+    );
   }
 
   const now = Date.now();

@@ -31,7 +31,7 @@ import {
   MAX_BUNDLE_BYTES,
   RENDERERS_DIR,
 } from '../services/renderer-bundler.js';
-import { requireAuthenticatedInCloud } from '../lib/auth.js';
+import { notOwnerResponse, requireAuthenticatedInCloud } from '../lib/auth.js';
 import { filterTestFixtures } from '../lib/hub-filter.js';
 import {
   getHubCache,
@@ -418,7 +418,7 @@ hubRouter.get('/:slug/runs', async (c) => {
     (!!app.author && app.author === ctx.user_id) ||
     (isOssLocal && app.workspace_id === 'local');
   if (!isOwner) {
-    return c.json({ error: 'Not the owner of this app', code: 'not_owner' }, 403);
+    return notOwnerResponse(c);
   }
 
   // SECURITY (issue #124, 2026-04-19): scope runs to the caller's own
@@ -516,7 +516,7 @@ hubRouter.get('/:slug/runs-by-day', async (c) => {
     (!!app.author && app.author === ctx.user_id) ||
     (isOssLocal && app.workspace_id === 'local');
   if (!isOwner) {
-    return c.json({ error: 'Not the owner of this app', code: 'not_owner' }, 403);
+    return notOwnerResponse(c);
   }
 
   // Aggregate by UTC calendar day. SQLite's date() function truncates
@@ -568,7 +568,7 @@ hubRouter.delete('/:slug', async (c) => {
   const isOssLocal = !ctx.is_authenticated && ctx.workspace_id === 'local';
   const isOwner = app.author === ctx.user_id || isOssLocal;
   if (!isOwner) {
-    return c.json({ error: 'Not the owner of this app', code: 'not_owner' }, 403);
+    return notOwnerResponse(c);
   }
 
   deleteAppRecordById(app.id);
@@ -612,7 +612,7 @@ hubRouter.patch('/:slug', async (c) => {
   const isOssLocal = !ctx.is_authenticated && ctx.workspace_id === 'local';
   const isOwner = app.author === ctx.user_id || isOssLocal;
   if (!isOwner) {
-    return c.json({ error: 'Not the owner of this app', code: 'not_owner' }, 403);
+    return notOwnerResponse(c);
   }
 
   let body: unknown;
@@ -987,7 +987,7 @@ hubRouter.post('/:slug/renderer', async (c) => {
   const isOssLocal = !ctx.is_authenticated && ctx.workspace_id === 'local';
   const isOwner = app.author === ctx.user_id || isOssLocal;
   if (!isOwner) {
-    return c.json({ error: 'Not the owner of this app', code: 'not_owner' }, 403);
+    return notOwnerResponse(c);
   }
 
   let body: unknown;
@@ -1063,7 +1063,7 @@ hubRouter.delete('/:slug/renderer', async (c) => {
   const isOssLocal = !ctx.is_authenticated && ctx.workspace_id === 'local';
   const isOwner = app.author === ctx.user_id || isOssLocal;
   if (!isOwner) {
-    return c.json({ error: 'Not the owner of this app', code: 'not_owner' }, 403);
+    return notOwnerResponse(c);
   }
 
   const bundlePath = join(RENDERERS_DIR, `${slug}.js`);

@@ -18,6 +18,37 @@ import type { Context, MiddlewareHandler } from 'hono';
 import type { SessionContext } from '../types.js';
 import { isCloudMode } from './better-auth.js';
 
+// Actionable hints embedded in every 401/403 auth response. Single source
+// of truth so the ax-eval baseline fix (#536) can't drift across routes.
+// Keep strings generic — no stack traces, no internal identifiers, no
+// environment-specific tokens. Callers (CLI, agents, humans) should be
+// able to act on the hint without knowing anything about the server.
+export const AUTH_DOCS_URL = 'https://floom.dev/docs/auth';
+export const AUTH_HINT_CLOUD =
+  'Run `floom auth --device` or set FLOOM_API_KEY, then retry.';
+export const AUTH_HINT_SELFHOST =
+  'Set FLOOM_AUTH_TOKEN on the server and present it via Authorization: Bearer <token>.';
+export const AUTH_HINT_SIGNATURE =
+  'Compute the HMAC signature of the raw body with the shared secret and send it in the X-Floom-Signature header.';
+export const AUTH_HINT_NOT_OWNER =
+  'Sign in as the account that originally published this app.';
+
+/**
+ * Canonical `not_owner` 403 response. Used across hub and trigger routes so
+ * the actionable hint stays consistent after the #536 audit.
+ */
+export function notOwnerResponse(c: Context): Response {
+  return c.json(
+    {
+      error: 'Not the owner of this app',
+      code: 'not_owner',
+      hint: AUTH_HINT_NOT_OWNER,
+      docs_url: AUTH_DOCS_URL,
+    },
+    403,
+  );
+}
+
 function getExpectedToken(): string | null {
   const token = process.env.FLOOM_AUTH_TOKEN;
   if (!token || token.length === 0) return null;
@@ -65,7 +96,15 @@ export const globalAuthMiddleware: MiddlewareHandler = async (c, next) => {
 
   const got = presentedToken(c);
   if (!got || !constantTimeEqual(got, expected)) {
-    return c.json({ error: 'Unauthorized: missing or invalid Floom token' }, 401);
+    return c.json(
+      {
+        error: 'Unauthorized: missing or invalid Floom token',
+        code: 'auth_required',
+        hint: AUTH_HINT_SELFHOST,
+        docs_url: AUTH_DOCS_URL,
+      },
+      401,
+    );
   }
   return next();
 };
@@ -111,13 +150,24 @@ export function checkAppVisibility(
       {
         error:
           'App requires authentication but FLOOM_AUTH_TOKEN is not set on the server. Set the env var and retry.',
+        code: 'auth_required',
+        hint: AUTH_HINT_SELFHOST,
+        docs_url: AUTH_DOCS_URL,
       },
       401,
     );
   }
   const got = presentedToken(c);
   if (!got || !constantTimeEqual(got, expected)) {
-    return c.json({ error: 'Unauthorized: app requires a bearer token' }, 401);
+    return c.json(
+      {
+        error: 'Unauthorized: app requires a bearer token',
+        code: 'auth_required',
+        hint: AUTH_HINT_SELFHOST,
+        docs_url: AUTH_DOCS_URL,
+      },
+      401,
+    );
   }
   return null;
 }
@@ -176,6 +226,8 @@ export function requireAuthenticatedInCloud(
     {
       error: 'Authentication required. Sign in and retry.',
       code: 'auth_required',
+      hint: AUTH_HINT_CLOUD,
+      docs_url: AUTH_DOCS_URL,
     },
     401,
   );
