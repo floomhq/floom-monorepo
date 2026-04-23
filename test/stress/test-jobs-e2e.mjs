@@ -58,21 +58,31 @@ writeFileSync(
 `,
 );
 
-const processes = [];
+const children = new Set();
+function spawnTracked(...args) {
+  const c = spawn(...args);
+  children.add(c);
+  c.on('exit', () => children.delete(c));
+  return c;
+}
+
 let cleanedUp = false;
 function cleanup() {
   if (cleanedUp) return;
   cleanedUp = true;
-  // Kill the whole process group (SIGTERM → short wait → SIGKILL) so any
-  // grandchildren spawned by the floom server (runners, bundler workers) also
-  // die. spawn() uses detached:true + setsid so `-pid` targets the group.
-  for (const p of processes) {
-    if (!p.pid || p.exitCode !== null) continue;
+  for (const c of children) {
+    if (!c.pid || c.exitCode !== null) continue;
+    // Kill the whole process group so grandchildren spawned by the Floom
+    // server (runners, bundler workers) also die. spawn uses detached:true.
     for (const sig of ['SIGTERM', 'SIGKILL']) {
       try {
-        process.kill(-p.pid, sig);
+        process.kill(-c.pid, sig);
       } catch {
-        try { p.kill(sig); } catch { /* already dead */ }
+        try {
+          c.kill(sig);
+        } catch {
+          /* already dead */
+        }
       }
     }
   }
@@ -83,12 +93,14 @@ function cleanup() {
   }
 }
 process.on('exit', cleanup);
-for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-  process.on(sig, () => {
-    cleanup();
-    process.exit(sig === 'SIGINT' ? 130 : 1);
-  });
-}
+process.on('SIGINT', () => {
+  cleanup();
+  process.exit(130);
+});
+process.on('SIGTERM', () => {
+  cleanup();
+  process.exit(143);
+});
 process.on('uncaughtException', (err) => {
   console.error('[e2e] uncaughtException:', err);
   cleanup();
@@ -121,201 +133,205 @@ const webhookServer = createServer((req, res) => {
   res.writeHead(404);
   res.end();
 });
-await new Promise((resolve) => webhookServer.listen(WEBHOOK_PORT, resolve));
-console.log(`[e2e] webhook collector on :${WEBHOOK_PORT}`);
+try {
+  await new Promise((resolve) => webhookServer.listen(WEBHOOK_PORT, resolve));
+  console.log(`[e2e] webhook collector on :${WEBHOOK_PORT}`);
 
-// ---- 2. slow-echo upstream ----
-const slowEcho = spawn(
-  'node',
-  [join(REPO_ROOT, 'examples/slow-echo/server.mjs')],
-  {
-    env: {
-      ...process.env,
-      PORT: String(SLOW_ECHO_PORT),
-      ECHO_DELAY_MS: '1000', // 1s instead of default 5s to keep tests fast
+  // ---- 2. slow-echo upstream ----
+  const slowEcho = spawnTracked(
+    'node',
+    [join(REPO_ROOT, 'examples/slow-echo/server.mjs')],
+    {
+      env: {
+        ...process.env,
+        PORT: String(SLOW_ECHO_PORT),
+        ECHO_DELAY_MS: '1000', // 1s instead of default 5s to keep tests fast
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true, // own process group so cleanup can SIGKILL it
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true, // own process group so cleanup can SIGKILL it
-  },
-);
-processes.push(slowEcho);
-slowEcho.stdout.on('data', (d) => process.stdout.write(`[slow-echo] ${d}`));
-slowEcho.stderr.on('data', (d) => process.stderr.write(`[slow-echo] ${d}`));
-
-await waitForHttp(`http://localhost:${SLOW_ECHO_PORT}/health`, 10_000);
-
-// ---- 3. Floom server ----
-const floom = spawn(
-  'node',
-  [join(REPO_ROOT, 'apps/server/dist/index.js')],
-  {
-    env: {
-      ...process.env,
-      PORT: String(FLOOM_PORT),
-      PUBLIC_URL: `http://localhost:${FLOOM_PORT}`,
-      DATA_DIR: tmpDataDir,
-      FLOOM_APPS_CONFIG: appsYamlPath,
-      FLOOM_JOB_POLL_MS: '250', // speed up worker polling in tests
-      FLOOM_FAST_APPS: 'false', // keep the jobs fixture isolated from sidecar boot/ports
-      FLOOM_SEED_LAUNCH_DEMOS: 'false', // the test owns its fixture app; demo image builds only slow CI boot
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true, // own process group so cleanup can SIGKILL it
-  },
-);
-processes.push(floom);
-floom.stdout.on('data', (d) => process.stdout.write(`[floom] ${d}`));
-floom.stderr.on('data', (d) => process.stderr.write(`[floom] ${d}`));
-
-await waitForHttp(`http://localhost:${FLOOM_PORT}/api/health`, 15_000);
-
-// Give the openapi-ingest a moment to finish (it's async on boot).
-await waitForCondition(async () => {
-  try {
-    const res = await fetch(`http://localhost:${FLOOM_PORT}/api/hub`);
-    if (!res.ok) return false;
-    const json = await res.json();
-    return Array.isArray(json) && json.some((a) => a.slug === 'slow-echo');
-  } catch {
-    return false;
-  }
-}, 15_000);
-log('hub: slow-echo registered', true);
-
-// ---- 4. synchronous endpoint should reject (app is async) ----
-{
-  const res = await fetch(`http://localhost:${FLOOM_PORT}/api/slow-echo/run`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ inputs: { message: 'hi' } }),
-  });
-  // /run will still dispatch (sync path) but the contract for async apps is
-  // the jobs endpoint. We simply verify /run still exists for back-compat.
-  log('sync /run still reachable on async app (back-compat)', res.status === 200);
-}
-
-// ---- 5. enqueue a job ----
-const createRes = await fetch(
-  `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs`,
-  {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      action: 'slow_echo',
-      inputs: { message: 'hello world', delay_ms: 500 },
-    }),
-  },
-);
-const createJson = await createRes.json();
-log(
-  'POST /jobs: 202 + job_id present',
-  createRes.status === 202 && typeof createJson.job_id === 'string',
-  `status=${createRes.status} body=${JSON.stringify(createJson)}`,
-);
-log(
-  'POST /jobs: status=queued',
-  createJson.status === 'queued',
-  JSON.stringify(createJson),
-);
-log(
-  'POST /jobs: poll_url populated',
-  typeof createJson.poll_url === 'string' && createJson.poll_url.includes(createJson.job_id),
-  createJson.poll_url,
-);
-
-// ---- 6. poll until done ----
-const jobId = createJson.job_id;
-const deadline = Date.now() + 20_000;
-let finalStatus = null;
-let finalJob = null;
-while (Date.now() < deadline) {
-  const res = await fetch(
-    `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs/${jobId}`,
   );
-  if (res.ok) {
-    const body = await res.json();
-    if (['succeeded', 'failed', 'cancelled'].includes(body.status)) {
-      finalStatus = body.status;
-      finalJob = body;
-      break;
+  slowEcho.stdout.on('data', (d) => process.stdout.write(`[slow-echo] ${d}`));
+  slowEcho.stderr.on('data', (d) => process.stderr.write(`[slow-echo] ${d}`));
+
+  await waitForHttp(`http://localhost:${SLOW_ECHO_PORT}/health`, 10_000);
+
+  // ---- 3. Floom server ----
+  const floom = spawnTracked(
+    'node',
+    [join(REPO_ROOT, 'apps/server/dist/index.js')],
+    {
+      env: {
+        ...process.env,
+        PORT: String(FLOOM_PORT),
+        PUBLIC_URL: `http://localhost:${FLOOM_PORT}`,
+        DATA_DIR: tmpDataDir,
+        FLOOM_APPS_CONFIG: appsYamlPath,
+        FLOOM_JOB_POLL_MS: '250', // speed up worker polling in tests
+        FLOOM_FAST_APPS: 'false', // keep the jobs fixture isolated from sidecar boot/ports
+        FLOOM_SEED_LAUNCH_DEMOS: 'false', // the test owns its fixture app; demo image builds only slow CI boot
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true, // own process group so cleanup can SIGKILL it
+    },
+  );
+  floom.stdout.on('data', (d) => process.stdout.write(`[floom] ${d}`));
+  floom.stderr.on('data', (d) => process.stderr.write(`[floom] ${d}`));
+
+  await waitForHttp(`http://localhost:${FLOOM_PORT}/api/health`, 15_000);
+
+  // Give the openapi-ingest a moment to finish (it's async on boot).
+  await waitForCondition(async () => {
+    try {
+      const res = await fetch(`http://localhost:${FLOOM_PORT}/api/hub`);
+      if (!res.ok) return false;
+      const json = await res.json();
+      return Array.isArray(json) && json.some((a) => a.slug === 'slow-echo');
+    } catch {
+      return false;
     }
+  }, 15_000);
+  log('hub: slow-echo registered', true);
+
+  // ---- 4. synchronous endpoint should reject (app is async) ----
+  {
+    const res = await fetch(`http://localhost:${FLOOM_PORT}/api/slow-echo/run`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ inputs: { message: 'hi' } }),
+    });
+    // /run will still dispatch (sync path) but the contract for async apps is
+    // the jobs endpoint. We simply verify /run still exists for back-compat.
+    log('sync /run still reachable on async app (back-compat)', res.status === 200);
   }
-  await new Promise((r) => setTimeout(r, 250));
+
+  // ---- 5. enqueue a job ----
+  const createRes = await fetch(
+    `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'slow_echo',
+        inputs: { message: 'hello world', delay_ms: 500 },
+      }),
+    },
+  );
+  const createJson = await createRes.json();
+  log(
+    'POST /jobs: 202 + job_id present',
+    createRes.status === 202 && typeof createJson.job_id === 'string',
+    `status=${createRes.status} body=${JSON.stringify(createJson)}`,
+  );
+  log(
+    'POST /jobs: status=queued',
+    createJson.status === 'queued',
+    JSON.stringify(createJson),
+  );
+  log(
+    'POST /jobs: poll_url populated',
+    typeof createJson.poll_url === 'string' && createJson.poll_url.includes(createJson.job_id),
+    createJson.poll_url,
+  );
+
+  // ---- 6. poll until done ----
+  const jobId = createJson.job_id;
+  const deadline = Date.now() + 20_000;
+  let finalStatus = null;
+  let finalJob = null;
+  while (Date.now() < deadline) {
+    const res = await fetch(
+      `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs/${jobId}`,
+    );
+    if (res.ok) {
+      const body = await res.json();
+      if (['succeeded', 'failed', 'cancelled'].includes(body.status)) {
+        finalStatus = body.status;
+        finalJob = body;
+        break;
+      }
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  log('GET /jobs/:id: reached terminal state', finalStatus !== null, `status=${finalStatus}`);
+  log('GET /jobs/:id: status=succeeded', finalStatus === 'succeeded', JSON.stringify(finalJob));
+  const outputEchoed = extractEchoedField(finalJob?.output);
+  log(
+    'GET /jobs/:id: output echoed our message',
+    outputEchoed === 'hello world',
+    JSON.stringify(finalJob?.output),
+  );
+  log(
+    'GET /jobs/:id: attempts=1',
+    finalJob && finalJob.attempts === 1,
+    `attempts=${finalJob?.attempts}`,
+  );
+
+  // ---- 7. webhook was delivered ----
+  // Give the worker a moment to POST the webhook after completion.
+  await waitForCondition(() => webhookHits.length > 0, 5000);
+  log('webhook: collector received exactly 1 POST', webhookHits.length === 1, `count=${webhookHits.length}`);
+
+  if (webhookHits.length > 0) {
+    const hit = webhookHits[0];
+    log(
+      'webhook: X-Floom-Event header set',
+      hit.headers['x-floom-event'] === 'job.completed',
+      hit.headers['x-floom-event'],
+    );
+    log(
+      'webhook: body.job_id matches',
+      hit.body?.job_id === jobId,
+      `got=${hit.body?.job_id} want=${jobId}`,
+    );
+    log(
+      'webhook: body.slug=slow-echo',
+      hit.body?.slug === 'slow-echo',
+      hit.body?.slug,
+    );
+    log(
+      'webhook: body.status=succeeded',
+      hit.body?.status === 'succeeded',
+      hit.body?.status,
+    );
+    log(
+      'webhook: body.output echoed the message',
+      extractEchoedField(hit.body?.output) === 'hello world',
+      JSON.stringify(hit.body?.output),
+    );
+    log('webhook: body.duration_ms present', typeof hit.body?.duration_ms === 'number' && hit.body.duration_ms >= 0);
+    log('webhook: body.attempts=1', hit.body?.attempts === 1);
+  }
+
+  // ---- 8. cancelling an already-terminal job is a no-op ----
+  const cancelRes = await fetch(
+    `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs/${jobId}/cancel`,
+    { method: 'POST' },
+  );
+  const cancelBody = await cancelRes.json();
+  log(
+    'POST /cancel on terminal job: stays succeeded',
+    cancelBody.status === 'succeeded',
+    cancelBody.status,
+  );
+
+  // ---- 9. 404 on non-existent job ----
+  const missingRes = await fetch(
+    `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs/job_doesnotexist`,
+  );
+  log('GET /jobs/:missing: 404', missingRes.status === 404);
+
+  // ---- 10. sync /run on petstore still works (regression) ----
+  // (only if someone had petstore in the same instance — skip, we only have slow-echo)
+} finally {
+  try {
+    webhookServer.close();
+  } catch {
+    // ignore
+  }
+  cleanup();
 }
-log('GET /jobs/:id: reached terminal state', finalStatus !== null, `status=${finalStatus}`);
-log('GET /jobs/:id: status=succeeded', finalStatus === 'succeeded', JSON.stringify(finalJob));
-const outputEchoed = extractEchoedField(finalJob?.output);
-log(
-  'GET /jobs/:id: output echoed our message',
-  outputEchoed === 'hello world',
-  JSON.stringify(finalJob?.output),
-);
-log(
-  'GET /jobs/:id: attempts=1',
-  finalJob && finalJob.attempts === 1,
-  `attempts=${finalJob?.attempts}`,
-);
 
-// ---- 7. webhook was delivered ----
-// Give the worker a moment to POST the webhook after completion.
-await waitForCondition(() => webhookHits.length > 0, 5000);
-log('webhook: collector received exactly 1 POST', webhookHits.length === 1, `count=${webhookHits.length}`);
-
-if (webhookHits.length > 0) {
-  const hit = webhookHits[0];
-  log(
-    'webhook: X-Floom-Event header set',
-    hit.headers['x-floom-event'] === 'job.completed',
-    hit.headers['x-floom-event'],
-  );
-  log(
-    'webhook: body.job_id matches',
-    hit.body?.job_id === jobId,
-    `got=${hit.body?.job_id} want=${jobId}`,
-  );
-  log(
-    'webhook: body.slug=slow-echo',
-    hit.body?.slug === 'slow-echo',
-    hit.body?.slug,
-  );
-  log(
-    'webhook: body.status=succeeded',
-    hit.body?.status === 'succeeded',
-    hit.body?.status,
-  );
-  log(
-    'webhook: body.output echoed the message',
-    extractEchoedField(hit.body?.output) === 'hello world',
-    JSON.stringify(hit.body?.output),
-  );
-  log('webhook: body.duration_ms present', typeof hit.body?.duration_ms === 'number' && hit.body.duration_ms >= 0);
-  log('webhook: body.attempts=1', hit.body?.attempts === 1);
-}
-
-// ---- 8. cancelling an already-terminal job is a no-op ----
-const cancelRes = await fetch(
-  `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs/${jobId}/cancel`,
-  { method: 'POST' },
-);
-const cancelBody = await cancelRes.json();
-log(
-  'POST /cancel on terminal job: stays succeeded',
-  cancelBody.status === 'succeeded',
-  cancelBody.status,
-);
-
-// ---- 9. 404 on non-existent job ----
-const missingRes = await fetch(
-  `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs/job_doesnotexist`,
-);
-log('GET /jobs/:missing: 404', missingRes.status === 404);
-
-// ---- 10. sync /run on petstore still works (regression) ----
-// (only if someone had petstore in the same instance — skip, we only have slow-echo)
-
-// ---- teardown ----
-webhookServer.close();
-cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
 
