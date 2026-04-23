@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { createHash, randomUUID } from 'node:crypto';
 import { db } from '../db.js';
 import { resolveUserContext } from '../services/session.js';
+import { AUTH_DOCS_URL } from '../lib/auth.js';
 import {
   fileFeedbackIssue,
   isFeedbackGitHubConfigured,
@@ -168,7 +169,15 @@ feedbackRouter.post('/', async (c) => {
 feedbackRouter.get('/', async (c) => {
   const adminKey = process.env.FLOOM_FEEDBACK_ADMIN_KEY;
   if (!adminKey) {
-    return c.json({ error: 'Admin key not configured', code: 'admin_disabled' }, 403);
+    return c.json(
+      {
+        error: 'Admin key not configured',
+        code: 'admin_disabled',
+        hint: 'The feedback admin endpoint is disabled on this server. Contact your Floom administrator to enable it.',
+        docs_url: AUTH_DOCS_URL,
+      },
+      403,
+    );
   }
   // Reject admin keys in the URL query string. Fail loud — we want the
   // client to fix the call, not to silently accept the worse credential
@@ -180,6 +189,8 @@ feedbackRouter.get('/', async (c) => {
       {
         error: 'Admin key must be sent via Authorization: Bearer or X-Admin-Key header, never in the URL.',
         code: 'admin_key_in_query',
+        hint: 'Resend the request with the admin key in the Authorization: Bearer header (or X-Admin-Key).',
+        docs_url: AUTH_DOCS_URL,
       },
       401,
     );
@@ -189,7 +200,15 @@ feedbackRouter.get('/', async (c) => {
     c.req.header('x-admin-key') ||
     '';
   if (presented !== adminKey) {
-    return c.json({ error: 'Unauthorized', code: 'unauthorized' }, 401);
+    return c.json(
+      {
+        error: 'Unauthorized',
+        code: 'unauthorized',
+        hint: 'Present the feedback admin key via Authorization: Bearer <key> or X-Admin-Key. Contact your Floom administrator if you need access.',
+        docs_url: AUTH_DOCS_URL,
+      },
+      401,
+    );
   }
   const limit = Math.max(1, Math.min(500, Number(c.req.query('limit') || 100)));
   const rows = db

@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { db } from '../db.js';
 import { resolveUserContext } from '../services/session.js';
-import { requireAuthenticatedInCloud } from '../lib/auth.js';
+import { notOwnerResponse, requireAuthenticatedInCloud } from '../lib/auth.js';
 import {
   createTrigger,
   deleteTrigger,
@@ -77,7 +77,7 @@ hubTriggersRouter.post('/:slug/triggers', async (c) => {
     | undefined;
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!ownerOf(app, ctx)) {
-    return c.json({ error: 'Not the owner of this app', code: 'not_owner' }, 403);
+    return notOwnerResponse(c);
   }
 
   let body: unknown;

@@ -18,6 +18,7 @@
 // senders can't provide one. The HMAC signature is the auth.
 import { Hono } from 'hono';
 import { db } from '../db.js';
+import { AUTH_DOCS_URL, AUTH_HINT_SIGNATURE } from '../lib/auth.js';
 import { newJobId } from '../lib/ids.js';
 import { createJob } from '../services/jobs.js';
 import {
@@ -49,7 +50,15 @@ webhookRouter.post('/:path', async (c) => {
   const body = await c.req.text();
   const sig = c.req.header('x-floom-signature') || c.req.header('X-Floom-Signature') || null;
   if (!verifyWebhookSignature(trigger.webhook_secret, body, sig)) {
-    return c.json({ error: 'Invalid signature', code: 'bad_signature' }, 401);
+    return c.json(
+      {
+        error: 'Invalid signature',
+        code: 'bad_signature',
+        hint: AUTH_HINT_SIGNATURE,
+        docs_url: AUTH_DOCS_URL,
+      },
+      401,
+    );
   }
 
   if (trigger.enabled !== 1) {
