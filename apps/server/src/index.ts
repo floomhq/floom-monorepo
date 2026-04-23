@@ -1321,6 +1321,14 @@ if (webDist) {
       });
     }
 
+    // #348: legacy /apps/:slug used to load the React app, hit <Navigate>, and
+    // return HTTP 200 with a soft-404. Crawlers and bookmarks should 301 to
+    // the canonical /p/:slug (query string preserved; fragment not sent by GET).
+    const legacyAppSlugM = pathname.match(/^\/apps\/([a-z0-9][a-z0-9-]*)\/?$/);
+    if (legacyAppSlugM) {
+      return c.redirect(`/p/${legacyAppSlugM[1]}${url.search}`, 301);
+    }
+
     // 2026-04-20 (PRR tail cleanup): /spec and /spec/* were linked from the
     // wireframes/sitemap but returned 404 because the real route is /protocol.
     // Redirect every /spec/* (including /spec/protocol.md) to /protocol so
