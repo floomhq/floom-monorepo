@@ -19,6 +19,8 @@ import { FeedbackButton } from '../components/FeedbackButton';
 import { DocsSidebar, DOCS_SIDEBAR_GROUPS } from '../components/docs/DocsSidebar';
 import { DocsPublishWaitlistBanner } from '../components/docs/DocsPublishWaitlistBanner';
 import { readDeployEnabled } from '../lib/flags';
+import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
+import { DOCS_HUB_DESCRIPTION } from '../seo/docsSeoClient';
 
 // ── Styles ────────────────────────────────────────────────────────────────
 
@@ -279,6 +281,10 @@ export function DocsLandingPage() {
 
   useEffect(() => {
     document.title = 'Floom docs';
+    applyPublicMarketingMeta({
+      ogTitle: 'Floom docs',
+      description: DOCS_HUB_DESCRIPTION,
+    });
     return () => {
       document.title = 'Floom: production layer for AI apps';
     };

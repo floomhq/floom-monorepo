@@ -11,6 +11,8 @@ import {
 } from '../components/docs/markdown';
 import { DocsSidebar, DOCS_SIDEBAR_GROUPS } from '../components/docs/DocsSidebar';
 import { DocsPublishWaitlistBanner } from '../components/docs/DocsPublishWaitlistBanner';
+import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
+import { DOCS_HUB_DESCRIPTION, DOCS_SEO } from '../seo/docsSeoClient';
 import limitsMd from '../assets/docs/limits.md?raw';
 import securityMd from '../assets/docs/security.md?raw';
 import observabilityMd from '../assets/docs/observability.md?raw';
@@ -59,6 +61,11 @@ export function DocsPage() {
   useEffect(() => {
     if (!doc) return undefined;
     document.title = `${doc.label} · Floom Docs`;
+    const ent = DOCS_SEO[doc.slug];
+    applyPublicMarketingMeta({
+      ogTitle: ent?.ogTitle ?? doc.label,
+      description: ent?.description ?? DOCS_HUB_DESCRIPTION,
+    });
     return () => {
       document.title = 'Floom: production layer for AI apps';
     };

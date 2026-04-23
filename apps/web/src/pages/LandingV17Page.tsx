@@ -22,6 +22,7 @@
  *   /root/floom-internal/launch/v17-preview-delta-2026-04-22.md
  */
 import { useEffect, useState } from 'react';
+import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
@@ -98,6 +99,13 @@ export function LandingV17Page() {
 
   useEffect(() => {
     document.title = 'Ship AI apps fast · Floom';
+    applyPublicMarketingMeta({
+      ogTitle: 'Ship AI apps fast · Floom',
+      description:
+        'Ship AI apps fast. The protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Paste your app link and get a Claude tool, a page to share, a command-line, and a clean URL your teammates can hit. Sign-in, history, and all the boring stuff are handled.',
+      socialDescription:
+        'The protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Works with Claude, Cursor, ChatGPT, Codex CLI, and any MCP client.',
+    });
     api
       .getHub()
       .then((apps) => {

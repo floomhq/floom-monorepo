@@ -21,11 +21,12 @@
 //   5. Who's behind it: Federico + Floom Inc + OSS commitment
 //   + Footer CTA band: "Paste your thing" → /studio/build
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
 import { readDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
+import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 
 // ── Shared styles ─────────────────────────────────────────────────────────
 
@@ -77,6 +78,14 @@ const MUTED_BODY_STYLE: React.CSSProperties = {
 export function AboutPage() {
   const deployEnabled = useMemo(() => readDeployEnabled(), []);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    applyPublicMarketingMeta({
+      ogTitle: 'About Floom',
+      description:
+        'Floom turns the thing you built on localhost into a real app with a real URL so other people can actually use it.',
+    });
+  }, []);
 
   return (
     <PageShell

@@ -7,6 +7,7 @@ import { Footer } from '../components/Footer';
 import { FeedbackButton } from '../components/FeedbackButton';
 // Import the protocol markdown at build time via Vite ?raw
 import protocolMd from '../assets/protocol.md?raw';
+import { applyPublicMarketingMeta } from '../lib/publicPageMeta';
 
 // ── Markdown rendering ─────────────────────────────────────────────────────
 // Uses `react-markdown` (CSP-safe, no HTML injection) with custom
@@ -464,7 +465,12 @@ export function ProtocolPage() {
   const [tocOpen, setTocOpen] = useState(false);
 
   useEffect(() => {
-    document.title = 'The Floom Protocol';
+    document.title = 'The Floom Protocol · Floom';
+    applyPublicMarketingMeta({
+      ogTitle: 'The Floom Protocol',
+      description:
+        'The open protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Read the spec.',
+    });
     return () => {
       document.title = 'Floom: production layer for AI apps';
     };

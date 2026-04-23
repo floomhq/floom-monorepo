@@ -820,6 +820,92 @@ if (webDist) {
   // curl/wget). Rewrite the <title> tag per-route in the same middleware
   // that already handles /p/:slug OG rewriting.
   const LANDING_TITLE = 'Ship AI apps fast · Floom';
+  const LANDING_META_DESCRIPTION =
+    'Ship AI apps fast. The protocol + runtime for agentic work. Vibe-coding speed. Production-grade safety. Paste your app link and get a Claude tool, a page to share, a command-line, and a clean URL your teammates can hit. Sign-in, history, and all the boring stuff are handled.';
+
+  // #317: keep in sync with `DOCS` in apps/web/src/pages/DocsPage.tsx, and with
+  // `apps/web/src/seo/docsSeoClient.ts` (OG copy on the client).
+  const DOCS_SEO: Record<string, { label: string; ogTitle: string; description: string }> = {
+    quickstart: {
+      label: 'Quickstart',
+      ogTitle: 'Quickstart',
+      description:
+        'Your first app on Floom in a few minutes: from repo URL to a live tool with HTTP, CLI, and MCP in one pass.',
+    },
+    'mcp-install': {
+      label: 'MCP install',
+      ogTitle: 'MCP install',
+      description:
+        'Add Floom to Claude Desktop, Cursor, or any MCP client. Copy the URL, drop it in, and your apps show up as tools.',
+    },
+    cli: {
+      label: 'CLI',
+      ogTitle: 'Floom CLI',
+      description:
+        'Install and use the floom CLI to publish, run locally, and wire apps into your workflow from the terminal.',
+    },
+    'runtime-specs': {
+      label: 'Runtime specs',
+      ogTitle: 'Runtime specs',
+      description:
+        'What Floom runs, how long jobs can take, and how the runtime connects HTTP, containers, and MCP in one app.',
+    },
+    'self-host': {
+      label: 'Self-host',
+      ogTitle: 'Self-host Floom',
+      description:
+        'Run Floom on your own machine or server: Docker, environment flags, and the same tool surface as the cloud.',
+    },
+    'api-reference': {
+      label: 'API reference',
+      ogTitle: 'API reference',
+      description:
+        'HTTP endpoints, auth, and run surfaces you can call from scripts, agents, and backends — next to the MCP tools.',
+    },
+    limits: {
+      label: 'Runtime & limits',
+      ogTitle: 'Runtime & limits',
+      description:
+        'Timeouts, payload limits, and how Floom throttles work so you can reason about production behavior.',
+    },
+    security: {
+      label: 'Security',
+      ogTitle: 'Security',
+      description:
+        'How Floom isolates runs, stores secrets, and keeps agent-native surfaces from becoming foot-guns by default.',
+    },
+    observability: {
+      label: 'Observability',
+      ogTitle: 'Observability',
+      description: 'Logging, metrics hooks, and how to see what your apps did in production or self-hosted installs.',
+    },
+    workflow: {
+      label: 'Workflow',
+      ogTitle: 'Workflow',
+      description:
+        'From paste-to-publish to promoted releases: a practical flow for teams shipping AI tools on Floom.',
+    },
+    ownership: {
+      label: 'Ownership',
+      ogTitle: 'Ownership',
+      description:
+        'Who owns an app, how workspaces and invites work, and what happens when people join or leave a team.',
+    },
+    reliability: {
+      label: 'Reliability',
+      ogTitle: 'Reliability',
+      description: 'What “stable” means on Floom: idempotency, retries, and what we promise for hosted runs.',
+    },
+    pricing: {
+      label: 'Pricing (docs)',
+      ogTitle: 'Pricing (docs)',
+      description:
+        'How Floom thinks about free beta, self-host, and where paid plans will land for cloud — honest and current.',
+    },
+  };
+  const DOCS_HUB_DESCRIPTION =
+    'Everything you need to run Floom: quickstart, MCP install, CLI, self-host, API reference, limits, and security — in one docs hub.';
+
   function escapeTitle(t: string): string {
     // <title> is #PCDATA so only < & > really matter. We also strip newlines
     // defensively so a row with a stray \n doesn't break the document.
@@ -876,7 +962,16 @@ if (webDist) {
     if (pathname === '/onboarding' || pathname === '/onboarding/') return 'Welcome to Floom · Floom';
     if (pathname === '/me' || pathname.startsWith('/me/')) return 'Me · Floom';
     if (pathname.startsWith('/studio')) return 'Studio · Floom';
-    if (pathname.startsWith('/docs')) return 'Docs · Floom';
+    if (pathname === '/docs' || pathname === '/docs/') {
+      return 'Floom docs';
+    }
+    {
+      const m = pathname.match(/^\/docs\/([a-z0-9-]+)\/?$/);
+      if (m) {
+        const row = DOCS_SEO[m[1]];
+        if (row) return `${row.label} · Floom Docs`;
+      }
+    }
     if (pathname === '/protocol' || pathname.startsWith('/protocol/') || pathname.startsWith('/protocol#')) {
       return 'The Floom Protocol · Floom';
     }
@@ -962,6 +1057,22 @@ if (webDist) {
         description: 'Create a free Floom account to publish and run AI apps.',
       };
     }
+    if (pathname === '/docs' || pathname === '/docs/') {
+      return {
+        ogTitle: 'Floom docs',
+        description: DOCS_HUB_DESCRIPTION,
+      };
+    }
+    {
+      const m = pathname.match(/^\/docs\/([a-z0-9-]+)\/?$/);
+      if (m) {
+        const row = DOCS_SEO[m[1]];
+        if (row) {
+          return { ogTitle: row.ogTitle, description: row.description };
+        }
+        return { ogTitle: 'Floom docs', description: DOCS_HUB_DESCRIPTION };
+      }
+    }
     return null;
   }
 
@@ -969,6 +1080,11 @@ if (webDist) {
     let out = html;
     out = rewriteTitle(out, LANDING_TITLE);
     out = rewriteCanonicalLink(out, `${siteOrigin}/`);
+    const d = LANDING_META_DESCRIPTION.replace(/"/g, '&quot;');
+    out = out.replace(
+      /<meta name="description" content="[^"]*"/,
+      `<meta name="description" content="${d}"`,
+    );
     out = out.replace(
       /<meta property="og:url" content="[^"]*"/,
       `<meta property="og:url" content="${siteOrigin}/"`,
@@ -980,6 +1096,10 @@ if (webDist) {
     out = out.replace(
       /<meta name="twitter:image" content="[^"]*"/,
       `<meta name="twitter:image" content="${defaultOgImage}"`,
+    );
+    out = out.replace(
+      /<meta name="twitter:card" content="[^"]*"/,
+      `<meta name="twitter:card" content="summary_large_image"`,
     );
     out = out.replace(
       /"url":\s*"[^"]*"/,
@@ -1028,7 +1148,55 @@ if (webDist) {
         /<meta name="description" content="[^"]*"/,
         `<meta name="description" content="${d}"`,
       );
+    } else if (
+      title &&
+      !(
+        pathname.startsWith('/me') ||
+        pathname.startsWith('/studio') ||
+        pathname === '/forgot-password' ||
+        pathname === '/reset-password'
+      )
+    ) {
+      // #317: minimum Open Graph set for public routes without dedicated copy.
+      const t = title.replace(/"/g, '&quot;');
+      const d = LANDING_META_DESCRIPTION.replace(/"/g, '&quot;');
+      out = out.replace(
+        /<meta property="og:title" content="[^"]*"/,
+        `<meta property="og:title" content="${t}"`,
+      );
+      out = out.replace(
+        /<meta property="og:description" content="[^"]*"/,
+        `<meta property="og:description" content="${d}"`,
+      );
+      out = out.replace(
+        /<meta name="twitter:title" content="[^"]*"/,
+        `<meta name="twitter:title" content="${t}"`,
+      );
+      out = out.replace(
+        /<meta name="twitter:description" content="[^"]*"/,
+        `<meta name="twitter:description" content="${d}"`,
+      );
+      out = out.replace(
+        /<meta name="description" content="[^"]*"/,
+        `<meta name="description" content="${d}"`,
+      );
     }
+
+    // #317: absolute OG + Twitter image on every SSR HTML (except /p/:slug, which
+    // rewrites the image in rewriteHeadForSlug). Reinforces preview hosts + staging
+    // where index.html bakes a different absolute origin.
+    out = out.replace(
+      /<meta property="og:image" content="[^"]*"/,
+      `<meta property="og:image" content="${defaultOgImage}"`,
+    );
+    out = out.replace(
+      /<meta name="twitter:image" content="[^"]*"/,
+      `<meta name="twitter:image" content="${defaultOgImage}"`,
+    );
+    out = out.replace(
+      /<meta name="twitter:card" content="[^"]*"/,
+      `<meta name="twitter:card" content="summary_large_image"`,
+    );
 
     // 2026-04-20 (about-page ship): the SPA fallback + <noscript> block in
     // index.html bake the landing H1 ("Production infrastructure for AI
@@ -1110,6 +1278,10 @@ if (webDist) {
       out = out.replace(
         /<meta property="og:description" content="[^"]*"/,
         `<meta property="og:description" content="${desc}"`,
+      );
+      out = out.replace(
+        /<meta name="description" content="[^"]*"/,
+        `<meta name="description" content="${desc}"`,
       );
       out = out.replace(
         /<meta name="twitter:description" content="[^"]*"/,
