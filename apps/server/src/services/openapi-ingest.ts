@@ -875,7 +875,14 @@ interface FetchSpecOptions {
 //   - IPv6 link-local fe80::/10
 //   - IPv6 unspecified ::/128
 //   - IPv6 IPv4-mapped ::ffff:0:0/96 (e.g. ::ffff:127.0.0.1)
-const SSRF_BLOCK_LIST = (() => {
+// IMPORTANT: BlockList rules are indexed by family. A mixed block-list that
+// adds `::ffff:0:0/96` under family 'ipv6' poisons the IPv4 code path —
+// `check(publicV4, 'ipv4')` returns true for every IPv4 address, including
+// GitHub's. That was the regression that broke ingest of public repos like
+// federicodeponte/openblog. Fix: keep v4 and v6 rules in separate BlockLists
+// and handle v4-mapped v6 addresses by extracting the embedded v4 and running
+// it against the v4 list.
+const SSRF_BLOCK_LIST_V4 = (() => {
   const bl = new BlockList();
   bl.addSubnet('127.0.0.0', 8, 'ipv4');
   bl.addSubnet('0.0.0.0', 8, 'ipv4');
@@ -886,18 +893,48 @@ const SSRF_BLOCK_LIST = (() => {
   bl.addSubnet('100.64.0.0', 10, 'ipv4');
   bl.addSubnet('224.0.0.0', 4, 'ipv4'); // multicast
   bl.addAddress('255.255.255.255', 'ipv4'); // broadcast
+  return bl;
+})();
+
+const SSRF_BLOCK_LIST_V6 = (() => {
+  const bl = new BlockList();
   bl.addAddress('::1', 'ipv6');
   bl.addAddress('::', 'ipv6');
   bl.addSubnet('fc00::', 7, 'ipv6');
   bl.addSubnet('fe80::', 10, 'ipv6');
-  bl.addSubnet('::ffff:0:0', 96, 'ipv6'); // v4-mapped v6
   return bl;
 })();
+
+// Matches IPv4-mapped IPv6 in two valid forms: dotted (`::ffff:127.0.0.1`)
+// and hex (`::ffff:7f00:1`). We extract the embedded v4 and run it against
+// the v4 block list so neither form is a bypass vector.
+const MAPPED_V4_DOTTED_RE = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i;
+const MAPPED_V4_HEX_RE = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i;
+
+function extractMappedIpv4(ip: string): string | null {
+  const dotted = MAPPED_V4_DOTTED_RE.exec(ip);
+  if (dotted) return dotted[1];
+  const hex = MAPPED_V4_HEX_RE.exec(ip);
+  if (hex) {
+    const hi = parseInt(hex[1], 16);
+    const lo = parseInt(hex[2], 16);
+    if (Number.isFinite(hi) && Number.isFinite(lo)) {
+      return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+    }
+  }
+  return null;
+}
 
 function isBlockedIp(ip: string): boolean {
   const family = isIP(ip);
   if (family === 0) return true; // non-IP string: treat as unsafe
-  return SSRF_BLOCK_LIST.check(ip, family === 6 ? 'ipv6' : 'ipv4');
+  if (family === 4) return SSRF_BLOCK_LIST_V4.check(ip, 'ipv4');
+  // family === 6
+  const mapped = extractMappedIpv4(ip);
+  if (mapped && isIP(mapped) === 4) {
+    return SSRF_BLOCK_LIST_V4.check(mapped, 'ipv4');
+  }
+  return SSRF_BLOCK_LIST_V6.check(ip, 'ipv6');
 }
 
 async function isSafeUrl(
