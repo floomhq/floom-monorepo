@@ -780,12 +780,39 @@ if (webDist) {
   // og:description (+ twitter equivalents) in the served HTML so previewers
   // see the per-app card.
   const pSlugPattern = /^\/p\/([a-z0-9][a-z0-9-]*)\/?$/;
-  const publicOrigin = process.env.PUBLIC_ORIGIN || PUBLIC_URL || '';
+  // #172: never leave canonical/OG tags without an absolute origin — empty
+  // publicOrigin used to no-op the canonical rewrite, leaving href="/" on
+  // every SPA response (crawlers treat that as the homepage).
+  const siteOrigin = (process.env.PUBLIC_ORIGIN || PUBLIC_URL || 'https://floom.dev').replace(
+    /\/$/,
+    '',
+  );
   // 2026-04-22 (PR #400 ripple): consolidate on /og-main.png as the single
   // source of truth. Earlier, SSR pointed at /og-image.png and index.html
   // pointed at /og-main.png, so the served asset depended on whether SSR
   // ran. Unify everything on /og-main.png and delete the dup PNGs.
-  const defaultOgImage = `${publicOrigin}/og-main.png`;
+  const defaultOgImage = `${siteOrigin}/og-main.png`;
+
+  /** Strip trailing slash (except root), /index.html → /, and map /store → /apps. */
+  function canonicalPathForSeo(pathname: string): string {
+    if (pathname === '/index.html') return '/';
+    let p = pathname;
+    if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+    if (p === '/store') return '/apps';
+    return p;
+  }
+
+  function rewriteCanonicalLink(html: string, href: string): string {
+    const relFirst = html.replace(
+      /<link rel="canonical" href="[^"]*"/,
+      `<link rel="canonical" href="${href}"`,
+    );
+    if (relFirst !== html) return relFirst;
+    return html.replace(
+      /<link href="[^"]*" rel="canonical"/,
+      `<link href="${href}" rel="canonical"`,
+    );
+  }
 
   // 2026-04-20 (P2 #149): SSR title drift. Previously every route returned
   // the same landing <title> at SSR because client-side `document.title`
@@ -806,21 +833,9 @@ if (webDist) {
   // crawlers don't index duplicate landing-canonicalised pages. Replaces
   // whatever canonical was baked into index.html at build time.
   function rewriteCanonical(html: string, pathname: string): string {
-    if (!publicOrigin) return html;
-    // Nav-polish 2026-04-20: /store is an alias for /apps (same component
-    // mounted at both paths). Canonicalize /store -> /apps so crawlers
-    // don't index duplicates.
-    const canonicalPath =
-      pathname === '/store' || pathname === '/store/'
-        ? '/apps'
-        : pathname === '/index.html'
-          ? '/'
-          : pathname;
-    const canonical = `${publicOrigin}${canonicalPath}`;
-    return html.replace(
-      /<link rel="canonical" href="[^"]*"/,
-      `<link rel="canonical" href="${canonical}"`,
-    );
+    const canonicalPath = canonicalPathForSeo(pathname);
+    const canonical = `${siteOrigin}${canonicalPath}`;
+    return rewriteCanonicalLink(html, canonical);
   }
 
   // Map a non-slug pathname to its title. Returns null to fall through to
@@ -953,13 +968,10 @@ if (webDist) {
   function rewriteHeadForLanding(html: string): string {
     let out = html;
     out = rewriteTitle(out, LANDING_TITLE);
-    out = out.replace(
-      /<link rel="canonical" href="[^"]*"/,
-      `<link rel="canonical" href="${publicOrigin}/"`,
-    );
+    out = rewriteCanonicalLink(out, `${siteOrigin}/`);
     out = out.replace(
       /<meta property="og:url" content="[^"]*"/,
-      `<meta property="og:url" content="${publicOrigin}/"`,
+      `<meta property="og:url" content="${siteOrigin}/"`,
     );
     out = out.replace(
       /<meta property="og:image" content="[^"]*"/,
@@ -971,7 +983,7 @@ if (webDist) {
     );
     out = out.replace(
       /"url":\s*"[^"]*"/,
-      `"url": "${publicOrigin}/"`,
+      `"url": "${siteOrigin}/"`,
     );
     return out;
   }
@@ -981,13 +993,12 @@ if (webDist) {
     const title = titleForPath(pathname);
     if (title) out = rewriteTitle(out, title);
 
-    // Per-route og:url so crawlers don't see every page claiming it is "/".
-    if (publicOrigin) {
-      out = out.replace(
-        /<meta property="og:url" content="[^"]*"/,
-        `<meta property="og:url" content="${publicOrigin}${pathname === '/index.html' ? '/' : pathname}"`,
-      );
-    }
+    // Per-route og:url (same path as canonical, incl. /store -> /apps).
+    const forOg = canonicalPathForSeo(pathname);
+    out = out.replace(
+      /<meta property="og:url" content="[^"]*"/,
+      `<meta property="og:url" content="${siteOrigin}${forOg}"`,
+    );
 
     // Per-route og:title + og:description + twitter equivalents. Before
     // 2026-04-22 every non-slug page inherited the landing OG block, so
@@ -1063,7 +1074,7 @@ if (webDist) {
       row &&
       row.publish_status === 'published' &&
       (row.visibility === 'public' || row.visibility === null);
-    const ogImage = `${publicOrigin}/og/${slug}.svg`;
+    const ogImage = `${siteOrigin}/og/${slug}.svg`;
     // 2026-04-20 (PRR #172): canonical per-slug so indexers don't fold
     // every /p/:slug back to the landing canonical.
     let out = rewriteCanonical(html, `/p/${slug}`);
@@ -1107,7 +1118,7 @@ if (webDist) {
     }
     out = out.replace(
       /<meta property="og:url" content="[^"]*"/,
-      `<meta property="og:url" content="${publicOrigin}/p/${slug}"`,
+      `<meta property="og:url" content="${siteOrigin}/p/${slug}"`,
     );
     return out;
   }

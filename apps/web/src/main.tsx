@@ -82,6 +82,7 @@ const ChangelogPage = lazy(() => import('./pages/ChangelogPage').then(m => ({ de
 // for the /deploy shortcut when the flow is gated.
 const WaitlistPage = lazy(() => import('./pages/WaitlistPage').then(m => ({ default: m.WaitlistPage })));
 import { IconSprite } from './components/IconSprite';
+import { SeoClientCanonicalSync } from './components/SeoClientCanonicalSync';
 import { CookieBanner } from './components/CookieBanner';
 import { RouteLoading } from './components/RouteLoading';
 import { primeSession, refreshSession } from './hooks/useSession';
@@ -176,6 +177,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <IconSprite />
     <BrowserRouter>
+      <SeoClientCanonicalSync />
       {/* a11y 2026-04-20: WCAG 2.4.1 skip link. Hidden until keyboard
           focus lands on it (first Tab press from the URL bar). Target
           is the #main landmark set on PageShell's <main>. Styling
