@@ -3,7 +3,7 @@
 Build and deploy AI apps to Floom from Claude Code. Three slash commands:
 
 - `/floom-init` — scaffold a `floom.yaml` in the current directory
-- `/floom-deploy` — publish the app to floom.dev, return a live URL + MCP install snippet
+- `/floomit` — publish the app to floom.dev, return a live URL + MCP install snippet
 - `/floom-status` — list your published apps + recent runs
 
 This skill is a thin wrapper. It calls the `floom` CLI, which must be installed first.

@@ -1,6 +1,6 @@
 ---
 name: floom
-description: Build and deploy AI apps to Floom from Claude Code. Use when the user says "deploy to Floom", "publish this to Floom", "/floom-init", "/floom-deploy", or "/floom-status". Creates a floom.yaml manifest, publishes the app to floom.dev, and returns a live URL plus an MCP install snippet.
+description: Build and deploy AI apps to Floom from Claude Code. Use when the user says "deploy to Floom", "publish this to Floom", "/floom-init", "/floomit", or "/floom-status". Creates a floom.yaml manifest, publishes the app to floom.dev, and returns a live URL plus an MCP install snippet.
 ---
 
 # Floom Skill for Claude Code
@@ -8,7 +8,7 @@ description: Build and deploy AI apps to Floom from Claude Code. Use when the us
 Thin wrapper around the `floom` CLI. Three slash commands:
 
 - `/floom-init` — scaffold a `floom.yaml` in the current directory
-- `/floom-deploy` — publish the current app, return live URL + MCP snippet
+- `/floomit` — publish the current app, return live URL + MCP snippet
 - `/floom-status` — list the caller's published apps and recent runs
 
 Docs: https://floom.dev/docs. Examples: https://github.com/floomhq/floom/tree/main/examples.
@@ -71,7 +71,7 @@ Stop after scaffolding. Do NOT deploy from `/floom-init`.
 
 ---
 
-## `/floom-deploy` — publish to Floom
+## `/floomit` — publish to Floom
 
 ```bash
 floom deploy

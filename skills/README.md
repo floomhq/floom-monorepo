@@ -8,7 +8,7 @@ shell out to `floom` directly.
 
 | Agent | Directory | What it provides |
 |-------|-----------|-----------------|
-| Claude Code | `skills/claude-code/` | `/floom-init`, `/floom-deploy`, `/floom-status` slash commands |
+| Claude Code | `skills/claude-code/` | `/floom-init`, `/floomit`, `/floom-status` slash commands |
 | Cursor | `skills/cursor/` | `floom.mdc` rules file; agent shells out to `floom` CLI |
 
 ## CLI first

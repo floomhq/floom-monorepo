@@ -4,10 +4,11 @@
  * Placement: BELOW the hero (Federico 2026-04-23 — removed from hero, moved
  * below hero as a smaller strip).
  *
- * Shows the slash command (`/floom-deploy`) and shell equivalent
+ * Shows the slash command (`/floomit`) and shell equivalent
  * (`floom deploy`). The slash command is real and lives at
  * /root/floom/skills/claude-code/SKILL.md; `floom deploy` is the CLI
- * equivalent (skills/floom/cli).
+ * equivalent (skills/floom/cli). Reconciled 2026-04-23 to match HeroDemo v3
+ * which uses `/floomit` (single-word verb, matches Federico's spec).
  *
  * Light theme terminal per the 2026-04-21 "no black terminals on landing"
  * correction (memory · feedback_light_terminals). Downsized vs the original
@@ -54,7 +55,7 @@ export function CliReference() {
       <div style={BLOCK_STYLE}>
         <div>
           <span style={DIM}>{'>'}</span>{' '}
-          <span style={{ fontWeight: 600 }}>/floom-deploy</span>
+          <span style={{ fontWeight: 600 }}>/floomit</span>
           <span style={DIM}> &nbsp;# inside Claude Code</span>
         </div>
         <div>

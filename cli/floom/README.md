@@ -80,7 +80,7 @@ floom status               # see it listed
 
 ## Agent packages
 
-- **Claude Code**: `skills/claude-code/` — drop into `~/.claude/skills/floom/`, provides `/floom-init`, `/floom-deploy`, `/floom-status`.
+- **Claude Code**: `skills/claude-code/` — drop into `~/.claude/skills/floom/`, provides `/floom-init`, `/floomit`, `/floom-status`.
 - **Cursor**: `skills/cursor/` — `floom.mdc` Cursor rules file.
 - **Anything else**: shell out to `floom` directly. Aider, Continue, Codex CLI, etc. all work.
 
