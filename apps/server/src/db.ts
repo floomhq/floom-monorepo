@@ -743,6 +743,8 @@ db.exec(`
 //   megabytes of spoofed nonsense.
 // - ip_hash: sha256(ip + WAITLIST_IP_HASH_SECRET) hex. Never store raw
 //   IP. Lets the route layer rate-limit per-IP without retaining PII.
+// - deploy_repo_url / deploy_intent: optional; captured for triage when the
+//   user says what they want to deploy (see #454).
 //
 // Postgres would use citext + gen_random_uuid + timestamptz here; on
 // SQLite we hand-roll a UUID at insert time and use the standard TEXT
@@ -754,6 +756,8 @@ db.exec(`
     source TEXT,
     user_agent TEXT,
     ip_hash TEXT,
+    deploy_repo_url TEXT,
+    deploy_intent TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_email_lower
@@ -761,6 +765,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_waitlist_created
     ON waitlist_signups(created_at);
 `);
+
+const waitlistCols = (db.prepare(`PRAGMA table_info(waitlist_signups)`).all() as { name: string }[])
+  .map((c) => c.name);
+if (!waitlistCols.includes('deploy_repo_url')) {
+  db.exec(`ALTER TABLE waitlist_signups ADD COLUMN deploy_repo_url TEXT`);
+}
+if (!waitlistCols.includes('deploy_intent')) {
+  db.exec(`ALTER TABLE waitlist_signups ADD COLUMN deploy_intent TEXT`);
+}
 
 // =====================================================================
 // ---------- Secrets policy (per-app creator-override vs user-vault) ---
@@ -932,8 +945,9 @@ db.exec(`
 // triggers (unified schedule + webhook) lands v11.
 // Manual publish-review gate (#362) lands v12: apps.publish_status.
 // Deploy waitlist (launch 2026-04-27) lands v13: waitlist_signups.
+// v14: waitlist_signups.deploy_repo_url + deploy_intent (#454).
 const currentUserVersion = (db.prepare(`PRAGMA user_version`).get() as { user_version: number })
   .user_version;
-if (currentUserVersion < 13) {
-  db.pragma('user_version = 13');
+if (currentUserVersion < 14) {
+  db.pragma('user_version = 14');
 }

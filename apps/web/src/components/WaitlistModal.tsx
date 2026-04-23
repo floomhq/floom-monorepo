@@ -60,6 +60,9 @@ export function WaitlistModal({
   autoCloseMs = 3000,
 }: WaitlistModalProps) {
   const [email, setEmail] = useState('');
+  const [showDeployDetails, setShowDeployDetails] = useState(false);
+  const [deployRepoUrl, setDeployRepoUrl] = useState('');
+  const [deployIntent, setDeployIntent] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -70,6 +73,9 @@ export function WaitlistModal({
     // into a second opening from a different CTA.
     if (!open) {
       setEmail('');
+      setShowDeployDetails(false);
+      setDeployRepoUrl('');
+      setDeployIntent('');
       setError(null);
       setSubmitting(false);
       setSuccess(false);
@@ -107,14 +113,25 @@ export function WaitlistModal({
     setError(null);
     setSubmitting(true);
     try {
-      await submitWaitlist({ email: trimmed, source });
+      await submitWaitlist({
+        email: trimmed,
+        source,
+        deploy_repo_url: deployRepoUrl,
+        deploy_intent: deployIntent,
+      });
       setSuccess(true);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 429) {
           setError('Too many signups from this network. Try again in an hour.');
         } else if (err.status === 400) {
-          setError('That email looked invalid to the server. Double-check and retry.');
+          if (err.message === 'invalid_deploy_repo_url') {
+            setError('Use a valid http(s) link for the repo, e.g. https://github.com/org/repo');
+          } else if (err.message === 'invalid_deploy_intent') {
+            setError('Description must be 2000 characters or less.');
+          } else {
+            setError('That email looked invalid to the server. Double-check and retry.');
+          }
         } else {
           setError('Something went wrong on our end. Please try again.');
         }
@@ -268,9 +285,111 @@ export function WaitlistModal({
                 color: 'var(--ink)',
                 fontSize: 14,
                 boxSizing: 'border-box',
-                marginBottom: error ? 6 : 14,
+                marginBottom: 10,
               }}
             />
+            <button
+              type="button"
+              onClick={() => setShowDeployDetails((v) => !v)}
+              data-testid="waitlist-toggle-details"
+              disabled={submitting}
+              style={{
+                display: 'block',
+                width: '100%',
+                marginBottom: showDeployDetails ? 10 : 12,
+                padding: 0,
+                border: 'none',
+                background: 'none',
+                color: 'var(--muted)',
+                fontSize: 12,
+                fontWeight: 600,
+                textAlign: 'left',
+                cursor: submitting ? 'default' : 'pointer',
+                textDecoration: 'underline',
+                textUnderlineOffset: 2,
+              }}
+            >
+              {showDeployDetails ? '− Hide' : '+'} What do you want to deploy? (optional)
+            </button>
+            {showDeployDetails && (
+              <div style={{ marginBottom: 12 }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'var(--muted)',
+                    marginBottom: 6,
+                  }}
+                  htmlFor="waitlist-repo-url"
+                >
+                  Repo URL
+                </label>
+                <input
+                  id="waitlist-repo-url"
+                  type="url"
+                  inputMode="url"
+                  value={deployRepoUrl}
+                  onChange={(e) => {
+                    setDeployRepoUrl(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  placeholder="github.com/yourname/your-repo"
+                  data-testid="waitlist-repo-url-input"
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={submitting}
+                  style={{
+                    width: '100%',
+                    padding: 12,
+                    border: '1px solid var(--line)',
+                    borderRadius: 8,
+                    background: 'var(--bg)',
+                    color: 'var(--ink)',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                    marginBottom: 12,
+                  }}
+                />
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'var(--muted)',
+                    marginBottom: 6,
+                  }}
+                  htmlFor="waitlist-deploy-intent"
+                >
+                  Tell us about it
+                </label>
+                <textarea
+                  id="waitlist-deploy-intent"
+                  value={deployIntent}
+                  onChange={(e) => {
+                    setDeployIntent(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  placeholder="What does it do? Who's it for?"
+                  data-testid="waitlist-deploy-intent-input"
+                  rows={3}
+                  disabled={submitting}
+                  style={{
+                    width: '100%',
+                    padding: 12,
+                    border: '1px solid var(--line)',
+                    borderRadius: 8,
+                    background: 'var(--bg)',
+                    color: 'var(--ink)',
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
+                    minHeight: 72,
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+            )}
             {error && (
               <div
                 data-testid="waitlist-error"
@@ -278,7 +397,7 @@ export function WaitlistModal({
                 style={{
                   fontSize: 12,
                   color: 'var(--danger, #e5484d)',
-                  marginBottom: 10,
+                  marginBottom: 12,
                 }}
               >
                 {error}

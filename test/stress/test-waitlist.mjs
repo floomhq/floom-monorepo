@@ -199,6 +199,80 @@ console.log('Deploy waitlist (/api/waitlist)');
     `status=${res.status} body=${res.text}`);
 }
 
+// ── 7. email-only POST (no deploy fields) still 200 ─────────────────────
+{
+  __resetWaitlistRateLimitForTests();
+  db.prepare(`DELETE FROM waitlist_signups`).run();
+  const res = await post({ email: 'email-only@example.com' });
+  log('POST with only email returns 200',
+    res.status === 200 && res.json?.ok === true,
+    `status=${res.status} body=${res.text}`);
+  const rows = rowsByEmail('email-only@example.com');
+  log('email-only row omits deploy fields',
+    rows.length === 1 &&
+      (rows[0].deploy_repo_url === null || rows[0].deploy_repo_url === undefined) &&
+      (rows[0].deploy_intent === null || rows[0].deploy_intent === undefined),
+    JSON.stringify(rows[0]),
+  );
+}
+
+// ── 8. deploy repo URL + intent persisted ───────────────────────────────
+{
+  __resetWaitlistRateLimitForTests();
+  db.prepare(`DELETE FROM waitlist_signups`).run();
+  const res = await post({
+    email: 'deploy-full@example.com',
+    source: 'hero',
+    deploy_repo_url: 'github.com/acme/widget',
+    deploy_intent: 'Internal CRM for our sales team.',
+  });
+  log('POST with email + deploy_repo_url + deploy_intent returns 200',
+    res.status === 200 && res.json?.ok === true,
+    `status=${res.status} body=${res.text}`);
+  const rows = rowsByEmail('deploy-full@example.com');
+  const row = rows[0];
+  log('deploy fields persisted on row',
+    rows.length === 1 &&
+      row.deploy_repo_url === 'https://github.com/acme/widget' &&
+      row.deploy_intent === 'Internal CRM for our sales team.',
+    JSON.stringify(row),
+  );
+}
+
+// ── 9. invalid deploy_repo_url → 400 ──────────────────────────────────
+{
+  __resetWaitlistRateLimitForTests();
+  const before = rowCount();
+  for (const bad of [
+    'javascript:alert(1)',
+    'ftp://files.example.com/x',
+    'not a url at all',
+  ]) {
+    const res = await post({
+      email: 'bad-url@example.com',
+      deploy_repo_url: bad,
+    });
+    log(`invalid deploy_repo_url "${bad.slice(0, 24)}…" → 400`,
+      res.status === 400 && res.json?.error === 'invalid_deploy_repo_url',
+      `status=${res.status} body=${res.text}`);
+  }
+  log('invalid deploy_repo_url writes no row', rowCount() === before);
+}
+
+// ── 10. deploy_intent over max length → 400 ─────────────────────────────
+{
+  __resetWaitlistRateLimitForTests();
+  const before = rowCount();
+  const res = await post({
+    email: 'long-intent@example.com',
+    deploy_intent: 'x'.repeat(2001),
+  });
+  log('deploy_intent > 2000 chars → 400 invalid_deploy_intent',
+    res.status === 400 && res.json?.error === 'invalid_deploy_intent',
+    `status=${res.status} body=${res.text}`);
+  log('oversized deploy_intent writes no row', rowCount() === before);
+}
+
 try {
   rmSync(tmp, { recursive: true, force: true });
 } catch {

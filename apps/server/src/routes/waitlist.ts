@@ -1,6 +1,6 @@
 // POST /api/waitlist — deploy waitlist email capture for launch 2026-04-27.
 //
-// Shape: `{ email: string, source?: string }`.
+// Shape: `{ email: string, source?: string, deploy_repo_url?: string, deploy_intent?: string }`.
 // Behaviour:
 //   - Validates email (RFC-lite check: non-empty, exactly one `@`, `.` in
 //     the domain, no whitespace).
@@ -112,6 +112,58 @@ function sanitizeUserAgent(raw: string | null | undefined): string | null {
   return v.length > 0 ? v : null;
 }
 
+const DEPLOY_REPO_URL_MAX = 512;
+const DEPLOY_INTENT_MAX = 2000;
+
+/**
+ * Parse and normalize a user-supplied repo / deploy URL. Returns the
+ * canonical href (http/https only) or `null` when the field is omitted /
+ * all-whitespace. Throws a string error token for 400 responses.
+ */
+function parseDeployRepoUrl(raw: unknown): string | null {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== 'string') {
+    throw new Error('invalid_deploy_repo_url');
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > DEPLOY_REPO_URL_MAX) {
+    throw new Error('invalid_deploy_repo_url');
+  }
+  let toParse = trimmed;
+  if (!toParse.includes('://')) {
+    toParse = `https://${toParse}`;
+  }
+  let u: URL;
+  try {
+    u = new URL(toParse);
+  } catch {
+    throw new Error('invalid_deploy_repo_url');
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    throw new Error('invalid_deploy_repo_url');
+  }
+  if (!u.hostname || u.hostname.length === 0) {
+    throw new Error('invalid_deploy_repo_url');
+  }
+  return u.href;
+}
+
+function parseDeployIntent(raw: unknown): string | null {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== 'string') {
+    throw new Error('invalid_deploy_intent');
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    throw new Error('invalid_deploy_intent');
+  }
+  if (trimmed.length > DEPLOY_INTENT_MAX) {
+    throw new Error('invalid_deploy_intent');
+  }
+  return trimmed;
+}
+
 export interface WaitlistInsertResult {
   inserted: boolean;
   id: string | null;
@@ -130,13 +182,23 @@ export function insertWaitlistSignup(opts: {
   source: string | null;
   user_agent: string | null;
   ip_hash: string | null;
+  deploy_repo_url: string | null;
+  deploy_intent: string | null;
 }): WaitlistInsertResult {
   const id = `wl_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
   try {
     db.prepare(
-      `INSERT INTO waitlist_signups (id, email, source, user_agent, ip_hash)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(id, opts.email, opts.source, opts.user_agent, opts.ip_hash);
+      `INSERT INTO waitlist_signups (id, email, source, user_agent, ip_hash, deploy_repo_url, deploy_intent)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      opts.email,
+      opts.source,
+      opts.user_agent,
+      opts.ip_hash,
+      opts.deploy_repo_url,
+      opts.deploy_intent,
+    );
     return { inserted: true, id };
   } catch (err) {
     // UNIQUE constraint on LOWER(email) → duplicate. Return the existing
@@ -203,7 +265,12 @@ Questions? <a href="mailto:hello@floom.dev" style="color:#77736a;text-decoration
 }
 
 waitlistRouter.post('/', async (c) => {
-  let body: { email?: unknown; source?: unknown };
+  let body: {
+    email?: unknown;
+    source?: unknown;
+    deploy_repo_url?: unknown;
+    deploy_intent?: unknown;
+  };
   try {
     body = await c.req.json();
   } catch {
@@ -213,6 +280,18 @@ waitlistRouter.post('/', async (c) => {
   const email = typeof body.email === 'string' ? body.email.trim() : '';
   if (!isValidEmail(email)) {
     return c.json({ error: 'invalid_email' }, 400);
+  }
+
+  let deployRepoUrl: string | null;
+  let deployIntent: string | null;
+  try {
+    deployRepoUrl = parseDeployRepoUrl(body.deploy_repo_url);
+    deployIntent = parseDeployIntent(body.deploy_intent);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'invalid_deploy_repo_url';
+    const err =
+      msg === 'invalid_deploy_intent' || msg === 'invalid_deploy_repo_url' ? msg : 'invalid_deploy_repo_url';
+    return c.json({ error: err }, 400);
   }
 
   // Rate-limit per-IP. Admin bearer (ops tests) and the explicit
@@ -244,6 +323,8 @@ waitlistRouter.post('/', async (c) => {
     source,
     user_agent: userAgent,
     ip_hash: ipHash,
+    deploy_repo_url: deployRepoUrl,
+    deploy_intent: deployIntent,
   });
 
   // Fire-and-forget the confirmation email. We DON'T block the response

@@ -568,13 +568,20 @@ export function getSessionMe(): Promise<SessionMePayload> {
 export function submitWaitlist(opts: {
   email: string;
   source?: string;
+  deploy_repo_url?: string;
+  deploy_intent?: string;
 }): Promise<{ ok: true }> {
+  const body: Record<string, string> = { email: opts.email };
+  if (opts.source !== undefined) body.source = opts.source;
+  if (opts.deploy_repo_url !== undefined && opts.deploy_repo_url.trim() !== '') {
+    body.deploy_repo_url = opts.deploy_repo_url.trim();
+  }
+  if (opts.deploy_intent !== undefined && opts.deploy_intent.trim() !== '') {
+    body.deploy_intent = opts.deploy_intent.trim();
+  }
   return request<{ ok: true }>('/api/waitlist', {
     method: 'POST',
-    body: JSON.stringify({
-      email: opts.email,
-      source: opts.source,
-    }),
+    body: JSON.stringify(body),
   });
 }
 

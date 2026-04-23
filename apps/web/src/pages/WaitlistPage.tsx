@@ -54,11 +54,15 @@ const SUB_STYLE: React.CSSProperties = {
   maxWidth: 480,
 };
 
+const FORM_WRAP_STYLE: React.CSSProperties = {
+  maxWidth: 420,
+  margin: '0 auto',
+  textAlign: 'left' as const,
+};
+
 const FORM_STYLE: React.CSSProperties = {
   display: 'flex',
   gap: 8,
-  maxWidth: 420,
-  margin: '0 auto',
   flexWrap: 'wrap',
   justifyContent: 'center',
 };
@@ -87,6 +91,9 @@ const BUTTON_STYLE: React.CSSProperties = {
 
 export function WaitlistPage() {
   const [email, setEmail] = useState('');
+  const [showDeployDetails, setShowDeployDetails] = useState(false);
+  const [deployRepoUrl, setDeployRepoUrl] = useState('');
+  const [deployIntent, setDeployIntent] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -101,14 +108,25 @@ export function WaitlistPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await submitWaitlist({ email: trimmed, source: 'direct' });
+      await submitWaitlist({
+        email: trimmed,
+        source: 'direct',
+        deploy_repo_url: deployRepoUrl,
+        deploy_intent: deployIntent,
+      });
       setSuccess(true);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 429) {
           setError('Too many signups from this network. Try again in an hour.');
         } else if (err.status === 400) {
-          setError('That email looked invalid to the server. Double-check and retry.');
+          if (err.message === 'invalid_deploy_repo_url') {
+            setError('Use a valid http(s) link for the repo, e.g. https://github.com/org/repo');
+          } else if (err.message === 'invalid_deploy_intent') {
+            setError('Description must be 2000 characters or less.');
+          } else {
+            setError('That email looked invalid to the server. Double-check and retry.');
+          }
         } else {
           setError('Something went wrong on our end. Please try again.');
         }
@@ -155,42 +173,135 @@ export function WaitlistPage() {
               we&rsquo;ll let you know as soon as you can publish your own
               app.
             </p>
-            <form
-              onSubmit={handleSubmit}
-              style={FORM_STYLE}
-              data-testid="waitlist-page-form"
-            >
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (error) setError(null);
-                }}
-                placeholder="you@example.com"
-                data-testid="waitlist-page-email"
-                autoComplete="email"
-                spellCheck={false}
-                disabled={submitting}
-                aria-label="Email address"
-                style={{
-                  ...INPUT_STYLE,
-                  border: `1px solid ${error ? 'var(--danger, #e5484d)' : 'var(--line)'}`,
-                }}
-              />
-              <button
-                type="submit"
-                disabled={submitting}
-                data-testid="waitlist-page-submit"
-                style={{
-                  ...BUTTON_STYLE,
-                  opacity: submitting ? 0.7 : 1,
-                  cursor: submitting ? 'default' : 'pointer',
-                }}
-              >
-                {submitting ? 'Joining…' : 'Join waitlist'}
-              </button>
-            </form>
+            <div style={FORM_WRAP_STYLE}>
+              <form onSubmit={handleSubmit} data-testid="waitlist-page-form">
+                <div style={FORM_STYLE}>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (error) setError(null);
+                    }}
+                    placeholder="you@example.com"
+                    data-testid="waitlist-page-email"
+                    autoComplete="email"
+                    spellCheck={false}
+                    disabled={submitting}
+                    aria-label="Email address"
+                    style={{
+                      ...INPUT_STYLE,
+                      border: `1px solid ${error ? 'var(--danger, #e5484d)' : 'var(--line)'}`,
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    data-testid="waitlist-page-submit"
+                    style={{
+                      ...BUTTON_STYLE,
+                      opacity: submitting ? 0.7 : 1,
+                      cursor: submitting ? 'default' : 'pointer',
+                    }}
+                  >
+                    {submitting ? 'Joining…' : 'Join waitlist'}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDeployDetails((v) => !v)}
+                  data-testid="waitlist-page-toggle-details"
+                  disabled={submitting}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    marginTop: 10,
+                    marginBottom: showDeployDetails ? 10 : 0,
+                    padding: 0,
+                    border: 'none',
+                    background: 'none',
+                    color: 'var(--muted)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textAlign: 'left',
+                    cursor: submitting ? 'default' : 'pointer',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: 2,
+                  }}
+                >
+                  {showDeployDetails ? '− Hide' : '+'} What do you want to deploy? (optional)
+                </button>
+                {showDeployDetails && (
+                  <div style={{ marginBottom: 4 }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'var(--muted)',
+                        marginBottom: 6,
+                      }}
+                      htmlFor="waitlist-page-repo-url"
+                    >
+                      Repo URL
+                    </label>
+                    <input
+                      id="waitlist-page-repo-url"
+                      type="url"
+                      inputMode="url"
+                      value={deployRepoUrl}
+                      onChange={(e) => {
+                        setDeployRepoUrl(e.target.value);
+                        if (error) setError(null);
+                      }}
+                      placeholder="github.com/yourname/your-repo"
+                      data-testid="waitlist-page-repo-url"
+                      autoComplete="off"
+                      spellCheck={false}
+                      disabled={submitting}
+                      style={{
+                        ...INPUT_STYLE,
+                        width: '100%',
+                        marginBottom: 12,
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'var(--muted)',
+                        marginBottom: 6,
+                      }}
+                      htmlFor="waitlist-page-deploy-intent"
+                    >
+                      Tell us about it
+                    </label>
+                    <textarea
+                      id="waitlist-page-deploy-intent"
+                      value={deployIntent}
+                      onChange={(e) => {
+                        setDeployIntent(e.target.value);
+                        if (error) setError(null);
+                      }}
+                      placeholder="What does it do? Who's it for?"
+                      data-testid="waitlist-page-deploy-intent"
+                      rows={3}
+                      disabled={submitting}
+                      style={{
+                        ...INPUT_STYLE,
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        resize: 'vertical',
+                        minHeight: 72,
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
+                )}
+              </form>
+            </div>
             {error && (
               <div
                 data-testid="waitlist-page-error"
