@@ -1,6 +1,8 @@
 import type { ActionSpec, InputSpec, PickResult } from '../../lib/types';
+import { credentialInputNameLooksSensitive } from '../../lib/credential-field';
 import { AppIcon } from '../AppIcon';
 import { DescriptionMarkdown } from '../DescriptionMarkdown';
+import { SecretInput } from '../forms/SecretInput';
 
 interface Props {
   app: PickResult;
@@ -204,6 +206,9 @@ function InputField({
     );
   }
 
+  const isSecretish = credentialInputNameLooksSensitive(spec.name);
+  const isUrl = spec.type === 'url';
+
   return (
     <div className="input-group">
       <label className="input-label" htmlFor={`inp-${spec.name}`}>
@@ -212,14 +217,24 @@ function InputField({
           <span style={{ fontWeight: 400, color: 'var(--muted)' }}> (optional)</span>
         )}
       </label>
-      <input
-        id={`inp-${spec.name}`}
-        className="input-field"
-        type={spec.type === 'url' ? 'url' : 'text'}
-        placeholder={spec.placeholder}
-        value={str}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      {isSecretish ? (
+        <SecretInput
+          id={`inp-${spec.name}`}
+          className="input-field"
+          placeholder={spec.placeholder}
+          value={str}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <input
+          id={`inp-${spec.name}`}
+          className="input-field"
+          type={isUrl ? 'url' : 'text'}
+          placeholder={spec.placeholder}
+          value={str}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
     </div>
   );
 }

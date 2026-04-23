@@ -4,8 +4,10 @@
 
 import { useRef, useState } from 'react';
 import type { InputSpec } from '../../lib/types';
+import { credentialInputNameLooksSensitive } from '../../lib/credential-field';
 import { DEFAULT_MAX_FILE_BYTES } from '../../api/client';
 import { getLaunchDemoFilePrefills, loadSampleFile } from '../../lib/app-examples';
+import { SecretInput } from '../forms/SecretInput';
 
 export const ARRAY_INPUT_NAMES = new Set<string>(['hashtags', 'urls']);
 
@@ -233,6 +235,32 @@ export function InputField({
     );
   }
 
+  const textControl = credentialInputNameLooksSensitive(spec.name) ? (
+    <SecretInput
+      id={id}
+      className="input-field"
+      style={invalidStyle}
+      placeholder={spec.placeholder}
+      value={str}
+      name={spec.name}
+      aria-invalid={invalid || undefined}
+      aria-describedby={errorId}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ) : (
+    <input
+      id={id}
+      className="input-field"
+      type="text"
+      style={invalidStyle}
+      placeholder={spec.placeholder}
+      value={str}
+      aria-invalid={invalid || undefined}
+      aria-describedby={errorId}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+
   return (
     <div className="input-group">
       <label className="input-label" htmlFor={id}>
@@ -241,17 +269,7 @@ export function InputField({
           <span style={{ fontWeight: 400, color: 'var(--muted)' }}> (optional)</span>
         )}
       </label>
-      <input
-        id={id}
-        className="input-field"
-        type="text"
-        style={invalidStyle}
-        placeholder={spec.placeholder}
-        value={str}
-        aria-invalid={invalid || undefined}
-        aria-describedby={errorId}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      {textControl}
       {error && <FieldError id={errorId!} text={error} />}
     </div>
   );

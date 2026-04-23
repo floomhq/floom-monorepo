@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import type { AppDetail } from '../../lib/types';
 import * as api from '../../api/client';
+import { SecretInput } from '../forms/SecretInput';
 
 interface HelpEntry {
   label: string;
@@ -230,11 +231,11 @@ export function SecretsRequiredCard({ app, missingKeys, onSaved }: Props) {
                   )}
                 </p>
               )}
-              <input
+              <SecretInput
                 id={`cred-${key}`}
                 data-testid={`cred-input-${key}`}
-                type="password"
                 autoComplete="off"
+                spellCheck={false}
                 value={values[key] ?? ''}
                 onChange={(e) =>
                   setValues((v) => ({ ...v, [key]: e.target.value }))

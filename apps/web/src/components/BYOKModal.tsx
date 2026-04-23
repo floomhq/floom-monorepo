@@ -16,6 +16,7 @@
  */
 import { useEffect, useState } from 'react';
 import { writeUserGeminiKey, clearUserGeminiKey } from '../api/client';
+import { SecretInput } from './forms/SecretInput';
 
 export interface BYOKModalProps {
   open: boolean;
@@ -155,8 +156,7 @@ export function BYOKModal({ open, payload, onClose, onSaved }: BYOKModalProps) {
           >
             Gemini API key
           </label>
-          <input
-            type="password"
+          <SecretInput
             value={value}
             onChange={(e) => {
               setValue(e.target.value);

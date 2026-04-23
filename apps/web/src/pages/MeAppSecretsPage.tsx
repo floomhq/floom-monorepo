@@ -28,6 +28,7 @@ import { useEffect, useState, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
+import { SecretInput } from '../components/forms/SecretInput';
 import { MeRail } from '../components/me/MeRail';
 import { StudioLayout } from '../components/studio/StudioLayout';
 import { AppHeader, TabBar } from './MeAppPage';
@@ -594,26 +595,27 @@ function CreatorSecretRow({ slug, entry, onPolicyChanged }: CreatorSecretRowProp
             onSubmit={handleSaveValue}
             style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
           >
-            <input
-              ref={inputRef}
-              data-testid={`creator-secret-input-${key}`}
-              type="password"
-              autoComplete="off"
-              placeholder={creatorHasValue ? 'Paste to replace…' : 'Paste value…'}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              style={{
-                flex: 1,
-                minWidth: 220,
-                padding: '8px 12px',
-                border: '1px solid var(--line)',
-                borderRadius: 8,
-                fontSize: 13,
-                fontFamily: 'JetBrains Mono, monospace',
-                background: 'var(--bg)',
-                color: 'var(--ink)',
-              }}
-            />
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <SecretInput
+                ref={inputRef}
+                data-testid={`creator-secret-input-${key}`}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={creatorHasValue ? 'Paste to replace…' : 'Paste value…'}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid var(--line)',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontFamily: 'JetBrains Mono, monospace',
+                  background: 'var(--bg)',
+                  color: 'var(--ink)',
+                }}
+              />
+            </div>
             <button
               type="submit"
               data-testid={`creator-secret-save-${key}`}
@@ -841,25 +843,26 @@ function SecretRow({ secretKey, entry, onSave, onRemove }: SecretRowProps) {
       </div>
 
       <form onSubmit={handleSave} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <input
-          data-testid={`secret-input-${secretKey}`}
-          type="password"
-          autoComplete="off"
-          placeholder={isSet ? 'Paste to replace…' : 'Paste value…'}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          style={{
-            flex: 1,
-            minWidth: 220,
-            padding: '8px 12px',
-            border: '1px solid var(--line)',
-            borderRadius: 8,
-            fontSize: 13,
-            fontFamily: 'JetBrains Mono, monospace',
-            background: 'var(--bg)',
-            color: 'var(--ink)',
-          }}
-        />
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <SecretInput
+            data-testid={`secret-input-${secretKey}`}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={isSet ? 'Paste to replace…' : 'Paste value…'}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: '1px solid var(--line)',
+              borderRadius: 8,
+              fontSize: 13,
+              fontFamily: 'JetBrains Mono, monospace',
+              background: 'var(--bg)',
+              color: 'var(--ink)',
+            }}
+          />
+        </div>
         <button
           type="submit"
           data-testid={`secret-save-${secretKey}`}
