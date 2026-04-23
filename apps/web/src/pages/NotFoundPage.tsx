@@ -1,11 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
-import { Logo } from '../components/Logo';
 import { PageHead } from '../components/PageHead';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { readDeployEnabled } from '../lib/flags';
-import { waitlistHref } from '../lib/waitlistCta';
 
 /**
  * Imperatively append a `<meta name="robots" content="noindex,nofollow">`
@@ -43,10 +42,112 @@ function useNoIndexMeta() {
   }, []);
 }
 
+// Popular-links grid per wireframes/v17/404.html. Wireframe mockup lists
+// app names (Lead Scorer, Competitor Analyzer, etc.), but the task spec
+// for this PR specifies six navigation destinations — home, apps directory,
+// docs, build, me, login. Keeping navigation destinations (not specific
+// app slugs) avoids the card going stale when the catalogue changes, and
+// matches the "real catalogue" spirit of the wireframe note more honestly
+// than hard-coding three slugs.
+//
+// Icons are monochrome SVGs on a neutral chip background. Stroke-based so
+// they inherit `color: var(--ink)` from the chip — same visual language
+// as /apps and /me cards.
+type PopLink = {
+  to: string;
+  title: string;
+  path: string;
+  icon: JSX.Element;
+};
+
+const POPULAR_LINKS: PopLink[] = [
+  {
+    to: '/',
+    title: 'Home',
+    path: '/',
+    icon: (
+      <svg viewBox="0 0 24 24">
+        <path d="M3 12 L12 3 L21 12" />
+        <path d="M5 10 v10 a2 2 0 0 0 2 2 h10 a2 2 0 0 0 2 -2 v-10" />
+      </svg>
+    ),
+  },
+  {
+    to: '/apps',
+    title: 'Apps directory',
+    path: '/apps',
+    icon: (
+      <svg viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
+        <rect x="14" y="14" width="7" height="7" />
+      </svg>
+    ),
+  },
+  {
+    to: '/docs',
+    title: 'Docs',
+    path: '/docs',
+    icon: (
+      <svg viewBox="0 0 24 24">
+        <path d="M4 19.5 v-15 A2.5 2.5 0 0 1 6.5 2 H20 v20 H6.5 a2.5 2.5 0 0 1 0 -5 H20" />
+      </svg>
+    ),
+  },
+  {
+    to: '/studio/build',
+    title: 'Build an app',
+    path: '/studio/build',
+    icon: (
+      <svg viewBox="0 0 24 24">
+        <path d="M14 2 v6 h6" />
+        <path d="M14 2 H6 a2 2 0 0 0 -2 2 v16 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 V8 z" />
+        <path d="M9 14 l2 2 l4 -4" />
+      </svg>
+    ),
+  },
+  {
+    to: '/me',
+    title: 'Your dashboard',
+    path: '/me',
+    icon: (
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21 v-1 a7 7 0 0 1 16 0 v1" />
+      </svg>
+    ),
+  },
+  {
+    to: '/login',
+    title: 'Sign in',
+    path: '/login',
+    icon: (
+      <svg viewBox="0 0 24 24">
+        <path d="M15 3 h4 a2 2 0 0 1 2 2 v14 a2 2 0 0 1 -2 2 h-4" />
+        <polyline points="10 17 15 12 10 7" />
+        <line x1="15" y1="12" x2="3" y2="12" />
+      </svg>
+    ),
+  },
+];
+
 export function NotFoundPage() {
   useNoIndexMeta();
   const navigate = useNavigate();
   const deployEnabled = useMemo(() => readDeployEnabled(), []);
+  const [query, setQuery] = useState('');
+
+  // No /docs search component ships in this repo yet (DocsLandingPage does
+  // not expose a search endpoint), so route to /apps with the query as a
+  // filter hint. The apps directory already surfaces its own search, which
+  // is the most useful destination for a typoed slug or renamed app.
+  function handleSearch(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    navigate(`/apps?q=${encodeURIComponent(q)}`);
+  }
 
   return (
     <div className="page-root" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -66,89 +167,264 @@ export function NotFoundPage() {
           paddingBottom: 72,
         }}
       >
-        {/* Brand echo: small glowing mark sits behind the headline.
-            Round 2 polish: previously the mark was centered on the main
-            axis (top: 50%, translate -64%), which pulled it over the
-            pills row. Shrink it to 240px and anchor it at the top so
-            its bounding box clears the CTA row at 1440x900. Geometry
-            gate: pills top must exceed the mark's bottom. */}
-        <div
-          aria-hidden="true"
-          data-testid="not-found-glow"
-          style={{
-            position: 'absolute',
-            top: 40,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 240,
-            height: 240,
-            pointerEvents: 'none',
-            opacity: 0.14,
-            zIndex: 0,
-          }}
-        >
-          <Logo size={240} variant="glow" />
-        </div>
-
         <div
           className="not-found-inner"
           style={{
             position: 'relative',
             zIndex: 1,
-            maxWidth: 560,
+            maxWidth: 780,
             margin: '0 auto',
-            padding: '300px 24px 40px',
+            padding: '48px 24px 40px',
             boxSizing: 'border-box',
             width: '100%',
           }}
         >
-          <h1 className="headline" style={{ fontSize: 48, margin: '0 0 14px' }}>
-            404 <span className="headline-dim">· not found</span>
-          </h1>
-          <p className="subhead" style={{ margin: '0 auto 32px' }}>
-            This path isn't wired to anything. Head back home or browse public apps.
-          </p>
-          <div
-            className="pills"
-            data-testid="not-found-pills"
+          {/* Mono status badge — sets expectations before the display-font
+              headline. Same visual language as the label-mono treatment
+              used elsewhere in the marketing surfaces. */}
+          <span
+            data-testid="not-found-code-badge"
             style={{
-              justifyContent: 'center',
-              position: 'relative',
-              zIndex: 2,
-              display: 'flex',
-              flexWrap: 'wrap',
-              /* #94: former pentagon/absolute layout was replaced with this
-                 flex row + wrap. gap applies to both axes so wrapped rows
-                 never touch (320–428px mobile and 1440px+ desktop). */
-              gap: 12,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '5px 12px',
+              border: '1px solid var(--line)',
+              borderRadius: 999,
+              background: 'var(--card)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'var(--muted)',
+              marginBottom: 18,
             }}
           >
-            <Link to="/" className="pill" data-testid="not-found-pill-home" style={{ textDecoration: 'none' }}>
+            <span
+              aria-hidden="true"
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--muted)',
+              }}
+            />
+            404 · not found
+          </span>
+
+          {/* v17 parity 2026-04-24: "This page ran away." per wireframe
+              spec. Display-font (Inter 800 tight-tracked) — wireframe.css
+              decision log supersedes the stale DM Serif Display on
+              wireframes.floom.dev. Green accent on "ran away." echoes the
+              headline-dim treatment used elsewhere but flipped to accent,
+              matching the wireframe's `.nf-h1 .accent` rule. */}
+          <h1
+            className="headline"
+            data-testid="not-found-headline"
+            style={{
+              fontSize: 56,
+              lineHeight: 1.02,
+              letterSpacing: '-0.025em',
+              margin: '0 0 14px',
+            }}
+          >
+            This page <span style={{ color: 'var(--accent)' }}>ran away.</span>
+          </h1>
+          <p
+            className="subhead"
+            data-testid="not-found-subhead"
+            style={{
+              fontSize: 17,
+              maxWidth: 520,
+              margin: '0 auto 28px',
+              lineHeight: 1.5,
+            }}
+          >
+            Either it never existed, or the app was unpublished. Search the
+            catalogue or jump to one of the popular destinations below.
+          </p>
+
+          {/* Search input. There's no docs/apps search SDK on the client
+              today, so submission routes to /apps?q=... — the apps
+              directory already ships its own filter box that reads ?q. */}
+          <form
+            onSubmit={handleSearch}
+            data-testid="not-found-search"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderRadius: 12,
+              padding: '10px 14px',
+              maxWidth: 480,
+              margin: '0 auto 28px',
+              transition: 'border-color 0.12s',
+            }}
+          >
+            <svg
+              aria-hidden="true"
+              width={18}
+              height={18}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--muted)"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              style={{ flexShrink: 0 }}
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search apps — try 'lead scorer' or 'jwt'"
+              aria-label="Search Floom apps"
+              data-testid="not-found-search-input"
+              style={{
+                flex: 1,
+                border: 0,
+                outline: 'none',
+                background: 'transparent',
+                fontSize: 15,
+                fontFamily: 'inherit',
+                color: 'var(--ink)',
+                minWidth: 0,
+                padding: 0,
+              }}
+            />
+            <button
+              type="submit"
+              aria-label="Submit search"
+              data-testid="not-found-search-submit"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+                color: 'var(--muted)',
+                background: 'var(--bg)',
+                border: '1px solid var(--line)',
+                borderRadius: 6,
+                padding: '4px 8px',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              Enter
+            </button>
+          </form>
+
+          <div
+            className="not-found-ctas"
+            data-testid="not-found-ctas"
+            style={{
+              display: 'flex',
+              gap: 10,
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              marginBottom: 48,
+            }}
+          >
+            <Link
+              to="/apps"
+              data-testid="not-found-cta-apps"
+              style={primaryCtaStyle}
+            >
+              Browse all apps
+            </Link>
+            <Link
+              to="/"
+              data-testid="not-found-cta-home"
+              style={secondaryCtaStyle}
+            >
               Back to home
             </Link>
-            <Link to="/apps" className="pill" data-testid="not-found-pill-apps" style={{ textDecoration: 'none' }}>
-              Try apps
-            </Link>
-            {!deployEnabled && (
-              <button
-                type="button"
-                className="pill"
-                data-testid="not-found-pill-waitlist"
-                onClick={() => {
-                  // TODO(Agent 9): open WaitlistModal instead of routing.
-                  navigate(waitlistHref('404'));
-                }}
+          </div>
+
+          <section
+            className="not-found-popular"
+            data-testid="not-found-popular"
+            style={{
+              textAlign: 'left',
+              maxWidth: 720,
+              margin: '0 auto',
+              paddingTop: 40,
+              borderTop: '1px solid var(--line)',
+            }}
+          >
+            <p
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                color: 'var(--muted)',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                margin: '0 0 14px',
+              }}
+            >
+              Popular right now
+            </p>
+            <div
+              className="not-found-pop-grid"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 10,
+              }}
+            >
+              {POPULAR_LINKS.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  data-testid={`not-found-popular-${link.to.replace(/[/]/g, '-') || '-home'}`}
+                  style={popCardStyle}
+                  className="not-found-pop-card"
+                >
+                  <span style={popIconChipStyle} aria-hidden="true">
+                    {link.icon}
+                  </span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={popTitleStyle}>{link.title}</span>
+                    <span style={popPathStyle}>{link.path}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          {/* Keep the waitlist nudge for non-deploy builds — it was the
+              previous 404's main CTA pillar. Demoted to a quiet one-liner
+              under the popular grid so it doesn't compete with Browse /
+              Back to home. */}
+          {!deployEnabled && (
+            <p
+              data-testid="not-found-waitlist-note"
+              style={{
+                marginTop: 28,
+                fontSize: 13,
+                color: 'var(--muted)',
+              }}
+            >
+              Want to publish your own app?{' '}
+              <Link
+                to="/waitlist?source=404"
                 style={{
-                  textDecoration: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  font: 'inherit',
+                  color: 'var(--accent)',
+                  fontWeight: 600,
+                  textDecoration: 'underline',
                 }}
               >
-                Join waitlist
-              </button>
-            )}
-          </div>
+                Join the waitlist
+              </Link>
+              .
+            </p>
+          )}
         </div>
       </main>
       {/* Landing visual audit 2026-04-18: 404 previously had no footer,
@@ -157,16 +433,112 @@ export function NotFoundPage() {
           (Docs / GitHub / Privacy / Terms / Cookies) as the landing. */}
       <PublicFooter />
       <style>{`
+        .not-found-pop-card:hover {
+          border-color: var(--muted) !important;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        .not-found-pop-card svg {
+          width: 16px;
+          height: 16px;
+          fill: none;
+          stroke: currentColor;
+          stroke-width: 1.75;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
+        @media (max-width: 720px) {
+          .not-found-pop-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
         @media (max-width: 640px) {
           .not-found-inner {
-            padding: 200px 16px 32px !important;
+            padding: 28px 16px 32px !important;
           }
           .not-found-inner .headline {
             font-size: 36px !important;
             word-break: break-word;
+          }
+          .not-found-inner .subhead {
+            font-size: 15px !important;
           }
         }
       `}</style>
     </div>
   );
 }
+
+const primaryCtaStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '11px 20px',
+  background: 'var(--accent)',
+  color: '#fff',
+  border: '1px solid var(--accent)',
+  borderRadius: 10,
+  fontSize: 14,
+  fontWeight: 600,
+  fontFamily: 'inherit',
+  textDecoration: 'none',
+  boxShadow:
+    '0 4px 14px rgba(5,150,105,0.22), inset 0 1px 0 rgba(255,255,255,0.18)',
+};
+
+const secondaryCtaStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '11px 20px',
+  background: 'var(--card)',
+  color: 'var(--ink)',
+  border: '1px solid var(--line)',
+  borderRadius: 10,
+  fontSize: 14,
+  fontWeight: 600,
+  fontFamily: 'inherit',
+  textDecoration: 'none',
+};
+
+const popCardStyle: React.CSSProperties = {
+  background: 'var(--card)',
+  border: '1px solid var(--line)',
+  borderRadius: 12,
+  padding: '14px 16px',
+  textDecoration: 'none',
+  color: 'inherit',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  transition: 'border-color 0.12s, transform 0.12s, box-shadow 0.12s',
+};
+
+const popIconChipStyle: React.CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: 8,
+  background: 'var(--bg)',
+  border: '1px solid var(--line)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  color: 'var(--ink)',
+};
+
+const popTitleStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 13.5,
+  fontWeight: 600,
+  lineHeight: 1.3,
+  color: 'var(--ink)',
+};
+
+const popPathStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 12,
+  color: 'var(--muted)',
+  marginTop: 2,
+  fontFamily: 'var(--font-mono)',
+};
