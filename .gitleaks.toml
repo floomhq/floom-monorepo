@@ -1,0 +1,18 @@
+# Gitleaks config — allowlist test fixtures and example apps.
+# Post-scrub 2026-04-23: fingerprint-based .gitleaksignore insufficient when
+# force-pushing many branches (each branch has distinct post-scrub SHAs for
+# the same files). Path-based allowlist is stable across branches.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures and example demo apps — known non-sensitive"
+paths = [
+  '''^test/stress/test-hub-runs-auth\.mjs$''',
+  '''^test/stress/test-w31-auth-boundary\.mjs$''',
+  '''^test/stress/test-fast-apps\.mjs$''',
+  '''^examples/fast-apps/README\.md$''',
+  '''^examples/fast-apps/server\.mjs$''',
+  '''^packages/hub-smoke/tests/fixtures\.ts$''',
+]

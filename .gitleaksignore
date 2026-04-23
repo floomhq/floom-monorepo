@@ -1,8 +1,26 @@
 # Gitleaks false-positive allowlist.
 # Format: <commit-sha>:<path>:<rule-id>:<additional>
+# Regenerated 2026-04-23 after git-history scrub (509 commits rewritten) — old SHAs invalidated.
 
-# jwt.io classic demo token ("1234567890 / John Doe") used as test fixture for
-# hub-smoke e2e tests. Verified non-sensitive during the pre-public audit on
-# 2026-04-18. Keeps the test realistic without stuffing a synthetic token that
-# would fail decoder shape checks.
-bc9717ff4a16bdab9d725c63e00b87ff7375e0bd:packages/hub-smoke/tests/fixtures.ts:jwt:8
+# jwt.io classic demo token ("1234567890 / John Doe") — hub-smoke e2e test fixture.
+# Non-sensitive (public well-known token). Verified during pre-public audit 2026-04-18.
+8b905cc308336afe5d3ce5a4c4cdaef597913eee:packages/hub-smoke/tests/fixtures.ts:jwt:8
+e06db757e0d8e51e01155a8879f9b731b1313cf2:packages/hub-smoke/tests/fixtures.ts:jwt:8
+
+# examples/fast-apps/ — ships public demo JWTs and "sk-alice-secret-12345"
+# placeholders for README + smoke test. Non-sensitive by design.
+897988a2123c2f83183b0976e5c1d9efa37ce874:examples/fast-apps/README.md:generic-api-key:61
+897988a2123c2f83183b0976e5c1d9efa37ce874:examples/fast-apps/server.mjs:jwt:590
+df16f20647f8dc7c114bedbaeea55ff092b2d91e:examples/fast-apps/README.md:generic-api-key:61
+df16f20647f8dc7c114bedbaeea55ff092b2d91e:examples/fast-apps/server.mjs:jwt:590
+df16f20647f8dc7c114bedbaeea55ff092b2d91e:test/stress/test-fast-apps.mjs:jwt:232
+
+# test/stress/ — stress tests use fake "PRIVATE-SECRET-456" + "sk-alice-secret-12345" strings
+# to exercise auth boundary logic. Never pointed at a real issuer.
+5dbd46bc2d5875afffd308dd56d9b75626bed901:test/stress/test-hub-runs-auth.mjs:generic-api-key:209
+a2d50504e01e7a10abb3fb57b5f9019e9af766c0:test/stress/test-hub-runs-auth.mjs:generic-api-key:140
+a2d50504e01e7a10abb3fb57b5f9019e9af766c0:test/stress/test-hub-runs-auth.mjs:generic-api-key:150
+a2d50504e01e7a10abb3fb57b5f9019e9af766c0:test/stress/test-hub-runs-auth.mjs:generic-api-key:160
+ade72f9a99b684afd1e93bf8ba144c43aa731a90:test/stress/test-hub-runs-auth.mjs:generic-api-key:209
+82e7a6d3fd0292860600c36b2018a753bf678302:test/stress/test-w31-auth-boundary.mjs:generic-api-key:219
+82e7a6d3fd0292860600c36b2018a753bf678302:test/stress/test-w31-auth-boundary.mjs:generic-api-key:223
