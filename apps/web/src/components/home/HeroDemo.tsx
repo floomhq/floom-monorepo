@@ -7,8 +7,10 @@
  *   a reset — it appends `/floomit` to the prior Build output). Use then
  *   flips to a consumer ChatGPT-style surface for the payoff.
  *
- *   Canvas is a FIXED 420px tall container. No height jumps between states.
- *   Same top alignment, same padding. A tracker at the top — `01 BUILD ·
+ *   Canvas is a fixed 580px tall container (bumped from 420 on 2026-04-23 —
+ *   Cursor-style "demo doesn't have to fit above fold"). No height jumps
+ *   between states. Same top alignment, same padding. A tracker at the top
+ *   — `01 BUILD ·
  *   02 DEPLOY · 03 USE` — has an animating dot that slides between active
  *   pills.
  *
@@ -725,7 +727,7 @@ const WRAP_STYLE: CSSProperties = {
 };
 
 // Tracker lives OUTSIDE the fixed-height canvas so the canvas hits exactly
-// 420px without the tracker eating into that budget.
+// its target height without the tracker eating into that budget.
 const TRACKER_WRAP: CSSProperties = {
   padding: '14px 18px 6px',
   background: 'var(--studio, #f5f4f0)',
@@ -766,10 +768,13 @@ const TRACKER_DOT: CSSProperties = {
   background: 'var(--accent, #047857)',
 };
 
-// FIXED 420px canvas — the morphing surface.
+// Fixed-height canvas — the morphing surface. Bumped to 580px on 2026-04-23
+// (Federico: "like cursor, the visual demo doesn't have to fit on the hero
+// in full"). Larger demo = more cinematic; the bottom of the canvas falls
+// below the fold at 1440x900 and the user scrolls to see the payoff state.
 const CANVAS_STYLE: CSSProperties = {
   position: 'relative',
-  height: 420,
+  height: 580,
   overflow: 'hidden',
   background: '#1a1816',
 };
