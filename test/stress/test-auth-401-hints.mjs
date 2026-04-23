@@ -224,6 +224,333 @@ app.get('/api/probe', (c) => c.json({ ok: true }));
   log('global auth accepts valid token (200)', res.status === 200);
 }
 
+// ---------- 5. feedback admin 401/403 shape ----------
+//
+// Codex #557 finding: /api/feedback admin was missing `docs_url` + leaked
+// env-var names in hints. Cover all three auth paths (disabled, key-in-
+// query, unauthorized).
+
+console.log('\n/api/feedback admin auth shapes');
+
+const { feedbackRouter } = await import(
+  '../../apps/server/dist/routes/feedback.js'
+);
+
+async function callFeedback(method, url, init = {}) {
+  const res = await feedbackRouter.fetch(
+    new Request(`http://localhost${url}`, { method, ...init }),
+  );
+  const text = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {}
+  return { status: res.status, body: json, raw: text };
+}
+
+// 5a. Admin key not configured → 403 structured response
+const prevFeedbackAdminKey = process.env.FLOOM_FEEDBACK_ADMIN_KEY;
+delete process.env.FLOOM_FEEDBACK_ADMIN_KEY;
+{
+  const r = await callFeedback('GET', '/');
+  log('feedback admin (unset) returns 403', r.status === 403);
+  log('body.code === admin_disabled', r.body && r.body.code === 'admin_disabled');
+  log(
+    'body.hint exists and is actionable',
+    r.body && typeof r.body.hint === 'string' && r.body.hint.length > 10,
+  );
+  log(
+    'body.hint does NOT leak FLOOM_FEEDBACK_ADMIN_KEY',
+    r.body && r.body.hint && !r.body.hint.includes('FLOOM_FEEDBACK_ADMIN_KEY'),
+    `hint=${r.body && r.body.hint}`,
+  );
+  log(
+    'body.docs_url is a floom.dev URL',
+    r.body &&
+      typeof r.body.docs_url === 'string' &&
+      r.body.docs_url.startsWith('https://floom.dev/'),
+  );
+}
+
+// 5b. Admin key configured, missing from request → 401 structured
+process.env.FLOOM_FEEDBACK_ADMIN_KEY = 'feedback-test-key-xyz';
+{
+  const r = await callFeedback('GET', '/');
+  log('feedback admin (wrong key) returns 401', r.status === 401);
+  log('body.code === unauthorized', r.body && r.body.code === 'unauthorized');
+  log(
+    'body.hint does NOT leak FLOOM_FEEDBACK_ADMIN_KEY',
+    r.body && r.body.hint && !r.body.hint.includes('FLOOM_FEEDBACK_ADMIN_KEY'),
+    `hint=${r.body && r.body.hint}`,
+  );
+  log(
+    'body.docs_url set',
+    r.body &&
+      typeof r.body.docs_url === 'string' &&
+      r.body.docs_url.startsWith('https://'),
+  );
+}
+
+// 5c. Admin key in query string → 401 structured with docs_url
+{
+  const r = await callFeedback('GET', '/?admin_key=feedback-test-key-xyz');
+  log(
+    'feedback admin (key in query) returns 401',
+    r.status === 401,
+  );
+  log(
+    'body.code === admin_key_in_query',
+    r.body && r.body.code === 'admin_key_in_query',
+  );
+  log(
+    'body.docs_url set',
+    r.body &&
+      typeof r.body.docs_url === 'string' &&
+      r.body.docs_url.startsWith('https://'),
+  );
+}
+
+// 5d. No leakage across all three feedback admin responses
+const feedbackResponses = [
+  await callFeedback('GET', '/'),
+  await callFeedback('GET', '/?admin_key=feedback-test-key-xyz'),
+];
+delete process.env.FLOOM_FEEDBACK_ADMIN_KEY;
+feedbackResponses.push(await callFeedback('GET', '/'));
+if (prevFeedbackAdminKey !== undefined) {
+  process.env.FLOOM_FEEDBACK_ADMIN_KEY = prevFeedbackAdminKey;
+}
+for (const r of feedbackResponses) {
+  const serialized = JSON.stringify(r.body || {});
+  for (const needle of FORBIDDEN_LEAK) {
+    log(
+      `feedback ${r.status} body does not leak "${needle}"`,
+      !serialized.includes(needle),
+      `body=${serialized}`,
+    );
+  }
+  // Env var names are a recon leak even if not in FORBIDDEN_LEAK.
+  log(
+    `feedback ${r.status} body does not leak FLOOM_FEEDBACK_ADMIN_KEY`,
+    !serialized.includes('FLOOM_FEEDBACK_ADMIN_KEY'),
+    `body=${serialized}`,
+  );
+}
+
+// ---------- 6. webhook bad-signature 401 shape ----------
+
+console.log('\n/hook/:path bad-signature 401 shape');
+
+const { webhookRouter } = await import(
+  '../../apps/server/dist/routes/webhook.js'
+);
+
+// Seed a trigger row so the webhook handler reaches the signature check
+// rather than 404ing on path lookup. The synthetic 'local' workspace/user
+// already exist from db.ts bootstrap.
+const { db: webhookDb } = await import('../../apps/server/dist/db.js');
+webhookDb
+  .prepare(
+    `INSERT INTO apps (id, slug, name, description, manifest, code_path, status, workspace_id, visibility)
+     VALUES (?, ?, ?, ?, ?, ?, 'active', 'local', 'public')`,
+  )
+  .run(
+    'app_hook_test',
+    'hook-test',
+    'Hook Test',
+    'fixture',
+    JSON.stringify({
+      slug: 'hook-test',
+      name: 'Hook Test',
+      version: '1',
+      actions: { run: { name: 'run', inputs: [], outputs: [] } },
+    }),
+    '/tmp/hook-test',
+  );
+webhookDb
+  .prepare(
+    `INSERT INTO triggers (id, app_id, user_id, workspace_id, trigger_type, action, inputs, enabled, webhook_url_path, webhook_secret)
+     VALUES (?, ?, 'local', 'local', 'webhook', 'run', '{}', 1, ?, ?)`,
+  )
+  .run(
+    'trg_test',
+    'app_hook_test',
+    'test-hook-path',
+    'shared-secret-value',
+  );
+
+{
+  const res = await webhookRouter.fetch(
+    new Request('http://localhost/test-hook-path', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-floom-signature': 'sha256=deadbeef',
+      },
+      body: JSON.stringify({ hello: 'world' }),
+    }),
+  );
+  const text = await res.text();
+  let body = null;
+  try {
+    body = JSON.parse(text);
+  } catch {}
+  log('webhook bad-sig returns 401', res.status === 401);
+  log('body.code === bad_signature', body && body.code === 'bad_signature');
+  log(
+    'body.hint mentions HMAC',
+    body && typeof body.hint === 'string' && body.hint.includes('HMAC'),
+    `hint=${body && body.hint}`,
+  );
+  log(
+    'body.docs_url set',
+    body &&
+      typeof body.docs_url === 'string' &&
+      body.docs_url.startsWith('https://'),
+  );
+  const serialized = JSON.stringify(body || {});
+  for (const needle of FORBIDDEN_LEAK) {
+    log(
+      `webhook 401 body does not leak "${needle}"`,
+      !serialized.includes(needle),
+      `body=${serialized}`,
+    );
+  }
+}
+
+// ---------- 7. metrics 401 shape ----------
+
+console.log('\n/api/metrics 401 shape');
+
+// Reset module cache: metrics.ts caches a module-scoped `cache` object and
+// reads METRICS_TOKEN at call time. We only need to flip the env.
+const { metricsRouter, __resetMetricsCacheForTests } = await import(
+  '../../apps/server/dist/routes/metrics.js'
+);
+__resetMetricsCacheForTests();
+
+const prevMetricsToken = process.env.METRICS_TOKEN;
+process.env.METRICS_TOKEN = 'metrics-test-token-xyz';
+
+{
+  const res = await metricsRouter.fetch(
+    new Request('http://localhost/', { method: 'GET' }),
+  );
+  log('metrics (no token) returns 401', res.status === 401);
+  log(
+    'metrics 401 is application/json (not text/plain)',
+    (res.headers.get('content-type') || '').includes('application/json'),
+    `content-type=${res.headers.get('content-type')}`,
+  );
+  const text = await res.text();
+  let body = null;
+  try {
+    body = JSON.parse(text);
+  } catch {}
+  log('body.code === auth_required', body && body.code === 'auth_required');
+  log(
+    'body.hint does NOT leak METRICS_TOKEN',
+    body && body.hint && !body.hint.includes('METRICS_TOKEN'),
+    `hint=${body && body.hint}`,
+  );
+  log(
+    'body.docs_url set',
+    body &&
+      typeof body.docs_url === 'string' &&
+      body.docs_url.startsWith('https://'),
+  );
+  const serialized = JSON.stringify(body || {});
+  for (const needle of FORBIDDEN_LEAK) {
+    log(
+      `metrics 401 body does not leak "${needle}"`,
+      !serialized.includes(needle),
+      `body=${serialized}`,
+    );
+  }
+  // Env var name leak check (not in FORBIDDEN_LEAK but still a recon signal).
+  log(
+    'metrics 401 body does not leak METRICS_TOKEN anywhere',
+    !serialized.includes('METRICS_TOKEN'),
+    `body=${serialized}`,
+  );
+}
+
+if (prevMetricsToken !== undefined) {
+  process.env.METRICS_TOKEN = prevMetricsToken;
+} else {
+  delete process.env.METRICS_TOKEN;
+}
+
+// ---------- 8. MCP ingest_app auth gate in Cloud mode ----------
+//
+// The MCP admin surface wraps its auth rejection in a JSON-RPC tool-call
+// payload. The hint + docs_url must still be present in the embedded JSON
+// body so agent clients (Claude Desktop, Cursor) can act on it.
+
+console.log('\n/mcp ingest_app Cloud-mode auth shape');
+
+// Re-import mcp with cloud flag flipped so isCloudMode() returns true. We
+// already set FLOOM_CLOUD_MODE above; mcp.js imports better-auth which
+// reads that env at call time via isCloudMode().
+const mcpMod = await import(
+  `../../apps/server/dist/routes/mcp.js?authhints=${Date.now()}`
+);
+
+{
+  const res = await mcpMod.mcpRouter.fetch(
+    new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/event-stream',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 42,
+        method: 'tools/call',
+        params: {
+          name: 'ingest_app',
+          arguments: {
+            openapi_url: 'https://example.com/openapi.json',
+            slug: 'cloud-block-hints',
+          },
+        },
+      }),
+    }),
+  );
+  const text = await res.text();
+  let envelope = null;
+  try {
+    envelope = JSON.parse(text);
+  } catch {}
+  log('mcp ingest_app unauth returns isError', envelope?.result?.isError === true);
+  const rawPayload = envelope?.result?.content?.[0]?.text;
+  let payload = null;
+  try {
+    payload = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : null;
+  } catch {}
+  log('mcp payload.code === auth_required', payload && payload.code === 'auth_required');
+  log(
+    'mcp payload.hint mentions `floom auth`',
+    payload && typeof payload.hint === 'string' && payload.hint.includes('floom auth'),
+    `hint=${payload && payload.hint}`,
+  );
+  log(
+    'mcp payload.docs_url is a floom.dev URL',
+    payload &&
+      typeof payload.docs_url === 'string' &&
+      payload.docs_url.startsWith('https://floom.dev/'),
+  );
+  const serialized = rawPayload || '';
+  for (const needle of FORBIDDEN_LEAK) {
+    log(
+      `mcp ingest_app payload does not leak "${needle}"`,
+      !serialized.includes(needle),
+      `payload=${serialized}`,
+    );
+  }
+}
+
 // ---------- Teardown ----------
 
 try {

@@ -18,6 +18,7 @@
 // senders can't provide one. The HMAC signature is the auth.
 import { Hono } from 'hono';
 import { db } from '../db.js';
+import { AUTH_DOCS_URL, AUTH_HINT_SIGNATURE } from '../lib/auth.js';
 import { newJobId } from '../lib/ids.js';
 import { createJob } from '../services/jobs.js';
 import {
@@ -53,7 +54,8 @@ webhookRouter.post('/:path', async (c) => {
       {
         error: 'Invalid signature',
         code: 'bad_signature',
-        hint: 'Compute the HMAC signature of the raw body with the shared secret and send it in the X-Floom-Signature header.',
+        hint: AUTH_HINT_SIGNATURE,
+        docs_url: AUTH_DOCS_URL,
       },
       401,
     );

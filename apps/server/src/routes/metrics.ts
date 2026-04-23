@@ -4,6 +4,7 @@
 
 import { Hono } from 'hono';
 import { db } from '../db.js';
+import { AUTH_DOCS_URL } from '../lib/auth.js';
 import { snapshotMcpToolCalls, snapshotRateLimitHits } from '../lib/metrics-counters.js';
 
 export const metricsRouter = new Hono();
@@ -112,10 +113,17 @@ metricsRouter.get('/', (c) => {
   const match = /^Bearer\s+(.+)$/.exec(header);
   const presented = match ? match[1] : '';
   if (!presented || !constantTimeEqual(presented, expected)) {
-    // Prometheus scrape path: keep response short and plain-text. Hint
-    // points the operator at the env var they need to align on both sides.
-    return c.text(
-      'Unauthorized. Set METRICS_TOKEN on the server and present it via Authorization: Bearer <token>.',
+    // Structured JSON so agents + ops tooling can branch on `code` / `hint`
+    // the same way they do for every other 401 on the server. Prometheus
+    // scrapes treat any non-2xx as a failed scrape regardless of body
+    // shape, so JSON here doesn't break the collector.
+    return c.json(
+      {
+        error: 'Unauthorized',
+        code: 'auth_required',
+        hint: 'Present the metrics scrape token via Authorization: Bearer <token>. Contact your Floom administrator if you need the token rotated.',
+        docs_url: AUTH_DOCS_URL,
+      },
       401,
     );
   }

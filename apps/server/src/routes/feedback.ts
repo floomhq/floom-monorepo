@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { createHash, randomUUID } from 'node:crypto';
 import { db } from '../db.js';
 import { resolveUserContext } from '../services/session.js';
+import { AUTH_DOCS_URL } from '../lib/auth.js';
 import {
   fileFeedbackIssue,
   isFeedbackGitHubConfigured,
@@ -172,7 +173,8 @@ feedbackRouter.get('/', async (c) => {
       {
         error: 'Admin key not configured',
         code: 'admin_disabled',
-        hint: 'Set FLOOM_FEEDBACK_ADMIN_KEY on the server to enable the feedback admin endpoint.',
+        hint: 'The feedback admin endpoint is disabled on this server. Contact your Floom administrator to enable it.',
+        docs_url: AUTH_DOCS_URL,
       },
       403,
     );
@@ -188,6 +190,7 @@ feedbackRouter.get('/', async (c) => {
         error: 'Admin key must be sent via Authorization: Bearer or X-Admin-Key header, never in the URL.',
         code: 'admin_key_in_query',
         hint: 'Resend the request with the admin key in the Authorization: Bearer header (or X-Admin-Key).',
+        docs_url: AUTH_DOCS_URL,
       },
       401,
     );
@@ -201,7 +204,8 @@ feedbackRouter.get('/', async (c) => {
       {
         error: 'Unauthorized',
         code: 'unauthorized',
-        hint: 'Set FLOOM_FEEDBACK_ADMIN_KEY on the server and present it via Authorization: Bearer <key> or X-Admin-Key.',
+        hint: 'Present the feedback admin key via Authorization: Bearer <key> or X-Admin-Key. Contact your Floom administrator if you need access.',
+        docs_url: AUTH_DOCS_URL,
       },
       401,
     );
