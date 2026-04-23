@@ -6,6 +6,7 @@
 import {
   buildGithubSpecCandidates,
   formatGithubCandidate,
+  looksLikeGithubRef,
 } from '../../apps/web/src/lib/githubUrl.ts';
 
 let passed = 0;
@@ -28,6 +29,10 @@ console.log('GitHub spec candidates');
     'https://github.com/Redocly/openapi-starter/blob/main/openapi/openapi.yaml',
   );
   log(
+    'blob URL: classifies as GitHub input',
+    looksLikeGithubRef('https://github.com/Redocly/openapi-starter/blob/main/openapi/openapi.yaml'),
+  );
+  log(
     'blob URL: exact raw file tried first',
     candidates[0] ===
       'https://raw.githubusercontent.com/Redocly/openapi-starter/main/openapi/openapi.yaml',
@@ -37,6 +42,15 @@ console.log('GitHub spec candidates');
     'blob URL: sibling files in same folder are included',
     candidates.includes(
       'https://raw.githubusercontent.com/Redocly/openapi-starter/main/openapi/openapi.json',
+    ),
+  );
+}
+
+{
+  log(
+    'raw GitHub URL: classifies as GitHub input',
+    looksLikeGithubRef(
+      'https://raw.githubusercontent.com/Redocly/museum-openapi-example/main/openapi.yaml',
     ),
   );
 }
