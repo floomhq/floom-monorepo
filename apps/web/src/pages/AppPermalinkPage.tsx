@@ -908,7 +908,21 @@ export function AppPermalinkPage() {
                 {publishedRelative && (
                   <>
                     <span aria-hidden="true">·</span>
-                    <span data-testid="hero-published">{publishedRelative}</span>
+                    {/* Age label opts out of the meta row's uppercase +
+                        letter-spacing treatment. The formatter returns
+                        natural-cased values like "1d ago" / "3h ago"
+                        (see formatRelative below), and under the
+                        inherited `textTransform: uppercase` those
+                        rendered as "1D AGO" / "3H AGO" — which read as
+                        broken (it looks like the unit letter got eaten
+                        by the space). Keeping sentence-case here matches
+                        how the rating chip below already opts out. */}
+                    <span
+                      data-testid="hero-published"
+                      style={{ textTransform: 'none', letterSpacing: 0 }}
+                    >
+                      {publishedRelative}
+                    </span>
                   </>
                 )}
                 {summary && summary.count > 0 && (

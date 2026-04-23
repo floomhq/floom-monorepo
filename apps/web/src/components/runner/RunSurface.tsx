@@ -29,6 +29,7 @@ import type {
   AppDetail,
   JobRecord,
   MeRunSummary,
+  OutputType,
   PickResult,
   RunRecord,
 } from '../../lib/types';
@@ -938,6 +939,18 @@ function InputCard({
     return { required: req, optional: opt };
   }, [actionSpec.inputs]);
 
+  // Subtitle under the app name in the input card header. The old copy
+  // just echoed `app.category` ("growth", "hiring", …) which reads as
+  // noise because the category is already carried by the breadcrumb
+  // tint + the /apps directory filter. Federico audit 2026-04-24:
+  // drop it. When we DO have a per-action description (most OpenAPI
+  // imports carry one — e.g. "Score leads against your ICP" — and the
+  // featured apps' manifests have hand-written copy), use that
+  // instead; it tells the user what Run will do, which is the real
+  // question in this moment. When neither is available, we omit the
+  // row entirely rather than showing a placeholder.
+  const subtitle = actionSpec.description?.trim() || null;
+
   return (
     <div className="run-surface-card" data-testid="run-surface-input-card">
       <header className="run-surface-card-header">
@@ -946,7 +959,11 @@ function InputCard({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="run-surface-app-title">{app.name}</div>
-          <div className="run-surface-app-sub">{app.category || 'app'}</div>
+          {subtitle && (
+            <div className="run-surface-app-sub" data-testid="run-surface-app-sub">
+              {subtitle}
+            </div>
+          )}
         </div>
       </header>
 
@@ -1174,7 +1191,12 @@ function OutputSlot({
   onRetry,
 }: OutputSlotProps) {
   if (state.phase === 'ready') {
-    return <EmptyOutputCard appName={app.name} />;
+    return (
+      <EmptyOutputCard
+        appName={app.name}
+        actionSpec={state.actionSpec}
+      />
+    );
   }
 
   if (state.phase === 'streaming') {
@@ -1249,18 +1271,133 @@ function OutputSlot({
   );
 }
 
-function EmptyOutputCard({ appName }: { appName: string }) {
+function EmptyOutputCard({
+  appName,
+  actionSpec,
+}: {
+  appName: string;
+  actionSpec: ActionSpec;
+}) {
+  // Pre-run empty state. The previous copy ("Output will appear here /
+  // Fill in the form and press Run …") was functionally correct but
+  // joyless — Federico audit 2026-04-24: "a small ghost preview would
+  // invite the run". We now:
+  //
+  //   1. Pull the first output's label/description from actionSpec to
+  //      tell the user what they'll get ("Lead scores" / "One row per
+  //      lead, scored 0-100"). Falls back to the original generic copy
+  //      when the action omits outputs (rare, but the OpenAPI importer
+  //      allows it).
+  //   2. Render a type-specific skeleton underneath so the empty slot
+  //      has visual structure: a 3-row dashed table for table outputs,
+  //      3 stacked lines of text for text/markdown/html, a `{ }` shell
+  //      for json. Skeletons use `--muted` at low opacity so they read
+  //      as placeholder, not content.
+  const firstOutput = actionSpec.outputs[0];
+  const outputLabel = firstOutput?.label || 'Output';
+  const outputHint =
+    firstOutput?.description?.trim() ||
+    `Fill in the form and press Run to generate a result with ${appName}.`;
   return (
     <div
       className="run-surface-card run-surface-empty-output"
       data-testid="run-surface-empty-output"
     >
       <div className="run-surface-empty-output-inner">
-        <div className="run-surface-empty-output-title">Output will appear here</div>
-        <div className="run-surface-empty-output-sub">
-          Fill in the form and press Run to generate a result with {appName}.
+        <div className="run-surface-empty-output-title">{outputLabel} will appear here</div>
+        <div className="run-surface-empty-output-sub">{outputHint}</div>
+        <EmptyOutputSkeleton outputType={firstOutput?.type} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Faint, non-interactive skeleton that hints at the shape of the
+ * upcoming run output. Purely presentational — role=presentation so
+ * screen readers skip it (the copy above already describes the slot).
+ */
+function EmptyOutputSkeleton({ outputType }: { outputType: OutputType | undefined }) {
+  const commonWrap: React.CSSProperties = {
+    marginTop: 18,
+    opacity: 0.45,
+    pointerEvents: 'none',
+  };
+  if (outputType === 'table') {
+    return (
+      <div role="presentation" style={commonWrap}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: 0,
+            border: '1px dashed var(--line)',
+            borderRadius: 8,
+            overflow: 'hidden',
+            background: 'var(--card, transparent)',
+          }}
+        >
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                padding: '8px 10px',
+                borderRight:
+                  (i + 1) % 3 === 0 ? 'none' : '1px dashed var(--line)',
+                borderBottom:
+                  i < 6 ? '1px dashed var(--line)' : 'none',
+                fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                fontSize: 11,
+                color: 'var(--muted)',
+                textAlign: 'center',
+              }}
+            >
+              —
+            </div>
+          ))}
         </div>
       </div>
+    );
+  }
+  if (outputType === 'json') {
+    return (
+      <pre
+        role="presentation"
+        style={{
+          ...commonWrap,
+          padding: '10px 12px',
+          border: '1px dashed var(--line)',
+          borderRadius: 8,
+          background: 'var(--card, transparent)',
+          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontSize: 12,
+          color: 'var(--muted)',
+          whiteSpace: 'pre-wrap',
+          margin: 0,
+        }}
+      >
+        {'{\n  …\n}'}
+      </pre>
+    );
+  }
+  // text / markdown / html / number / image / file — render three stacked
+  // faded bars that approximate a block of generated prose. Good enough
+  // as a "something will show up here" cue without committing to a shape
+  // that the real output will not match.
+  const barWidths = ['92%', '78%', '54%'];
+  return (
+    <div role="presentation" style={{ ...commonWrap, display: 'grid', gap: 8 }}>
+      {barWidths.map((w, i) => (
+        <div
+          key={i}
+          style={{
+            height: 10,
+            width: w,
+            borderRadius: 999,
+            background: 'var(--line)',
+          }}
+        />
+      ))}
     </div>
   );
 }
