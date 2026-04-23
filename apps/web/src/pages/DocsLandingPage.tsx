@@ -33,7 +33,10 @@ const shellStyle: CSSProperties = {
 };
 
 const mainStyle: CSSProperties = {
-  padding: '44px 48px 60px',
+  // Audit 2026-04-24 (S2): /docs was dense above the fold. Dropped top padding
+  // 44 → 28 and bottom 60 → 48 so the H1 + lede + first code block can all
+  // breathe in the first viewport without squeezing the sidebar.
+  padding: '28px 48px 48px',
   minWidth: 0,
 };
 
@@ -41,7 +44,7 @@ const crumbsStyle: CSSProperties = {
   fontFamily: "'JetBrains Mono', ui-monospace, monospace",
   fontSize: 11,
   color: 'var(--muted)',
-  marginBottom: 14,
+  marginBottom: 12,
   letterSpacing: '0.02em',
 };
 
@@ -57,7 +60,9 @@ const h1Style: CSSProperties = {
 const ledeStyle: CSSProperties = {
   fontSize: 17,
   color: 'var(--muted)',
-  margin: '0 0 36px',
+  // Audit 2026-04-24: tightened 36 → 22 so the install command lands closer to
+  // the hero copy and the "try this" moment is in-view on first paint.
+  margin: '0 0 22px',
   maxWidth: 640,
   lineHeight: 1.55,
 };
@@ -66,9 +71,25 @@ const h2Style: CSSProperties = {
   fontSize: 22,
   fontWeight: 600,
   letterSpacing: '-0.01em',
-  margin: '36px 0 14px',
+  // Audit 2026-04-24: top margin 36 → 28 to tighten section rhythm.
+  margin: '28px 0 14px',
   paddingBottom: 10,
   borderBottom: '1px solid var(--line)',
+  scrollMarginTop: 24,
+};
+
+// Above-the-fold variant of h2: smaller, no rule, so the first "Install in
+// 60 seconds" heading doesn't compete with the H1 for visual weight. Only
+// used for the first H2 on the page.
+const h2LeadStyle: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 600,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+  color: 'var(--muted)',
+  margin: '0 0 10px',
+  paddingBottom: 0,
+  border: 'none',
   scrollMarginTop: 24,
 };
 
@@ -102,10 +123,13 @@ const codeBlockStyle: CSSProperties = {
 };
 
 const quickStartStyle: CSSProperties = {
+  // Audit 2026-04-24: trimmed 4 pills → 2 and moved the row below the install
+  // code block, so this is now a "next steps" row rather than a top-of-page
+  // nav. Bottom margin trimmed 28 → 8 (the next H2 supplies its own top margin).
   display: 'flex',
-  gap: 12,
+  gap: 10,
   flexWrap: 'wrap',
-  marginBottom: 28,
+  marginBottom: 8,
 };
 
 const pillStyle: CSSProperties = {
@@ -314,25 +338,15 @@ export function DocsLandingPage() {
             )}
           </p>
 
-          <div style={quickStartStyle}>
-            <Link to="/docs/quickstart" style={pillStyle}>
-              Quickstart
-              <span style={pillKeyStyle}>5 min</span>
-            </Link>
-            <Link to="/docs/cli" style={pillStyle}>
-              Install CLI
-              <span style={pillKeyStyle}>curl install.sh</span>
-            </Link>
-            <Link to="/docs/mcp-install" style={pillStyle}>
-              Install in Claude
-            </Link>
-            <Link to="/protocol" style={pillStyle}>
-              Read protocol
-            </Link>
-          </div>
+          {/* Audit 2026-04-24 (S2): dropped the 4-pill quick-start row (Quickstart,
+              Install CLI, Install in Claude, Read protocol). All four routes already
+              live in the sidebar — the pills duplicated navigation and pushed the
+              install command below the fold on 1366×768 laptops. Kept a single
+              "Install in Claude" soft link next to the install H2 as the one
+              non-CLI entry point that isn't obvious from the curl command. */}
 
           {/* Install in 60 seconds */}
-          <h2 style={h2Style}>Install in 60 seconds</h2>
+          <h2 style={h2LeadStyle}>Install in 60 seconds</h2>
           <p style={pStyle}>
             Floom ships as a small CLI plus an optional local runtime (Docker). You
             need either curl or brew. No Node.
@@ -342,6 +356,16 @@ $ curl -fsSL https://raw.githubusercontent.com/floomhq/floom/main/cli/floom/inst
 
 # verify
 $ floom --version`}</pre>
+
+          <div style={quickStartStyle}>
+            <Link to="/docs/quickstart" style={pillStyle}>
+              Quickstart
+              <span style={pillKeyStyle}>5 min</span>
+            </Link>
+            <Link to="/docs/mcp-install" style={pillStyle}>
+              Install in Claude / Cursor
+            </Link>
+          </div>
 
           {/* Run your first app */}
           <h2 style={h2Style}>Run your first app</h2>
