@@ -98,7 +98,12 @@ export function LandingV17Page() {
   const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   useEffect(() => {
-    document.title = 'Ship AI apps fast · Floom';
+    // document.title is owned by <PageHead> (see the component below). We
+    // used to hard-set the title here but that raced PageHead's own update
+    // and left the browser tab/share cards on the pre-v17 "Ship AI apps
+    // fast · Floom" string even though <meta og:title> had the current
+    // copy. Removing the override lets PageHead stay the single source of
+    // truth.
     api
       .getHub()
       .then((apps) => {

@@ -18,7 +18,14 @@ const BUCKET: Record<
 
 const NEUTRAL: CategoryTint = { bg: '#f4f4f5', fg: '#27272a' };
 
-/** Maps manifest `HubApp.category` strings → bucket. Unlisted → neutral. */
+/** Maps manifest `HubApp.category` strings → bucket. Unlisted → neutral.
+ *
+ * Audit fix 2026-04-24: the seed/launch-demos categories (growth, hiring,
+ * research) are the ones that actually appear on /apps today. Only
+ * `research` was wired; `growth` and `hiring` fell through to neutral,
+ * which is the bug #91 set out to fix. Mapping them explicitly restores
+ * the category-tint promise.
+ */
 const CATEGORY_TO_BUCKET: Record<string, keyof typeof BUCKET> = {
   ai: 'ai',
   marketing: 'ai',
@@ -36,6 +43,8 @@ const CATEGORY_TO_BUCKET: Record<string, keyof typeof BUCKET> = {
   productivity: 'productivity',
   analytics: 'analytics',
   research: 'research',
+  growth: 'dev',
+  hiring: 'productivity',
 };
 
 export function categoryTint(category: string | null | undefined): CategoryTint {

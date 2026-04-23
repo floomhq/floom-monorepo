@@ -12,7 +12,7 @@
 //   - Mid-page underlined tab bar REMOVED. Replaced with a quiet chip
 //     row at the bottom of the frame (About / Install / Source / Source).
 //     Active chip uses --accent-soft bg, non-active is plain pill.
-//   - Breadcrumb row above the frame is small + quiet (Store / name).
+//   - Breadcrumb row above the frame is small + quiet (Apps / name).
 //
 // Schedule drawer and ChatGPT/Notion/Terminal connectors stay as explicit
 // "coming soon" stubs (schedule needs job queue UI; the provider
@@ -340,7 +340,11 @@ export function AppPermalinkPage() {
   // SEO meta
   useEffect(() => {
     if (!app) return;
-    document.title = `${app.name} | Floom`;
+    // Title separator: use a middle dot to match every other page on the
+    // site (Pricing · Floom, Docs · Floom, etc.). We were shipping a pipe
+    // here, which read as inconsistent across tabs and share cards.
+    const docTitle = `${app.name} · Floom`;
+    document.title = docTitle;
     const setMeta = (name: string, content: string, prop = false) => {
       const attr = prop ? 'property' : 'name';
       let el = document.querySelector(`meta[${attr}="${name}"]`);
@@ -352,7 +356,7 @@ export function AppPermalinkPage() {
       el.setAttribute('content', content);
     };
     setMeta('description', app.description);
-    setMeta('og:title', `${app.name} | Floom`, true);
+    setMeta('og:title', docTitle, true);
     setMeta('og:description', app.description, true);
     setMeta('og:url', `${window.location.origin}/p/${app.slug}`, true);
     setMeta('og:type', 'website', true);
@@ -363,7 +367,7 @@ export function AppPermalinkPage() {
     // Per-app dynamic OG card (served by /og/:slug.svg on the same origin).
     setMeta('og:image', `${window.location.origin}/og/${app.slug}.svg`, true);
     setMeta('twitter:image', `${window.location.origin}/og/${app.slug}.svg`);
-    setMeta('twitter:title', `${app.name} | Floom`);
+    setMeta('twitter:title', docTitle);
     setMeta('twitter:description', app.description);
 
     const existing = document.getElementById('jsonld-app');
@@ -663,9 +667,12 @@ export function AppPermalinkPage() {
         style={{ padding: '24px 24px 80px', maxWidth: 1200, margin: '0 auto' }}
         data-testid="permalink-page"
       >
-        {/* v17 breadcrumb: quiet Store / app-name. Lives OUTSIDE the
+        {/* v17 breadcrumb: quiet Apps / app-name. Lives OUTSIDE the
             frame, small + muted. "Open in Studio" affordance (owner only)
-            sits on the right. */}
+            sits on the right. We renamed "Store" → "Apps" to match the
+            live route (/apps); the word "Store" never appears in the top
+            nav so it was a dead-end label for anyone trying to trace
+            their way back up. */}
         <div
           style={{
             display: 'flex',
@@ -687,7 +694,7 @@ export function AppPermalinkPage() {
             }}
           >
             <Link to="/apps" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
-              Store
+              Apps
             </Link>
             <span aria-hidden="true" style={{ color: 'var(--line)' }}>/</span>
             <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{app.name}</span>
