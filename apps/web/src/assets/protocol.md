@@ -43,13 +43,23 @@ From the OpenAPI spec, Floom derives:
 
 ## Plumbing layers (auto-applied)
 
-Every Floom app gets:
+Every Floom app gets these for free. We split what's shipped from what's on the roadmap so you don't build a mental model around features that don't exist yet.
+
+### Shipped
 
 - Secrets vault (injected as env vars at runtime)
 - Rate limiting (global + per-IP, custom per-operation)
 - Streaming output for long-running operations
 - Run history + audit log
-- (Coming soon) Access control, staging environments, version control, per-app databases, OAuth, payment / billing
+
+### Roadmap
+
+- Access control
+- Staging environments
+- Version control
+- Per-app databases
+- OAuth
+- Payment / billing
 
 ## Plain-language launch docs
 
