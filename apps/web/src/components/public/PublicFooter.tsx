@@ -15,10 +15,14 @@ import { waitlistHref } from '../../lib/waitlistCta';
 // /legal is added as an alias so either URL hits the same page.
 //
 // 2026-04-20 (about-page ship): added a one-line identity strip above
-// the link row — "Get that thing off localhost fast." This is the About
-// page H1 and pulls double-duty here as the site-wide tagline. Muted,
-// centered to match the existing rhythm. Also wired an "About" link into
-// the link row (new page, supersedes the old `/about` → `/` redirect).
+// the link row. Originally echoed the About page H1 "Get that thing off
+// localhost fast." — which reads as dev-bro tone on pages where most
+// visitors are consumers of apps rather than their authors (/apps,
+// /p/:slug, /pricing). Audit 2026-04-24 (S4): swapped for "Ship AI apps
+// fast." — the new site-wide hero line (PR #515). This keeps the footer
+// consistent with the landing H1 the user just rewrote, works across
+// both audiences, and leaves the About H1 free to keep its specific
+// pain-framing voice ("Get that thing off localhost fast.").
 const LINK_STYLE: React.CSSProperties = { color: 'var(--muted)', textDecoration: 'none' };
 
 function FootLink({ children, to, href }: { children: React.ReactNode; to?: string; href?: string }) {
@@ -51,7 +55,7 @@ export function PublicFooter() {
         borderTop: '1px solid var(--line)',
       }}
     >
-      {/* Identity strip: tagline double-duty with the About page H1. */}
+      {/* Identity strip: site-wide tagline, mirrors the new landing H1. */}
       <div
         data-testid="footer-tagline"
         style={{
@@ -61,7 +65,7 @@ export function PublicFooter() {
           margin: '0 0 10px',
         }}
       >
-        Get that thing off localhost fast.
+        Ship AI apps fast.
       </div>
       {!deployEnabled && (
         <div

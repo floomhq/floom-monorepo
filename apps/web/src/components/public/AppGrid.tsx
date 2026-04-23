@@ -139,6 +139,16 @@ function formatRuns(n: number): string {
 }
 
 export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
+  // HERO badge is pure visual noise when EVERY visible card is a hero —
+  // the tag stops signalling "this one's featured" and just clutters
+  // three identical corners (audit 2026-04-24: S3). Suppress it while
+  // the directory is in that all-hero state; once we ship a 4th+ app
+  // and the ratio breaks, the badge naturally reappears on the ones
+  // that are marked. We also continue to render it when there's only
+  // one card, since a solitary badge still reads as intentional.
+  const heroCount = apps.reduce((n, a) => n + (a.hero ? 1 : 0), 0);
+  const suppressHeroBadge = apps.length > 1 && heroCount === apps.length;
+
   return (
     <div
       data-testid="apps-grid"
@@ -150,7 +160,12 @@ export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
       className="app-grid"
     >
       {apps.map((app) => (
-        <AppGridCard key={app.slug} app={app} variant={variant} />
+        <AppGridCard
+          key={app.slug}
+          app={app}
+          variant={variant}
+          suppressHeroBadge={suppressHeroBadge}
+        />
       ))}
       <style>{`
         @media (max-width: 1024px) {
@@ -177,15 +192,17 @@ export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
 function AppGridCard({
   app,
   variant = 'default',
+  suppressHeroBadge = false,
 }: {
   app: HubApp;
   variant?: 'default' | 'featured';
+  suppressHeroBadge?: boolean;
 }) {
   const tint = categoryTint(app.category);
   const stars = app.stars ?? 0;
   const runs7d = app.runs_7d ?? 0;
   const isHot = stars >= 100;
-  const hero = !!app.hero;
+  const hero = !!app.hero && !suppressHeroBadge;
   const thumbnail = app.thumbnail_url ?? null;
   const badge = badgePaletteFor(app.category);
   const isFeatured = variant === 'featured';

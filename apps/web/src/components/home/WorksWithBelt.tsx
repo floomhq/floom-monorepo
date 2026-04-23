@@ -95,12 +95,18 @@ const LEAD_MARK: CSSProperties = {
   alignItems: 'center',
 };
 
+// Gap spec (audit 2026-04-24 · S4): the belt wraps to two lines at
+// ~390px wide. Old 6px×14px row/col gap made the wrapped examples read
+// as cramped — items stacked tight, and "e.g." kissed the first mark.
+// 10px×16px keeps the desktop density near-identical (that 2px row
+// bump is imperceptible on one-liners) but restores breathing room
+// when the row wraps on mobile.
 const EXAMPLES_ROW: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   justifyContent: 'center',
   alignItems: 'center',
-  gap: '6px 14px',
+  gap: '10px 16px',
   margin: 0,
 };
 
