@@ -848,8 +848,12 @@ if (webDist) {
     // 2026-04-20 (about-page ship): /about is a real story page now (not
     // a redirect to landing). Per-route SSR title so crawlers + social
     // previews see the About title, not the landing title.
+    // Audit 2026-04-24 (S2) follow-up to #512: SSR title was still leaking
+    // the old marketing tagline into browser tabs (the client-side PageHead
+    // fix in #512 only covered SPA navs, not first-load SSR). Matched to
+    // `About · Floom` from AboutPage.tsx.
     if (pathname === '/about' || pathname === '/about/') {
-      return 'About Floom · Get that thing off localhost fast';
+      return 'About · Floom';
     }
     // 2026-04-20 (pricing-page ship): /pricing graduated from redirect
     // to a real page. Honest placeholder (free during beta, self-host
@@ -1080,7 +1084,11 @@ if (webDist) {
       // non-JS crawlers see `{app_name} · Floom` for /p/:slug.
       const documentTitle = `${row.name} · Floom`;
       out = rewriteTitle(out, documentTitle);
-      const title = `${row.name} | Floom`;
+      // Audit 2026-04-24 (S2) follow-up to #512: normalized social-card
+      // title separator to `·` so OG/Twitter previews match the document
+      // title. Previously this shipped as `{name} | Floom` while the
+      // rest of the site used `·`, causing inconsistent share previews.
+      const title = `${row.name} · Floom`;
       out = out.replace(
         /<meta property="og:title" content="[^"]*"/,
         `<meta property="og:title" content="${title.replace(/"/g, '&quot;')}"`,
