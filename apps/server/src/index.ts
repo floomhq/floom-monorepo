@@ -47,7 +47,11 @@ import {
 } from './lib/better-auth.js';
 import { sanitizeAuthResponse } from './lib/auth-response.js';
 import { padToFloor, shouldPadAuthTiming } from './lib/auth-response-guard.js';
-import { runRateLimitMiddleware } from './lib/rate-limit.js';
+import {
+  runRateLimitMiddleware,
+  writeOnlyRateLimitMiddleware,
+  readOnlyRateLimitMiddleware,
+} from './lib/rate-limit.js';
 import {
   applyProgressiveSigninDelayFromContext,
   parseEmailForSigninProgressiveDelay,
@@ -251,6 +255,77 @@ app.use('/mcp/app/:slug', runBodyLimit, rateLimit);
 // uncapped. Route covers only POST (other hub paths are reads / owner-
 // scoped writes and route through their own auth).
 app.use('/api/hub/ingest', runBodyLimit, rateLimit);
+
+// Issue #600 (2026-04-23): extend rate-limit coverage to every non-run
+// write + expensive read endpoint. Defense-in-depth for mutations that
+// previously relied on per-route auth alone, plus scraping protection
+// for list/search/identity endpoints.
+//
+// Two tiers (see lib/rate-limit.ts):
+//   - `write`      : POST/PATCH/PUT/DELETE on state-changing paths.
+//                    Per-IP 120/hr, per-user 600/hr.
+//   - `read-heavy` : GET on scan/directory/identity paths that are
+//                    attractive scraping vectors. Per-IP 90/hr,
+//                    per-user 900/hr.
+//
+// Webhook endpoints (`/api/stripe/webhook`, `/hook/*`) are signature-
+// verified and excluded by policy — a rate-limit on them risks dropping
+// legitimate provider callbacks and the HMAC check already rejects
+// unauthenticated traffic. See docs/ops/rate-limits.md.
+const writeLimit = writeOnlyRateLimitMiddleware(resolveUserContext);
+const readHeavyLimit = readOnlyRateLimitMiddleware(resolveUserContext);
+
+// Writes (method-filtered inside writeLimit — GETs pass through).
+// `/api/hub/ingest` is already handled by the `run` tier above; the
+// write tier's `isRunTierPath` guard skips it so it isn't double-charged.
+// `/api/stripe/webhook` is signature-verified and explicitly allowlisted
+// below.
+app.use('/api/hub/*', writeLimit);
+app.use('/api/workspaces/*', writeLimit);
+app.use('/api/memory/*', writeLimit);
+app.use('/api/secrets/*', writeLimit);
+app.use('/api/connections/*', writeLimit);
+app.use('/api/feedback/*', writeLimit);
+app.use('/api/me/*', writeLimit);
+app.use('/api/apps/*', writeLimit);
+app.use('/api/admin/*', writeLimit);
+app.use('/api/parse/*', writeLimit);
+app.use('/api/pick/*', writeLimit);
+app.use('/api/thread/*', writeLimit);
+app.use('/api/session/*', writeLimit);
+app.use('/api/waitlist/*', writeLimit);
+app.use('/api/deploy-waitlist/*', writeLimit);
+// POST /api/run/:id/share — the only write method on /api/run subpaths.
+// The root POST /api/run is covered by the run tier; isRunTierPath guards
+// it from double-charging. GET reads pass through to readHeavyLimit below.
+app.use('/api/run/*', writeLimit);
+// POST /api/:slug/jobs/:job_id/cancel — write-tier cap on the cancel
+// action. The enqueue/list (POST / on same prefix) is run-tier; the
+// result read is read-heavy (below). isRunTierPath skips the exact
+// `/api/:slug/jobs` path so double-charging doesn't happen.
+app.use('/api/:slug/jobs/*', writeLimit);
+
+// Stripe write tier with an explicit pass-through for the webhook path.
+// Signature-verified provider callbacks must never 429: losing a Stripe
+// webhook means losing a payment-event source of truth, and the HMAC
+// check already rejects un-authenticated traffic.
+app.use('/api/stripe/*', async (c, next) => {
+  const path = new URL(c.req.url).pathname;
+  if (path === '/api/stripe/webhook') return next();
+  return writeLimit(c, next);
+});
+
+// Heavy reads (method-filtered inside readHeavyLimit — writes pass through).
+// Applied on the same path prefixes as the write mounts so one entry handles
+// both methods without duplicating paths.
+app.use('/api/hub/*', readHeavyLimit);
+app.use('/api/session/*', readHeavyLimit);
+app.use('/api/me/*', readHeavyLimit);
+app.use('/api/run/*', readHeavyLimit);
+// `/api/:slug/jobs` (enqueue/list) is covered by the `run` tier above;
+// the `/api/:slug/jobs/:job_id` result read is NOT (exact-path mount).
+// Catch it here so individual job-result GETs have a cap.
+app.use('/api/:slug/jobs/*', readHeavyLimit);
 
 // API routes
 app.route('/api/health', healthRouter);

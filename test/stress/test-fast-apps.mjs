@@ -160,6 +160,11 @@ const floom = spawn(
       // Empty seed + no composio + no stripe so boot is minimal.
       FLOOM_SEED_APPS: 'false',
       FLOOM_SEED_LAUNCH_DEMOS: 'false',
+      // Issue #600: rate-limit coverage extended to GET /api/hub + GET
+      // /api/run/:id. This test fires >70 of each while polling, which
+      // exceeds the read-heavy cap. Rate-limit tests assert the caps
+      // fire independently.
+      FLOOM_RATE_LIMIT_DISABLED: 'true',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   },
