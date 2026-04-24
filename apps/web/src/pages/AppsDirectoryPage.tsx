@@ -7,7 +7,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { AppGrid } from '../components/public/AppGrid';
@@ -19,6 +19,26 @@ import { isPubliclyListed } from '../lib/hub-filter';
 import { useSession } from '../hooks/useSession';
 
 const ALL = 'all';
+
+/**
+ * Sort-dropdown options (v17 store.html wireframe parity).
+ *
+ * Inert on purpose. The launch catalog is ~50 apps with fresh runs
+ * data, so sorting beyond "Trending" has no signal yet. This keeps
+ * the affordance visible without promising behavior that does not
+ * work. When sort really ships, flip `active` / remove disabled
+ * state and wire an `activeSort` state variable.
+ */
+const SORT_OPTIONS: ReadonlyArray<{
+  key: string;
+  label: string;
+  hint: string;
+  active: boolean;
+}> = [
+  { key: 'trending', label: 'Trending', hint: 'runs 7d', active: true },
+  { key: 'recent', label: 'Most recent', hint: 'post-launch', active: false },
+  { key: 'starred', label: 'Most starred', hint: 'post-launch', active: false },
+];
 
 const CATEGORY_LABELS: Record<string, string> = {
   all: 'All',
@@ -66,6 +86,10 @@ export function AppsDirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [hubError, setHubError] = useState<string | null>(null);
   const [rawSearch, setRawSearch] = useState('');
+  // Sort dropdown: open/closed only (no selected state yet — options
+  // are inert per v17 spec). Closes on any click outside the button +
+  // pop; see the wiring below.
+  const [sortOpen, setSortOpen] = useState(false);
   // Self-host bypass for the launch-week SHOWCASE allowlist. See
   // lib/hub-filter.ts HubFilterOptions. `cloud_mode === false` on
   // `/api/session/me` means this instance is self-hosted; show every
@@ -351,11 +375,27 @@ export function AppsDirectoryPage() {
               ))}
           </div>
 
-          {/* Search — inline, 260px min.
-              Keeps the existing submit/blur/scroll handler for mobile
-              keyboards. Debounced filter runs on every keystroke via the
-              controlled input. Submit button is visually hidden (SR-only)
-              because the live filter is the real interaction. */}
+          {/* Right cluster: search (260px min) + Sort button.
+              v17 store.html parity (2026-04-24 PR A): the wireframe
+              toolbar ends with a "Sort · Trending [soon]" button that
+              hints at future "Most recent / Most starred" affordance.
+              We render it inert for now — the dropdown opens but all
+              three options are disabled with a "post-launch" pill,
+              because sort needs a populated catalog first. Current
+              sort is Trending (runs_7d desc via AppsDirectoryPage's
+              sortedApps memo + hero-first tiebreak).
+              Search keeps its existing submit/blur/scroll handler for
+              mobile keyboards; debounced filter runs on every keystroke
+              via the controlled input. Submit button is visually hidden
+              (SR-only) because the live filter is the real interaction. */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+            }}
+          >
           <form
             role="search"
             onSubmit={handleSearchSubmit}
@@ -421,7 +461,157 @@ export function AppsDirectoryPage() {
               Search
             </button>
           </form>
+
+          {/* Sort button — inert, "soon" pill (v17 store.html wireframe).
+              The wireframe shows a sort affordance with three options
+              (Trending / Most recent / Most starred) where the last two
+              are tagged "post-launch". Because the launch catalog is
+              still small and runs data is fresh, we render the button
+              as a visual hint only — the dropdown is keyboard-opened
+              and all three options are disabled. When real sort ships,
+              this becomes the wiring point.
+              Styled per wireframe `.sort-btn`: same height as chip/
+              search, monospace "Sort" label, default value "Trending"
+              + accent "soon" pill, chevron down. */}
+          <button
+            type="button"
+            data-testid="apps-sort-btn"
+            aria-haspopup="listbox"
+            aria-expanded={sortOpen}
+            aria-label="Sort apps (coming soon)"
+            onClick={() => setSortOpen((v) => !v)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 12px',
+              border: '1px solid var(--line)',
+              borderRadius: 10,
+              background: 'var(--card)',
+              color: 'var(--ink)',
+              fontSize: 12.5,
+              fontFamily: 'inherit',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'border-color 120ms ease',
+              position: 'relative',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--ink)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--line)';
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontSize: 10.5,
+                color: 'var(--muted)',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+              }}
+            >
+              Sort
+            </span>
+            <span>Trending</span>
+            <span
+              style={{
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontSize: 9.5,
+                color: 'var(--accent, #047857)',
+                background: 'var(--accent-soft, #ecfdf5)',
+                border: '1px solid var(--accent-border, #a7f3d0)',
+                padding: '1px 6px',
+                borderRadius: 999,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+              }}
+            >
+              soon
+            </span>
+            <ChevronDown size={12} aria-hidden="true" />
+          </button>
+          </div>
         </div>
+
+        {/* Sort dropdown (inert). Opens when Sort is clicked; three
+            disabled options. Closed-state keeps the DOM out so layout
+            stays stable at 0 height. Not yet a real listbox (no arrow
+            navigation) since nothing is actually selectable. */}
+        {sortOpen && (
+          <div
+            data-testid="apps-sort-pop"
+            role="listbox"
+            aria-label="Sort options"
+            style={{
+              maxWidth: 1180,
+              margin: '-8px auto 0',
+              padding: '0 28px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              pointerEvents: 'none', // whole pop is inert for now
+            }}
+          >
+            <div
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+                padding: 6,
+                width: 240,
+                boxShadow: '0 6px 24px -12px rgba(14,14,12,.18)',
+              }}
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <div
+                  key={opt.key}
+                  role="option"
+                  aria-selected={opt.active || undefined}
+                  aria-disabled="true"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: opt.active ? 'var(--bg)' : 'transparent',
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: 'var(--ink)',
+                    opacity: opt.active ? 1 : 0.7,
+                  }}
+                >
+                  <span style={{ flex: 1 }}>{opt.label}</span>
+                  <span
+                    style={{
+                      fontFamily:
+                        "'JetBrains Mono', ui-monospace, monospace",
+                      fontSize: 9.5,
+                      color: opt.active
+                        ? 'var(--muted)'
+                        : 'var(--accent, #047857)',
+                      background: opt.active
+                        ? 'transparent'
+                        : 'var(--accent-soft, #ecfdf5)',
+                      border: opt.active
+                        ? 'none'
+                        : '1px solid var(--accent-border, #a7f3d0)',
+                      padding: opt.active ? 0 : '1px 6px',
+                      borderRadius: 999,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {opt.hint}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* APP LIST · 4-column thumbnail grid (v17 store.html).
             CLS fix (2026-04-18): reserve vertical space for the list area so

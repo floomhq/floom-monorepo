@@ -96,6 +96,27 @@ function formatRuns(n: number): string {
 }
 
 /**
+ * Deterministic per-slug "thumb lines" pattern. v17 wireframe shows
+ * 3 bars per card with short/medium/long widths to mimic UI content.
+ * We pick the pattern from a 4-way pool indexed by a cheap hash of the
+ * slug so identical patterns don't repeat adjacent cards (all-`48%`
+ * bars across 12 cards would look like a bug).
+ */
+function thumbLinesForSlug(slug: string): string[] {
+  const patterns: string[][] = [
+    ['100%', '70%', '45%'],
+    ['70%', '100%', '55%'],
+    ['60%', '85%', '100%'],
+    ['100%', '55%', '80%'],
+  ];
+  let h = 0;
+  for (let i = 0; i < slug.length; i++) {
+    h = (h * 31 + slug.charCodeAt(i)) | 0;
+  }
+  return patterns[Math.abs(h) % patterns.length];
+}
+
+/**
  * Per-slug output-preview snippets — small taste of what the app returns.
  *
  * Added 2026-04-24 after the browser audit flagged cards as "not sexy":
@@ -236,17 +257,25 @@ function AppGridCard({
         el.style.boxShadow = 'none';
       }}
     >
-      {/* THUMBNAIL. Gradient tile + centered AppIcon (or real PNG when
-          we have one). Top-right corner hosts the category chip so the
-          card footer can stay clean (2026-04-24 audit: chip previously
-          sat bottom-left and competed with the "Run →" CTA). HERO badge
-          — when present — sits on the top-left so it never collides
-          with the category chip. */}
+      {/* THUMBNAIL. v17 store.html parity (2026-04-24 PR A):
+          the wireframe's `.app-card-thumb` is a 120px band with
+          `linear-gradient(135deg, var(--bg), var(--studio))`, a 1px
+          border, AND a faint 3-bar mock that simulates "UI content
+          inside a screenshot" so the thumbnail carries visual signal
+          instead of feeling flat. Previously we rendered a flat pastel
+          block with a centered icon — cards read as thin.
+          When `thumbnail_url` is set we still show the real image; when
+          it's null we render the gradient + thumb-lines + centered icon
+          on top (the icon sits at low opacity so the bars show through).
+          Top-right corner hosts the category chip; HERO (when present)
+          sits on the top-left so they never collide. */}
       <div
         data-testid={`app-grid-thumb-${app.slug}`}
         style={{
           height: thumbHeight,
-          background: thumbnail ? 'var(--bg)' : CARD_NEUTRAL.bg,
+          background: thumbnail
+            ? 'var(--bg)'
+            : `linear-gradient(135deg, var(--bg) 0%, ${CARD_NEUTRAL.bg} 100%)`,
           boxShadow: thumbnail ? undefined : 'inset 0 0 0 1px rgba(15, 23, 42, 0.06)',
           position: 'relative',
           overflow: 'hidden',
@@ -266,19 +295,60 @@ function AppGridCard({
             }}
           />
         ) : (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: CARD_NEUTRAL.fg,
-            }}
-            aria-hidden="true"
-          >
-            <AppIcon slug={app.slug} size={isFeatured ? 52 : 44} color={CARD_NEUTRAL.fg} />
-          </div>
+          <>
+            {/* Faint bar mock (v17 `.thumb-lines`). Three horizontal
+                bars of varying widths inside a translucent white sheet
+                — reads as "there is UI content here" rather than an
+                empty slab. Deterministic per-slug so two apps don't
+                accidentally show the same bar layout.
+                Hidden from screen readers via aria-hidden on the
+                parent icon wrapper; this is purely decorative. */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 16,
+                background: 'rgba(255,255,255,0.7)',
+                borderRadius: 4,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                gap: 5,
+                padding: '10px 14px',
+              }}
+            >
+              {thumbLinesForSlug(app.slug).map((w, i) => (
+                <span
+                  key={i}
+                  style={{
+                    height: 4,
+                    width: w,
+                    background: 'rgba(14,14,12,0.16)',
+                    borderRadius: 2,
+                    display: 'block',
+                  }}
+                />
+              ))}
+            </div>
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: CARD_NEUTRAL.fg,
+                // Icon drops to 70% opacity so the bar mock stays
+                // legible behind it. At full opacity the icon's solid
+                // fill was swallowing the bars and undoing the new
+                // "there is content here" affordance.
+                opacity: 0.7,
+              }}
+              aria-hidden="true"
+            >
+              <AppIcon slug={app.slug} size={isFeatured ? 52 : 44} color={CARD_NEUTRAL.fg} />
+            </div>
+          </>
         )}
 
         {/* Category chip — top-right inside the pastel band. Moved here
@@ -514,13 +584,19 @@ function AppGridCard({
         </div>
       )}
 
-      {/* FOOTER: Run → CTA, right-aligned. Category pill moved to the
-          thumbnail band (2026-04-24 polish), so this row is now a single
-          action affordance — no competition. */}
+      {/* FOOTER: Run → CTA, right-aligned. v17 wireframe gives this row
+          a 1px border-top separator so the card has a clear "action
+          zone" distinct from the description above. Previously the
+          CTA floated without any boundary, which made the card feel
+          thin — Federico's "cards don't look like cards" read narrowed
+          to the top (flat thumbnail) and the bottom (no footer rule).
+          Category pill stayed in the thumbnail band (2026-04-24
+          polish), so this row stays single-purpose. */}
       <div
         style={{
           marginTop: 'auto',
           padding: '10px 14px 14px',
+          borderTop: '1px solid var(--line)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-end',
