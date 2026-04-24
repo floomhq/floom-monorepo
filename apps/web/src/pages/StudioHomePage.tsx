@@ -79,31 +79,60 @@ export function StudioHomePage() {
   // empty array on error so the panel shows an honest "no runs yet"
   // empty state instead of faking data.
   //
-  // IMPORTANT: getMyRuns() returns /me/runs, which is "every app the
-  // user has ever run" — not just apps they OWN. Studio's feed must
-  // scope to owned apps only, otherwise a creator who also uses public
-  // apps sees unrelated activity here. /me/runs applies the `limit`
-  // BEFORE any ownership filter, so we need to over-fetch enough
-  // rows that heavy consumer-side activity can't push the creator's
-  // own app runs beyond the window. 200 matches the cap used by
-  // /me/runs and /me/threads surfaces elsewhere in the app.
+  // Cross-app activity feed. IMPORTANT nuance per codex review:
+  // /me/runs is scoped by (workspace_id, user_id) — only runs the OWNER
+  // personally triggered. That's wrong for Studio: a creator wants to
+  // see activity from ALL callers on their apps (the whole point of
+  // "cross-app activity"). The owner-scoped source is /api/hub/:slug/runs,
+  // which shows every caller but per-app. So: fan out one request per
+  // owned app, merge + sort by started_at desc, cap at 6. `apps.length`
+  // is typically <10 so the fan-out is bounded; for heavier accounts
+  // we still get the freshest runs because each call is already sorted
+  // DESC by started_at server-side.
   useEffect(() => {
     if (signedOutPreview) return;
     if (!apps || apps.length === 0) return;
-    const ownedSlugs = new Set(apps.map((a) => a.slug));
     let cancelled = false;
-    api
-      .getMyRuns(200)
-      .then((resp) => {
+    (async () => {
+      try {
+        const perApp = await Promise.all(
+          apps.map((a) =>
+            api
+              .getAppRuns(a.slug, 6)
+              .then((resp) =>
+                resp.runs.map(
+                  (r) =>
+                    ({
+                      id: r.id,
+                      action: r.action,
+                      status: r.status,
+                      duration_ms: r.duration_ms,
+                      started_at: r.started_at,
+                      finished_at: r.finished_at,
+                      error: r.error,
+                      error_type: r.error_type,
+                      upstream_status: r.upstream_status,
+                      app_slug: a.slug,
+                      app_name: a.name,
+                      app_icon: a.icon,
+                    }) as MeRunSummary,
+                ),
+              )
+              // Per-app failures shouldn't blank the whole feed. Swallow
+              // and contribute zero rows for that slug.
+              .catch(() => [] as MeRunSummary[]),
+          ),
+        );
         if (cancelled) return;
-        const filtered = resp.runs
-          .filter((r) => r.app_slug && ownedSlugs.has(r.app_slug))
+        const merged = perApp
+          .flat()
+          .sort((a, b) => (a.started_at < b.started_at ? 1 : -1))
           .slice(0, 6);
-        setRecentRuns(filtered);
-      })
-      .catch(() => {
+        setRecentRuns(merged);
+      } catch {
         if (!cancelled) setRecentRuns([]);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };

@@ -305,11 +305,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             (the paste-repo flow). Must be listed before /studio/:slug or
             react-router matches "new" as an app slug and 404s. */}
         <Route path="/studio/new" element={<Navigate to="/studio/build" replace />} />
-        {/* v17 wireframe alias: the sidebar rail renamed "Home" to "My
-            apps" (studio-my-apps.html). Route both URLs to the same
-            surface so links from the wireframes + any "My apps"
-            affordances land cleanly. */}
-        <Route path="/studio/my-apps" element={<Navigate to="/studio" replace />} />
+        {/* NOTE: an earlier revision of this branch added
+            /studio/my-apps → /studio as a wireframe alias (v17 renamed
+            "Home" to "My apps"). Codex correctly flagged that
+            `my-apps` is a valid lowercase-kebab app slug, so an
+            exact-match redirect would shadow an app with that slug and
+            make its overview unreachable. Dropped: the rename is purely
+            sidebar copy, and no external URL references
+            /studio/my-apps. Revisit if we ever start emitting that URL
+            from docs / marketing. */}
         <Route path="/studio/settings" element={<WaitlistGuard source="studio"><StudioSettingsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug" element={<WaitlistGuard source="studio"><StudioAppPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/runs" element={<WaitlistGuard source="studio"><StudioAppRunsPage /></WaitlistGuard>} />
