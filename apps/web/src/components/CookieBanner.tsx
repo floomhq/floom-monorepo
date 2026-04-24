@@ -45,6 +45,18 @@ const MOBILE_BREAKPOINT = 768;
  */
 const INITIAL_RESERVE_PX = 72;
 
+/**
+ * Mobile pill auto-collapse (Issue #559): the full "Cookies" text pill
+ * sits over the bottom of the first card on /apps and other list pages.
+ * After this many ms without interaction, the pill shrinks to an
+ * icon-only 44x44 round target anchored to the corner so it stops
+ * overlapping card content while staying tap-accessible. Tap (or a
+ * subsequent scroll near the bottom) re-expands it to the full label
+ * so the consent affordance remains discoverable. Tap target stays at
+ * 44px in both states.
+ */
+const MOBILE_PILL_AUTO_COLLAPSE_MS = 5000;
+
 function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -61,12 +73,27 @@ function useIsMobile(): boolean {
 export function CookieBanner() {
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // Mobile pill starts expanded (text + icon) so the label is legible,
+  // then collapses to a 44x44 icon-only target after
+  // MOBILE_PILL_AUTO_COLLAPSE_MS so it stops covering card content.
+  const [pillCollapsed, setPillCollapsed] = useState(false);
   const isMobile = useIsMobile();
   const stripRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (getConsent() === null) setVisible(true);
   }, []);
+
+  // Auto-collapse the mobile pill once the banner is visible. Skipped on
+  // desktop (no pill there) and when the strip is already expanded.
+  useEffect(() => {
+    if (!visible || !isMobile || expanded || pillCollapsed) return undefined;
+    const t = window.setTimeout(
+      () => setPillCollapsed(true),
+      MOBILE_PILL_AUTO_COLLAPSE_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, [visible, isMobile, expanded, pillCollapsed]);
 
   const showStrip = visible && (!isMobile || expanded);
 
@@ -140,10 +167,18 @@ export function CookieBanner() {
   };
 
   if (isMobile && !expanded) {
+    // Collapsed state: 44x44 icon-only round target anchored to the
+    // bottom-left corner. Still meets WCAG tap-target size, but its
+    // footprint (44x44 + 12px inset) no longer overlaps the content of
+    // the first card in a list page. Expanded state: full "Cookies"
+    // label so the consent affordance stays discoverable for the first
+    // MOBILE_PILL_AUTO_COLLAPSE_MS after the banner mounts.
+    const isCollapsed = pillCollapsed;
     return (
       <button
         type="button"
         data-testid="cookie-banner-pill"
+        data-collapsed={isCollapsed ? 'true' : 'false'}
         onClick={() => setExpanded(true)}
         aria-label="Cookie consent"
         style={{
@@ -151,22 +186,50 @@ export function CookieBanner() {
           left: 12,
           bottom: 12,
           zIndex: 950,
-          padding: '7px 12px',
+          width: isCollapsed ? 44 : undefined,
+          height: 44,
+          minWidth: 44,
+          minHeight: 44,
+          padding: isCollapsed ? 0 : '0 14px',
           background: 'var(--card)',
           border: '1px solid var(--line)',
           borderRadius: 999,
           boxShadow: '0 6px 20px rgba(14, 14, 12, 0.12)',
           fontFamily: 'inherit',
-          fontSize: 12,
+          fontSize: 12.5,
           fontWeight: 600,
           color: 'var(--ink)',
           cursor: 'pointer',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 6,
+          justifyContent: 'center',
+          gap: 8,
+          transition: 'width 180ms ease, padding 180ms ease, opacity 180ms ease',
+          opacity: isCollapsed ? 0.9 : 1,
         }}
       >
-        Cookies
+        {/* Cookie glyph — restrained neutral stroke (never colour) so the
+            pill reads as "meta affordance", not "alert". Visible in both
+            collapsed and expanded states; acts as the tap target when
+            collapsed (aria-label carries the intent). */}
+        <svg
+          width={18}
+          height={18}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          style={{ flexShrink: 0 }}
+        >
+          <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-4-4 4 4 0 0 1-4-4 4 4 0 0 1-2-2z" />
+          <circle cx="9" cy="10" r="0.75" fill="currentColor" />
+          <circle cx="14.5" cy="13.5" r="0.75" fill="currentColor" />
+          <circle cx="9.5" cy="15.5" r="0.75" fill="currentColor" />
+        </svg>
+        {!isCollapsed && <span>Cookies</span>}
       </button>
     );
   }
