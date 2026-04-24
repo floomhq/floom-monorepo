@@ -743,10 +743,11 @@ function RunSurface({
 
   const score = useCountUp(87, resultReady, 700, reducedMotion);
 
-  const surfaceStyle: CSSProperties = {
-    ...makeSurfaceStyle(active, reducedMotion),
-    background: '#ffffff',
-  };
+  // 2026-04-29 #664: drop the bright white override that made RUN look
+  // like a different product grafted in. Let RUN share the same cream
+  // canvas as BUILD / DEPLOY. Panel backgrounds (below) carry the
+  // product-UI feel without the jarring pure-white frame.
+  const surfaceStyle: CSSProperties = makeSurfaceStyle(active, reducedMotion);
 
   // Reasons fade in staggered after the score lands so the right column
   // fills with content rather than appearing all at once. The same clock
@@ -1424,7 +1425,11 @@ const RUN_WRAP: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 14,
-  background: '#ffffff',
+  // 2026-04-29 #664: warm paper canvas to match BUILD / DEPLOY. Previously
+  // `#ffffff`, which looked like a different product grafted into the demo.
+  // Panel backgrounds below provide the lighter product-UI surfaces inside
+  // this cream frame.
+  background: '#faf8f3',
   color: '#0e0e0c',
   fontFamily: "'Inter', system-ui, sans-serif",
   overflow: 'hidden',
@@ -1479,8 +1484,15 @@ const RUN_GRID: CSSProperties = {
   minHeight: 0,
 };
 
+// 2026-04-29 #664: panels now sit on cream paper surfaces instead of pure
+// white, matching the BUILD editor pane + DEPLOY left column tones
+// (`#f8f5ef` / `#f0ede5`). Subtle separation between input and output
+// panels is preserved via a small tone shift: input uses the darker paper
+// (`#f0ede5`, same as BUILD sidebar + DEPLOY slash pill), output uses the
+// lighter paper (`#f8f5ef`, same as BUILD terminal). The shadow on output
+// now tints toward warm-ink instead of cool-grey for tonal consistency.
 const RUN_INPUT_COL: CSSProperties = {
-  background: '#fafaf8',
+  background: '#f0ede5',
   border: '1px solid #e8e6e0',
   borderRadius: 14,
   padding: '18px 20px 18px',
@@ -1491,7 +1503,7 @@ const RUN_INPUT_COL: CSSProperties = {
 };
 
 const RUN_OUTPUT_COL: CSSProperties = {
-  background: '#ffffff',
+  background: '#f8f5ef',
   border: '1px solid #e8e6e0',
   borderRadius: 14,
   padding: '18px 22px 18px',
@@ -1500,7 +1512,7 @@ const RUN_OUTPUT_COL: CSSProperties = {
   gap: 12,
   minHeight: 0,
   boxShadow:
-    '0 1px 0 rgba(14,14,12,0.02), 0 14px 30px -24px rgba(14,14,12,0.18)',
+    '0 1px 0 rgba(14,14,12,0.02), 0 14px 30px -24px rgba(42,40,37,0.14)',
 };
 
 const RUN_APP_HEADER: CSSProperties = {
@@ -1566,8 +1578,11 @@ const RUN_FIELD_LABEL: CSSProperties = {
   fontWeight: 600,
 };
 
+// 2026-04-29 #664: inputs now sit on the cream paper surface (`#faf8f3`,
+// matching the BUILD editor pane) instead of pure white. Still a touch
+// lighter than the input-column background to read as an input well.
 const RUN_FIELD_INPUT: CSSProperties = {
-  background: '#ffffff',
+  background: '#faf8f3',
   border: '1px solid #e4e1d8',
   borderRadius: 8,
   padding: '9px 12px',
@@ -1577,7 +1592,7 @@ const RUN_FIELD_INPUT: CSSProperties = {
 };
 
 const RUN_FIELD_INPUT_MULTI: CSSProperties = {
-  background: '#ffffff',
+  background: '#faf8f3',
   border: '1px solid #e4e1d8',
   borderRadius: 8,
   padding: '10px 12px',
