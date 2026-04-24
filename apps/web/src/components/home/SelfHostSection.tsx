@@ -17,7 +17,12 @@ import { ArrowRight } from 'lucide-react';
 import { SectionEyebrow } from './SectionEyebrow';
 import { track } from '../../lib/posthog';
 
-const DOCKER_CMD = 'docker run -p 3010:3010 floomhq/floom';
+// Canonical self-host command. Matches the README + docs/ROADMAP + pricing
+// copy — don't diverge without updating both surfaces in lockstep. Launch-audit
+// 2026-04-24 (P1 #616): homepage said `floomhq/floom :3010` while pricing said
+// `floomhq/floom-docker :3000`, pointing users at two different images and
+// ports. Canonical form is the README's ghcr.io/floomhq/floom-monorepo:latest.
+const DOCKER_CMD = 'docker run -p 3010:3010 ghcr.io/floomhq/floom-monorepo:latest';
 
 export function SelfHostSection() {
   const [copied, setCopied] = useState(false);

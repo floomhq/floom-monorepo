@@ -763,7 +763,7 @@ export function ProtocolPage() {
           >
             <span style={{ color: 'var(--muted)' }}># Self-host Floom</span>
             {'\n'}
-            <span style={{ color: 'var(--muted)' }}>$</span> docker run -p 3051:3051 ghcr.io/floomhq/floom-monorepo:latest
+            <span style={{ color: 'var(--muted)' }}>$</span> docker run -p 3010:3010 ghcr.io/floomhq/floom-monorepo:latest
           </div>
         </article>
       </main>

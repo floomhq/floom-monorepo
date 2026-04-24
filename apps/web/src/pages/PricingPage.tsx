@@ -130,7 +130,7 @@ const FAQS: FaqItem[] = [
             padding: '2px 7px',
           }}
         >
-          docker run floomhq/floom-docker
+          docker run -p 3010:3010 ghcr.io/floomhq/floom-monorepo:latest
         </code>{' '}
         on your own infra and you&rsquo;re live in under a minute. See the{' '}
         <a
@@ -639,7 +639,7 @@ export function PricingPage() {
               whiteSpace: 'nowrap',
             }}
           >
-            docker run -p 3000:3000 floomhq/floom-docker
+            docker run -p 3010:3010 ghcr.io/floomhq/floom-monorepo:latest
           </code>
         </div>
       </section>
