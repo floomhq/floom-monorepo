@@ -1,5 +1,5 @@
-// Launch-demo seeder: registers the 3 showcase demo apps (lead-scorer,
-// competitor-analyzer, resume-screener) in the runtime catalog at boot.
+// Launch-demo seeder: registers the 3 showcase demo apps (competitor-lens,
+// ai-readiness-audit, pitch-coach) in the runtime catalog at boot.
 //
 // Why this exists
 // ---------------
@@ -82,117 +82,112 @@ interface LaunchDemo {
   manifest: NormalizedManifest;
 }
 
+// Launch showcase roster flipped 2026-04-25 (Federico P0 call):
+// previous 3 (lead-scorer, competitor-analyzer, resume-screener) can run
+// 30s-5min on real inputs, which times out in the demo UX. Replacement
+// roster below is bounded to <5s per run. Old 3 stay under examples/
+// and return to the showcase when the job queue (Phase 2 protocol)
+// ships — see project memory.
 export const DEMOS: LaunchDemo[] = [
   {
-    slug: 'lead-scorer',
-    name: 'Lead Scorer',
+    slug: 'competitor-lens',
+    name: 'Competitor Lens',
     description:
-      'Drop in a CSV of leads plus your ICP. Gemini 3 researches each company with live web search, scores fit 0-100, and returns reasoning plus enriched fields.',
-    category: 'growth',
-    icon: null,
-    author: 'floom',
-    contextDir: 'examples/lead-scorer',
-    manifest: {
-      name: 'Lead Scorer',
-      description:
-        'Score CSV leads against an ICP using Gemini 3 with web search grounding.',
-      render: {
-        output_component: 'ScoredRowsTable',
-        rows_field: 'rows',
-        company_key: 'company',
-        reason_key: 'reasoning',
-        source_key: 'website',
-        score_scale: '0-100',
-      },
-      runtime: 'python',
-      python_dependencies: ['google-genai==1.64.0'],
-      node_dependencies: {},
-      secrets_needed: ['GEMINI_API_KEY'],
-      manifest_version: '2.0',
-      actions: {
-        score: {
-          label: 'Score Leads',
-          inputs: [
-            {
-              name: 'data',
-              label: 'Leads CSV',
-              type: 'file',
-              required: true,
-              description:
-                'CSV with a header row. company, website, name, title, industry, country columns are used as-is if present.',
-            },
-            {
-              name: 'icp',
-              label: 'Ideal Customer Profile',
-              type: 'textarea',
-              required: true,
-              placeholder:
-                'e.g. B2B SaaS CFOs at 100-500 employee fintechs in EU',
-              description: 'Free-text description of the lead you want.',
-            },
-          ],
-          outputs: [
-            { name: 'total', label: 'Total Rows', type: 'number' },
-            { name: 'scored', label: 'Successfully Scored', type: 'number' },
-            { name: 'failed', label: 'Failed', type: 'number' },
-            { name: 'rows', label: 'Scored Leads', type: 'table' },
-            {
-              name: 'score_distribution',
-              label: 'Score Distribution',
-              type: 'json',
-            },
-            { name: 'model', label: 'Model', type: 'text' },
-          ],
-        },
-      },
-    },
-  },
-  {
-    slug: 'competitor-analyzer',
-    name: 'Competitor Analyzer',
-    description:
-      'Paste competitor URLs, get positioning, pricing, and strengths/weaknesses. Grounded in live web data via Gemini 3 URL-context and search.',
+      'Paste 2 URLs (yours + one competitor). Floom fetches both pages and a single Gemini 2.5 Flash Lite call returns a positioning, pricing, and angle diff. Under 5 seconds.',
     category: 'research',
     icon: null,
     author: 'floom',
-    contextDir: 'examples/competitor-analyzer',
+    contextDir: 'examples/competitor-lens',
     manifest: {
-      name: 'Competitor Analyzer',
+      name: 'Competitor Lens',
       description:
-        'Paste competitor URLs, get positioning, pricing, and strengths/weaknesses table.',
+        'Compare your page against one competitor page. Bounded positioning + pricing + angle diff.',
       runtime: 'python',
-      python_dependencies: [],
+      python_dependencies: [
+        'beautifulsoup4==4.13.4',
+        'httpx==0.28.1',
+        'fastapi>=0.110',
+        'pydantic>=2',
+      ],
       node_dependencies: {},
       secrets_needed: ['GEMINI_API_KEY'],
       manifest_version: '2.0',
       actions: {
         analyze: {
-          label: 'Analyze Competitors',
+          label: 'Compare Pages',
           inputs: [
             {
-              name: 'urls',
-              label: 'Competitor URLs (one per line)',
-              type: 'textarea',
+              name: 'your_url',
+              label: 'Your URL',
+              type: 'url',
               required: true,
+              placeholder: 'https://floom.dev',
               description:
-                'Competitor homepages to analyze. One URL per line. https:// is added automatically if omitted.',
-              placeholder:
-                'https://linear.app\nhttps://notion.so\nhttps://asana.com',
+                'Your HTTPS homepage or product page. Max 200 chars.',
             },
             {
-              name: 'your_product',
-              label: 'Your product',
-              type: 'textarea',
+              name: 'competitor_url',
+              label: 'Competitor URL',
+              type: 'url',
               required: true,
+              placeholder: 'https://n8n.io',
               description:
-                'One-line description of what you sell, so the analysis is comparative.',
-              placeholder:
-                'e.g. We sell B2B sales automation software to EU mid-market.',
+                'One competitor HTTPS page on a different host. Max 200 chars.',
             },
           ],
           outputs: [
-            { name: 'competitors', label: 'Competitor Table', type: 'table' },
-            { name: 'summary', label: 'Comparative Summary', type: 'markdown' },
+            { name: 'positioning_diff', label: 'Positioning', type: 'json' },
+            { name: 'pricing_diff', label: 'Pricing', type: 'json' },
+            { name: 'unique_angles', label: 'Unique Angles', type: 'json' },
+            { name: 'meta', label: 'Meta', type: 'json' },
+          ],
+        },
+      },
+    },
+  },
+  {
+    slug: 'ai-readiness-audit',
+    name: 'AI Readiness Audit',
+    description:
+      'Paste one HTTPS URL. Floom fetches the landing page and a single Gemini 2.5 Flash Lite call returns a readiness score 0-10, 3 risks, 3 opportunities, and one next action. Under 5 seconds.',
+    category: 'research',
+    icon: null,
+    author: 'floom',
+    contextDir: 'examples/ai-readiness-audit',
+    manifest: {
+      name: 'AI Readiness Audit',
+      description:
+        'Single-URL AI readiness score with 3 risks, 3 opportunities, and a concrete next step.',
+      runtime: 'python',
+      python_dependencies: [
+        'beautifulsoup4==4.13.4',
+        'google-genai==1.64.0',
+        'httpx==0.28.1',
+      ],
+      node_dependencies: {},
+      secrets_needed: ['GEMINI_API_KEY'],
+      manifest_version: '2.0',
+      actions: {
+        audit: {
+          label: 'Run Audit',
+          inputs: [
+            {
+              name: 'company_url',
+              label: 'Company URL',
+              type: 'url',
+              required: true,
+              placeholder: 'https://floom.dev',
+              description:
+                'Public HTTPS URL only. Max 200 chars. Private / loopback / RFC1918 addresses are rejected server-side.',
+            },
+          ],
+          outputs: [
+            { name: 'company_url', label: 'Audited URL', type: 'text' },
+            { name: 'readiness_score', label: 'Readiness Score', type: 'number' },
+            { name: 'score_rationale', label: 'Score Rationale', type: 'text' },
+            { name: 'risks', label: 'Risks', type: 'json' },
+            { name: 'opportunities', label: 'Opportunities', type: 'json' },
+            { name: 'next_action', label: 'Next Action', type: 'text' },
             { name: 'model', label: 'Model', type: 'text' },
           ],
         },
@@ -200,57 +195,42 @@ export const DEMOS: LaunchDemo[] = [
     },
   },
   {
-    slug: 'resume-screener',
-    name: 'Resume Screener',
+    slug: 'pitch-coach',
+    name: 'Pitch Coach',
     description:
-      'Rank candidate CVs against a job description. Upload a zip of PDFs and paste the JD, get a ranked shortlist with reasoning and must-have pass/fail per candidate.',
-    category: 'hiring',
+      'Paste a 20-500 char startup pitch. A single Gemini 2.5 Flash Lite call returns 3 direct critiques, 3 angle-specific rewrites, and a 1-line TL;DR of the biggest issue. Under 5 seconds.',
+    category: 'writing',
     icon: null,
     author: 'floom',
-    contextDir: 'examples/resume-screener',
+    contextDir: 'examples/pitch-coach',
     manifest: {
-      name: 'Resume Screener',
+      name: 'Pitch Coach',
       description:
-        'Rank candidate CVs against a job description using Gemini 3.',
+        'Roast + rewrite a startup pitch. 3 critiques with VC reactions, 3 rewrites by angle, 1 TL;DR.',
       runtime: 'python',
-      python_dependencies: ['pypdf>=4.2.0', 'google-genai>=0.8.0'],
+      python_dependencies: ['google-genai>=1.64.0,<2'],
       node_dependencies: {},
       secrets_needed: ['GEMINI_API_KEY'],
       manifest_version: '2.0',
       actions: {
-        screen: {
-          label: 'Screen Resumes',
+        coach: {
+          label: 'Coach Pitch',
           inputs: [
             {
-              name: 'cvs_zip',
-              label: 'Upload PDFs (single file or zip)',
-              type: 'file',
-              required: true,
-              description:
-                'A single candidate CV as a PDF, or a .zip of PDFs. Each PDF becomes one candidate.',
-            },
-            {
-              name: 'job_description',
-              label: 'Job Description',
+              name: 'pitch',
+              label: 'Pitch',
               type: 'textarea',
               required: true,
-              description:
-                'Free-text job description. The model ranks each CV against this.',
               placeholder:
-                'Paste the JD. Role, responsibilities, must-haves, nice-to-haves.',
-            },
-            {
-              name: 'must_haves',
-              label: 'Must-haves (one per line)',
-              type: 'textarea',
-              required: false,
+                'e.g. We help B2B ops teams stop losing leads to slow handoffs.',
               description:
-                'Optional hard requirements, one per line. Candidates missing one are flagged must_have_pass: false regardless of score.',
+                '20-500 characters. One or two sentences of startup pitch.',
             },
           ],
           outputs: [
-            { name: 'ranked', label: 'Ranked Candidates', type: 'json' },
-            { name: 'summary', label: 'Summary', type: 'text' },
+            { name: 'harsh_truth', label: 'Harsh Truth', type: 'json' },
+            { name: 'rewrites', label: 'Rewrites', type: 'json' },
+            { name: 'one_line_tldr', label: 'Biggest Issue', type: 'text' },
             { name: 'model', label: 'Model', type: 'text' },
           ],
         },
@@ -262,7 +242,7 @@ export const DEMOS: LaunchDemo[] = [
 function findRepoRoot(): string | null {
   const here = dirname(fileURLToPath(import.meta.url));
   // From apps/server/src/services or apps/server/dist/services, walk up
-  // until we find a directory that contains both `examples/lead-scorer`
+  // until we find a directory that contains both `examples/competitor-lens`
   // and `package.json`.
   const candidates = [
     resolve(here, '..', '..', '..', '..'),
@@ -272,7 +252,9 @@ function findRepoRoot(): string | null {
     resolve(process.cwd(), '..', '..'),
   ];
   for (const c of candidates) {
-    if (existsSync(resolve(c, 'examples', 'lead-scorer', 'Dockerfile'))) {
+    // Sentinel: one of the current showcase apps is always shipped under
+    // examples/. competitor-lens is the launch roster's 2026-04-25 anchor.
+    if (existsSync(resolve(c, 'examples', 'competitor-lens', 'Dockerfile'))) {
       return c;
     }
   }
@@ -532,7 +514,7 @@ export async function seedLaunchDemos(
   const repoRoot = options.repoRoot ?? findRepoRoot();
   if (!repoRoot) {
     logger.log(
-      '[launch-demos] repo root not found (no examples/lead-scorer/Dockerfile nearby) — skipping',
+      '[launch-demos] repo root not found (no examples/competitor-lens/Dockerfile nearby) — skipping',
     );
     return { apps_added: 0, apps_existing: 0, apps_failed: 0 };
   }
@@ -556,9 +538,9 @@ export async function seedLaunchDemos(
   //
   // Wireframe parity (2026-04-23): seed hero=1 on the 3 AI demo apps so
   // the /apps grid renders the accent "HERO" tag per v17 store.html. All
-  // three slugs in DEMOS are the AI demos (lead-scorer, competitor-
-  // analyzer, resume-screener) so a blanket hero=1 is correct here; if
-  // a non-hero demo is added later, gate this on demo.slug.
+  // three slugs in DEMOS are the bounded AI demos (competitor-lens,
+  // ai-readiness-audit, pitch-coach) so a blanket hero=1 is correct here;
+  // if a non-hero demo is added later, gate this on demo.slug.
   const insertApp = db.prepare(
     `INSERT INTO apps (id, slug, name, description, manifest, status, docker_image, code_path, category, author, icon, publish_status, hero)
      VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, 'published', 1)`,
@@ -590,6 +572,31 @@ export async function seedLaunchDemos(
   let failed = 0;
   let keptPrevious = 0;
   let markedInactive = 0;
+
+  // 2026-04-25 roster swap (Federico P0): the previous showcase slugs can
+  // exceed the demo budget on real inputs. Mark any leftover rows inactive
+  // so they stop appearing in the hub listing even if their docker images
+  // linger. The examples/ directory keeps the source for the v1.1 re-launch
+  // when the job queue ships.
+  const PREVIOUS_SHOWCASE_SLUGS = [
+    'lead-scorer',
+    'competitor-analyzer',
+    'resume-screener',
+  ];
+  const markPreviousInactive = db.prepare(
+    `UPDATE apps
+       SET status = 'inactive',
+           updated_at = datetime('now')
+     WHERE slug = ? AND status != 'inactive'`,
+  );
+  for (const oldSlug of PREVIOUS_SHOWCASE_SLUGS) {
+    const info = markPreviousInactive.run(oldSlug) as { changes: number };
+    if (info.changes > 0) {
+      logger.log(
+        `[launch-demos] ${oldSlug}: marked inactive (2026-04-25 roster swap)`,
+      );
+    }
+  }
 
   for (const demo of DEMOS) {
     const contextPath = resolve(repoRoot, demo.contextDir);
