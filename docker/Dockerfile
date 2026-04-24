@@ -39,10 +39,15 @@ COPY cli/floom/install.sh ./cli/floom/install.sh
 # Copy the fast-apps sidecar bundle into the build context so the runtime
 # stage can grab it from the builder image. Pure .mjs source, no build step.
 COPY examples/fast-apps ./examples/fast-apps
-# Launch demos (#252): the 3 showcase apps shipped as self-contained
-# python:3.12-slim images. services/launch-demos.ts reads each demo's
-# Dockerfile + source from these dirs on boot and builds the image against
-# the host docker daemon (via the mounted /var/run/docker.sock).
+# Launch demos: the showcase apps shipped as self-contained python:3.12-slim
+# images. services/launch-demos.ts reads each demo's Dockerfile + source
+# from these dirs on boot and builds the image against the host docker
+# daemon (via the mounted /var/run/docker.sock). Roster swapped 2026-04-25
+# to bounded <5s apps; old 3 stay under examples/ for v1.1 re-launch when
+# the job queue ships.
+COPY examples/competitor-lens ./examples/competitor-lens
+COPY examples/ai-readiness-audit ./examples/ai-readiness-audit
+COPY examples/pitch-coach ./examples/pitch-coach
 COPY examples/lead-scorer ./examples/lead-scorer
 COPY examples/competitor-analyzer ./examples/competitor-analyzer
 COPY examples/resume-screener ./examples/resume-screener
