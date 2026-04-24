@@ -131,10 +131,13 @@ COPY --from=builder /app/packages/renderer/src ./packages/renderer/src
 # empty hub.
 COPY --from=builder /app/examples/fast-apps ./examples/fast-apps
 
-# Launch demos (#252): source dirs consumed at boot by
-# services/launch-demos.ts to build + register the 3 showcase apps
-# (lead-scorer, competitor-analyzer, resume-screener).
-# Set FLOOM_SEED_LAUNCH_DEMOS=false to skip.
+# Launch demos: source dirs consumed at boot by services/launch-demos.ts
+# to build + register the showcase apps. Roster swapped 2026-04-25 to
+# bounded <5s apps; old 3 stay for v1.1 re-launch when the job queue
+# ships. Set FLOOM_SEED_LAUNCH_DEMOS=false to skip.
+COPY --from=builder /app/examples/competitor-lens ./examples/competitor-lens
+COPY --from=builder /app/examples/ai-readiness-audit ./examples/ai-readiness-audit
+COPY --from=builder /app/examples/pitch-coach ./examples/pitch-coach
 COPY --from=builder /app/examples/lead-scorer ./examples/lead-scorer
 COPY --from=builder /app/examples/competitor-analyzer ./examples/competitor-analyzer
 COPY --from=builder /app/examples/resume-screener ./examples/resume-screener
