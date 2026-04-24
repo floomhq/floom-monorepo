@@ -10,12 +10,26 @@
 // 2026-04-23 wireframe-parity pass: per-card sparkline is back (v17
 // `studio-my-apps.html` requires it). This time the sparkline is a
 // lean 7-bar strip (24px tall, 2px min bars) driven by REAL run data
-// from GET /api/hub/:slug/runs-by-day — not a fabricated series. The
-// hero stats row + ACTIVE/IDLE pills stay out. Scope: the sparkline,
-// nothing else. See components/studio/Sparkline.tsx.
+// from GET /api/hub/:slug/runs-by-day — not a fabricated series.
+//
+// 2026-04-24 v17 full wireframe parity pass (see issue #__studio-parity):
+// aligned with v17/studio-home.html + v17/studio-my-apps.html +
+// v17/studio-empty.html. Adds:
+//   - "MY APPS" eyebrow + DM-serif headline that adapts to live/draft counts
+//   - metrics row (runs 7d · active apps) derived client-side from
+//     CreatorApp list; success/latency/unique-users intentionally not
+//     shown (no real server data yet — refuse to fake numbers per
+//     feedback_never_fabricate)
+//   - cross-app activity feed below the grid, fed by GET /api/me/runs
+//     (existing getMyRuns API)
+//   - 3-card empty state (GitHub / Docker / OpenAPI) mirroring
+//     studio-empty.html's entry-card grid
+//   - LIVE/DRAFT pill on each card, monochrome letter chip, mini
+//     thumbnail lines matching the wireframe's app-thumb pattern
 //
 // Preserved: app cards (name, slug, description, total runs, last run),
-// the "+ New app" CTA, the empty state, and the delete-confirm dialog.
+// the primary "+ New app" CTA, waitlist gating, the delete-confirm
+// dialog, visibility + publish-status pills.
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -27,7 +41,11 @@ import { refreshMyApps, useMyApps } from '../hooks/useMyApps';
 import { useSession } from '../hooks/useSession';
 import { useDeployEnabled } from '../lib/flags';
 import { formatTime } from '../lib/time';
-import type { AppVisibility, CreatorApp } from '../lib/types';
+import type {
+  AppVisibility,
+  CreatorApp,
+  MeRunSummary,
+} from '../lib/types';
 import { DescriptionMarkdown } from '../components/DescriptionMarkdown';
 import { WaitlistModal } from '../components/WaitlistModal';
 
@@ -38,6 +56,7 @@ export function StudioHomePage() {
   const [confirmSlug, setConfirmSlug] = useState<string | null>(null);
   const [confirmInput, setConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [recentRuns, setRecentRuns] = useState<MeRunSummary[] | null>(null);
   const signedOutPreview = !!session && session.cloud_mode && session.user.is_local;
   // Launch flag. Null while session loads → fall back to showing the
   // original + New app / Start publishing CTAs rather than flickering.
@@ -55,6 +74,27 @@ export function StudioHomePage() {
     if (loadError) setError(loadError.message);
   }, [loadError, signedOutPreview]);
 
+  // Fetch the cross-app activity feed. Only runs when we have a real
+  // signed-in session (not the signed-out preview). Falls back to an
+  // empty array on error so the panel shows an honest "no runs yet"
+  // empty state instead of faking data.
+  useEffect(() => {
+    if (signedOutPreview) return;
+    if (!apps || apps.length === 0) return;
+    let cancelled = false;
+    api
+      .getMyRuns(6)
+      .then((resp) => {
+        if (!cancelled) setRecentRuns(resp.runs);
+      })
+      .catch(() => {
+        if (!cancelled) setRecentRuns([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apps, signedOutPreview]);
+
   async function handleDelete() {
     if (!confirmSlug) return;
     setDeleting(true);
@@ -70,6 +110,17 @@ export function StudioHomePage() {
     }
   }
 
+  // Client-side metrics derived from the apps list. We deliberately
+  // only show numbers we can verify — total run count summed from the
+  // per-app counters, and the live/draft split. Success rate, p50
+  // latency, unique users appear in the wireframe but require hub-level
+  // aggregates the API doesn't expose yet; per
+  // memory/feedback_never_fabricate.md we leave them out rather than
+  // hardcode an "illustrative" number.
+  const liveCount = apps?.filter((a) => a.publish_status !== 'draft').length ?? 0;
+  const draftCount = apps?.filter((a) => a.publish_status === 'draft').length ?? 0;
+  const totalRuns = apps?.reduce((sum, a) => sum + (a.run_count || 0), 0) ?? 0;
+
   return (
     <StudioLayout
       title="Studio · Floom"
@@ -80,133 +131,186 @@ export function StudioHomePage() {
           <StudioSignedOutState />
         ) : (
           <>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 24,
-            gap: 16,
-            flexWrap: 'wrap',
-          }}
-        >
-          <h1
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 28,
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
-              lineHeight: 1.1,
-              margin: 0,
-              color: 'var(--ink)',
-            }}
-          >
-            Your apps
-          </h1>
-          {waitlistMode ? (
-            <button
-              type="button"
-              onClick={() => setWaitlistOpen(true)}
-              data-testid="studio-new-app-waitlist"
-              className="btn-ink"
-              style={{ border: 'none', cursor: 'pointer', font: 'inherit' }}
-            >
-              Join waitlist
-            </button>
-          ) : (
-            <Link
-              to="/studio/build"
-              data-testid="studio-new-app-cta"
-              className="btn-ink"
-              style={{ textDecoration: 'none' }}
-            >
-              + New app
-            </Link>
-          )}
-        </div>
-
-        {error && (
-          <div
-            style={{
-              background: '#fdecea',
-              border: '1px solid #f4b7b1',
-              color: '#c2321f',
-              borderRadius: 10,
-              padding: '14px 18px',
-              marginBottom: 20,
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {!apps && !error && (
-          <div data-testid="studio-loading" style={{ color: 'var(--muted)', padding: 32 }}>
-            Loading...
-          </div>
-        )}
-
-        {apps && apps.length === 0 && (
-          <div
-            data-testid="studio-empty"
-            style={{
-              textAlign: 'center',
-              padding: '64px 24px',
-              background: 'var(--card)',
-              border: '1px dashed var(--line)',
-              borderRadius: 12,
-            }}
-          >
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)', margin: '0 0 8px' }}>
-              Ship your first app in 2 minutes
-            </h3>
-            <p
+            {/* Hero: eyebrow + DM-serif headline + primary CTA. Headline
+                adapts to the app list so the page reads like it knows
+                you: "Ship your first app." when empty, "One app live."
+                etc when populated. Mirrors v17/studio-my-apps.html. */}
+            <div
               style={{
-                fontSize: 13,
-                color: 'var(--muted)',
-                margin: '0 auto 20px',
-                maxWidth: 380,
-                lineHeight: 1.55,
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'space-between',
+                gap: 20,
+                marginBottom: 26,
+                flexWrap: 'wrap',
               }}
             >
-              Paste your app's link. Floom gives you a Claude tool, a page to share, a CLI, and a URL your teammates can hit.
-            </p>
-            {waitlistMode ? (
-              <button
-                type="button"
-                onClick={() => setWaitlistOpen(true)}
-                data-testid="studio-empty-waitlist"
-                className="btn-ink"
-                style={{ border: 'none', cursor: 'pointer', font: 'inherit' }}
-              >
-                Join waitlist
-              </button>
-            ) : (
-              <Link to="/studio/build" className="btn-ink">
-                Start publishing
-              </Link>
-            )}
-          </div>
-        )}
+              <div style={{ minWidth: 0, flex: '1 1 420px' }}>
+                <div
+                  style={{
+                    fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: 'var(--accent)',
+                    marginBottom: 6,
+                  }}
+                >
+                  My apps
+                </div>
+                <h1
+                  data-testid="studio-home-headline"
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 30,
+                    fontWeight: 400,
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1.1,
+                    margin: 0,
+                    color: 'var(--ink)',
+                  }}
+                >
+                  {studioHeadline(apps, liveCount, draftCount)}
+                </h1>
+                {apps && apps.length > 0 && (
+                  <p
+                    style={{
+                      fontSize: 13.5,
+                      color: 'var(--muted)',
+                      lineHeight: 1.55,
+                      margin: '8px 0 0',
+                      maxWidth: 520,
+                    }}
+                  >
+                    Apps you&rsquo;ve built and published. Installed apps live on your{' '}
+                    <Link to="/me/apps" style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                      Me · Installed
+                    </Link>{' '}
+                    page.
+                  </p>
+                )}
+              </div>
+              {waitlistMode ? (
+                <button
+                  type="button"
+                  onClick={() => setWaitlistOpen(true)}
+                  data-testid="studio-new-app-waitlist"
+                  className="btn-ink"
+                  style={{ border: 'none', cursor: 'pointer', font: 'inherit' }}
+                >
+                  Join waitlist
+                </button>
+              ) : (
+                <Link
+                  to="/studio/build"
+                  data-testid="studio-new-app-cta"
+                  className="btn-ink"
+                  style={{ textDecoration: 'none' }}
+                >
+                  + Deploy new app
+                </Link>
+              )}
+            </div>
 
-        {apps && apps.length > 0 && (
-          <div
-            data-testid="studio-apps-list"
-            style={{
-              display: 'grid',
-              gap: 12,
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            }}
-          >
-            {apps.map((a) => (
-              <AppCard
-                key={a.slug}
-                app={a}
-                onDelete={() => setConfirmSlug(a.slug)}
-              />
-            ))}
-          </div>
-        )}
+            {error && (
+              <div
+                style={{
+                  background: '#fdecea',
+                  border: '1px solid #f4b7b1',
+                  color: '#c2321f',
+                  borderRadius: 10,
+                  padding: '14px 18px',
+                  marginBottom: 20,
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            {!apps && !error && (
+              <div data-testid="studio-loading" style={{ color: 'var(--muted)', padding: 32 }}>
+                Loading...
+              </div>
+            )}
+
+            {/* Metrics row. Two honest cells (Runs · total, Apps live) —
+                see note above re: deliberate omission of success/latency/
+                users until we have a real aggregates endpoint. */}
+            {apps && apps.length > 0 && (
+              <div
+                data-testid="studio-metrics-row"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: 12,
+                  marginBottom: 28,
+                }}
+              >
+                <MetricCell label="Runs · total" value={totalRuns.toLocaleString()} />
+                <MetricCell
+                  label="Apps"
+                  value={String(apps.length)}
+                  sub={`${liveCount} live${draftCount > 0 ? ` · ${draftCount} draft` : ''}`}
+                />
+                <MetricCell
+                  label="Last run"
+                  value={lastRunLabel(apps)}
+                />
+              </div>
+            )}
+
+            {apps && apps.length === 0 && <StudioEmptyState waitlistMode={waitlistMode} onWaitlist={() => setWaitlistOpen(true)} />}
+
+            {apps && apps.length > 0 && (
+              <>
+                {/* Section rail. Mirrors wireframe: mono eyebrow + hairline. */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: 12,
+                    fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    color: 'var(--muted)',
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  <span>Your apps</span>
+                  <span
+                    aria-hidden="true"
+                    style={{ flex: 1, height: 1, background: 'var(--line)' }}
+                  />
+                </div>
+                <div
+                  data-testid="studio-apps-list"
+                  style={{
+                    display: 'grid',
+                    gap: 14,
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                    marginBottom: 28,
+                  }}
+                >
+                  {apps.map((a) => (
+                    <AppCard
+                      key={a.slug}
+                      app={a}
+                      onDelete={() => setConfirmSlug(a.slug)}
+                    />
+                  ))}
+                </div>
+
+                {/* Cross-app activity feed. Lifted from v17 studio-home +
+                    studio-my-apps wireframes. Hidden when there are no
+                    runs yet. */}
+                {recentRuns && recentRuns.length > 0 && (
+                  <ActivityFeed runs={recentRuns} />
+                )}
+              </>
+            )}
           </>
         )}
 
@@ -314,6 +418,401 @@ export function StudioHomePage() {
   );
 }
 
+// ------------------------------------------------------------------
+// Headline + metric helpers
+// ------------------------------------------------------------------
+
+function studioHeadline(
+  apps: CreatorApp[] | null | undefined,
+  liveCount: number,
+  draftCount: number,
+): string {
+  if (!apps) return 'Your apps';
+  if (apps.length === 0) return 'Ship your first app.';
+  const liveLabel =
+    liveCount === 0
+      ? 'No apps live yet'
+      : liveCount === 1
+        ? 'One app live'
+        : `${liveCount} apps live`;
+  if (draftCount === 0) return `${liveLabel}.`;
+  const draftLabel =
+    draftCount === 1 ? 'one draft' : `${draftCount} drafts`;
+  return `${liveLabel}. ${capitalize(draftLabel)}.`;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function lastRunLabel(apps: CreatorApp[]): string {
+  const latest = apps
+    .map((a) => a.last_run_at)
+    .filter((v): v is string => !!v)
+    .sort((a, b) => (a < b ? 1 : -1))[0];
+  if (!latest) return 'never';
+  return formatTime(latest);
+}
+
+function MetricCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div
+      style={{
+        background: 'var(--card)',
+        border: '1px solid var(--line)',
+        borderRadius: 10,
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: 'var(--muted)',
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 700,
+          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          letterSpacing: '-0.01em',
+          color: 'var(--ink)',
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{sub}</div>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Empty state — 3 entry cards (GitHub / Docker / OpenAPI)
+// Mirrors v17/studio-empty.html entry-grid. Every card points to the
+// same /studio/build surface today (the build page auto-detects paste
+// type); we keep three cards so the affordances match the wireframe
+// and the visual language signals "any of these inputs are fine".
+// ------------------------------------------------------------------
+
+function StudioEmptyState({
+  waitlistMode,
+  onWaitlist,
+}: {
+  waitlistMode: boolean;
+  onWaitlist: () => void;
+}) {
+  const entries: Array<{ title: string; desc: string }> = [
+    { title: 'From GitHub', desc: 'Paste a repo URL. We read the Dockerfile.' },
+    { title: 'Docker image', desc: 'Bring an image tag. Bind secrets, go.' },
+    { title: 'OpenAPI spec', desc: 'Paste the spec URL. We wrap the API.' },
+  ];
+  return (
+    <div
+      data-testid="studio-empty"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+        padding: '48px 24px 56px',
+        background: 'var(--card)',
+        border: '1px solid var(--line)',
+        borderRadius: 14,
+      }}
+    >
+      <div
+        aria-hidden="true"
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 14,
+          background: 'var(--accent-soft)',
+          border: '1px solid var(--accent-border, #a7f3d0)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 18,
+        }}
+      >
+        <svg
+          width="26"
+          height="26"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </div>
+      <h3
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 28,
+          fontWeight: 400,
+          letterSpacing: '-0.02em',
+          lineHeight: 1.1,
+          margin: '0 0 8px',
+          color: 'var(--ink)',
+        }}
+      >
+        Ship your first app.
+      </h3>
+      <p
+        style={{
+          fontSize: 14,
+          color: 'var(--muted)',
+          margin: '0 auto 24px',
+          maxWidth: 480,
+          lineHeight: 1.55,
+        }}
+      >
+        Paste a GitHub URL, a Docker image, or an OpenAPI spec. Floom packages it as a runnable app with a public page, an MCP endpoint, and a JSON API. Under 60 seconds.
+      </p>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 10,
+          maxWidth: 620,
+          width: '100%',
+          marginBottom: 20,
+        }}
+      >
+        {entries.map((e) => {
+          const common = {
+            display: 'flex',
+            flexDirection: 'column' as const,
+            gap: 6,
+            padding: 14,
+            textAlign: 'left' as const,
+            background: 'var(--bg)',
+            border: '1px solid var(--line)',
+            borderRadius: 10,
+            color: 'inherit',
+            textDecoration: 'none',
+            fontFamily: 'inherit',
+          };
+          return waitlistMode ? (
+            <button
+              key={e.title}
+              type="button"
+              onClick={onWaitlist}
+              data-testid={`studio-empty-entry-${slugify(e.title)}`}
+              style={{ ...common, cursor: 'pointer' }}
+            >
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>{e.title}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{e.desc}</div>
+            </button>
+          ) : (
+            <Link
+              key={e.title}
+              to="/studio/build"
+              data-testid={`studio-empty-entry-${slugify(e.title)}`}
+              style={common}
+            >
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>{e.title}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{e.desc}</div>
+            </Link>
+          );
+        })}
+      </div>
+      {waitlistMode ? (
+        <button
+          type="button"
+          onClick={onWaitlist}
+          data-testid="studio-empty-waitlist"
+          className="btn-ink"
+          style={{ border: 'none', cursor: 'pointer', font: 'inherit' }}
+        >
+          Join waitlist
+        </button>
+      ) : (
+        <Link to="/studio/build" data-testid="studio-empty-cta" className="btn-ink">
+          Deploy from GitHub
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+// ------------------------------------------------------------------
+// Cross-app activity feed
+// ------------------------------------------------------------------
+
+function ActivityFeed({ runs }: { runs: MeRunSummary[] }) {
+  return (
+    <div
+      data-testid="studio-activity-feed"
+      style={{
+        background: 'var(--card)',
+        border: '1px solid var(--line)',
+        borderRadius: 12,
+        padding: '16px 18px 6px',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'var(--accent)',
+            }}
+          >
+            Recent activity · cross-app
+          </div>
+          <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>
+            Latest runs across your apps
+          </div>
+        </div>
+        <Link
+          to="/me/runs"
+          data-testid="studio-activity-see-all"
+          style={{
+            fontSize: 12.5,
+            color: 'var(--muted)',
+            textDecoration: 'none',
+            fontWeight: 500,
+          }}
+        >
+          See all →
+        </Link>
+      </div>
+      <div style={{ borderTop: '1px solid var(--line)', margin: '0 -18px' }}>
+        {runs.map((run) => (
+          <ActivityRow key={run.id} run={run} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ActivityRow({ run }: { run: MeRunSummary }) {
+  const failed = run.status === 'error' || run.status === 'timeout';
+  const dotColor = failed ? '#ef4444' : 'var(--accent)';
+  const dotHalo = failed ? '#fef2f2' : 'var(--accent-soft)';
+  const durationLabel = run.duration_ms != null ? formatDuration(run.duration_ms) : '—';
+  const appLabel = run.app_name || run.app_slug || 'app';
+  const viewHref = `/me/runs/${run.id}`;
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '16px minmax(0,1fr) auto auto auto',
+        gap: 12,
+        alignItems: 'center',
+        padding: '10px 18px',
+        borderBottom: '1px solid var(--line)',
+        fontSize: 12.5,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 999,
+          background: dotColor,
+          boxShadow: `0 0 0 3px ${dotHalo}`,
+          display: 'inline-block',
+        }}
+      />
+      <div
+        style={{
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{appLabel}</span>{' '}
+        <span style={{ color: 'var(--muted)' }}>· {run.action}</span>
+        {failed && run.error && (
+          <span
+            style={{
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontSize: 11,
+              color: '#ef4444',
+              marginLeft: 6,
+            }}
+          >
+            · {truncate(run.error, 40)}
+          </span>
+        )}
+      </div>
+      <span
+        style={{
+          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          color: 'var(--muted)',
+          fontSize: 11.5,
+        }}
+      >
+        {durationLabel}
+      </span>
+      <span style={{ color: 'var(--muted)', fontSize: 11.5 }}>
+        {formatTime(run.started_at)}
+      </span>
+      <Link
+        to={viewHref}
+        style={{
+          fontSize: 12,
+          color: 'var(--accent)',
+          textDecoration: 'none',
+          fontWeight: 500,
+        }}
+      >
+        View →
+      </Link>
+    </div>
+  );
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function truncate(s: string, n: number): string {
+  if (s.length <= n) return s;
+  return `${s.slice(0, n - 1)}…`;
+}
+
+// ------------------------------------------------------------------
+// AppCard — v17 shape
+// ------------------------------------------------------------------
+
 function AppCard({
   app,
   onDelete,
@@ -321,6 +820,8 @@ function AppCard({
   app: CreatorApp;
   onDelete: () => void;
 }) {
+  const isDraft = app.publish_status === 'draft';
+  const initials = app.slug.slice(0, 2).toUpperCase();
   return (
     <div
       data-testid={`studio-app-card-${app.slug}`}
@@ -331,53 +832,137 @@ function AppCard({
         padding: 18,
         display: 'flex',
         flexDirection: 'column',
-        gap: 10,
-        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+        gap: 12,
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--muted)';
         e.currentTarget.style.boxShadow = '0 4px 16px rgba(15, 23, 42, 0.04)';
+        e.currentTarget.style.transform = 'translateY(-1px)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--line)';
         e.currentTarget.style.boxShadow = 'none';
+        e.currentTarget.style.transform = 'none';
       }}
     >
-      <div style={{ minWidth: 0 }}>
+      {/* Row 1: monochrome letter chip + name/last-run + LIVE/DRAFT pill */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div
+          aria-hidden="true"
           style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            marginBottom: 3,
-            flexWrap: 'wrap',
+            justifyContent: 'center',
+            fontSize: 15,
+            fontWeight: 700,
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            background: 'var(--bg)',
+            border: '1px solid var(--line)',
+            color: 'var(--ink)',
+            flexShrink: 0,
           }}
         >
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
-            {app.name}
-          </div>
-          {app.visibility && <VisibilityBadge value={app.visibility} />}
-          {app.publish_status && app.publish_status !== 'published' && (
-            <PublishStatusBadge value={app.publish_status} />
-          )}
+          {initials}
         </div>
-        <div style={{ fontSize: 11.5, fontFamily: 'JetBrains Mono, monospace', color: 'var(--muted)' }}>
-          /p/{app.slug}
-        </div>
-        {app.publish_status === 'pending_review' && (
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div
-            data-testid={`studio-app-card-pending-review-${app.slug}`}
             style={{
-              marginTop: 6,
-              fontSize: 12,
-              color: '#92400e',
-              lineHeight: 1.4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
             }}
           >
-            Pending review — Federico will take a look before this appears on the public Store.
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
+              {app.name}
+            </div>
+            {app.visibility && <VisibilityBadge value={app.visibility} />}
+            {app.publish_status && app.publish_status !== 'published' && app.publish_status !== 'draft' && (
+              <PublishStatusBadge value={app.publish_status} />
+            )}
           </div>
+          <div
+            style={{
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontSize: 10.5,
+              color: 'var(--muted)',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              marginTop: 2,
+            }}
+          >
+            /p/{app.slug}
+          </div>
+        </div>
+        {isDraft ? (
+          <span
+            data-testid={`studio-app-card-draft-${app.slug}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 7px',
+              borderRadius: 999,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              background: '#fef3c7',
+              color: '#92400e',
+              border: '1px solid #fde68a',
+              flexShrink: 0,
+            }}
+          >
+            DRAFT
+          </span>
+        ) : (
+          <span
+            data-testid={`studio-app-card-live-${app.slug}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '2px 8px',
+              borderRadius: 999,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              background: 'var(--accent-soft)',
+              color: 'var(--accent)',
+              border: '1px solid var(--accent-border, #a7f3d0)',
+              flexShrink: 0,
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: 999,
+                background: 'var(--accent)',
+                display: 'inline-block',
+              }}
+            />
+            LIVE
+          </span>
         )}
       </div>
+
+      {app.publish_status === 'pending_review' && (
+        <div
+          data-testid={`studio-app-card-pending-review-${app.slug}`}
+          style={{
+            fontSize: 12,
+            color: '#92400e',
+            lineHeight: 1.4,
+          }}
+        >
+          Pending review — Federico will take a look before this appears on the public Store.
+        </div>
+      )}
+
       {/* 2026-04-23: Fix #413 — app descriptions are markdown-enabled
           (per DescriptionMarkdown component). Previously rendered as
           plain text, so `## Heading\n` strings showed up literally in
@@ -413,15 +998,19 @@ function AppCard({
           '(no description)'
         )}
       </div>
+
       {/* 2026-04-23 wireframe parity: per-card 7-day sparkline. Bars
           come from GET /api/hub/:slug/runs-by-day?days=7 (zero-filled
           server-side). Muted when the app has never run so the
           flat-empty strip reads as absence not failure. */}
       <Sparkline slug={app.slug} days={7} muted={app.run_count === 0} />
+
       <div
         style={{
           display: 'flex',
-          gap: 10,
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
           fontSize: 12,
           color: 'var(--muted)',
           paddingTop: 8,
@@ -429,11 +1018,20 @@ function AppCard({
         }}
       >
         <span>
-          <strong style={{ color: 'var(--ink)' }}>{app.run_count}</strong> total
+          <strong
+            style={{
+              color: 'var(--ink)',
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            }}
+          >
+            {app.run_count.toLocaleString()}
+          </strong>{' '}
+          runs{' '}
+          <span aria-hidden="true" style={{ margin: '0 2px' }}>·</span>{' '}
+          {app.last_run_at ? `last ${formatTime(app.last_run_at)}` : 'never run'}
         </span>
-        <span aria-hidden="true">·</span>
-        <span>{app.last_run_at ? `last ${formatTime(app.last_run_at)}` : 'never run'}</span>
       </div>
+
       <div
         style={{
           display: 'flex',
