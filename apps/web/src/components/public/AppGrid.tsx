@@ -110,6 +110,11 @@ function formatRuns(n: number): string {
  *
  * All monochrome, all ~30px tall, all using the warm-dark CARD_NEUTRAL
  * token so the thumbnail band still reads as a single restrained surface.
+ *
+ * 2026-04-24 polish: dropped the 1px inner border on each viz panel.
+ * Together with the outer card border it read as two nested rectangles
+ * (Federico screenshot @ 2232). Tinted white background alone is enough
+ * to distinguish the viz from the band — the card stays unified.
  */
 function MiniViz({ slug, foreground }: { slug: string; foreground: string }) {
   // Shared utility: a little horizontal bar, used by several viz shapes.
@@ -151,7 +156,6 @@ function MiniViz({ slug, foreground }: { slug: string; foreground: string }) {
           position: 'absolute',
           inset: 14,
           background: 'rgba(255,255,255,0.78)',
-          border: '1px solid rgba(14,14,12,0.07)',
           borderRadius: 5,
           display: 'flex',
           flexDirection: 'column',
@@ -191,7 +195,6 @@ function MiniViz({ slug, foreground }: { slug: string; foreground: string }) {
           position: 'absolute',
           inset: 14,
           background: 'rgba(255,255,255,0.78)',
-          border: '1px solid rgba(14,14,12,0.07)',
           borderRadius: 5,
           display: 'flex',
           flexDirection: 'column',
@@ -311,7 +314,6 @@ function MiniViz({ slug, foreground }: { slug: string; foreground: string }) {
           position: 'absolute',
           inset: 14,
           background: 'rgba(255,255,255,0.78)',
-          border: '1px solid rgba(14,14,12,0.07)',
           borderRadius: 5,
           display: 'flex',
           flexDirection: 'column',
@@ -385,18 +387,26 @@ export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
   const heroCount = apps.reduce((n, a) => n + (a.hero ? 1 : 0), 0);
   const suppressHeroBadge = apps.length > 1 && heroCount === apps.length;
 
-  // Grid layout (2026-04-24): switched from fixed `repeat(4, 1fr)` to
-  // `auto-fit` so the directory doesn't leave a dead empty column when
-  // the app count is smaller than 4. At launch there are 3 showcase apps
-  // in the prod curation, which previously rendered as 3 cards + one
-  // ~400px hole on the right (audit screenshot `apps-prod.png`). With
-  // auto-fit the 3 cards now expand to fill the 1180px container. When
-  // the directory grows past 4 apps the layout naturally settles back to
-  // a tight 4-col grid.
-  const gridColumns =
-    apps.length <= 3
-      ? `repeat(${Math.max(1, apps.length)}, minmax(240px, 1fr))`
-      : 'repeat(auto-fill, minmax(260px, 1fr))';
+  // Grid layout (2026-04-24, revised for #679): `auto-fill` with a capped
+  // max track width so cards keep a consistent size regardless of how many
+  // match the current filter.
+  //
+  // Two requirements at once:
+  //   1. At the prod-launch count of 3 apps, cards should fill the ~1180px
+  //      container without a dead ~400px empty column on the right.
+  //   2. When a tag filter narrows to 1 or 2 matches, each card must keep
+  //      its ~380px width — NOT stretch to the full container. (Regression
+  //      #679: "Growth" filter left one full-width card with 1600px thumbnail
+  //      bars and unreadable line length; Federico screenshot 22:33.)
+  //
+  // The earlier fix sized the grid to the filtered count
+  // (`repeat(N, minmax(240px, 1fr))`), which collapsed to a single full-width
+  // column when only one card remained. `auto-fill` with a bounded 380px max
+  // keeps column tracks the same width whether the filter returns 1 card or
+  // 10 — empty tracks stay empty, and `justify-content: start` left-aligns
+  // the cards when the set doesn't fill the row. 3 × 380 + 2 × 16 gap ≈ 1172px,
+  // so the 3-up launch layout still sits neatly inside the 1180px container.
+  const gridColumns = 'repeat(auto-fill, minmax(260px, 380px))';
 
   return (
     <div
@@ -405,6 +415,7 @@ export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
         display: 'grid',
         gridTemplateColumns: gridColumns,
         gap: 16,
+        justifyContent: 'start',
       }}
       className="app-grid"
     >
@@ -418,7 +429,9 @@ export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
       ))}
       <style>{`
         @media (max-width: 1024px) {
-          .app-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important; }
+          /* Bounded max track so a single filtered card doesn't stretch
+             to fill the row on tablets (regression #679). */
+          .app-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 360px)) !important; }
         }
         @media (max-width: 760px) {
           .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
