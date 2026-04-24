@@ -15,7 +15,21 @@ import { extractIp } from './client-ip.js';
 import { recordRateLimitHit } from './metrics-counters.js';
 import { sendDiscordAlert } from './alerts.js';
 
-type Scope = 'ip' | 'user' | 'app' | 'mcp_ingest';
+type Scope = 'ip' | 'user' | 'app' | 'mcp_ingest' | 'write' | 'read-heavy';
+
+/**
+ * Policy tier for the generic rate-limit middleware. Each tier has its own
+ * per-IP + per-user caps (see `defaultWrite*PerHour` / `defaultReadHeavy*PerHour`).
+ *
+ * - `write`: mutating endpoints (POST/PATCH/PUT/DELETE) that aren't run
+ *   surfaces. Standard cap — slightly tighter than `run` because there's no
+ *   per-slug bucket to absorb bursts.
+ * - `read-heavy`: list/search/scan endpoints that return many rows and are a
+ *   scraping vector (e.g. `/api/hub` directory, `/api/me/runs` history,
+ *   `/api/session/me` identity probe). Lower cap to make mass enumeration
+ *   expensive without hurting normal users.
+ */
+export type PolicyTier = 'write' | 'read-heavy';
 
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -47,6 +61,21 @@ export const defaultPerAppPerHour = (): number =>
   envNumber('FLOOM_RATE_LIMIT_APP_PER_HOUR', 500);
 export const defaultMcpIngestPerDay = (): number =>
   envNumber('FLOOM_RATE_LIMIT_MCP_INGEST_PER_DAY', 10);
+
+// Tiered caps (issue #600, 2026-04-23). Defense-in-depth on every mutation
+// and heavy read endpoint. `write` is tighter than `run` because there's no
+// per-slug bucket to share across apps, and writes typically do a database
+// round-trip regardless of payload. `read-heavy` is tightest — these are
+// list/search/identity-probe endpoints that are the most attractive scraping
+// targets. All are independently tunable at boot.
+export const defaultWriteIpPerHour = (): number =>
+  envNumber('FLOOM_RATE_LIMIT_WRITE_IP_PER_HOUR', 120);
+export const defaultWriteUserPerHour = (): number =>
+  envNumber('FLOOM_RATE_LIMIT_WRITE_USER_PER_HOUR', 600);
+export const defaultReadHeavyIpPerHour = (): number =>
+  envNumber('FLOOM_RATE_LIMIT_READ_HEAVY_IP_PER_HOUR', 90);
+export const defaultReadHeavyUserPerHour = (): number =>
+  envNumber('FLOOM_RATE_LIMIT_READ_HEAVY_USER_PER_HOUR', 900);
 
 // Re-export: historical import path is ../lib/rate-limit.js
 export { extractIp } from './client-ip.js';
@@ -301,6 +330,129 @@ export function runRateLimitMiddleware(
       applyLimitHeaders(c, p, primaryCap, primaryScope);
     }
     return next();
+  };
+}
+
+/**
+ * Tiered middleware for non-run write + read-heavy endpoints (#600).
+ *
+ * Separate from `runRateLimitMiddleware` on purpose: run surfaces want the
+ * per-(IP, app) bucket so one slug can't monopolize the process, but writes
+ * (create workspace, upsert secret, edit trigger) and heavy reads (hub
+ * directory, session probe) have no app context. Keying on IP + user is
+ * enough.
+ *
+ * The primary key (IP when anon, user when authed) and the stored window are
+ * deliberately namespaced with the tier so `write` and `read-heavy` don't
+ * share a bucket with each other or with `run`. A user who pulls their run
+ * history (`read-heavy`) still has full headroom to create a workspace
+ * (`write`) in the same hour.
+ *
+ * Admin bearer (`FLOOM_AUTH_TOKEN`) bypasses the check — same policy as
+ * `runRateLimitMiddleware`. FLOOM_RATE_LIMIT_DISABLED=true skips every tier.
+ */
+export function genericRateLimitMiddleware(
+  tier: PolicyTier,
+  resolveCtx: (c: Context) => Promise<SessionContext>,
+): MiddlewareHandler {
+  return async (c, next) => {
+    if (isRateLimitDisabled()) return next();
+    if (hasValidAdminBearer(c)) return next();
+    const now = Date.now();
+    const windowMs = 3600 * 1000;
+    const ip = extractIp(c);
+    const ctx = await resolveCtx(c);
+
+    const anonCap =
+      tier === 'write' ? defaultWriteIpPerHour() : defaultReadHeavyIpPerHour();
+    const userCap =
+      tier === 'write'
+        ? defaultWriteUserPerHour()
+        : defaultReadHeavyUserPerHour();
+
+    const primaryKey = ctx.is_authenticated
+      ? `${tier}:user:${ctx.user_id}`
+      : `${tier}:ip:${ip}`;
+    const primaryCap = ctx.is_authenticated ? userCap : anonCap;
+    const r = incrementAndCheck(primaryKey, primaryCap, windowMs, now);
+    if (!r.allowed) return rateLimitResponse(c, tier, r, primaryCap);
+    applyLimitHeaders(c, r, primaryCap, tier);
+    return next();
+  };
+}
+
+/**
+ * Paths already covered by `runRateLimitMiddleware` (the `run` tier with
+ * per-slug buckets). These MUST pass through the generic `write` tier
+ * un-touched so we don't double-charge a single request against two
+ * buckets. Matching is prefix-based because sub-paths like
+ * `/api/hub/ingest/...` shouldn't exist today but adding them later
+ * shouldn't silently introduce a double-charge.
+ */
+/**
+ * Exact paths already covered by `runRateLimitMiddleware` — the `run` tier
+ * with per-slug buckets. These MUST pass through the generic `write` tier
+ * un-touched so we don't double-charge a single request against two
+ * buckets.
+ *
+ * Only exact matches or explicit sub-paths count here; `/api/run/:id/share`
+ * is NOT a run-tier path even though it shares the `/api/run` prefix — it's
+ * a share-link write and belongs in the generic `write` tier.
+ */
+function isRunTierPath(path: string): boolean {
+  // Root run endpoints (exact match).
+  if (path === '/api/run') return true;
+  if (path === '/api/hub/ingest') return true;
+  // MCP per-app: /mcp/app/:slug and any sub-path (tool-call echoes).
+  if (path === '/mcp/app' || path.startsWith('/mcp/app/')) return true;
+  // /api/:slug/run — exact, not share/result.
+  if (/^\/api\/[^/]+\/run$/.test(path)) return true;
+  // /api/:slug/jobs — exact enqueue/list, NOT the /:job_id sub-path which
+  // is a read the generic read-heavy tier should throttle.
+  if (/^\/api\/[^/]+\/jobs$/.test(path)) return true;
+  return false;
+}
+
+/**
+ * Wrap `genericRateLimitMiddleware('write', ...)` so it only applies to
+ * mutating HTTP methods. Useful on routers that mix GET + write methods on
+ * the same path prefix (e.g. `/api/workspaces`, where GET /:id is a read
+ * but PATCH /:id / DELETE /:id are writes). GETs fall through to the
+ * appropriate read-heavy middleware (if mounted) or flow un-throttled.
+ *
+ * Also skips paths already covered by the `run` tier so a single request
+ * isn't charged against two buckets (see `isRunTierPath`).
+ */
+export function writeOnlyRateLimitMiddleware(
+  resolveCtx: (c: Context) => Promise<SessionContext>,
+): MiddlewareHandler {
+  const inner = genericRateLimitMiddleware('write', resolveCtx);
+  return async (c, next) => {
+    const method = c.req.method.toUpperCase();
+    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+      return next();
+    }
+    const path = new URL(c.req.url).pathname;
+    if (isRunTierPath(path)) return next();
+    return inner(c, next);
+  };
+}
+
+/**
+ * Wrap `genericRateLimitMiddleware('read-heavy', ...)` so it only applies
+ * to GET/HEAD. Mounted on path prefixes that mix reads + writes (e.g.
+ * `/api/hub/*`), the write counterpart handles the mutating methods.
+ */
+export function readOnlyRateLimitMiddleware(
+  resolveCtx: (c: Context) => Promise<SessionContext>,
+): MiddlewareHandler {
+  const inner = genericRateLimitMiddleware('read-heavy', resolveCtx);
+  return async (c, next) => {
+    const method = c.req.method.toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') {
+      return next();
+    }
+    return inner(c, next);
   };
 }
 
