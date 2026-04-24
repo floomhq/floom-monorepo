@@ -1,19 +1,31 @@
 /**
  * LandingV17Page — marketing home `/` rebuilt to the v17 wireframes.
  *
- * 2026-04-27 waitlist-reality rewrite:
+ * 2026-04-24 restructure ("landing still feels messy"):
+ *   Federico audit flagged the landing as too tall, too duplicated, and
+ *   with a missing manifesto band on preview. This revision collapses the
+ *   page to 7 core sections (was 9):
+ *     1. Hero (slim: H1 + sub + CTAs only, no inline DeployYourOwnTile)
+ *     2. ManifestoBand (the vision) — "Infrastructure for agentic work."
+ *     3. TryTheseApps (3 live apps)
+ *     4. SelfHost band
+ *     5. CliReference + HowItWorks (3 steps)
+ *     6. DualAudiences (makers + teams)
+ *     7. PricingTeaser + Final CTA + Footer
+ *   Removed: the duplicate Showcase stripes (same 3 apps as TryTheseApps),
+ *   the PublishCtaBox (duplicated DualAudiences' makers column), and the
+ *   inline DeployYourOwnTile (hero bloat — the hero-secondary CTA and the
+ *   SelfHost band already carry that message).
+ *   The works-with-MCP eyebrow moved from above-H1 to a thin proof-bar
+ *   BELOW the hero CTAs — the H1 now leads, the compatibility claim trails.
+ *
+ * 2026-04-27 waitlist-reality rewrite (still applies):
  *   floom.dev (production) is waitlist-only for the build/deploy flow, but
  *   the 3 featured apps (Lead Scorer, Resume Screener, Competitor Analyzer)
  *   are live and runnable today. preview.floom.dev keeps the full flow.
- *   This file is re-framed so it never visually promises "instant deploy"
- *   on prod while still being exciting:
  *     - Hero CTAs: [Try an app] primary, [Join the waitlist] secondary.
- *     - Hero demo: 2-state (build -> use) driven by `DEPLOY_ENABLED` flag.
- *     - New "Try these 3 apps" row right under the hero demo.
- *     - "Deploy your own" collapses into the waitlist CTA.
+ *     - Hero demo: full 3-state build -> deploy -> use (visual explainer).
  *     - Every deploy/publish CTA across the page reacts to DEPLOY_ENABLED.
- *   When `VITE_DEPLOY_ENABLED=true` (preview + post-launch), copy reverts
- *   to the original Deploy-forward phrasing.
  *
  * Sources of truth:
  *   /var/www/wireframes-floom/v17/landing.html            (desktop)
@@ -21,19 +33,17 @@
  *   /var/www/wireframes-floom/v17/REVISION-2026-04-22.md  (latest revisions)
  *   /root/floom-internal/launch/v17-preview-delta-2026-04-22.md
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 import { TopBar } from '../components/TopBar';
 import { PublicFooter } from '../components/public/PublicFooter';
-import { AppStripe } from '../components/public/AppStripe';
 import { FeedbackButton } from '../components/FeedbackButton';
 
 import { PageHead } from '../components/PageHead';
 import { WorksWithBelt } from '../components/home/WorksWithBelt';
 import { CliReference } from '../components/home/CliReference';
-import { PublishCtaBox } from '../components/home/PublishCtaBox';
 import { DualAudiences } from '../components/home/DualAudiences';
 import { PricingTeaser } from '../components/home/PricingTeaser';
 import { HeroDemo } from '../components/home/HeroDemo';
@@ -42,87 +52,15 @@ import { TryTheseApps } from '../components/home/TryTheseApps';
 import { ManifestoBand } from '../components/landing/ManifestoBand';
 import { SelfHostSection } from '../components/home/SelfHostSection';
 
-import * as api from '../api/client';
-import type { HubApp } from '../lib/types';
-import { publicHubApps } from '../lib/hub-filter';
 import { DEPLOY_ENABLED, useDeployEnabled } from '../lib/flags';
-import { useSession } from '../hooks/useSession';
 import { WaitlistModal } from '../components/WaitlistModal';
 
-interface Stripe {
-  slug: string;
-  name: string;
-  description: string;
-  category?: string;
-}
-
-// Same showcase roster as CreatorHeroPage (see P0 launch curation #253).
-const PREFERRED_SLUGS = ['lead-scorer', 'competitor-analyzer', 'resume-screener'] as const;
-
-const FALLBACK_STRIPES: Stripe[] = [
-  {
-    slug: 'lead-scorer',
-    name: 'Lead Scorer',
-    description: 'Upload a CSV of leads + your ICP. Get fit scores, reasoning, and enriched columns.',
-    category: 'growth',
-  },
-  {
-    slug: 'competitor-analyzer',
-    name: 'Competitor Analyzer',
-    description: 'Paste competitor URLs, get positioning, pricing, and a strengths/weaknesses table.',
-    category: 'research',
-  },
-  {
-    slug: 'resume-screener',
-    name: 'Resume Screener',
-    description: 'Upload a zip of PDFs + a JD, get a ranked shortlist with reasoning per candidate.',
-    category: 'growth',
-  },
-];
-
-function pickStripes(apps: HubApp[]): Stripe[] {
-  if (apps.length === 0) return FALLBACK_STRIPES;
-  const bySlug = new Map(apps.map((app) => [app.slug, app]));
-  const picked: Stripe[] = [];
-  for (const slug of PREFERRED_SLUGS) {
-    const hit = bySlug.get(slug);
-    if (hit) picked.push({ slug: hit.slug, name: hit.name, description: hit.description, category: hit.category ?? undefined });
-  }
-  if (picked.length === PREFERRED_SLUGS.length) return picked;
-  return picked.length >= 3 ? picked : FALLBACK_STRIPES;
-}
-
 export function LandingV17Page() {
-  const [stripes, setStripes] = useState<Stripe[]>(FALLBACK_STRIPES);
   // Launch feature flag (2026-04-27). When false, the secondary
   // "Deploy your own" hero link swaps to a "Join waitlist" button that
   // opens WaitlistModal instead of navigating to /signup.
   const deployEnabled = useDeployEnabled();
-  const { data: sessionData } = useSession();
-  // Self-host bypass for the launch-week SHOWCASE allowlist (see
-  // lib/hub-filter.ts). cloud_mode === false on `/api/session/me`
-  // means we're rendering from a self-hosted instance — show every
-  // app the operator has, not just the three hosted demos.
-  const selfHost = sessionData?.cloud_mode === false;
   const [waitlistOpen, setWaitlistOpen] = useState(false);
-
-  useEffect(() => {
-    // document.title is owned by <PageHead> (see the component below). We
-    // used to hard-set the title here but that raced PageHead's own update
-    // and left the browser tab/share cards on the pre-v17 "Ship AI apps
-    // fast · Floom" string even though <meta og:title> had the current
-    // copy. Removing the override lets PageHead stay the single source of
-    // truth.
-    api
-      .getHub()
-      .then((apps) => {
-        const visible = publicHubApps(apps, { selfHost });
-        if (visible.length > 0) setStripes(pickStripes(visible));
-      })
-      .catch(() => {
-        // Keep static roster on failure.
-      });
-  }, [selfHost]);
 
   return (
     <div
@@ -149,7 +87,10 @@ export function LandingV17Page() {
           data-testid="hero"
           style={{
             position: 'relative',
-            padding: '24px 24px 40px',
+            // 2026-04-24 restructure: trimmed padding from 24/40 -> 16/24
+            // to keep hero within ~820px budget after also shrinking the
+            // HeroDemo canvas (580 -> 460).
+            padding: '16px 24px 24px',
             borderBottom: '1px solid var(--line)',
             background:
               'linear-gradient(180deg, var(--card) 0%, var(--bg) 100%)',
@@ -162,10 +103,6 @@ export function LandingV17Page() {
               textAlign: 'center',
             }}
           >
-            {/* Works-with belt as small eyebrow ABOVE the H1
-                (Federico 2026-04-23 — "like we had before"). */}
-            <WorksWithBelt />
-
             {/* H1 — "Ship AI apps fast." (Federico 2026-04-24 —
                 restored the original punchy two-word-verb headline that
                 preview used to carry. The 2026-04-27 waitlist-reality
@@ -294,20 +231,23 @@ export function LandingV17Page() {
                 </Link>
               )}
             </div>
+
+            {/* Works-with proof strip — moved BELOW the CTAs (2026-04-24
+                restructure). Previously sat above the H1 as a compat
+                eyebrow, but pushed the headline down and competed with the
+                H1 for attention. Below the CTAs it reads as quiet proof
+                ("this works with your tools"), not a lede. */}
+            <div style={{ marginTop: 20 }}>
+              <WorksWithBelt />
+            </div>
           </div>
 
-          {/* Hero demo — morphing canvas. `build -> use` (2-state) by default
-              under waitlist; flips to the full `build -> deploy -> use` loop
-              on preview / post-launch via DEPLOY_ENABLED. The Use state
-              shows Lead Scorer (the most universally appealing of the three
-              featured apps) returning a real fit score. */}
+          {/* Hero demo — morphing canvas. Full build -> deploy -> use loop.
+              The hero demo is a visual explainer of the product shape,
+              unrelated to DEPLOY_ENABLED (which gates the *public*
+              deploy flow at the CTA layer). The Use state shows Lead
+              Scorer returning a real fit score. */}
           <HeroDemo />
-
-          {/* "Deploy your own" — compact tile directly under the demo.
-              This is where the Deploy moment narrative lives now that the
-              demo itself no longer animates it. One sentence + waitlist CTA
-              on prod; swaps to a plain Deploy CTA when DEPLOY_ENABLED is on. */}
-          <DeployYourOwnTile onWaitlist={() => setWaitlistOpen(true)} />
         </section>
 
         {/* MANIFESTO BAND — vision-forward block under the hero.
@@ -348,7 +288,7 @@ export function LandingV17Page() {
         {/* HOW IT WORKS — 3 steps */}
         <section
           data-testid="how-it-works"
-          style={{ padding: '72px 28px', maxWidth: 1240, margin: '0 auto' }}
+          style={{ padding: '56px 28px', maxWidth: 1240, margin: '0 auto' }}
         >
           <SectionEyebrow>How it works</SectionEyebrow>
           <h2
@@ -429,67 +369,15 @@ export function LandingV17Page() {
           </div>
         </section>
 
-        {/* SHOWCASE (vertical stripes) — kept only when DEPLOY_ENABLED.
-            On waitlist-prod the 3 featured apps are already surfaced as the
-            top-of-page <TryTheseApps /> cards, so this section duplicates
-            them. On preview / post-launch it reappears because the "three
-            apps Floom runs in production" narrative reinforces the deploy
-            claim. 2026-04-27 launch-reality pivot. */}
-        {DEPLOY_ENABLED && (
-          <section
-            data-testid="showcase"
-            style={{
-              padding: '72px 28px',
-              maxWidth: 1240,
-              margin: '0 auto',
-              borderTop: '1px solid var(--line)',
-            }}
-          >
-            <SectionEyebrow>Showcase</SectionEyebrow>
-            <h2
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 700,
-                fontSize: 34,
-                lineHeight: 1.1,
-                letterSpacing: '-0.03em',
-                textAlign: 'center',
-                margin: '0 auto 10px',
-                maxWidth: 760,
-              }}
-            >
-              Three apps Floom already runs in production.
-            </h2>
-            <p
-              style={{
-                fontSize: 15.5,
-                color: 'var(--muted)',
-                textAlign: 'center',
-                maxWidth: 620,
-                margin: '0 auto 40px',
-              }}
-            >
-              Real AI doing real work. All three deploy from a single GitHub repo.
-            </p>
-            <div style={{ display: 'grid', gap: 12, maxWidth: 820, margin: '0 auto' }}>
-              {stripes.map((s) => (
-                <AppStripe
-                  key={s.slug}
-                  slug={s.slug}
-                  name={s.name}
-                  description={s.description}
-                  category={s.category}
-                  variant="landing"
-                />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* 2026-04-24 restructure: two duplicated sections removed here.
+            - <Showcase /> — same 3 apps as <TryTheseApps /> above; pure
+              duplication. Was previously gated on DEPLOY_ENABLED so it
+              only hit preview, but even on preview it was redundant. */}
 
-        {/* PUBLISH-CTA BOX */}
-        <section style={{ padding: '24px 28px', maxWidth: 1240, margin: '0 auto' }}>
-          <PublishCtaBox />
-        </section>
+        {/* 2026-04-24 restructure: <PublishCtaBox /> also removed — its
+            "Publish your own app" tile duplicated the Makers column of
+            <DualAudiences /> below. One "for makers" CTA per page is
+            enough; DualAudiences carries it alongside the teams column. */}
 
         {/* DUAL AUDIENCES — makers + teams */}
         <DualAudiences />
@@ -502,8 +390,9 @@ export function LandingV17Page() {
             your first app" framing, the copy now leans on "join the waitlist"
             on prod. Reverts when DEPLOY_ENABLED is on. */}
         <section
+          data-testid="final-cta"
           style={{
-            padding: '72px 28px',
+            padding: '56px 28px',
             maxWidth: 760,
             margin: '0 auto',
             textAlign: 'center',
@@ -670,117 +559,12 @@ const HERO_GHOST_STYLE = {
   fontFamily: "'Inter', system-ui, sans-serif",
 } as const;
 
-/**
- * DeployYourOwnTile — compact "deploy the next app" block under the hero
- * demo. Replaces what the old hero demo used to show as its Deploy state
- * (the `/floomit` slash command and live URL line). Single sentence +
- * waitlist CTA; flips to a direct Deploy CTA when DEPLOY_ENABLED is on.
- */
-function DeployYourOwnTile({ onWaitlist }: { onWaitlist: () => void }) {
-  if (DEPLOY_ENABLED) {
-    return (
-      <div data-testid="deploy-your-own-tile" style={DEPLOY_TILE_STYLE}>
-        <div style={DEPLOY_TILE_TEXT}>
-          <strong style={DEPLOY_TILE_STRONG}>Deploy your own.</strong>
-          <span style={DEPLOY_TILE_MUTED}>
-            One slash command in Claude Code or{' '}
-            <code style={DEPLOY_TILE_CODE}>floom deploy</code> from any terminal
-            &mdash; live in ~60 seconds.
-          </span>
-        </div>
-        <Link to="/signup" data-testid="deploy-tile-cta" style={DEPLOY_TILE_BTN}>
-          Deploy your app
-          <ArrowRight size={14} aria-hidden="true" />
-        </Link>
-      </div>
-    );
-  }
-  return (
-    <div data-testid="deploy-your-own-tile" style={DEPLOY_TILE_STYLE}>
-      <div style={DEPLOY_TILE_TEXT}>
-        <strong style={DEPLOY_TILE_STRONG}>Deploy your own.</strong>
-        <span style={DEPLOY_TILE_MUTED}>
-          The public build-and-deploy flow is rolling out in waves. Join the
-          waitlist and we&rsquo;ll let you in as soon as your slot opens.
-        </span>
-      </div>
-      <button
-        type="button"
-        data-testid="deploy-tile-waitlist"
-        onClick={onWaitlist}
-        style={{ ...DEPLOY_TILE_BTN, cursor: 'pointer' }}
-      >
-        Join the waitlist
-        <ArrowRight size={14} aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
-const DEPLOY_TILE_STYLE = {
-  marginTop: 24,
-  maxWidth: 1080,
-  marginLeft: 'auto',
-  marginRight: 'auto',
-  background: 'var(--card)',
-  border: '1px solid var(--line)',
-  borderRadius: 14,
-  padding: '16px 20px',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 16,
-  flexWrap: 'wrap' as const,
-  justifyContent: 'space-between',
-  textAlign: 'left' as const,
-};
-
-const DEPLOY_TILE_TEXT = {
-  display: 'flex',
-  flexDirection: 'column' as const,
-  gap: 2,
-  minWidth: 260,
-  flex: 1,
-};
-
-const DEPLOY_TILE_STRONG = {
-  fontFamily: 'var(--font-display)',
-  fontSize: 18,
-  fontWeight: 600,
-  color: 'var(--ink)',
-  letterSpacing: '-0.015em',
-};
-
-const DEPLOY_TILE_MUTED = {
-  fontSize: 13.5,
-  color: 'var(--muted)',
-  lineHeight: 1.5,
-};
-
-const DEPLOY_TILE_CODE = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-  fontSize: 12,
-  background: 'var(--studio)',
-  padding: '1px 6px',
-  borderRadius: 4,
-  color: 'var(--ink)',
-};
-
-const DEPLOY_TILE_BTN = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 6,
-  background: 'var(--ink)',
-  color: '#fff',
-  border: '1px solid var(--ink)',
-  borderRadius: 999,
-  padding: '10px 18px',
-  fontSize: 13.5,
-  fontWeight: 600,
-  textDecoration: 'none',
-  fontFamily: "'Inter', system-ui, sans-serif",
-  flexShrink: 0,
-};
+// 2026-04-24 restructure: DeployYourOwnTile removed. The tile sat directly
+// under the HeroDemo, pushing the hero to ~1100px and visually competing
+// with (a) the hero CTA row above it and (b) the SelfHost band below the
+// manifesto. The hero secondary CTA ("Join the waitlist to build your own")
+// already carries the waitlist ask, and the SelfHost band carries the
+// self-host ask — this tile was redundant on both axes.
 
 const STEPS = [
   {

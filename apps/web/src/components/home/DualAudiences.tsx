@@ -183,7 +183,7 @@ export function DualAudiences(_: DualAudiencesProps = {}) {
   return (
     <section
       data-testid="dual-audiences"
-      style={{ padding: '72px 28px', maxWidth: 1240, margin: '0 auto' }}
+      style={{ padding: '56px 28px', maxWidth: 1240, margin: '0 auto' }}
     >
       <SectionEyebrow testid="dual-eyebrow">Who it&rsquo;s for</SectionEyebrow>
       <h2

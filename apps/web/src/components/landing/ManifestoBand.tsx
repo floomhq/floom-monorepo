@@ -80,7 +80,10 @@ export function ManifestoBand() {
 const SECTION_STYLE: CSSProperties = {
   background: '#1b1a17',
   color: '#f5f2ec',
-  padding: '72px 28px',
+  // 2026-04-24 restructure: padding 72 -> 56 to cut the section height
+  // from 404 -> ~372 without losing visual weight (this band is
+  // dark-on-light, so it still reads as a substantial beat).
+  padding: '56px 28px',
   borderTop: '1px solid rgba(255,255,255,0.06)',
   borderBottom: '1px solid rgba(255,255,255,0.06)',
 };

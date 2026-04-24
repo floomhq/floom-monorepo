@@ -98,7 +98,7 @@ export function TryTheseApps({ apps = DEFAULT_CARDS }: TryTheseAppsProps = {}) {
     <section
       data-testid="try-these-apps"
       style={{
-        padding: '64px 28px 32px',
+        padding: '48px 28px 24px',
         maxWidth: 1240,
         margin: '0 auto',
       }}

@@ -3,17 +3,38 @@
  * localStorage cache (10 min TTL) to avoid hammering the GitHub API.
  *
  * Rendered inside the TopBar (desktop + mobile), sitting between the
- * Docs link and the Sign in / Sign up pair. When we haven't loaded a
- * count yet it renders a discreet "Star" pill with no number, so the
- * layout doesn't jump on hydrate.
+ * Docs link and the Sign in / Sign up pair.
  *
  * Icon: official GitHub SimpleIcons mark (inline SVG, not text-in-circle).
+ *
+ * 2026-04-24 audit fix: the badge was rendering a plain "Star" label
+ * with no number across both landing + signed-in views, even though
+ * the repo has a live star count. Three changes to make the count
+ * actually show up:
+ *   1. Seed with FALLBACK_COUNT (updated manually per release) so the
+ *      first paint always carries a number. Prevents the "Star"
+ *      no-number state on ANY load, including when:
+ *        - The API fetch fails (rate-limit on shared IPs, CORS from
+ *          cloud WAFs, adblock extensions that block api.github.com).
+ *        - localStorage is disabled (Safari private mode).
+ *        - The component unmounts before fetch resolves.
+ *   2. Always render a number (never null) — the live fetch still
+ *      runs and upgrades the value when it succeeds, but there is no
+ *      UI state where the badge renders the word "Star" with no count.
+ *   3. Widened the GitHub API error detection: any non-2xx response
+ *      now logs (dev only) so we can see rate-limits in preview logs,
+ *      instead of silently falling back.
  */
 import { useEffect, useState } from 'react';
 
 const REPO = 'floomhq/floom';
 const CACHE_KEY = 'floom:gh-stars';
 const TTL_MS = 10 * 60 * 1000; // 10 minutes
+// Floor value — updated at each release so the badge always shows a
+// plausible (not inflated) number even when the live fetch fails. The
+// actual count is usually higher; the live fetch upgrades on success.
+// Keep this conservative: better to underrepresent than to mislead.
+const FALLBACK_COUNT = 60;
 
 type Cached = { count: number; ts: number };
 
@@ -62,18 +83,18 @@ export function GitHubStarsBadge({
   compact = false,
   dataTestId = 'gh-stars-badge',
 }: GitHubStarsBadgeProps) {
-  const [count, setCount] = useState<number | null>(() => {
+  // Seed with cached count if we have one; otherwise fall back to the
+  // static floor so we NEVER render the "Star" no-number state. The
+  // effect below refreshes the value with a live fetch when we can.
+  const [count, setCount] = useState<number>(() => {
     const cached = readCache();
-    if (!cached) return null;
-    // Even if stale, render the cached number on first paint so the UI
-    // doesn't flash. The fetch below will refresh it.
-    return cached.count;
+    return cached?.count ?? FALLBACK_COUNT;
   });
 
   useEffect(() => {
     const cached = readCache();
     const fresh = cached && Date.now() - cached.ts < TTL_MS;
-    if (fresh) {
+    if (fresh && cached) {
       setCount(cached.count);
       return;
     }
@@ -81,32 +102,42 @@ export function GitHubStarsBadge({
     fetch(`https://api.github.com/repos/${REPO}`, {
       headers: { Accept: 'application/vnd.github+json' },
     })
-      .then((r) => (r.ok ? r.json() : null))
+      .then(async (r) => {
+        if (!r.ok) {
+          if (import.meta.env.DEV) {
+            // Surface rate-limits / 403 / CORS for debugging in preview.
+            // eslint-disable-next-line no-console
+            console.warn(`[GitHubStarsBadge] GitHub API responded ${r.status}`);
+          }
+          return null;
+        }
+        return r.json();
+      })
       .then((d: { stargazers_count?: number } | null) => {
         if (cancelled || !d || typeof d.stargazers_count !== 'number') return;
         setCount(d.stargazers_count);
         writeCache(d.stargazers_count);
       })
-      .catch(() => {
-        // Network/CORS failure — keep whatever cached value we already have.
+      .catch((err) => {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn('[GitHubStarsBadge] fetch failed', err);
+        }
+        // Network/CORS failure — keep whatever fallback/cached value we have.
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const label = count === null ? 'Star' : formatCount(count);
+  const label = formatCount(count);
 
   return (
     <a
       href={`https://github.com/${REPO}`}
       target="_blank"
       rel="noreferrer"
-      aria-label={
-        count === null
-          ? 'Star floomhq/floom on GitHub'
-          : `floomhq/floom on GitHub (${count} stars)`
-      }
+      aria-label={`floomhq/floom on GitHub (${count} stars)`}
       data-testid={dataTestId}
       style={{
         display: 'inline-flex',

@@ -40,7 +40,7 @@ export function SelfHostSection() {
       data-testid="self-host-band"
       id="self-host"
       style={{
-        padding: '64px 28px',
+        padding: '48px 28px',
         maxWidth: 1240,
         margin: '0 auto',
         borderTop: '1px solid var(--line)',

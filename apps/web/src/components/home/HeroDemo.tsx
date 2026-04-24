@@ -946,7 +946,17 @@ const SCOPED_CSS = `
     [data-testid="hero-demo"] [data-hd="deploy-grid"] > :last-child{display:none}
     [data-testid="hero-demo"] [data-hd="use-grid"]{grid-template-columns:1fr;gap:10px}
   }
+  /* Mobile: code snippet was overflowing past the viewport on ≤640px.
+     Shrink font + tighten padding so the full Python snippet fits, and
+     keep overflowX:auto on the pre for graceful scroll if it still
+     doesn't. Audit 2026-04-24 flagged this as the most visible mobile
+     regression on the hero. */
+  @media (max-width:640px){
+    [data-testid="hero-demo"] pre{font-size:11px !important;line-height:1.6 !important;padding:10px 12px !important;}
+    [data-testid="hero-demo"] [data-hd="deploy-grid"] > :first-child{padding:20px 18px;gap:14px}
+  }
   @media (max-width:480px){
+    [data-testid="hero-demo"] pre{font-size:10.5px !important;padding:10px 10px !important;}
     [data-testid="hero-demo"] [data-hd="deploy-grid"] > :first-child{padding:20px 18px;gap:14px}
   }
 `;
@@ -955,8 +965,10 @@ const WRAP_STYLE: CSSProperties = {
   // Federico 2026-04-23: "wider and bigger" (previously 720px — felt small
   // vs. the hero text). 1080px gives Cursor-style visual weight while still
   // fitting a 1200px content column on desktop. Mobile collapses via CSS.
+  // 2026-04-24: marginTop trimmed 28 -> 16 as part of the landing
+  // restructure (cap hero at ~820px).
   maxWidth: 1080,
-  margin: '28px auto 0',
+  margin: '16px auto 0',
   borderRadius: 24,
   background: 'var(--card, #ffffff)',
   border: '1px solid var(--line, #e8e6e0)',
@@ -1007,13 +1019,17 @@ const TRACKER_DOT: CSSProperties = {
   background: 'var(--accent, #047857)',
 };
 
-// Fixed-height canvas — the morphing surface. 580px (PR #427: Federico
-// "like cursor, the visual demo doesn't have to fit on the hero in full";
-// larger demo = more cinematic, bottom falls below fold on 1440x900).
-// Combined with wrap maxWidth 1080 from this PR for proportional weight.
+// Fixed-height canvas — the morphing surface. Trimmed from 580 -> 460
+// as part of the 2026-04-24 landing restructure: the 580 canvas pushed
+// the total hero height to 993px (well above Federico's 820px target,
+// and enough that the Manifesto band below fell out of the first
+// viewport). 460 keeps the demo cinematic — editor + deploy timeline +
+// run card all legible — while letting the hero fit in ~820px. The
+// Cursor-style "demo extends below the fold on scroll" narrative still
+// holds at 1440x900; it just doesn't extend as deep.
 const CANVAS_STYLE: CSSProperties = {
   position: 'relative',
-  height: 580,
+  height: 460,
   overflow: 'hidden',
   // Warm paper tone — the visible background around the panels. Brand rule:
   // never pure black on hero demo surfaces. See feedback_terminal_never_black.md.
@@ -1148,10 +1164,17 @@ const CODE_PRE: CSSProperties = {
   padding: '12px 16px',
   margin: 0,
   whiteSpace: 'pre',
-  overflow: 'hidden',
+  // 2026-04-24 mobile fix: `overflow: hidden` clipped the code silently
+  // when the panel width dropped below the widest code line (~46ch).
+  // Switch to `auto` so narrow viewports can scroll the code horizontally
+  // rather than truncating. Combined with the mobile font-size shrink
+  // in SCOPED_CSS below (12.5 -> 11), readability holds at 390px.
+  overflowX: 'auto',
+  overflowY: 'hidden',
   fontFamily: 'inherit',
   // Bumped from 11.5 -> 12.5 for the wider canvas; easier to read at the
-  // new 1080px hero size.
+  // new 1080px hero size. Mobile scales down via the @media block in
+  // SCOPED_CSS so the full Python snippet fits on a 360px viewport.
   fontSize: 12.5,
   lineHeight: 1.7,
   color: '#2a2825',
