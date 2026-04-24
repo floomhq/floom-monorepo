@@ -177,6 +177,83 @@ test('ScoredRowsTable model chip: cache_hit=true appends "· CACHED" suffix', ()
   );
 });
 
+test('composite auto-pick model chip: surfaces meta.model and · CACHED for competitor-analyzer', () => {
+  // Issue #579: competitor-analyzer falls into Layer 3a composite
+  // (RowTable + Markdown sidecar) instead of ScoredRowsTable. Its model
+  // lives at `meta.model` and cache flag at `meta.cache_hit`. The
+  // composite renderer appends a ModelChip whenever meta.model is
+  // present, and suffixes "· CACHED" at opacity 0.65 when cache_hit.
+  const app = {
+    slug: 'competitor-analyzer',
+    manifest: mkManifest({
+      outputs: [
+        { name: 'competitors', label: 'Competitors', type: 'table' },
+        { name: 'summary', label: 'Summary', type: 'markdown' },
+      ],
+    }),
+  };
+  const cachedOut = {
+    competitors: [{ name: 'Linear', pricing: '$8/seat' }],
+    summary: 'Linear is faster...',
+    meta: {
+      analyzed: 1,
+      failed: 0,
+      cache_hit: true,
+      model: 'gemini-3.1-pro-preview',
+    },
+  };
+  const cached = pickRenderer({ app, action: 'go', runOutput: cachedOut, runId: 'r1' });
+  assert.equal(cached.kind, 'auto');
+  const cachedHtml = renderToStaticMarkup(cached.element!);
+  assert.ok(cachedHtml.includes('gemini-3.1-pro-preview'), 'model name should render');
+  assert.ok(cachedHtml.includes('· CACHED'), 'cache_hit=true should append "· CACHED"');
+  assert.ok(/opacity:\s*0\.65/.test(cachedHtml), 'cached suffix should be dimmed to 0.65 opacity');
+
+  const liveOut = {
+    ...cachedOut,
+    meta: { ...cachedOut.meta, cache_hit: false },
+  };
+  const live = pickRenderer({ app, action: 'go', runOutput: liveOut, runId: 'r2' });
+  const liveHtml = renderToStaticMarkup(live.element!);
+  assert.ok(liveHtml.includes('gemini-3.1-pro-preview'), 'live model name should render');
+  assert.ok(!liveHtml.includes('· CACHED'), 'cache_hit=false must NOT append "· CACHED"');
+
+  // Legacy fixtures stamp "(cached)" into the model string itself; the
+  // chip strips it before re-appending its own suffix (mirrors the
+  // ScoredRowsTable normalization in PR #578).
+  const doubleOut = {
+    ...cachedOut,
+    meta: { ...cachedOut.meta, cache_hit: true, model: 'gemini-3.1-pro-preview (cached)' },
+  };
+  const doubled = pickRenderer({ app, action: 'go', runOutput: doubleOut, runId: 'r3' });
+  const doubledHtml = renderToStaticMarkup(doubled.element!);
+  assert.ok(!/\(cached\)/i.test(doubledHtml), 'legacy "(cached)" should be stripped');
+  assert.ok(doubledHtml.includes('· CACHED'), 'the new suffix should be present');
+});
+
+test('composite auto-pick model chip: absent when meta.model is missing', () => {
+  // Any app that returns {rows, summary} without a meta.model must not
+  // sprout a chip. Keeps the zero-config "just shape-based" path quiet
+  // for non-AI apps (e.g. plain CSV aggregators).
+  const app = {
+    slug: 'plain-table-app',
+    manifest: mkManifest({
+      outputs: [
+        { name: 'rows', label: 'Rows', type: 'table' },
+        { name: 'summary', label: 'Summary', type: 'markdown' },
+      ],
+    }),
+  };
+  const out = {
+    rows: [{ a: 1, b: 2 }],
+    summary: 'Narrative.',
+  };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  const html = renderToStaticMarkup(result.element!);
+  assert.ok(!html.includes('composite-model-chip'), 'no chip when meta.model missing');
+  assert.ok(!html.includes('· CACHED'), 'no cache suffix without model');
+});
+
 test('ScoredRowsTable model chip: legacy "(cached)" backend stamp is normalized, not doubled', () => {
   // examples/lead-scorer/main.py uses setdefault("model", "...-pro-preview (cached)")
   // as a fallback when the cache fixture lacks a `model` field. The UI must
