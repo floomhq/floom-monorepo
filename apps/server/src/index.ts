@@ -828,27 +828,22 @@ if (webDist) {
     }
   }
 
-  const deployBootstrapMarker = 'data-floom-bootstrap="deploy-enabled"';
-  const deployBootstrapCache = new Map<boolean, string>();
+  const deployBootstrapMarker = 'data-floom-bootstrap';
+  let deployBootstrapCache: string | null = null;
 
-  function injectDeployBootstrap(html: string, deployEnabled: boolean): string {
+  function injectDeployBootstrap(html: string, _deployEnabled: boolean): string {
     if (html.includes(deployBootstrapMarker)) return html;
     const scriptTagIndex = html.search(/<script\b[^>]*\btype=["']module["'][^>]*>/i);
     if (scriptTagIndex === -1) return html;
     const bootstrap =
-      `<script ${deployBootstrapMarker}>` +
-      `window.__FLOOM__=window.__FLOOM__||{};` +
-      `window.__FLOOM__.deployEnabled=${deployEnabled};` +
-      `</script>\n    `;
+      `<script src='/__floom/bootstrap.js' ${deployBootstrapMarker}></script>\n    `;
     return `${html.slice(0, scriptTagIndex)}${bootstrap}${html.slice(scriptTagIndex)}`;
   }
 
   function getIndexHtmlForDeployFlag(deployEnabled: boolean): string {
-    const cached = deployBootstrapCache.get(deployEnabled);
-    if (cached) return cached;
-    const injected = injectDeployBootstrap(indexHtml, deployEnabled);
-    deployBootstrapCache.set(deployEnabled, injected);
-    return injected;
+    if (deployBootstrapCache) return deployBootstrapCache;
+    deployBootstrapCache = injectDeployBootstrap(indexHtml, deployEnabled);
+    return deployBootstrapCache;
   }
 
   // Paths that must never be swallowed by the SPA wildcard. These reach
@@ -860,7 +855,7 @@ if (webDist) {
   // which rendered a blank page instead of triggering the Google/GitHub
   // redirect. Fix for blank-page on social sign-in reported post-launch.
   const spaExcludedPrefixes = ['/api/', '/mcp', '/renderer/', '/og/', '/hook/', '/auth/'];
-  const spaExcludedExact = new Set(['/openapi.json', '/metrics']);
+  const spaExcludedExact = new Set(['/openapi.json', '/metrics', '/__floom/bootstrap.js']);
 
   // SEO #621: known-route table for proper 404 status on unknown SPA paths.
   //
@@ -1312,10 +1307,25 @@ if (webDist) {
     return out;
   }
 
+  // CSP-safe deploy flag bootstrap: external same-origin script so the
+  // top-level `script-src 'self'` policy still allows the flag setup.
+  app.get('/__floom/bootstrap.js', () => {
+    const body =
+      'window.__FLOOM__=window.__FLOOM__||{};' +
+      `window.__FLOOM__.deployEnabled=${isDeployEnabled()};`;
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'content-type': 'application/javascript; charset=utf-8',
+        'cache-control': 'no-cache, no-store',
+      },
+    });
+  });
+
   app.use('/*', async (c, next) => {
     const url = new URL(c.req.url);
     const pathname = url.pathname;
-    const servedIndexHtml = getIndexHtmlForDeployFlag(isDeployEnabled());
+    const servedIndexHtml = getIndexHtmlForDeployFlag(true);
 
     // Skip API + MCP routes and named utility endpoints — let Hono handle them.
     if (

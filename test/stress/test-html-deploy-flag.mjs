@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// SPA HTML bootstrap: inject window.__FLOOM__.deployEnabled before the
-// module bundle so the client reads the correct flag on first paint.
+// SPA HTML bootstrap: inject a same-origin script before the module bundle
+// so the client reads window.__FLOOM__.deployEnabled on first paint without
+// tripping CSP `script-src 'self'`.
 
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -135,6 +136,16 @@ async function fetchHtml(port) {
   };
 }
 
+async function fetchBootstrap(port) {
+  const res = await fetch(`http://localhost:${port}/__floom/bootstrap.js`);
+  return {
+    status: res.status,
+    contentType: res.headers.get('content-type') || '',
+    cacheControl: res.headers.get('cache-control') || '',
+    text: await res.text(),
+  };
+}
+
 console.log('HTML deploy flag bootstrap');
 
 for (const deployEnabled of [false, true]) {
@@ -142,8 +153,9 @@ for (const deployEnabled of [false, true]) {
   try {
     const first = await fetchHtml(server.port);
     const second = await fetchHtml(server.port);
-    const flagNeedle = `window.__FLOOM__.deployEnabled=${deployEnabled}`;
-    const flagIndex = first.text.indexOf(flagNeedle);
+    const bootstrap = await fetchBootstrap(server.port);
+    const scriptNeedle = "<script src='/__floom/bootstrap.js' data-floom-bootstrap></script>";
+    const scriptIndex = first.text.indexOf(scriptNeedle);
     const bundleIndex = first.text.indexOf('<script type="module"');
     log(
       `DEPLOY_ENABLED=${deployEnabled}: GET / returns 200`,
@@ -156,13 +168,32 @@ for (const deployEnabled of [false, true]) {
       first.contentType,
     );
     log(
-      `DEPLOY_ENABLED=${deployEnabled}: HTML contains injected deploy flag`,
-      flagIndex !== -1,
+      `DEPLOY_ENABLED=${deployEnabled}: HTML contains bootstrap script tag`,
+      scriptIndex !== -1,
     );
     log(
-      `DEPLOY_ENABLED=${deployEnabled}: injected script appears before module bundle`,
-      flagIndex !== -1 && bundleIndex !== -1 && flagIndex < bundleIndex,
-      `flagIndex=${flagIndex} bundleIndex=${bundleIndex}`,
+      `DEPLOY_ENABLED=${deployEnabled}: bootstrap script appears before module bundle`,
+      scriptIndex !== -1 && bundleIndex !== -1 && scriptIndex < bundleIndex,
+      `scriptIndex=${scriptIndex} bundleIndex=${bundleIndex}`,
+    );
+    log(
+      `DEPLOY_ENABLED=${deployEnabled}: GET /__floom/bootstrap.js returns 200`,
+      bootstrap.status === 200,
+      `got ${bootstrap.status}`,
+    );
+    log(
+      `DEPLOY_ENABLED=${deployEnabled}: bootstrap content-type is application/javascript`,
+      bootstrap.contentType.includes('application/javascript'),
+      bootstrap.contentType,
+    );
+    log(
+      `DEPLOY_ENABLED=${deployEnabled}: bootstrap body exposes deployEnabled=${deployEnabled}`,
+      bootstrap.text.includes(`window.__FLOOM__.deployEnabled=${deployEnabled}`),
+    );
+    log(
+      `DEPLOY_ENABLED=${deployEnabled}: bootstrap is not cacheable`,
+      bootstrap.cacheControl.includes('no-cache') && bootstrap.cacheControl.includes('no-store'),
+      bootstrap.cacheControl,
     );
     log(
       `DEPLOY_ENABLED=${deployEnabled}: repeated GET / is byte-identical`,
