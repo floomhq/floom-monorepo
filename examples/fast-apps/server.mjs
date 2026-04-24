@@ -527,6 +527,11 @@ const SPECS = {
       properties: {
         text: {
           type: 'string',
+          // Valid JSON default so the generic string prefill
+          // ("The quick brown fox jumps over the lazy dog.") doesn't
+          // land in the textarea and produce a parse error on first
+          // click. Launch-audit 2026-04-24 (P1 #609).
+          default: '{"example": true, "items": [1, 2, 3]}',
           description: 'The JSON text to parse and format.',
         },
         indent: {

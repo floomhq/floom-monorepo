@@ -48,15 +48,41 @@ export const hubRouter = new Hono();
 /**
  * Pull just the host out of a proxied app's base_url, for the
  * `/api/hub/:slug` response. Used by the /p/:slug runner surface to
- * render "Can't reach {host}" on a network_unreachable error. Host only
- * — not path, not query, not creds — so there's nothing sensitive to
- * leak even for private apps. Returns null for docker apps (no
- * base_url) or malformed URLs.
+ * render "Can't reach {host}" on a network_unreachable error and to
+ * show "API: {host}" in the app metadata chip row. Host only — not
+ * path, not query, not creds — so there's nothing sensitive to leak
+ * even for private apps. Returns null for docker apps (no base_url)
+ * or malformed URLs.
+ *
+ * 2026-04-24 (P1 polish): also returns null for internal hosts
+ * (loopback 127.x, ::1, private-network ranges, bare "localhost"). The
+ * native fast-apps sidecar runs on 127.0.0.1:4200 on the same box as
+ * the server, so exposing that host to end users leaked an internal
+ * implementation detail on every fast-app page — "API: 127.0.0.1:4200"
+ * is both useless (users can't reach it) and confusing (it looks like
+ * a misconfigured app). For external proxied apps (api.example.com) we
+ * still surface the real host so users know where their request is
+ * going.
  */
 function deriveUpstreamHost(baseUrl: string | null | undefined): string | null {
   if (!baseUrl) return null;
   try {
-    return new URL(baseUrl).host || null;
+    const host = new URL(baseUrl).host;
+    if (!host) return null;
+    // Hostname without port, lowercased for matching.
+    const hostname = host.split(':')[0]?.toLowerCase() ?? '';
+    if (!hostname) return null;
+    // Bare localhost and loopback.
+    if (hostname === 'localhost' || hostname === '::1') return null;
+    // IPv4 loopback (127.0.0.0/8).
+    if (/^127\./.test(hostname)) return null;
+    // RFC1918 private ranges — fast-apps sidecar has historically used
+    // 127.0.0.1 but a future sidecar binding to a LAN IP would leak
+    // the same way.
+    if (/^10\./.test(hostname)) return null;
+    if (/^192\.168\./.test(hostname)) return null;
+    if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) return null;
+    return host;
   } catch {
     return null;
   }

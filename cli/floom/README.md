@@ -22,6 +22,8 @@ floom --help
 
 > Note: the `floom.dev/install.sh` URL is a follow-up. Manual install above is the supported path until then.
 
+> **Do not run `npm install floom`.** The unscoped `floom` name on npm belongs to an unrelated third-party streaming tool; installing it will not give you the Floom CLI. Use the curl installer or the manual clone above.
+
 ## Requirements
 
 - `bash` (4+ preferred, works on 3.2)
