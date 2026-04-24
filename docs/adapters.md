@@ -54,3 +54,5 @@ That's the whole pattern. The factory picks the impl, the adapter conforms to th
 ## Proof-of-pattern call site
 
 [`apps/server/src/routes/health.ts`](../apps/server/src/routes/health.ts) emits a `health.check` counter through `adapters.observability.increment(...)` on every request. It's the minimal demonstration that the bundle is reachable from a route. Swap `FLOOM_OBSERVABILITY` once we add a second impl and the same line starts writing to OpenTelemetry / Datadog / StatsD instead of stdout, without any change in `health.ts`.
+
+Migration target for the AuthAdapter: the failing tests in [`test/stress/test-adapters-auth-contract.mjs`](../test/stress/test-adapters-auth-contract.mjs) define the green-bar target. A signed-off auth migration makes all four tests pass.
