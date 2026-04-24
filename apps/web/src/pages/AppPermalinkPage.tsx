@@ -727,8 +727,8 @@ export function AppPermalinkPage() {
         </div>
 
         {/* v17 frame: 18px-radius white card wrapping the whole app page
-            (compact app-header · content body · chip row). Shadow is
-            quiet so the frame reads as a chip, not a popover. */}
+            (browser chrome · compact app-header · content body · chip row).
+            Shadow is quiet so the frame reads as a chip, not a popover. */}
         <div
           className="app-page-frame"
           style={{
@@ -739,6 +739,51 @@ export function AppPermalinkPage() {
             boxShadow: '0 1px 3px rgba(22,21,18,.04), 0 4px 20px rgba(22,21,18,.06)',
           }}
         >
+          {/* Browser chrome (wireframe parity, 2026-04-24): 3 traffic-light
+              dots + URL pill showing the current host + /p/<slug>.
+              Decorative — no interactive behavior. Mirrors the wireframe's
+              .chrome block so the app page reads as "your app, hosted
+              here". We derive the host from window.location so preview
+              (preview.floom.dev), self-host installs, and custom domains
+              all render their real address instead of a hardcoded
+              floom.dev string. SSR / tests without a window fall back to
+              a slug-only path so React doesn't throw. */}
+          <div
+            data-testid="permalink-chrome"
+            aria-hidden="true"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '10px 14px',
+              borderBottom: '1px solid var(--line)',
+              background: 'var(--bg)',
+            }}
+          >
+            <span style={{ width: 10, height: 10, borderRadius: 999, background: '#d1d5db' }} />
+            <span style={{ width: 10, height: 10, borderRadius: 999, background: '#d1d5db' }} />
+            <span style={{ width: 10, height: 10, borderRadius: 999, background: '#d1d5db' }} />
+            <div
+              className="permalink-chrome-url"
+              style={{
+                flex: 1,
+                margin: '0 12px',
+                fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                fontSize: 11,
+                color: 'var(--muted)',
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
+                borderRadius: 6,
+                padding: '4px 10px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {(typeof window !== 'undefined' ? window.location.host : '')}/p/{app.slug}{runIdFromUrl ? `?run=${runIdFromUrl}` : ''}
+            </div>
+          </div>
+
           {/* v17 compact app-header: 40px flat tile + 17px title + 13px
               muted description + right-aligned CTA cluster (version
               meta, Schedule, Share). Replaces the prior 2026-04-21
