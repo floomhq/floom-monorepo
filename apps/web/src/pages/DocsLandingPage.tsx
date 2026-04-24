@@ -19,6 +19,7 @@ import { FeedbackButton } from '../components/FeedbackButton';
 import { PageHead } from '../components/PageHead';
 import { DocsSidebar, DOCS_SIDEBAR_GROUPS } from '../components/docs/DocsSidebar';
 import { DocsPublishWaitlistBanner } from '../components/docs/DocsPublishWaitlistBanner';
+import { DocsHeroCards } from '../components/docs/DocsHeroCards';
 import { readDeployEnabled } from '../lib/flags';
 
 // ── Styles ────────────────────────────────────────────────────────────────
@@ -49,22 +50,27 @@ const crumbsStyle: CSSProperties = {
 };
 
 const h1Style: CSSProperties = {
+  // Audit 2026-04-24 (S3, docs-sexier pass): bumped 40 → 52 so the H1 is a
+  // real display hero, matching the weight of Stripe/Vercel/Linear docs
+  // landing pages. Tighter letter-spacing + lead-balance for cleaner wrap.
   fontFamily: 'var(--font-display)',
   fontWeight: 800,
-  fontSize: 40,
-  lineHeight: 1.1,
-  letterSpacing: '-0.02em',
-  margin: '0 0 10px',
+  fontSize: 52,
+  lineHeight: 1.05,
+  letterSpacing: '-0.025em',
+  margin: '0 0 14px',
+  maxWidth: 720,
+  textWrap: 'balance' as CSSProperties['textWrap'],
 };
 
 const ledeStyle: CSSProperties = {
-  fontSize: 17,
+  fontSize: 18,
   color: 'var(--muted)',
   // Audit 2026-04-24: tightened 36 → 22 so the install command lands closer to
   // the hero copy and the "try this" moment is in-view on first paint.
   margin: '0 0 22px',
   maxWidth: 640,
-  lineHeight: 1.55,
+  lineHeight: 1.5,
 };
 
 const h2Style: CSSProperties = {
@@ -75,21 +81,6 @@ const h2Style: CSSProperties = {
   margin: '28px 0 14px',
   paddingBottom: 10,
   borderBottom: '1px solid var(--line)',
-  scrollMarginTop: 24,
-};
-
-// Above-the-fold variant of h2: smaller, no rule, so the first "Install in
-// 60 seconds" heading doesn't compete with the H1 for visual weight. Only
-// used for the first H2 on the page.
-const h2LeadStyle: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 600,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
-  color: 'var(--muted)',
-  margin: '0 0 10px',
-  paddingBottom: 0,
-  border: 'none',
   scrollMarginTop: 24,
 };
 
@@ -120,6 +111,35 @@ const codeBlockStyle: CSSProperties = {
   overflowX: 'auto',
   border: '1px solid var(--line)',
   whiteSpace: 'pre',
+};
+
+// Hero terminal: warm dark neutral (#1b1a17) NOT pure black. Matches the
+// brand's terminal look on landing. Only used for the canonical "install
+// in 60 seconds" snippet right under the H1, to give the docs landing
+// the same polished hero moment you get from Stripe / Vercel docs.
+const heroCodeBlockStyle: CSSProperties = {
+  background: '#1b1a17',
+  color: '#f5f4ef',
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontSize: 13,
+  lineHeight: 1.75,
+  padding: '18px 20px',
+  borderRadius: 12,
+  margin: '0 0 18px',
+  maxWidth: 760,
+  overflowX: 'auto',
+  border: '1px solid #2a2824',
+  whiteSpace: 'pre',
+  boxShadow: '0 12px 28px -18px rgba(0, 0, 0, 0.35)',
+};
+
+const heroCodeCommentStyle: CSSProperties = {
+  color: '#8a877f',
+};
+
+const heroCodePromptStyle: CSSProperties = {
+  color: '#6fcf97',
+  userSelect: 'none',
 };
 
 const quickStartStyle: CSSProperties = {
@@ -328,45 +348,46 @@ export function DocsLandingPage() {
             {' / Welcome'}
           </nav>
 
-          <h1 style={h1Style}>Floom docs.</h1>
+          {/* Docs-sexier pass (2026-04-24): replaced the literal "Floom docs."
+              title with a real display H1 + a positioning lede. Same voice as
+              Floom's landing ("Ship AI apps fast."), just tuned for a docs
+              audience that wants to know what they'll learn here. Then a
+              3-card "where to start" row (Deploy / Protocol / Self-host) and
+              a warm-dark hero terminal showing the canonical one-liner — so
+              the first viewport on /docs has an H1, a promise, the three
+              highest-signal entry points, AND something you can copy-paste,
+              not just a wall of nav. */}
+          <h1 style={h1Style}>Everything you need to ship.</h1>
           <p style={ledeStyle}>
             {deployEnabled ? (
               <>
-                The protocol and runtime for agentic work. Write a manifest, ship an
-                app, let users (or agents) run it.
+                The protocol, the runtime, and the patterns that make Floom work.
+                Write a manifest, ship an app, let users (or agents) run it.
               </>
             ) : (
               <>
-                The protocol and runtime for agentic work. Write a manifest, run apps
-                today (MCP, CLI, web). Ship to the floom.dev cloud when publishing is
-                open for your account, or self-host with no waitlist.
+                The protocol, the runtime, and the patterns that make Floom work.
+                Run apps today via MCP, CLI, or web. Ship to the floom.dev cloud
+                when publishing opens for your account — or self-host, no waitlist.
               </>
             )}
           </p>
 
-          {/* Audit 2026-04-24 (S2): dropped the 4-pill quick-start row (Quickstart,
-              Install CLI, Install in Claude, Read protocol). All four routes already
-              live in the sidebar — the pills duplicated navigation and pushed the
-              install command below the fold on 1366×768 laptops. Kept a single
-              "Install in Claude" soft link next to the install H2 as the one
-              non-CLI entry point that isn't obvious from the curl command. */}
+          <DocsHeroCards />
 
-          {/* Install in 60 seconds */}
-          <h2 style={h2LeadStyle}>Install in 60 seconds</h2>
-          <p style={pStyle}>
-            Floom ships as a small CLI plus an optional local runtime (Docker). You
-            need either curl or brew. No Node.
-          </p>
-          <pre style={codeBlockStyle}>{`# macOS / Linux
-$ curl -fsSL https://raw.githubusercontent.com/floomhq/floom/main/cli/floom/install.sh | bash
-
-# verify
-$ floom --version`}</pre>
+          <pre style={heroCodeBlockStyle}>
+            <span style={heroCodeCommentStyle}>{'# macOS / Linux — one command, no Node required\n'}</span>
+            <span style={heroCodePromptStyle}>{'$ '}</span>
+            {'curl -fsSL https://floom.dev/install | bash\n\n'}
+            <span style={heroCodeCommentStyle}>{'# verify\n'}</span>
+            <span style={heroCodePromptStyle}>{'$ '}</span>
+            {'floom --version'}
+          </pre>
 
           <div style={quickStartStyle}>
             <Link to="/docs/quickstart" style={pillStyle}>
-              Quickstart
-              <span style={pillKeyStyle}>5 min</span>
+              5-min quickstart
+              <span style={pillKeyStyle}>→</span>
             </Link>
             <Link to="/docs/mcp-install" style={pillStyle}>
               Install in Claude / Cursor

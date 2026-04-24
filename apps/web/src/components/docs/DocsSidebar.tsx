@@ -2,15 +2,42 @@
 //
 // Lives in a grid next to the docs content panel. Groups mirror the
 // wireframe at /var/www/wireframes-floom/v17/docs.html. Each group is a
-// plain <section> with an uppercase eyebrow + a list of links. The
-// active entry is decided by matching `currentPath` to the link's `to`.
+// plain <section> with a row heading (icon + label) plus a list of
+// links. The active entry is decided by matching `currentPath` to the
+// link's `to`.
 //
-// Kept intentionally dependency-light: no state, no icons, no theme
-// tokens beyond CSS variables already used across the app.
+// Docs-sexier pass (2026-04-24):
+// - Each group heading gets a neutral lucide icon to the left so the
+//   sidebar reads at a glance (Getting started / Examples / Protocol /
+//   Runtime / Deploy / API reference…). Icons are stroke-only, colored
+//   --muted, stay neutral on active state. No emojis.
+// - Active link: left border accent (brand green, 2px) + bold weight,
+//   not a full ink pill — matches Stripe / Linear docs active style and
+//   keeps the restrained palette.
+// - Hover: subtle card-tint bg, not green.
+// - Mobile: drawer toggle with hamburger icon, closes on link click,
+//   is the only thing visible on docs landing at 390px.
 
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
+import {
+  Rocket,
+  Play,
+  FileText,
+  Cpu,
+  Server,
+  BookOpen,
+  Gauge,
+  Package,
+  Terminal,
+  Layers,
+  Menu,
+  X,
+  ChevronRight,
+  Compass,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 export interface DocsSidebarLink {
   to: string;
@@ -22,11 +49,32 @@ export interface DocsSidebarLink {
 export interface DocsSidebarGroup {
   heading: string;
   links: DocsSidebarLink[];
+  /** Optional override icon; otherwise looked up by heading. */
+  icon?: LucideIcon;
 }
 
 interface Props {
   groups: DocsSidebarGroup[];
   currentPath: string;
+}
+
+// Neutral stroke icons per section. Fallback Compass keeps the layout
+// consistent if a future group heading isn't in the map yet.
+const HEADING_ICONS: Record<string, LucideIcon> = {
+  'Getting started': Rocket,
+  Examples: Play,
+  Protocol: FileText,
+  Runtime: Cpu,
+  Deploy: Server,
+  'API reference': BookOpen,
+  'Limits and plans': Gauge,
+  'MCP install': Package,
+  'Self-host': Terminal,
+  'Runtime specs': Layers,
+};
+
+function iconForHeading(heading: string): LucideIcon {
+  return HEADING_ICONS[heading] ?? Compass;
 }
 
 const asideStyle: CSSProperties = {
@@ -48,10 +96,12 @@ const asideStyle: CSSProperties = {
 const mobileToggleStyle: CSSProperties = {
   display: 'none',
   width: '100%',
-  padding: '10px 16px',
+  alignItems: 'center',
+  gap: 10,
+  padding: '10px 14px',
   background: 'var(--card)',
   border: '1px solid var(--line)',
-  borderRadius: 8,
+  borderRadius: 10,
   fontSize: 13,
   fontWeight: 600,
   color: 'var(--ink)',
@@ -60,7 +110,10 @@ const mobileToggleStyle: CSSProperties = {
   textAlign: 'left',
 };
 
-const headingStyle: CSSProperties = {
+const headingRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
   fontFamily: "'JetBrains Mono', ui-monospace, monospace",
   fontSize: 10.5,
   fontWeight: 600,
@@ -77,24 +130,28 @@ const listStyle: CSSProperties = {
   margin: '0 0 22px',
 };
 
+// Link row — uses a 2px transparent left border by default so the active
+// state (accent left stripe) doesn't shift text on state change.
 const linkBase: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
-  padding: '7px 10px',
+  padding: '7px 10px 7px 12px',
   borderRadius: 8,
+  borderLeft: '2px solid transparent',
   fontSize: 13,
   color: 'var(--muted)',
   textDecoration: 'none',
   lineHeight: 1.3,
-  transition: 'background 0.12s, color 0.12s',
+  transition: 'background 0.12s, color 0.12s, border-color 0.12s',
 };
 
 const linkActive: CSSProperties = {
   ...linkBase,
-  background: 'var(--ink)',
-  color: '#fff',
-  fontWeight: 500,
+  borderLeft: '2px solid var(--accent)',
+  background: 'var(--accent-soft)',
+  color: 'var(--ink)',
+  fontWeight: 600,
 };
 
 const tagStyle: CSSProperties = {
@@ -106,6 +163,7 @@ const tagStyle: CSSProperties = {
   padding: '1px 6px',
   borderRadius: 4,
   fontWeight: 600,
+  border: '1px solid var(--accent-border, transparent)',
 };
 
 const tagOnActive: CSSProperties = {
@@ -143,49 +201,75 @@ export function DocsSidebar({ groups, currentPath }: Props) {
         aria-controls="docs-sidebar-groups"
         onClick={() => setMobileOpen((v) => !v)}
       >
-        {mobileOpen ? 'Close menu' : activeLabel}
+        {mobileOpen ? (
+          <X size={16} strokeWidth={1.8} aria-hidden="true" />
+        ) : (
+          <Menu size={16} strokeWidth={1.8} aria-hidden="true" />
+        )}
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {mobileOpen ? 'Close menu' : activeLabel}
+        </span>
+        {!mobileOpen ? (
+          <ChevronRight
+            size={14}
+            strokeWidth={1.8}
+            aria-hidden="true"
+            style={{ color: 'var(--muted)' }}
+          />
+        ) : null}
       </button>
       <div
         id="docs-sidebar-groups"
         className={`docs-sidebar-groups${mobileOpen ? ' is-open' : ''}`}
       >
-        {groups.map((group) => (
-          <section key={group.heading}>
-            <h4 style={headingStyle}>{group.heading}</h4>
-            <ul style={listStyle}>
-              {group.links.map((link) => {
-                const active = isActive(link.to, currentPath);
-                const style = active ? linkActive : linkBase;
-                return (
-                  <li key={link.to}>
-                    <Link
-                      to={link.to}
-                      style={style}
-                      onClick={() => setMobileOpen(false)}
-                      onMouseEnter={(e) => {
-                        if (!active) {
-                          (e.currentTarget as HTMLElement).style.background = 'var(--card)';
-                          (e.currentTarget as HTMLElement).style.color = 'var(--ink)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!active) {
-                          (e.currentTarget as HTMLElement).style.background = 'transparent';
-                          (e.currentTarget as HTMLElement).style.color = 'var(--muted)';
-                        }
-                      }}
-                    >
-                      <span>{link.label}</span>
-                      {link.tag ? (
-                        <span style={active ? tagOnActive : tagStyle}>{link.tag}</span>
-                      ) : null}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
+        {groups.map((group) => {
+          const Icon = group.icon ?? iconForHeading(group.heading);
+          return (
+            <section key={group.heading}>
+              <h4 style={headingRowStyle}>
+                <Icon
+                  size={13}
+                  strokeWidth={1.8}
+                  aria-hidden="true"
+                  style={{ color: 'var(--muted)', flex: 'none' }}
+                />
+                <span>{group.heading}</span>
+              </h4>
+              <ul style={listStyle}>
+                {group.links.map((link) => {
+                  const active = isActive(link.to, currentPath);
+                  const style = active ? linkActive : linkBase;
+                  return (
+                    <li key={`${link.to}-${link.label}`}>
+                      <Link
+                        to={link.to}
+                        style={style}
+                        onClick={() => setMobileOpen(false)}
+                        onMouseEnter={(e) => {
+                          if (!active) {
+                            (e.currentTarget as HTMLElement).style.background = 'var(--card)';
+                            (e.currentTarget as HTMLElement).style.color = 'var(--ink)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!active) {
+                            (e.currentTarget as HTMLElement).style.background = 'transparent';
+                            (e.currentTarget as HTMLElement).style.color = 'var(--muted)';
+                          }
+                        }}
+                      >
+                        <span>{link.label}</span>
+                        {link.tag ? (
+                          <span style={active ? tagOnActive : tagStyle}>{link.tag}</span>
+                        ) : null}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          );
+        })}
       </div>
       <style>{`
         @media (max-width: 900px) {
@@ -196,7 +280,7 @@ export function DocsSidebar({ groups, currentPath }: Props) {
             border-bottom: 1px solid var(--line);
             padding: 16px 16px !important;
           }
-          .docs-sidebar-mobile-toggle { display: block !important; }
+          .docs-sidebar-mobile-toggle { display: flex !important; }
           .docs-sidebar-groups { display: none; margin-top: 12px; }
           .docs-sidebar-groups.is-open { display: block; }
         }
