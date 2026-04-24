@@ -205,7 +205,8 @@ input { font-family: inherit; }
 }
 
 .topbar-links a {
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--muted);
   transition: color 0.1s;
 }
