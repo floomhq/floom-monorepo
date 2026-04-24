@@ -5,6 +5,7 @@ import { runAppContainer } from './docker.js';
 import { runProxied } from './proxied-runner.js';
 import { getOrCreateStream } from '../lib/log-stream.js';
 import { invalidateHubCache } from '../lib/hub-cache.js';
+import { noteAppUnavailable } from '../lib/alerts.js';
 import * as userSecrets from './user_secrets.js';
 import * as creatorSecrets from './app_creator_secrets.js';
 import type { SecretPolicy } from '../types.js';
@@ -365,6 +366,7 @@ export function dispatchRun(
     void runProxiedWorker({ app, manifest, runId, action, inputs, secrets });
   } else {
     void runActionWorker({
+      slug: app.slug,
       appId: app.id,
       runId,
       action,
@@ -414,6 +416,9 @@ async function runProxiedWorker(opts: {
       duration_ms: result.duration_ms,
       finished: true,
     });
+    if (result.status === 'error' && result.error_type === 'app_unavailable') {
+      noteAppUnavailable(opts.app.slug, result.error || 'app_unavailable');
+    }
   } catch (err) {
     // An exception here (as opposed to a returned error result) means
     // runProxied itself crashed — that's a Floom-side bug, not an
@@ -434,6 +439,7 @@ async function runProxiedWorker(opts: {
 }
 
 async function runActionWorker(opts: {
+  slug: string;
   appId: string;
   runId: string;
   action: string;
@@ -526,6 +532,9 @@ async function runActionWorker(opts: {
         duration_ms: result.durationMs,
         finished: true,
       });
+      if (parsed.error_type === 'app_unavailable') {
+        noteAppUnavailable(opts.slug, parsed.error || 'app_unavailable');
+      }
       return;
     }
 
@@ -560,6 +569,9 @@ async function runActionWorker(opts: {
       logs: e.stack || '',
       finished: true,
     });
+    if (klass === 'app_unavailable') {
+      noteAppUnavailable(opts.slug, e.message || 'Runner crashed');
+    }
   } finally {
     logStream.finish();
   }

@@ -36,6 +36,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '../db.js';
+import { alertLaunchDemoInactive } from '../lib/alerts.js';
 import { newAppId, newSecretId } from '../lib/ids.js';
 import type { NormalizedManifest } from '../types.js';
 
@@ -487,6 +488,23 @@ export async function resolveDemoImageTag(opts: {
   return { kind: 'missing', imageTag };
 }
 
+// Layer-5 Discord alert hook: flip `apps.status` to inactive and fire a
+// deduped Discord ping so ops see silent breakages within 10 min instead of
+// from a user report. Safe to call when the row is already inactive — the
+// guard below makes it a no-op. Network post is best-effort inside
+// alertLaunchDemoInactive; a webhook outage never blocks seeding.
+function markLaunchDemoInactive(slug: string, detail: string): void {
+  const row = db
+    .prepare('SELECT id, status FROM apps WHERE slug = ?')
+    .get(slug) as { id: string; status: string } | undefined;
+  if (!row || row.status === 'inactive') return;
+  db.prepare(
+    "UPDATE apps SET status = 'inactive', updated_at = datetime('now') WHERE id = ?",
+  ).run(row.id);
+  console.warn(`[launch-demos] ${slug}: marking inactive (${detail})`);
+  alertLaunchDemoInactive(slug, detail);
+}
+
 export async function seedLaunchDemos(): Promise<{
   apps_added: number;
   apps_existing: number;
@@ -560,12 +578,6 @@ export async function seedLaunchDemos(
            updated_at = datetime('now')
      WHERE id = ?`,
   );
-  const markAppInactive = db.prepare(
-    `UPDATE apps
-       SET status = 'inactive',
-           updated_at = datetime('now')
-     WHERE id = ?`,
-  );
   const markAppActive = db.prepare(
     `UPDATE apps
        SET status = 'active',
@@ -582,6 +594,10 @@ export async function seedLaunchDemos(
   for (const demo of DEMOS) {
     const contextPath = resolve(repoRoot, demo.contextDir);
     if (!existsSync(resolve(contextPath, 'Dockerfile'))) {
+      markLaunchDemoInactive(
+        demo.slug,
+        `seedLaunchDemos missing Dockerfile at ${contextPath}`,
+      );
       logger.log(
         `[launch-demos] ${demo.slug}: Dockerfile missing at ${contextPath} — skipping`,
       );
@@ -620,7 +636,10 @@ export async function seedLaunchDemos(
     if (resolvedImage.kind === 'missing') {
       failed++;
       if (row) {
-        markAppInactive.run(row.id);
+        markLaunchDemoInactive(
+          demo.slug,
+          `${resolvedImage.imageTag} unavailable after build/reuse`,
+        );
         markedInactive++;
         logger.error(
           `[launch-demos] FATAL: ${demo.slug}: ${resolvedImage.imageTag} unavailable; marked app inactive`,
