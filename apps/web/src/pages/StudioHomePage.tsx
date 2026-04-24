@@ -82,16 +82,18 @@ export function StudioHomePage() {
   // IMPORTANT: getMyRuns() returns /me/runs, which is "every app the
   // user has ever run" — not just apps they OWN. Studio's feed must
   // scope to owned apps only, otherwise a creator who also uses public
-  // apps sees unrelated activity here (and the owned-app rows get
-  // pushed out by the global limit). Over-fetch by ~6x then filter
-  // client-side by owned slug set and cap at 6.
+  // apps sees unrelated activity here. /me/runs applies the `limit`
+  // BEFORE any ownership filter, so we need to over-fetch enough
+  // rows that heavy consumer-side activity can't push the creator's
+  // own app runs beyond the window. 200 matches the cap used by
+  // /me/runs and /me/threads surfaces elsewhere in the app.
   useEffect(() => {
     if (signedOutPreview) return;
     if (!apps || apps.length === 0) return;
     const ownedSlugs = new Set(apps.map((a) => a.slug));
     let cancelled = false;
     api
-      .getMyRuns(40)
+      .getMyRuns(200)
       .then((resp) => {
         if (cancelled) return;
         const filtered = resp.runs
@@ -130,13 +132,18 @@ export function StudioHomePage() {
   // memory/feedback_never_fabricate.md we leave them out rather than
   // hardcode an "illustrative" number.
   //
-  // "Live" maps to publish_status === 'published' (the only state the
-  // backend treats as publicly live — pending_review / rejected / draft
-  // all 404 for non-owners). Everything else collapses to "draft" in
-  // the headline copy to avoid claiming a pending app is live.
-  const liveCount = apps?.filter((a) => a.publish_status === 'published').length ?? 0;
-  const draftCount =
-    apps?.filter((a) => !a.publish_status || a.publish_status !== 'published').length ?? 0;
+  // Live semantics: the backend only treats `published` apps as publicly
+  // visible (pending_review / rejected / draft all 404 for non-owners).
+  // BUT `publish_status` is optional on CreatorApp — older hub API
+  // responses omit it, and those apps are the already-published fleet.
+  // So: treat `published` OR undefined as live, and only the three
+  // explicit non-published states (draft / pending_review / rejected)
+  // as drafts. Preserves back-compat with older servers while still
+  // refusing to claim a pending app is live.
+  const isLive = (a: CreatorApp) =>
+    !a.publish_status || a.publish_status === 'published';
+  const liveCount = apps?.filter(isLive).length ?? 0;
+  const draftCount = apps?.filter((a) => !isLive(a)).length ?? 0;
   const totalRuns = apps?.reduce((sum, a) => sum + (a.run_count || 0), 0) ?? 0;
 
   return (
@@ -599,7 +606,7 @@ function StudioEmptyState({
           lineHeight: 1.55,
         }}
       >
-        Paste a GitHub URL, a Docker image, or an OpenAPI spec. Floom packages it as a runnable app with a public page, an MCP endpoint, and a JSON API. Under 60 seconds.
+        Paste a GitHub URL or an OpenAPI spec. Floom packages it as a runnable app with a public page, an MCP endpoint, and a JSON API. Under 60 seconds.
       </p>
       <div
         style={{
@@ -838,12 +845,14 @@ function AppCard({
   app: CreatorApp;
   onDelete: () => void;
 }) {
-  // Only explicitly-published apps render the LIVE pill. pending_review
-  // / rejected / draft / missing all fall back to a DRAFT pill so a
-  // creator with a freshly ingested app doesn't see a misleading
-  // "LIVE" signal while admin review is still pending. The
-  // pending_review card adds its own inline note below for context.
-  const isPublished = app.publish_status === 'published';
+  // Pill logic mirrors the page-level `isLive` helper: treat
+  // `published` OR missing as live (so apps from older hub-API
+  // responses that never emit publish_status still read as LIVE, not
+  // DRAFT — back-compat), and the three explicit non-published states
+  // (draft / pending_review / rejected) as DRAFT. The pending_review
+  // card renders its own inline note below for context.
+  const isPublished =
+    !app.publish_status || app.publish_status === 'published';
   const initials = app.slug.slice(0, 2).toUpperCase();
   return (
     <div
