@@ -41,14 +41,57 @@ function childrenToText(children: React.ReactNode): string {
   return '';
 }
 
+// Docs-sexier pass (2026-04-24):
+// - H1 uses the display font at 40px for a real page title, matching
+//   the docs landing hero rhythm. H2 gets a subtle top border so each
+//   section break reads, without shouting like an <hr>. H3 stays ink
+//   medium for sub-sections.
+// - All headings cap at the prose max-width the article sets, so
+//   nothing runs beyond the reading column on wide screens.
 function headingStyle(level: number): React.CSSProperties {
-  const sizes: Record<number, number> = { 1: 32, 2: 22, 3: 16 };
+  if (level === 1) {
+    return {
+      fontFamily: 'var(--font-display)',
+      fontSize: 40,
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
+      color: 'var(--ink)',
+      margin: '0 0 16px',
+      lineHeight: 1.1,
+      scrollMarginTop: 72,
+    };
+  }
+  if (level === 2) {
+    return {
+      fontFamily: 'var(--font-display)',
+      fontSize: 24,
+      fontWeight: 700,
+      letterSpacing: '-0.015em',
+      color: 'var(--ink)',
+      margin: '40px 0 14px',
+      paddingTop: 18,
+      borderTop: '1px solid var(--line)',
+      lineHeight: 1.2,
+      scrollMarginTop: 72,
+    };
+  }
+  if (level === 3) {
+    return {
+      fontSize: 17,
+      fontWeight: 600,
+      color: 'var(--ink)',
+      margin: '28px 0 10px',
+      letterSpacing: '-0.005em',
+      lineHeight: 1.3,
+      scrollMarginTop: 72,
+    };
+  }
   return {
-    fontSize: sizes[level] ?? 18,
-    fontWeight: 700,
+    fontSize: 15,
+    fontWeight: 600,
     color: 'var(--ink)',
-    margin: `${level === 1 ? '0 0 16px' : '32px 0 12px'}`,
-    lineHeight: 1.25,
+    margin: '20px 0 8px',
+    lineHeight: 1.3,
     scrollMarginTop: 72,
   };
 }
@@ -139,6 +182,27 @@ export const markdownComponents = {
   hr: () => (
     <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '28px 0' }} />
   ),
+  // Render markdown blockquotes as docs callouts: subtle warm-neutral
+  // bg + left accent stripe (brand green, matches the sidebar active
+  // state). Authors write ">  Note: foo" in the markdown and get a
+  // Stripe-docs-style "pro tip" block — no custom directive syntax
+  // needed, no amber/red alarm colors.
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
+    <aside
+      style={{
+        margin: '20px 0',
+        padding: '14px 18px',
+        background: 'var(--accent-soft)',
+        borderLeft: '3px solid var(--accent)',
+        borderRadius: '0 10px 10px 0',
+        color: 'var(--ink)',
+        fontSize: 14,
+        lineHeight: 1.6,
+      }}
+    >
+      {children}
+    </aside>
+  ),
   strong: ({ children }: { children?: React.ReactNode }) => <strong>{children}</strong>,
   a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
     if (href && href.startsWith('/')) {
@@ -171,11 +235,12 @@ export const markdownComponents = {
         <code
           style={{
             fontFamily: 'JetBrains Mono, monospace',
-            fontSize: '0.88em',
-            background: 'var(--bg)',
+            fontSize: '0.86em',
+            background: '#f5f5f3',
             border: '1px solid var(--line)',
-            padding: '2px 6px',
-            borderRadius: 4,
+            padding: '1px 6px',
+            borderRadius: 5,
+            color: 'var(--ink)',
           }}
         >
           {children}

@@ -216,12 +216,19 @@ export function DocsPage() {
             </div>
           )}
 
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={markdownComponents as never}
-          >
-            {doc.markdown}
-          </ReactMarkdown>
+          {/* Docs-sexier pass (2026-04-24): cap prose at 720px so long
+              paragraphs don't stretch past a comfortable reading line
+              on 1440px+ monitors. Matches Stripe / Linear docs measure
+              (~65–75 chars). Code blocks + tables can break out of this
+              width via their own maxWidth if they need the room. */}
+          <div style={{ maxWidth: 720 }}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={markdownComponents as never}
+            >
+              {doc.markdown}
+            </ReactMarkdown>
+          </div>
 
           <div
             style={{
