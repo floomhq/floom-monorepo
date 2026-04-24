@@ -63,10 +63,9 @@ export function ThreeSurfacesDiagram() {
         <svg
           viewBox="0 0 820 260"
           width="100%"
-          height="auto"
           role="img"
           aria-labelledby="three-surfaces-title three-surfaces-desc"
-          style={{ display: 'block' }}
+          style={{ display: 'block', height: 'auto' }}
         >
           <title id="three-surfaces-title">
             Paste your app to get three surfaces
