@@ -152,6 +152,63 @@ export interface CascadeResult {
 
 const MARKDOWN_FIELD_NAMES = ['markdown', 'summary', 'report', 'article'];
 
+// Shared "· CACHED" suffix mirror of ScoredRowsTable.tsx (PR #578).
+// competitor-analyzer uses the composite auto-pick (RowTable + Markdown)
+// so the model chip never lived on its renderer. When the run payload
+// carries `meta.model`, surface a bottom-aligned chip that matches the
+// ScoredRowsTable treatment — and append "· CACHED" at opacity 0.65
+// when `meta.cache_hit === true`. Issue #579.
+//
+// Fixture compatibility: older competitor-analyzer cache entries stamp
+// "(cached)" into the model string itself; strip that before re-
+// appending so cached demos don't render "... (cached) · CACHED".
+function readMetaModelChip(
+  runOutput: unknown,
+): { model: string; cacheHit: boolean } | null {
+  if (!runOutput || typeof runOutput !== 'object') return null;
+  const meta = (runOutput as Record<string, unknown>).meta;
+  if (!meta || typeof meta !== 'object') return null;
+  const rawModel = (meta as Record<string, unknown>).model;
+  if (typeof rawModel !== 'string' || rawModel.length === 0) return null;
+  const cacheHit = (meta as Record<string, unknown>).cache_hit === true;
+  const cleaned = rawModel.replace(/\s*\(cached\)\s*$/i, '');
+  return { model: cleaned, cacheHit };
+}
+
+function ModelChip({ model, cacheHit }: { model: string; cacheHit: boolean }) {
+  return (
+    <div
+      data-testid="composite-model-chip"
+      style={{
+        padding: '8px 16px',
+        borderTop: '1px solid var(--line)',
+        fontSize: 11,
+        color: 'var(--muted)',
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        display: 'flex',
+        justifyContent: 'space-between',
+        background: 'var(--card)',
+        borderBottomLeftRadius: 12,
+        borderBottomRightRadius: 12,
+      }}
+    >
+      <span>Model</span>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+        {model}
+        {cacheHit ? (
+          <span
+            data-testid="composite-cache-hit-suffix"
+            style={{ opacity: 0.65, marginLeft: 6 }}
+          >
+            · CACHED
+          </span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
 // Fields that, when present on an otherwise small object, should be
 // promoted as the "headline" in HeadlineWithMeta. Ordered — earlier
 // names win. Kept narrow on purpose: we only promote a field when the
@@ -252,6 +309,7 @@ function autoPick(
         runId={ctx?.runId}
       />
     );
+    const modelChip = readMetaModelChip(runOutput);
     if (md) {
       return (
         <div
@@ -261,6 +319,24 @@ function autoPick(
           {table}
           <div style={{ marginTop: 16 }}>
             <Markdown content={md} />
+          </div>
+          {modelChip ? (
+            <div style={{ marginTop: 12 }}>
+              <ModelChip model={modelChip.model} cacheHit={modelChip.cacheHit} />
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+    if (modelChip) {
+      return (
+        <div
+          className="floom-auto-composite-output"
+          data-renderer="composite"
+        >
+          {table}
+          <div style={{ marginTop: 12 }}>
+            <ModelChip model={modelChip.model} cacheHit={modelChip.cacheHit} />
           </div>
         </div>
       );
