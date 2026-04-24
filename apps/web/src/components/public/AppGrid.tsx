@@ -96,24 +96,255 @@ function formatRuns(n: number): string {
 }
 
 /**
- * Deterministic per-slug "thumb lines" pattern. v17 wireframe shows
- * 3 bars per card with short/medium/long widths to mimic UI content.
- * We pick the pattern from a 4-way pool indexed by a cheap hash of the
- * slug so identical patterns don't repeat adjacent cards (all-`48%`
- * bars across 12 cards would look like a bug).
+ * Per-slug mini-viz: a small, deliberate shape of what the app
+ * returns, sitting inside the 120px thumbnail band. Replaces the prior
+ * 3-bar "thumb-lines" mock (#645) which read as a loading skeleton
+ * rather than content.
+ *
+ * Option B from the brief: intentional viz per launch app. Unknown
+ * apps get the quieter gradient + icon-only band (no bars).
+ *
+ * Lead Scorer → 3-row mini leaderboard with score chips.
+ * Resume Screener → stacked candidate list with a top-pick bar.
+ * Competitor Analyzer → 2-column mini-grid (check / alert glyphs).
+ *
+ * All monochrome, all ~30px tall, all using the warm-dark CARD_NEUTRAL
+ * token so the thumbnail band still reads as a single restrained surface.
  */
-function thumbLinesForSlug(slug: string): string[] {
-  const patterns: string[][] = [
-    ['100%', '70%', '45%'],
-    ['70%', '100%', '55%'],
-    ['60%', '85%', '100%'],
-    ['100%', '55%', '80%'],
-  ];
-  let h = 0;
-  for (let i = 0; i < slug.length; i++) {
-    h = (h * 31 + slug.charCodeAt(i)) | 0;
+function MiniViz({ slug, foreground }: { slug: string; foreground: string }) {
+  // Shared utility: a little horizontal bar, used by several viz shapes.
+  const Bar = ({ width, opacity = 0.25 }: { width: string; opacity?: number }) => (
+    <span
+      style={{
+        display: 'block',
+        height: 3,
+        width,
+        background: foreground,
+        borderRadius: 2,
+        opacity,
+      }}
+    />
+  );
+  // Shared utility: small score pill (mono digits, one accent tint).
+  const ScorePill = ({ text, accent }: { text: string; accent?: boolean }) => (
+    <span
+      style={{
+        fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+        fontSize: 9,
+        fontWeight: 700,
+        color: accent ? 'var(--accent, #047857)' : foreground,
+        background: accent ? 'rgba(4,120,87,0.1)' : 'rgba(14,14,12,0.06)',
+        padding: '1px 5px',
+        borderRadius: 3,
+        letterSpacing: '0.02em',
+      }}
+    >
+      {text}
+    </span>
+  );
+
+  if (slug === 'lead-scorer') {
+    return (
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 14,
+          background: 'rgba(255,255,255,0.78)',
+          border: '1px solid rgba(14,14,12,0.07)',
+          borderRadius: 5,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          gap: 6,
+          padding: '9px 11px',
+        }}
+      >
+        {[
+          { w: '78%', score: '87', accent: true },
+          { w: '64%', score: '71' },
+          { w: '52%', score: '58' },
+        ].map((row, i) => (
+          <span
+            key={i}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              minWidth: 0,
+            }}
+          >
+            <Bar width={row.w} opacity={i === 0 ? 0.45 : 0.25} />
+            <span style={{ flex: 1 }} />
+            <ScorePill text={row.score} accent={row.accent} />
+          </span>
+        ))}
+      </div>
+    );
   }
-  return patterns[Math.abs(h) % patterns.length];
+
+  if (slug === 'resume-screener') {
+    return (
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 14,
+          background: 'rgba(255,255,255,0.78)',
+          border: '1px solid rgba(14,14,12,0.07)',
+          borderRadius: 5,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          padding: '9px 11px',
+        }}
+      >
+        {/* Header: "TOP CANDIDATE" micro-label */}
+        <span
+          style={{
+            fontSize: 8,
+            fontWeight: 700,
+            color: 'rgba(14,14,12,0.45)',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          }}
+        >
+          Top candidate
+        </span>
+        {/* Top-pick row: accent-tinted track + score pill */}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span
+            style={{
+              display: 'block',
+              height: 4,
+              flex: 1,
+              background: 'rgba(4,120,87,0.22)',
+              borderRadius: 2,
+              position: 'relative',
+            }}
+          >
+            <span
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '92%',
+                background: 'var(--accent, #047857)',
+                borderRadius: 2,
+                opacity: 0.75,
+              }}
+            />
+          </span>
+          <ScorePill text="92" accent />
+        </span>
+        {/* Next two rows: muted */}
+        {[
+          { w: '72%', score: '81' },
+          { w: '55%', score: '64' },
+        ].map((row, i) => (
+          <span
+            key={i}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Bar width={row.w} />
+            <span style={{ flex: 1 }} />
+            <ScorePill text={row.score} />
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (slug === 'competitor-analyzer') {
+    // 2-col mini-grid: left = strengths (check), right = gaps (alert).
+    // Check = brand-tinted, Alert = muted slate. Two "rows" of comparison.
+    const Row = ({ checks, alerts }: { checks: number; alerts: number }) => (
+      <span
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1px 1fr',
+          columnGap: 8,
+          alignItems: 'center',
+        }}
+      >
+        <span style={{ display: 'flex', gap: 3 }}>
+          {Array.from({ length: checks }).map((_, i) => (
+            <span
+              key={i}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 2,
+                background: 'var(--accent, #047857)',
+                opacity: 0.75,
+              }}
+            />
+          ))}
+        </span>
+        <span
+          style={{
+            display: 'block',
+            width: 1,
+            height: 12,
+            background: 'rgba(14,14,12,0.12)',
+          }}
+        />
+        <span style={{ display: 'flex', gap: 3 }}>
+          {Array.from({ length: alerts }).map((_, i) => (
+            <span
+              key={i}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 2,
+                background: 'rgba(107,111,118,0.8)',
+              }}
+            />
+          ))}
+        </span>
+      </span>
+    );
+    return (
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 14,
+          background: 'rgba(255,255,255,0.78)',
+          border: '1px solid rgba(14,14,12,0.07)',
+          borderRadius: 5,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 7,
+          padding: '9px 11px',
+          justifyContent: 'center',
+        }}
+      >
+        {/* Column headers */}
+        <span
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            columnGap: 14,
+            fontSize: 8,
+            fontWeight: 700,
+            color: 'rgba(14,14,12,0.45)',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          }}
+        >
+          <span>Strengths</span>
+          <span>Gaps</span>
+        </span>
+        <Row checks={3} alerts={2} />
+        <Row checks={4} alerts={1} />
+      </div>
+    );
+  }
+
+  // Unknown app: return nothing. The caller renders the icon-only band.
+  return null;
 }
 
 /**
@@ -133,6 +364,15 @@ const OUTPUT_PREVIEWS: Record<string, string> = {
   'resume-screener': '92/100 · Top candidate',
   'competitor-analyzer': '3 strengths, 2 gaps',
 };
+
+/**
+ * Slugs that have a dedicated `MiniViz` shape (#645). The 3 launch
+ * showcase apps get a tailored mini visualization in the thumbnail
+ * band — not a generic loading-skeleton bar stack. Unknown apps fall
+ * through to the quieter icon-only band, which is honest: no fake
+ * mini-viz for apps we don't have a shape for.
+ */
+const MINI_VIZ_SLUGS = new Set(['lead-scorer', 'resume-screener', 'competitor-analyzer']);
 
 export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
   // HERO badge is pure visual noise when EVERY visible card is a hero —
@@ -223,6 +463,15 @@ function AppGridCard({
   // the description so the card isn't purely name + blurb. Hardcoded
   // for the 3 launch apps; null for everything else (no fake preview).
   const outputPreview = OUTPUT_PREVIEWS[app.slug] ?? null;
+  // Per-slug mini-viz (#645): only the 3 launch apps get a tailored
+  // shape in the thumbnail band. Other apps get the quieter icon-only
+  // band so we don't ship fake mini-vizzes for apps we don't know.
+  const hasMiniViz = MINI_VIZ_SLUGS.has(app.slug);
+  // Hide the "{N} runs" label while an app is new and barely used —
+  // "0 runs" / "1 runs" reads as negative social proof pre-launch.
+  // Above 10 runs, the counter becomes meaningful signal. 7d age
+  // chip still renders so the card isn't dead silent.
+  const showRuns = runs7d >= 10;
 
   return (
     <Link
@@ -294,61 +543,34 @@ function AppGridCard({
               display: 'block',
             }}
           />
-        ) : (
+        ) : hasMiniViz ? (
           <>
-            {/* Faint bar mock (v17 `.thumb-lines`). Three horizontal
-                bars of varying widths inside a translucent white sheet
-                — reads as "there is UI content here" rather than an
-                empty slab. Deterministic per-slug so two apps don't
-                accidentally show the same bar layout.
-                Hidden from screen readers via aria-hidden on the
-                parent icon wrapper; this is purely decorative. */}
-            <div
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                inset: 16,
-                background: 'rgba(255,255,255,0.7)',
-                borderRadius: 4,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                gap: 5,
-                padding: '10px 14px',
-              }}
-            >
-              {thumbLinesForSlug(app.slug).map((w, i) => (
-                <span
-                  key={i}
-                  style={{
-                    height: 4,
-                    width: w,
-                    background: 'rgba(14,14,12,0.16)',
-                    borderRadius: 2,
-                    display: 'block',
-                  }}
-                />
-              ))}
-            </div>
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: CARD_NEUTRAL.fg,
-                // Icon drops to 70% opacity so the bar mock stays
-                // legible behind it. At full opacity the icon's solid
-                // fill was swallowing the bars and undoing the new
-                // "there is content here" affordance.
-                opacity: 0.7,
-              }}
-              aria-hidden="true"
-            >
-              <AppIcon slug={app.slug} size={isFeatured ? 52 : 44} color={CARD_NEUTRAL.fg} />
-            </div>
+            {/* Per-app mini-viz (#645): replaces the prior 3-bar
+                "thumb-lines" skeleton mock, which read as a loading
+                state. Each launch app gets a deliberate shape of what
+                it returns (leaderboard / candidate stack / strengths
+                grid). Unknown apps fall through to the quieter
+                icon-only band below. */}
+            <MiniViz slug={app.slug} foreground={CARD_NEUTRAL.fg} />
           </>
+        ) : (
+          /* Option-A fallback for non-launch apps: clean icon-only band
+             with the subtle gradient already applied on the parent.
+             No bars, no fake UI — just the app identity. Matches the
+             "intentional, not skeleton" directive. */
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: CARD_NEUTRAL.fg,
+            }}
+            aria-hidden="true"
+          >
+            <AppIcon slug={app.slug} size={isFeatured ? 52 : 44} color={CARD_NEUTRAL.fg} />
+          </div>
         )}
 
         {/* Category chip — top-right inside the pastel band. Moved here
@@ -498,11 +720,37 @@ function AppGridCard({
             <span aria-hidden="true" style={{ color: 'var(--line)' }}>·</span>
           </>
         )}
-        <span data-testid={`app-grid-runs-${app.slug}`}>
-          {formatRuns(runs7d)} runs
-        </span>
-        <span aria-hidden="true" style={{ color: 'var(--line)' }}>·</span>
-        <span>7d</span>
+        {showRuns ? (
+          <>
+            <span data-testid={`app-grid-runs-${app.slug}`}>
+              {formatRuns(runs7d)} runs
+            </span>
+            <span aria-hidden="true" style={{ color: 'var(--line)' }}>·</span>
+            <span>7d</span>
+          </>
+        ) : (
+          /* Pre-launch replacement for "{N} runs · 7d" while usage is
+             too small to be meaningful signal. A single "Fresh" badge
+             (#645) keeps the stats row anchored without showing an
+             embarrassing "0 runs" label. Flips back to the real counter
+             once runs_7d hits 10. */
+          <span
+            data-testid={`app-grid-fresh-${app.slug}`}
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: 'var(--accent, #047857)',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              padding: '2px 7px',
+              border: '1px solid var(--accent-border, #a7f3d0)',
+              borderRadius: 999,
+              background: 'rgba(4,120,87,0.06)',
+            }}
+          >
+            Fresh
+          </span>
+        )}
       </div>
 
       {/* DESCRIPTION: 3-line clamp so the first value sentence is
