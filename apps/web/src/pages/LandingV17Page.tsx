@@ -143,11 +143,13 @@ export function LandingV17Page() {
             {/* Launch week pill removed from landing (#669) — remains on
                 /waitlist where it's route-scoped to the beta banner.
                 Landing keeps the hero calm with just the works-with belt
-                eyebrow + H1 + sub. */}
-
-            {/* Works-with belt as small eyebrow ABOVE the H1
-                (Federico 2026-04-23 — "like we had before"). */}
-            <WorksWithBelt />
+                eyebrow + H1 + sub. The marginTop below restores the
+                vertical breathing room the pill wrapper used to provide
+                (Federico 2026-04-24 — "above ship ai apps fast we need
+                margin again"). */}
+            <div style={{ marginTop: 24 }}>
+              <WorksWithBelt />
+            </div>
 
             {/* H1 — locked copy. Wireframe ships 64px desktop, balance wrap. */}
             <h1
