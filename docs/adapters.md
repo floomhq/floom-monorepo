@@ -178,3 +178,7 @@ When your adapter is ready:
 ### Known adapters
 
 The known-adapters list will live here once the first out-of-tree adapter ships. Empty today.
+
+## Current migration targets
+
+Migration target for the AuthAdapter: the failing tests in [`test/stress/test-adapters-auth-contract.mjs`](../test/stress/test-adapters-auth-contract.mjs) define the green-bar target. A signed-off auth migration makes all four tests pass.
