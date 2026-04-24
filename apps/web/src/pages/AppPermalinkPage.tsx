@@ -1189,49 +1189,82 @@ export function AppPermalinkPage() {
         )}
 
         {/* About + reviews. v17 restructure: sits inside the frame body
-            so no own border/radius. The hero still shows a one-line
-            truncated description, so the full markdown description
-            always renders here (no more 200-char gate). This is the
-            canonical prose surface for the app. */}
-        <section
-          style={{
-            paddingBottom: 24,
-            marginBottom: 24,
-            borderBottom: '1px solid var(--line)',
-          }}
-        >
-          {app.description && (
-            <>
-              <h2
+            so no own border/radius. The hero shows a one-line truncated
+            description; this section renders the full markdown prose
+            when there's meaningfully more to say than the hero line.
+            2026-04-24 (P1 polish): on utility apps (jwt-decode,
+            password, uuid, json-format) the description is a single
+            short sentence. The hero already shows it in full, so
+            rendering "About this app" below was a literal duplication
+            of the exact same sentence. Suppress About when the
+            full description equals the (plain-text) hero line AND it's
+            short — the full markdown still renders for real prose. */}
+        {(() => {
+          const trimmed = (app.description ?? '').trim();
+          const isDuplicateOfHero =
+            trimmed.length > 0 &&
+            trimmed === headerDescription &&
+            trimmed.length <= 160;
+          const showAboutProse = !!trimmed && !isDuplicateOfHero;
+          const hasReviews = summary && summary.count > 0;
+          if (!showAboutProse && !hasReviews) {
+            // Nothing to render in the About block — don't emit an
+            // empty bordered section. AppReviews still ships the
+            // "write a review" affordance, so we render it standalone.
+            return (
+              <section
                 style={{
-                  fontSize: 18,
-                  fontWeight: 600,
-                  margin: '0 0 14px',
-                  color: 'var(--ink)',
-                  letterSpacing: '-0.01em',
+                  paddingBottom: 24,
+                  marginBottom: 24,
+                  borderBottom: '1px solid var(--line)',
                 }}
               >
-                About this app
-              </h2>
-              {/* Upgrade 3 (2026-04-19): markdown-enabled About copy. */}
-              <DescriptionMarkdown
-                description={app.description}
-                testId="about-description"
-                style={{
-                  fontSize: 14,
-                  color: 'var(--text-2, var(--muted))',
-                  margin: 0,
-                  lineHeight: 1.65,
-                  marginBottom: 24,
-                }}
-              />
-            </>
-          )}
+                <AppReviews slug={app.slug} />
+              </section>
+            );
+          }
+          return (
+            <section
+              style={{
+                paddingBottom: 24,
+                marginBottom: 24,
+                borderBottom: '1px solid var(--line)',
+              }}
+            >
+              {showAboutProse && (
+                <>
+                  <h2
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 600,
+                      margin: '0 0 14px',
+                      color: 'var(--ink)',
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    About this app
+                  </h2>
+                  {/* Upgrade 3 (2026-04-19): markdown-enabled About copy. */}
+                  <DescriptionMarkdown
+                    description={app.description!}
+                    testId="about-description"
+                    style={{
+                      fontSize: 14,
+                      color: 'var(--text-2, var(--muted))',
+                      margin: 0,
+                      lineHeight: 1.65,
+                      marginBottom: 24,
+                    }}
+                  />
+                </>
+              )}
 
-          {summary && summary.count > 0 && <RatingsWidget summary={summary} />}
+              {hasReviews && <RatingsWidget summary={summary} />}
 
-          <AppReviews slug={app.slug} />
-        </section>
+              <AppReviews slug={app.slug} />
+            </section>
+          );
+        })()}
 
         {/* Details block. v17: sits inside the frame body with a subtle
             surface-2 card to differentiate from the About prose above. */}
