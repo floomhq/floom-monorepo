@@ -34,6 +34,7 @@
 //     missing_secret instead of the creator discovering at run time.
 import Docker from 'dockerode';
 import { db } from '../db.js';
+import { adapters } from '../adapters/index.js';
 import { newAppId, newSecretId } from '../lib/ids.js';
 import { normalizeManifest, ManifestError } from './manifest.js';
 import { slugify, SlugTakenError, deriveSlugSuggestions } from './openapi-ingest.js';
@@ -451,25 +452,31 @@ export async function ingestAppFromDockerImage(args: {
   if (existing) {
     appId = existing.id;
     created = false;
-    db.prepare(
-      `UPDATE apps SET
-         name=?, description=?, manifest=?, category=?, app_type='docker',
-         docker_image=?, base_url=NULL, auth_type=NULL, auth_config=NULL,
-         openapi_spec_url=NULL, openapi_spec_cached=NULL, visibility=?,
-         is_async=0, webhook_url=NULL, timeout_ms=NULL, retries=0,
-         async_mode=NULL, workspace_id=?, author=?, updated_at=datetime('now')
-       WHERE slug=?`,
-    ).run(
+    // Routed through adapters.storage.updateApp so the UPDATE SQL lives in
+    // one place (adapters/storage-sqlite.ts). The wrapper emits
+    // `updated_at = datetime('now')` automatically, so behavior is
+    // identical to the prior prepared statement.
+    adapters.storage.updateApp(slug, {
       name,
       description,
-      manifestJson,
-      args.category || null,
-      args.docker_image_ref,
+      manifest: manifestJson,
+      category: args.category || null,
+      app_type: 'docker',
+      docker_image: args.docker_image_ref,
+      base_url: null,
+      auth_type: null,
+      auth_config: null,
+      openapi_spec_url: null,
+      openapi_spec_cached: null,
       visibility,
-      args.workspace_id,
-      args.author_user_id,
-      slug,
-    );
+      is_async: 0,
+      webhook_url: null,
+      timeout_ms: null,
+      retries: 0,
+      async_mode: null,
+      workspace_id: args.workspace_id,
+      author: args.author_user_id,
+    });
   } else {
     appId = newAppId();
     created = true;
@@ -478,33 +485,39 @@ export async function ingestAppFromDockerImage(args: {
     // on the public Store after an admin flips them. Re-ingesting an
     // existing slug hits the UPDATE branch above and leaves publish_status
     // untouched — a previously-published app keeps its slot.
-    db.prepare(
-      `INSERT INTO apps (
-         id, slug, name, description, manifest, status, docker_image, code_path,
-         category, author, icon, app_type, base_url, auth_type, auth_config,
-         openapi_spec_url, openapi_spec_cached, visibility, is_async,
-         webhook_url, timeout_ms, retries, async_mode, workspace_id, publish_status
-       ) VALUES (
-         ?, ?, ?, ?, ?, 'active', ?, ?,
-         ?, ?, NULL, 'docker', NULL, NULL, NULL,
-         NULL, NULL, ?, 0,
-         NULL, NULL, 0, NULL, ?, 'pending_review'
-       )`,
-    ).run(
-      appId,
+    //
+    // Routed through adapters.storage.createApp: the wrapper builds the
+    // INSERT from the provided keys, so explicit NULLs translate directly
+    // into the SQL that used to be hand-written here.
+    adapters.storage.createApp({
+      id: appId,
       slug,
       name,
       description,
-      manifestJson,
-      args.docker_image_ref,
+      manifest: manifestJson,
+      status: 'active',
+      docker_image: args.docker_image_ref,
       // code_path is unused when docker_image is set (same as seed.ts); we
       // store a placeholder so the NOT NULL constraint is satisfied.
-      `docker-image:${slug}`,
-      args.category || null,
-      args.author_user_id,
+      code_path: `docker-image:${slug}`,
+      category: args.category || null,
+      author: args.author_user_id,
+      icon: null,
+      app_type: 'docker',
+      base_url: null,
+      auth_type: null,
+      auth_config: null,
+      openapi_spec_url: null,
+      openapi_spec_cached: null,
       visibility,
-      args.workspace_id,
-    );
+      is_async: 0,
+      webhook_url: null,
+      timeout_ms: null,
+      retries: 0,
+      async_mode: null,
+      workspace_id: args.workspace_id,
+      publish_status: 'pending_review',
+    } as unknown as Parameters<typeof adapters.storage.createApp>[0]);
   }
 
   // Wire secret bindings. Each (envKey → vaultKey) becomes:

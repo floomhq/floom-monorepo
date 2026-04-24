@@ -34,6 +34,8 @@
 //   - apps/server/src/services/openapi-ingest.ts  (ingestOpenApiApps
 //     formerly :1612 INSERT/UPDATE apps; ingestAppFromSpec formerly
 //     :2397 INSERT + paired UPDATE apps)
+//   - apps/server/src/services/docker-image-ingest.ts  (formerly :482
+//     INSERT + paired UPDATE apps)
 // -------------------------------------------------------------------------
 
 import { db } from '../db.js';
