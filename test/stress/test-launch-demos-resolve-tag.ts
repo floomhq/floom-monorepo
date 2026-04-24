@@ -8,10 +8,6 @@ import { join } from 'node:path';
 const tmp = mkdtempSync(join(tmpdir(), 'floom-launch-demos-resolve-'));
 process.env.DATA_DIR = join(tmp, 'data');
 
-const {
-  imageTagForDemo,
-  resolveDemoImageTag,
-} = await import('../../apps/server/src/services/launch-demos.ts');
 type LaunchDemoDockerLike =
   import('../../apps/server/src/services/launch-demos.ts').LaunchDemoDockerLike;
 type SeedLogger = import('../../apps/server/src/services/launch-demos.ts').SeedLogger;
@@ -88,6 +84,9 @@ function contextDir(name: string): string {
 }
 
 async function run() {
+  const { imageTagForDemo, resolveDemoImageTag } = await import(
+    '../../apps/server/src/services/launch-demos.ts'
+  );
   const demo = { slug: 'lead-scorer' };
 
   {
@@ -200,9 +199,16 @@ async function run() {
   }
 }
 
-try {
-  await run();
-  console.log('launch-demos resolveDemoImageTag: ok');
-} finally {
-  rmSync(tmp, { recursive: true, force: true });
+async function main() {
+  try {
+    await run();
+    console.log('launch-demos resolveDemoImageTag: ok');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 }
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
