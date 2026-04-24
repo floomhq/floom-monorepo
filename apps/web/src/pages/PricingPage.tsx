@@ -327,8 +327,9 @@ export function PricingPage() {
             margin: '0 0 14px',
           }}
         >
-          Free.{' '}
-          <span style={{ color: ACCENT }}>Rate-limited, not paywalled.</span>
+          Free to start.{' '}
+          <span style={{ color: ACCENT }}>5 runs a day on us.</span>{' '}
+          Bring your own key for unlimited.
         </h1>
         <p
           style={{
@@ -341,16 +342,14 @@ export function PricingPage() {
         >
           {deployEnabled ? (
             <>
-              Every app on Floom runs for free on our Gemini key. When you hit
-              the limit, paste your own key for unlimited. Paid tiers come after
-              launch.
+              Every app on Floom runs on our Gemini key, no credit card.
+              Paid tiers come after launch.
             </>
           ) : (
             <>
-              Runs on floom.dev stay free on our Gemini key (fair-use limits
-              apply). When you hit the limit, paste your own key for unlimited.
-              Publishing new apps to floom.dev is waitlist-only; self-host
-              includes publish with no waitlist. Paid tiers come after launch.
+              Runs on floom.dev stay on our Gemini key, no credit card.
+              Publishing new apps is waitlist-only; self-host has no gate.
+              Paid tiers come after launch.
             </>
           )}
         </p>

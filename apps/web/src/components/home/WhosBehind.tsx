@@ -97,19 +97,22 @@ export function WhosBehind() {
   return (
     <section data-testid="whos-behind" style={SECTION_STYLE}>
       <div className="whos-behind-grid" style={GRID_STYLE}>
-        {/* PLACEHOLDER PHOTO: apps/web/public/team/fede.jpg ships as a
-            1x1 transparent stub. Federico drops in the real photo by
-            replacing that file; no JSX change needed. Keep alt text
-            generic so the layout doesn't look broken on the stub. */}
+        {/* Photo: /team/fede.webp (225KB, q=85) is the primary source;
+            /team/fede.jpg (757KB) stays in the repo as a fallback for
+            browsers without webp support. <picture> lets the browser
+            pick the smaller file. 2026-04-24 size optimization. */}
         <div style={PHOTO_WRAP_STYLE}>
-          <img
-            src="/team/fede.jpg"
-            alt="Federico De Ponte"
-            width={160}
-            height={160}
-            style={PHOTO_IMG_STYLE}
-            loading="lazy"
-          />
+          <picture>
+            <source srcSet="/team/fede.webp" type="image/webp" />
+            <img
+              src="/team/fede.jpg"
+              alt="Federico De Ponte"
+              width={160}
+              height={160}
+              style={PHOTO_IMG_STYLE}
+              loading="lazy"
+            />
+          </picture>
         </div>
 
         <div>

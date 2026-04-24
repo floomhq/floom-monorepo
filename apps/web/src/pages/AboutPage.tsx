@@ -24,6 +24,7 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
+import { WhosBehind } from '../components/home/WhosBehind';
 import { readDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
 
@@ -273,6 +274,18 @@ export function AboutPage() {
         </div>
       </section>
 
+      {/* Who's behind — photo + contact band (2026-04-24). The /about
+          page mentioned Federico textually but had no face; WhosBehind
+          is already rendered on the landing page, reuse it here.
+          Wrapped in a top-bordered section so the vertical rhythm
+          matches the other /about sections. */}
+      <section
+        data-testid="about-whos-behind-wrap"
+        style={{ ...SECTION_BORDERED, padding: '24px 0 24px' }}
+      >
+        <WhosBehind />
+      </section>
+
       {/* CTA footer band */}
       <section
         data-testid="about-cta"
@@ -317,7 +330,7 @@ export function AboutPage() {
               display: 'inline-block',
               padding: '14px 26px',
               background: 'var(--accent)',
-              color: '#1b1a17',
+              color: '#ffffff',
               fontWeight: 600,
               fontSize: 15,
               borderRadius: 10,
@@ -339,7 +352,7 @@ export function AboutPage() {
               display: 'inline-block',
               padding: '14px 26px',
               background: 'var(--accent)',
-              color: '#1b1a17',
+              color: '#ffffff',
               fontWeight: 600,
               fontSize: 15,
               borderRadius: 10,

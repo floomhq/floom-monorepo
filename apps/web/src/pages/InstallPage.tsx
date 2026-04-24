@@ -1,10 +1,12 @@
 // 2026-04-20 (PRR tail cleanup): /install is a public landing stub for the
-// Floom CLI install steps. The wireframes + sitemap link here from the
-// top-bar "Install" affordance, so the route needed to exist (returned 404
-// before). Keeps the copy short, points at self-host docs + the GitHub
-// repo for the authoritative source. When a real CLI ships, the steps
-// below get upgraded in-place without changing the URL surface.
+// Floom CLI install steps. 2026-04-24 rewrite: lead with the Docker
+// one-liner (the self-host path that actually works today) rather than
+// the pnpm dev-clone. CLI is still on the roadmap; dev-clone stays
+// behind a collapsed details block for contributors. Docker image +
+// port match what prod compose uses: ghcr.io/floomhq/floom-monorepo,
+// port 3000.
 
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
 
@@ -30,10 +32,11 @@ const codeBlockStyle: React.CSSProperties = {
 };
 
 export function InstallPage() {
+  const [devOpen, setDevOpen] = useState(false);
   return (
     <PageShell
-      title="Install the Floom CLI · Floom"
-      description="Install the Floom command-line in one line. Publish apps, tail runs, and manage your Floom deployments from your terminal."
+      title="Self-host Floom · Floom"
+      description="Run Floom on your own server in one Docker command. Open source, MIT-licensed, no waitlist."
     >
       <main
         data-testid="install-page"
@@ -50,44 +53,39 @@ export function InstallPage() {
             color: 'var(--ink)',
           }}
         >
-          Install the Floom CLI
+          Self-host Floom
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: 16, margin: '0 0 28px' }}>
-          Run Floom locally against your own stack, publish apps from the
-          terminal, and hook Floom into CI.
+          Run Floom on your own server in one command. Open source, MIT-licensed,
+          no waitlist, no signup.
         </p>
 
-        <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>1. Clone the repo</h2>
-        <p style={{ color: 'var(--muted)', margin: '0 0 6px', fontSize: 14 }}>
-          Today Floom ships as a git-installable workspace. A published npm
-          CLI is on the roadmap; until then, clone the repo and run the
-          server from the checkout.
-        </p>
+        <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>1. Docker (recommended)</h2>
         <pre style={codeBlockStyle}>
-          git clone https://github.com/floomhq/floom.git{'\n'}
-          cd floom{'\n'}
-          pnpm install
-        </pre>
-
-        <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>2. Boot the server</h2>
-        <pre style={codeBlockStyle}>
-          pnpm --filter @floom/server dev
+          docker run -p 3000:3000 ghcr.io/floomhq/floom-monorepo:latest
         </pre>
         <p style={{ color: 'var(--muted)', margin: '0 0 20px', fontSize: 14 }}>
-          The server comes up on <code>http://localhost:8787</code> with the
-          dashboard served from the same host.
+          Visit <code>http://localhost:3000</code>. Self-hosted Floom ships with
+          publish enabled by default, so you can paste an OpenAPI spec and get a
+          live app without joining any waitlist.
         </p>
 
-        <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>3. Publish an app</h2>
+        <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>2. CLI (coming soon)</h2>
         <p style={{ color: 'var(--muted)', margin: '0 0 6px', fontSize: 14 }}>
-          Point an OpenAPI spec at <code>POST /api/publish</code> and Floom
-          wraps it into a runnable app with a shareable permalink.
+          A published npm CLI (<code>@floomhq/cli</code>) is on the roadmap.
+          Until then, the Docker image is the self-host path.
         </p>
         <pre style={codeBlockStyle}>
-          curl -X POST http://localhost:8787/api/publish \{'\n'}
-          {'  '}-H "content-type: application/json" \{'\n'}
-          {'  '}-d '{'{'}"openapi_spec_url": "https://.../openapi.json"{'}'}'
+          # coming soon{'\n'}
+          npm i -g @floomhq/cli
         </pre>
+
+        <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>3. Link it to Claude</h2>
+        <p style={{ color: 'var(--muted)', margin: '0 0 6px', fontSize: 14 }}>
+          The MCP endpoint is at <code>http://localhost:3000/mcp</code>. Add it
+          in Claude Desktop settings and every app on your instance becomes a
+          Claude tool.
+        </p>
 
         <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>Full docs</h2>
         <ul style={{ color: 'var(--muted)', lineHeight: 1.8, paddingLeft: 20 }}>
@@ -115,6 +113,48 @@ export function InstallPage() {
             — source, examples, issues
           </li>
         </ul>
+
+        {/* Dev install / contribute — collapsed by default. For users
+            who want to hack on the monorepo rather than run the prebuilt
+            image. Kept here so the old pnpm dev-clone workflow is still
+            discoverable. */}
+        <details
+          data-testid="install-dev"
+          open={devOpen}
+          onToggle={(e) => setDevOpen((e.target as HTMLDetailsElement).open)}
+          style={{
+            margin: '32px 0 0',
+            padding: '14px 18px',
+            background: 'var(--card)',
+            border: '1px solid var(--line)',
+            borderRadius: 10,
+          }}
+        >
+          <summary
+            style={{
+              cursor: 'pointer',
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'var(--ink)',
+            }}
+          >
+            Dev install / contribute
+          </summary>
+          <p style={{ color: 'var(--muted)', margin: '10px 0 6px', fontSize: 14 }}>
+            Clone the monorepo and run the server from source. Needed if you
+            want to hack on Floom itself.
+          </p>
+          <pre style={codeBlockStyle}>
+            git clone https://github.com/floomhq/floom.git{'\n'}
+            cd floom{'\n'}
+            pnpm install{'\n'}
+            pnpm --filter @floom/server dev
+          </pre>
+          <p style={{ color: 'var(--muted)', margin: '0 0 0', fontSize: 14 }}>
+            The server comes up on <code>http://localhost:8787</code> with the
+            dashboard served from the same host.
+          </p>
+        </details>
       </main>
     </PageShell>
   );

@@ -34,16 +34,16 @@ const MUTED = '#585550';
 const ACCENT = '#047857';
 const BG = '#fafaf8';
 
-// Brand lockup sizing (#632): wordmark bumped from inherited 14px to a
-// bolder 22/700 on desktop so the logo outweighs surrounding CTAs, and
-// the icon goes from 20→24 to keep the lockup proportional. Compact
-// mode (/p/:slug run view) hides the wordmark entirely (unchanged) and
-// shrinks the mark so the TopBar can still collapse to 40px. Mobile
-// uses the same 22/700 — at 390px the wordmark + 24px mark + hamburger
-// still leaves room for CTAs.
-const WORDMARK_SIZE = 22;
-const WORDMARK_WEIGHT = 700;
-const MARK_SIZE_DEFAULT = 24;
+// Brand lockup sizing (#632 → 2026-04-24 rebalance): the earlier 22/700
+// wordmark towered over the 14/500 nav items (Apps · Docs · Pricing) and
+// felt off-balance. Step it down to 17/600 so the wordmark reads as a
+// peer to the nav, not a headline. Nav items get a matching lift to
+// 15/500 in wireframe.css so mark + wordmark + nav form a single
+// horizontal strip where no element dominates. Compact mode (/p/:slug
+// run view) still hides the wordmark entirely and shrinks the mark.
+const WORDMARK_SIZE = 17;
+const WORDMARK_WEIGHT = 600;
+const MARK_SIZE_DEFAULT = 22;
 const MARK_SIZE_COMPACT = 18;
 
 const navLinkBase: CSSProperties = {

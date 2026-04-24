@@ -621,7 +621,9 @@ export function AppsDirectoryPage() {
             Container widened to 1180px (2026-04-23) to host the 4-col grid —
             the old 760px max-width was calibrated for the single-column
             stripe variant. */}
-        <section ref={resultsRef} style={{ padding: '0 24px 80px', minHeight: 600 }}>
+        {/* 32px top gutter so the toolbar border-bottom breathes above
+            the first card row (2026-04-24: separator felt crowded). */}
+        <section ref={resultsRef} style={{ padding: '32px 24px 80px', minHeight: 600 }}>
           <div style={{ maxWidth: 1180, margin: '0 auto' }}>
             {loading ? (
               <div
@@ -779,7 +781,7 @@ export function AppsDirectoryPage() {
           [data-testid="apps-chips"] { gap: 6px !important; }
           [data-testid="apps-search"] { font-size: 16px !important; }
           /* Results section: smaller gutter, smaller bottom padding. */
-          [data-testid="apps-directory"] main > section:last-of-type { padding: 0 16px 48px !important; }
+          [data-testid="apps-directory"] main > section:last-of-type { padding: 20px 16px 48px !important; }
         }
         /* Mirror AppGrid breakpoints so the loading skeleton collapses the
            same way as the real grid: 4 → 3 → 2 → 1. Keeps grid shape stable
