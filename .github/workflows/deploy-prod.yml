@@ -25,6 +25,11 @@ on:
         description: "Docker image tag to deploy (default: current preview tag). Example: auto-abc1234 or floom-preview-local:auto-abc1234. Leave blank to promote whatever is currently live on preview.floom.dev."
         required: false
         default: ""
+      skip_smoke:
+        description: "Skip the post-deploy public health probe, demo smoke test, and auto-rollback. Emergency use only."
+        required: false
+        type: boolean
+        default: false
 
 # Serialize prod deploys. We never want two overlapping prod rollouts.
 concurrency:
@@ -42,6 +47,7 @@ jobs:
           echo "=== DEPLOYING TO PROD (floom.dev) ==="
           echo "=================================================="
           echo "image_tag input: '${{ github.event.inputs.image_tag }}'"
+          echo "skip_smoke input: '${{ github.event.inputs.skip_smoke }}'"
           echo "(blank = promote whatever is currently live on preview.floom.dev)"
           echo "commit:          ${{ github.sha }}"
           echo "ref:             ${{ github.ref }}"
@@ -54,7 +60,9 @@ jobs:
           echo "  3. Swap image tag in /opt/floom-mcp-preview/docker-compose.yml"
           echo "  4. docker compose up -d --no-deps floom-mcp-preview"
           echo "  5. Health-check http://127.0.0.1:3051/api/health"
-          echo "  6. On failure: restore prod compose backup, restart prod."
+          echo "  6. Workflow probes https://floom.dev/api/health and"
+          echo "     smoke-tests the 3 launch demos using cached inputs"
+          echo "  7. On smoke failure: rollback to the previous logged image tag"
           echo "  (Preview compose + container are never touched.)"
           echo "=================================================="
 
@@ -62,7 +70,10 @@ jobs:
     name: Deploy to AX41 prod
     needs: announce
     runs-on: ubuntu-latest
+    env:
+      PROD_URL: https://floom.dev
     steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - name: Validate image_tag input
         env:
           TAG_INPUT: ${{ github.event.inputs.image_tag }}
@@ -72,13 +83,30 @@ jobs:
             echo "Refusing to pass unsafe image_tag to SSH: '$TAG_INPUT'"
             exit 1
           fi
-      - name: Write deploy key
+      - name: Require rollback SSH key
+        if: ${{ github.event.inputs.skip_smoke != 'true' }}
         env:
-          KEY: ${{ secrets.AX41_PROD_DEPLOY_KEY }}
+          ROLLBACK_KEY: ${{ secrets.AX41_SHELL_KEY }}
+        run: |
+          if [ -z "$ROLLBACK_KEY" ]; then
+            echo "AX41_SHELL_KEY is required when skip_smoke=false."
+            echo "The prod deploy key is forced-command-only and cannot read"
+            echo "/var/log/floom-deploy-prod.log for workflow-side rollback."
+            exit 1
+          fi
+      - name: Write SSH keys
+        env:
+          DEPLOY_KEY: ${{ secrets.AX41_PROD_DEPLOY_KEY }}
+          ROLLBACK_KEY: ${{ secrets.AX41_SHELL_KEY }}
+          SKIP_SMOKE: ${{ github.event.inputs.skip_smoke }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "$KEY" > ~/.ssh/prod_deploy
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/prod_deploy
           chmod 600 ~/.ssh/prod_deploy
+          if [ "$SKIP_SMOKE" != "true" ]; then
+            printf '%s\n' "$ROLLBACK_KEY" > ~/.ssh/ax41_shell
+            chmod 600 ~/.ssh/ax41_shell
+          fi
           ssh-keyscan -H "${{ secrets.AX41_HOST }}" >> ~/.ssh/known_hosts
       - name: SSH to AX41 (forced-command runs prod deploy script)
         env:
@@ -95,3 +123,66 @@ jobs:
               -o BatchMode=yes \
               "${{ secrets.AX41_USER }}@${{ secrets.AX41_HOST }}" \
               "$TAG_INPUT"
+      - name: Public health probe
+        id: health
+        if: ${{ github.event.inputs.skip_smoke != 'true' }}
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          status="$(curl -sS -o /tmp/floom-prod-health.json -w '%{http_code}' --max-time 30 "$PROD_URL/api/health")"
+          if [ "$status" != "200" ]; then
+            echo "Expected 200 from $PROD_URL/api/health, got $status"
+            cat /tmp/floom-prod-health.json || true
+            exit 1
+          fi
+      - name: Demo smoke test
+        id: smoke
+        if: ${{ github.event.inputs.skip_smoke != 'true' && steps.health.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          bash scripts/smoke-launch-demos.sh
+      - name: Auto-rollback to previous prod image
+        id: rollback
+        if: ${{ always() && github.event.inputs.skip_smoke != 'true' && (steps.health.outcome == 'failure' || steps.smoke.outcome == 'failure') }}
+        timeout-minutes: 15
+        env:
+          AX41_HOST: ${{ secrets.AX41_HOST }}
+          AX41_USER: ${{ secrets.AX41_USER }}
+        run: |
+          ssh -i ~/.ssh/ax41_shell \
+              -o StrictHostKeyChecking=yes \
+              -o BatchMode=yes \
+              "${AX41_USER}@${AX41_HOST}" 'bash -se' <<'REMOTE'
+          set -euo pipefail
+
+          LOG=/var/log/floom-deploy-prod.log
+          if [ ! -r "$LOG" ]; then
+            echo "[rollback] Cannot read $LOG" >&2
+            exit 1
+          fi
+
+          mapfile -t tags < <(
+            grep -oE '\[resolve\] IMAGE_TAG=[A-Za-z0-9:._-]+' "$LOG" \
+              | sed 's/^.*=//'
+          )
+
+          if [ "${#tags[@]}" -lt 2 ]; then
+            echo "[rollback] Need at least 2 logged prod image tags in $LOG" >&2
+            exit 1
+          fi
+
+          rollback_tag="${tags[${#tags[@]}-2]}"
+          echo "[rollback] previous tag: ${rollback_tag}"
+          echo "=== workflow rollback started $(date --iso-8601=seconds) target=${rollback_tag} ===" >> "$LOG"
+          /usr/local/sbin/floom-deploy-prod.sh "$rollback_tag"
+          echo "=== workflow rollback finished $(date --iso-8601=seconds) target=${rollback_tag} ===" >> "$LOG"
+          REMOTE
+      - name: Fail workflow after rollback
+        if: ${{ always() && github.event.inputs.skip_smoke != 'true' && (steps.health.outcome == 'failure' || steps.smoke.outcome == 'failure') }}
+        run: |
+          echo "Post-deploy verification failed."
+          echo "health outcome:   ${{ steps.health.outcome }}"
+          echo "smoke outcome:    ${{ steps.smoke.outcome }}"
+          echo "rollback outcome: ${{ steps.rollback.outcome }}"
+          exit 1
