@@ -1,0 +1,46 @@
+{
+  "_comment": "Pre-generated fixture for the /p/pitch-coach demo sample input. If the user submits the exact sample (canonical hash below matches), main.py returns this blob in <500ms. Any other input falls through to a live Gemini call or the deterministic dry-run stub.",
+  "generated_with": "sample-fixture",
+  "entries": {
+    "2d39d674ab946f239649fb6cbde80e85bd1f9f6f7eafb3be8a09f935030c7f75": {
+      "harsh_truth": [
+        {
+          "critique": "vague claim",
+          "vc_reaction": "I hear category words, but I still cannot picture the product."
+        },
+        {
+          "critique": "unclear buyer",
+          "vc_reaction": "Teams is too broad, so I still do not know who writes the check."
+        },
+        {
+          "critique": "generic speed promise",
+          "vc_reaction": "Ship faster sounds nice, but without a before-and-after it reads like copy, not insight."
+        }
+      ],
+      "rewrites": [
+        {
+          "angle": "user-outcome",
+          "pitch": "We help product and engineering teams turn AI app ideas into shipped products in days instead of weeks.",
+          "when_to_use": "Use this when the listener cares most about time-to-value and a concrete user benefit."
+        },
+        {
+          "angle": "market-size",
+          "pitch": "Every software team is racing to ship AI products; we give them a faster path from prototype to production.",
+          "when_to_use": "Use this when you need to explain the category, urgency, and why now."
+        },
+        {
+          "angle": "technical-moat",
+          "pitch": "Our runtime turns one API-defined workflow into a deployable AI app, so teams ship faster without rebuilding the same plumbing.",
+          "when_to_use": "Use this when the room wants a sharper wedge and a defensible product story."
+        }
+      ],
+      "one_line_tldr": "The pitch points at the category, but it hides the buyer and wedge behind generic platform language.",
+      "dry_run": false,
+      "cache_hit": false,
+      "model": "sample-fixture"
+    }
+  },
+  "_debug": {
+    "canonical": "{\"pitch\":\"We are a platform for AI apps that helps teams ship faster\"}"
+  }
+}

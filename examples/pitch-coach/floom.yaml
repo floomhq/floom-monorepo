@@ -1,0 +1,40 @@
+name: Pitch Coach
+slug: pitch-coach
+description: Paste a startup pitch, get three direct critiques, three sharper rewrites, and a one-line TL;DR of the biggest issue.
+category: writing
+icon: megaphone
+actions:
+  coach:
+    label: Coach Pitch
+    description: |
+      One Gemini 3 Pro call. Returns three direct critiques, three rewrites,
+      and a one-line summary of the biggest issue in the pitch.
+    inputs:
+      - name: pitch
+        label: Pitch
+        type: textarea
+        required: true
+        placeholder: e.g. We are a platform for AI apps that helps teams ship faster
+        description: |
+          Paste a single pitch blurb. 20-500 characters. Below that is not
+          enough to critique; above that the app asks you to keep it tight.
+    outputs:
+      - name: harsh_truth
+        label: Harsh Truth
+        type: table
+      - name: rewrites
+        label: Rewrites
+        type: table
+      - name: one_line_tldr
+        label: Biggest Issue
+        type: text
+      - name: model
+        label: Model
+        type: text
+runtime: python
+python_dependencies:
+  - google-genai>=1.64.0,<2
+node_dependencies: {}
+secrets_needed:
+  - GEMINI_API_KEY
+manifest_version: "2.0"
