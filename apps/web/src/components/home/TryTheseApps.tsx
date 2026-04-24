@@ -62,25 +62,30 @@ const DEFAULT_CARDS: TryAppCardData[] = [
   },
 ];
 
+// 2026-04-24: unified to ONE neutral icon tint across all three cards.
+// Previously GROWTH / HIRING / RESEARCH each shipped their own fg/bg/ring
+// (green / amber / slate) which painted the landing hero row in three
+// pastel hues. That redundant signalling fought the rest of the page's
+// restrained palette (brand green as the ONLY accent). Category identity
+// stays legible via the eyebrow text (HIRING / GROWTH / RESEARCH) and
+// the app name — the icon color was carrying no information the label
+// wasn't already carrying.
+//
+// Matches AppGrid.tsx's CARD_NEUTRAL: warm dark neutral (#1b1a17) on a
+// warm light neutral band (#f5f5f3), identical chip treatment. One
+// palette entry per category is kept so the call-sites (icon tile +
+// category pill) can continue to read `palette.fg` without restructure.
+const NEUTRAL_PALETTE = {
+  fg: '#1b1a17',
+  bg: 'radial-gradient(circle at 30% 25%, #f5f5f3 0%, #fafaf8 55%, #ececea 100%)',
+  ring:
+    'inset 0 0 0 1px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.6)',
+} as const;
+
 const CATEGORY_PALETTE: Record<string, { fg: string; bg: string; ring: string }> = {
-  GROWTH: {
-    fg: '#047857',
-    bg: 'radial-gradient(circle at 30% 25%, #d1fae5 0%, #ecfdf5 55%, #d1fae5 100%)',
-    ring:
-      'inset 0 0 0 1px rgba(5,150,105,0.15), 0 1px 2px rgba(5,150,105,0.18), inset 0 1px 0 rgba(255,255,255,0.6)',
-  },
-  HIRING: {
-    fg: '#b45309',
-    bg: 'radial-gradient(circle at 30% 25%, #fef3c7 0%, #fffaf0 55%, #fde68a 100%)',
-    ring:
-      'inset 0 0 0 1px rgba(180,83,9,0.15), 0 1px 2px rgba(180,83,9,0.14), inset 0 1px 0 rgba(255,255,255,0.6)',
-  },
-  RESEARCH: {
-    fg: '#475569',
-    bg: 'radial-gradient(circle at 30% 25%, #e2e8f0 0%, #f1f5f9 55%, #cbd5e1 100%)',
-    ring:
-      'inset 0 0 0 1px rgba(71,85,105,0.12), 0 1px 2px rgba(71,85,105,0.12), inset 0 1px 0 rgba(255,255,255,0.6)',
-  },
+  GROWTH: NEUTRAL_PALETTE,
+  HIRING: NEUTRAL_PALETTE,
+  RESEARCH: NEUTRAL_PALETTE,
 };
 
 interface TryTheseAppsProps {
@@ -138,7 +143,10 @@ function TryAppCard({ app }: { app: TryAppCardData }) {
         >
           <AppIcon slug={app.slug} size={22} color={palette.fg} />
         </span>
-        <span style={{ ...CATEGORY_PILL, color: palette.fg }}>{app.category}</span>
+        {/* Category eyebrow stays muted — the ink-black palette.fg would
+            over-weight three ALL-CAPS monospace labels on the page. Muted
+            reads as metadata, matches AppGrid's treatment. */}
+        <span style={{ ...CATEGORY_PILL, color: 'var(--muted)' }}>{app.category}</span>
       </div>
 
       <div style={CARD_BODY}>
