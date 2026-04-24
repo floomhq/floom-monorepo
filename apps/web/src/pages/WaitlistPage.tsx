@@ -51,6 +51,34 @@ const EYEBROW_STYLE: CSSProperties = {
   margin: '0 0 14px',
 };
 
+// Launch Week pill — neutral #f5f5f3 bg, #1b1a17 ink, green accent dot.
+// Contrast on #f5f5f3: #1b1a17 = 16.1:1 (AAA). Color is NOT the info carrier —
+// the text "Launch week · 27 April 2026" carries the meaning on its own.
+const LAUNCH_PILL_STYLE: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '6px 14px',
+  borderRadius: 999,
+  background: '#f5f5f3',
+  border: '1px solid var(--line)',
+  color: '#1b1a17',
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  margin: '0 0 18px',
+};
+
+const LAUNCH_PILL_DOT: CSSProperties = {
+  width: 7,
+  height: 7,
+  borderRadius: '50%',
+  background: 'var(--accent)',
+  flex: '0 0 auto',
+};
+
 const H1_STYLE: CSSProperties = {
   fontFamily: 'var(--font-display)',
   fontWeight: 800,
@@ -399,10 +427,18 @@ export function WaitlistPage() {
       {/* 1. Vision band ---------------------------------------------------- */}
       <section style={HERO_SECTION} data-testid="waitlist-hero">
         <div style={EYEBROW_STYLE}>Waitlist</div>
+        <div
+          style={LAUNCH_PILL_STYLE}
+          data-testid="waitlist-launch-pill"
+          aria-label="Launch week 27 April 2026"
+        >
+          <span aria-hidden="true" style={LAUNCH_PILL_DOT} />
+          Launch week &middot; 27 April 2026
+        </div>
         <h1 style={H1_STYLE}>Infrastructure for agentic work.</h1>
         <p style={LEDE_STYLE}>
           Production-grade runtime + protocol for AI apps. Open source.
-          You&rsquo;re joining at the beginning.
+          Get early access to the runtime for the agent era.
         </p>
         <p style={MICRO_STYLE}>
           Deploy is rolling out in waves. Drop your email and we&rsquo;ll let
@@ -666,14 +702,14 @@ export function WaitlistPage() {
       <section style={TIMELINE_BAND} data-testid="waitlist-timeline">
         <div style={TIMELINE_EYEBROW}>Timeline</div>
         <p style={TIMELINE_LINE}>
-          Launching publicly within weeks. The waitlist opens access as we
-          scale.
+          Going live Launch Week: 27 April 2026. The waitlist opens access as
+          we scale.
         </p>
       </section>
 
       {/* 6. Footer links --------------------------------------------------- */}
       <div style={FOOTER_LINKS}>
-        Can&rsquo;t wait? Poke around{' '}
+        Already exploring? Poke around{' '}
         <Link to="/docs" style={FOOTER_LINK}>
           the docs
         </Link>
