@@ -75,15 +75,16 @@ log(
 
 rmSync(tmp, { recursive: true, force: true });
 
-// Regression guard (Federico 2026-04-23): every launch demo that routes
-// through the BYOK gate (lead-scorer / competitor-analyzer / resume-screener)
-// must declare GEMINI_API_KEY in its seeded manifest, otherwise the runner
-// will not inject the server-side key and free-tier runs return an
-// auth_error instead of succeeding. This was verified correct on
-// 2026-04-23 when Federico asked "shouldnt resume_screener have a gemini
-// api key secret?" — all 3 manifests do declare it. This test prevents
-// silent regression if someone edits the seeder.
-const BYOK_GATED = ['lead-scorer', 'competitor-analyzer', 'resume-screener'];
+// Regression guard (Federico 2026-04-23, updated 2026-04-25 after roster
+// swap): every launch demo that routes through the BYOK gate must declare
+// GEMINI_API_KEY in its seeded manifest, otherwise the runner will not
+// inject the server-side key and free-tier runs return an auth_error
+// instead of succeeding. Original incident: Federico asked "shouldnt
+// resume_screener have a gemini api key secret?" — all 3 manifests did
+// declare it. The roster was swapped on 2026-04-25 to bounded <5s demos
+// (competitor-lens, ai-readiness-audit, pitch-coach); the same invariant
+// applies to the new 3. This test prevents silent regression.
+const BYOK_GATED = ['competitor-lens', 'ai-readiness-audit', 'pitch-coach'];
 for (const slug of BYOK_GATED) {
   const demo = DEMOS.find((d) => d.slug === slug);
   log(
