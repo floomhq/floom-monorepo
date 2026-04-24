@@ -19,8 +19,8 @@
 // The email form, its testids, and the submitWaitlist call are preserved
 // exactly so tests + the backend endpoint keep working.
 
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   Layers,
@@ -320,7 +320,22 @@ const FOOTER_LINK: CSSProperties = {
 
 // ---------------------------------------------------------------------------
 
+// Accept only short, alnum+dash/underscore source tags so we don't let an
+// attacker stuff junk into the analytics pipeline via the URL. Anything
+// unexpected collapses back to 'direct'.
+const SOURCE_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/i;
+
+function sanitizeSource(raw: string | null): string {
+  if (!raw) return 'direct';
+  return SOURCE_RE.test(raw) ? raw : 'direct';
+}
+
 export function WaitlistPage() {
+  const [searchParams] = useSearchParams();
+  const source = useMemo(
+    () => sanitizeSource(searchParams.get('source')),
+    [searchParams],
+  );
   const [email, setEmail] = useState('');
   const [showDeployDetails, setShowDeployDetails] = useState(false);
   const [deployRepoUrl, setDeployRepoUrl] = useState('');
@@ -341,13 +356,13 @@ export function WaitlistPage() {
     try {
       await submitWaitlist({
         email: trimmed,
-        source: 'direct',
+        source,
         deploy_repo_url: deployRepoUrl,
         deploy_intent: deployIntent,
       });
       // Analytics #599: mirror the WaitlistModal emit for the standalone
       // /waitlist page so direct visitors are counted in the same funnel.
-      track('waitlist_join', { source: 'direct' });
+      track('waitlist_join', { source });
       setSuccess(true);
     } catch (err) {
       if (err instanceof ApiError) {
