@@ -311,7 +311,13 @@ export function DocsLandingPage() {
       <TopBar />
       <DocsPublishWaitlistBanner />
 
-      <main style={shellStyle}>
+      <main className="docs-shell" style={shellStyle}>
+        <style>{`
+          @media (max-width: 900px) {
+            .docs-shell { grid-template-columns: 1fr !important; }
+            .docs-shell > article { padding: 20px 18px 48px !important; }
+          }
+        `}</style>
         <DocsSidebar groups={DOCS_SIDEBAR_GROUPS} currentPath={pathname} />
 
         <article style={mainStyle}>

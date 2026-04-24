@@ -28,6 +28,10 @@ import runtimeSpecsMd from '../assets/docs/runtime-specs.md?raw';
 import cliMd from '../assets/docs/cli.md?raw';
 import apiReferenceMd from '../assets/docs/api-reference.md?raw';
 import quickstartMd from '../assets/docs/quickstart.md?raw';
+// v17 Examples section (#549). Links out to /p/<slug> for each launch app
+// and to the examples/ directory in the repo. Kept as markdown so the same
+// DocsPage chrome (sidebar + TOC + page-foot CTA) wraps it.
+import examplesMd from '../assets/docs/examples.md?raw';
 
 const DOCS = [
   // v17 hub slugs (2026-04-22). Real routes reachable via DocsSidebar.
@@ -38,6 +42,7 @@ const DOCS = [
   { slug: 'runtime-specs', label: 'Runtime specs', markdown: runtimeSpecsMd },
   { slug: 'self-host', label: 'Self-host', markdown: selfHostMd },
   { slug: 'api-reference', label: 'API reference', markdown: apiReferenceMd },
+  { slug: 'examples', label: 'Examples', markdown: examplesMd },
   // Existing launch-week answers (kept — referenced from the sidebar
   // Limits / Runtime / Deploy groups).
   { slug: 'limits', label: 'Runtime & limits', markdown: limitsMd },
@@ -105,6 +110,7 @@ export function DocsPage() {
       <DocsPublishWaitlistBanner />
 
       <main
+        className="docs-shell"
         style={{
           maxWidth: 1260,
           margin: '0 auto',
@@ -115,6 +121,12 @@ export function DocsPage() {
           alignItems: 'start',
         }}
       >
+        <style>{`
+          @media (max-width: 900px) {
+            .docs-shell { grid-template-columns: 1fr !important; }
+            .docs-shell > article { padding: 20px 18px 60px !important; }
+          }
+        `}</style>
         {/* Shared v17 sidebar. Same groups on /docs and every /docs/:slug. */}
         <DocsSidebar groups={DOCS_SIDEBAR_GROUPS} currentPath={pathname} />
 

@@ -9,6 +9,7 @@
 // tokens beyond CSS variables already used across the app.
 
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import type { CSSProperties } from 'react';
 
 export interface DocsSidebarLink {
@@ -33,6 +34,30 @@ const asideStyle: CSSProperties = {
   padding: '30px 20px 30px 28px',
   background: 'transparent',
   minWidth: 0,
+  // Desktop: stick the sidebar below the TopBar + waitlist banner so it
+  // stays in view while the article scrolls. On mobile the wrapper
+  // disables sticky via the `docs-sidebar` class so the collapsible
+  // drawer lives at the top of the flow.
+  position: 'sticky',
+  top: 0,
+  alignSelf: 'start',
+  maxHeight: '100vh',
+  overflowY: 'auto',
+};
+
+const mobileToggleStyle: CSSProperties = {
+  display: 'none',
+  width: '100%',
+  padding: '10px 16px',
+  background: 'var(--card)',
+  border: '1px solid var(--line)',
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  color: 'var(--ink)',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  textAlign: 'left',
 };
 
 const headingStyle: CSSProperties = {
@@ -97,44 +122,85 @@ function isActive(linkTo: string, currentPath: string): boolean {
 }
 
 export function DocsSidebar({ groups, currentPath }: Props) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  // Label the mobile toggle with the active group+link so the closed
+  // drawer doubles as breadcrumbs.
+  const activeLabel = (() => {
+    for (const group of groups) {
+      const hit = group.links.find((link) => isActive(link.to, currentPath));
+      if (hit) return `${group.heading} / ${hit.label}`;
+    }
+    return 'Docs navigation';
+  })();
+
   return (
-    <aside style={asideStyle} aria-label="Docs navigation">
-      {groups.map((group) => (
-        <section key={group.heading}>
-          <h4 style={headingStyle}>{group.heading}</h4>
-          <ul style={listStyle}>
-            {group.links.map((link) => {
-              const active = isActive(link.to, currentPath);
-              const style = active ? linkActive : linkBase;
-              return (
-                <li key={link.to}>
-                  <Link
-                    to={link.to}
-                    style={style}
-                    onMouseEnter={(e) => {
-                      if (!active) {
-                        (e.currentTarget as HTMLElement).style.background = 'var(--card)';
-                        (e.currentTarget as HTMLElement).style.color = 'var(--ink)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!active) {
-                        (e.currentTarget as HTMLElement).style.background = 'transparent';
-                        (e.currentTarget as HTMLElement).style.color = 'var(--muted)';
-                      }
-                    }}
-                  >
-                    <span>{link.label}</span>
-                    {link.tag ? (
-                      <span style={active ? tagOnActive : tagStyle}>{link.tag}</span>
-                    ) : null}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
+    <aside className="docs-sidebar" style={asideStyle} aria-label="Docs navigation">
+      <button
+        type="button"
+        className="docs-sidebar-mobile-toggle"
+        style={mobileToggleStyle}
+        aria-expanded={mobileOpen}
+        aria-controls="docs-sidebar-groups"
+        onClick={() => setMobileOpen((v) => !v)}
+      >
+        {mobileOpen ? 'Close menu' : activeLabel}
+      </button>
+      <div
+        id="docs-sidebar-groups"
+        className={`docs-sidebar-groups${mobileOpen ? ' is-open' : ''}`}
+      >
+        {groups.map((group) => (
+          <section key={group.heading}>
+            <h4 style={headingStyle}>{group.heading}</h4>
+            <ul style={listStyle}>
+              {group.links.map((link) => {
+                const active = isActive(link.to, currentPath);
+                const style = active ? linkActive : linkBase;
+                return (
+                  <li key={link.to}>
+                    <Link
+                      to={link.to}
+                      style={style}
+                      onClick={() => setMobileOpen(false)}
+                      onMouseEnter={(e) => {
+                        if (!active) {
+                          (e.currentTarget as HTMLElement).style.background = 'var(--card)';
+                          (e.currentTarget as HTMLElement).style.color = 'var(--ink)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!active) {
+                          (e.currentTarget as HTMLElement).style.background = 'transparent';
+                          (e.currentTarget as HTMLElement).style.color = 'var(--muted)';
+                        }
+                      }}
+                    >
+                      <span>{link.label}</span>
+                      {link.tag ? (
+                        <span style={active ? tagOnActive : tagStyle}>{link.tag}</span>
+                      ) : null}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+      <style>{`
+        @media (max-width: 900px) {
+          .docs-sidebar {
+            position: static !important;
+            max-height: none !important;
+            border-right: none !important;
+            border-bottom: 1px solid var(--line);
+            padding: 16px 16px !important;
+          }
+          .docs-sidebar-mobile-toggle { display: block !important; }
+          .docs-sidebar-groups { display: none; margin-top: 12px; }
+          .docs-sidebar-groups.is-open { display: block; }
+        }
+      `}</style>
     </aside>
   );
 }
@@ -152,6 +218,17 @@ export const DOCS_SIDEBAR_GROUPS: DocsSidebarGroup[] = [
       { to: '/docs/quickstart', label: 'Quickstart', tag: 'NEW' },
       { to: '/docs/cli', label: 'Install the CLI' },
       { to: '/docs/mcp-install', label: 'Install in Claude / Cursor' },
+    ],
+  },
+  // v17 Examples group (#549). Each link goes to a runnable app on
+  // /p/<slug>; /docs/examples is the markdown index with deploy snippets.
+  {
+    heading: 'Examples',
+    links: [
+      { to: '/docs/examples', label: 'All examples' },
+      { to: '/p/lead-scorer', label: 'Lead scorer' },
+      { to: '/p/competitor-analyzer', label: 'Competitor analyzer' },
+      { to: '/p/resume-screener', label: 'Resume screener' },
     ],
   },
   {
