@@ -65,6 +65,36 @@
       "author": { "@type": "Person", "name": "Federico De Ponte", "url": "https://github.com/federicodeponte" }
     }
     </script>
+    <!-- Organization schema (SEO #596). Declares the publishing entity so
+         Google can attach brand-card, Knowledge Graph, and cross-link
+         signals (Discord, GitHub, LinkedIn, X, etc.) to the right org. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Floom",
+      "url": "https://floom.dev",
+      "logo": "https://floom.dev/floom-mark.svg",
+      "sameAs": [
+        "https://github.com/floomhq/floom",
+        "https://discord.gg/8fXGXjxcRz",
+        "https://twitter.com/floomhq"
+      ]
+    }
+    </script>
+    <!-- WebSite schema (SEO #596). Gives Google's sitelinks searchbox
+         the correct target once we add a public search endpoint, and
+         declares the canonical site name to stop Google renaming us
+         in SERPs (https://developers.google.com/search/docs/appearance/site-names). -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Floom",
+      "alternateName": "Floom — infrastructure for agentic work",
+      "url": "https://floom.dev"
+    }
+    </script>
   </head>
   <body>
     <div id="root">

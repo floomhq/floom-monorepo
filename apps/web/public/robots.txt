@@ -12,3 +12,7 @@ Disallow: /forgot-password
 Disallow: /reset-password
 
 Sitemap: https://floom.dev/sitemap.xml
+
+# Agent-friendly manifest (floom.dev/llms.txt)
+# Floom is agent-native. If you're an LLM or an agent indexer,
+# start here for a page-by-page summary + machine-readable endpoints.

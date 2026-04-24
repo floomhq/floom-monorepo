@@ -2,11 +2,17 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://floom.dev/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://floom.dev/apps</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://floom.dev/docs</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://floom.dev/build</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://floom.dev/about</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://floom.dev/pricing</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://floom.dev/protocol</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://floom.dev/install</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://floom.dev/install-in-claude</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <!-- Showcase launch apps — the AI-native trio highlighted on the homepage. -->
+  <url><loc>https://floom.dev/p/lead-scorer</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://floom.dev/p/competitor-analyzer</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://floom.dev/p/resume-screener</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>https://floom.dev/p/json-format</loc><priority>0.6</priority></url>
   <url><loc>https://floom.dev/p/base64</loc><priority>0.6</priority></url>
   <url><loc>https://floom.dev/p/hash</loc><priority>0.6</priority></url>
