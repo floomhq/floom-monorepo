@@ -476,7 +476,7 @@ export function MePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: sessionData, loading: sessionLoading, error: sessionError } = useSession();
   const { apps: myApps } = useMyApps();
-  const { entries: secretEntries } = useSecrets();
+  const { entries: secretEntriesRaw } = useSecrets();
 
   const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
   const [runsError, setRunsError] = useState<string | null>(null);
@@ -484,6 +484,12 @@ export function MePage() {
   const sessionPending = sessionLoading || (sessionData === null && !sessionError);
   const signedOutPreview = !!sessionData && sessionData.cloud_mode && sessionData.user.is_local;
   const canLoadPersonalData = !signedOutPreview;
+
+  // Gate vault reads on a real cloud session. The `useSecrets` hook keeps
+  // a module-level cache that survives logout until full SPA reload —
+  // without this gate, signing out would flash the previous account's
+  // secret count + provider badges on /me. Fixes codex [P1].
+  const secretEntries = canLoadPersonalData ? secretEntriesRaw : null;
 
   const deployEnabled = useDeployEnabled();
   const [waitlistOpen, setWaitlistOpen] = useState(false);
@@ -512,29 +518,48 @@ export function MePage() {
     };
   }, [canLoadPersonalData, sessionPending]);
 
-  // Pinned apps = distinct slugs from run history, most-recent first.
-  const pinnedApps = useMemo(() => {
+  // Distinct slugs from the FULL run history (not truncated). Drives
+  // both the installed-count stat + tab pill AND the pinned-apps
+  // preview. Fixes codex [P2] — previously the count plateaued at 4
+  // because we derived it from the truncated preview slice.
+  const installedApps = useMemo(() => {
     if (runs === null) return null;
     const seen = new Map<
       string,
-      { slug: string; name: string; count: number; lastUsedAt: string | null }
+      {
+        slug: string;
+        name: string;
+        totalCount: number;
+        last7dCount: number;
+        lastUsedAt: string | null;
+      }
     >();
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     for (const run of runs) {
       if (!run.app_slug) continue;
+      const t = run.started_at ? new Date(run.started_at).getTime() : NaN;
+      const isRecent = Number.isFinite(t) && t >= cutoff;
       const prev = seen.get(run.app_slug);
       if (prev) {
-        prev.count += 1;
+        prev.totalCount += 1;
+        if (isRecent) prev.last7dCount += 1;
       } else {
         seen.set(run.app_slug, {
           slug: run.app_slug,
           name: run.app_name || run.app_slug,
-          count: 1,
+          totalCount: 1,
+          last7dCount: isRecent ? 1 : 0,
           lastUsedAt: run.started_at,
         });
       }
     }
-    return Array.from(seen.values()).slice(0, PINNED_APPS_PREVIEW);
+    return Array.from(seen.values());
   }, [runs]);
+
+  const pinnedApps = useMemo(() => {
+    if (installedApps === null) return null;
+    return installedApps.slice(0, PINNED_APPS_PREVIEW);
+  }, [installedApps]);
 
   // Stats
   const runsLast7d = useMemo(() => {
@@ -567,7 +592,7 @@ export function MePage() {
     return Math.round(sum / durations.length);
   }, [runs]);
 
-  const installedCount = pinnedApps ? pinnedApps.length : null;
+  const installedCount = installedApps ? installedApps.length : null;
   const authoredCount = myApps ? myApps.length : 0;
   const savedSecretsCount = secretEntries ? secretEntries.length : null;
 
@@ -900,7 +925,9 @@ export function MePage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={s.miniAppName}>{a.name}</div>
                         <div style={s.miniAppSub}>
-                          {a.count} run{a.count === 1 ? '' : 's'} · 7d
+                          {a.last7dCount > 0
+                            ? `${a.last7dCount} run${a.last7dCount === 1 ? '' : 's'} · 7d`
+                            : `${a.totalCount} run${a.totalCount === 1 ? '' : 's'} total`}
                         </div>
                       </div>
                       <span style={s.statPill}>pinned</span>

@@ -376,10 +376,18 @@ export function MeSecretsPage() {
   const [preset, setPreset] = useState<PresetKey>('GEMINI_API_KEY');
   const [nameField, setNameField] = useState<string>('GEMINI_API_KEY');
   const [valueField, setValueField] = useState<string>('');
-  const [labelField, setLabelField] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+
+  // Track existing keys to warn about overwrites before saving. The
+  // vault is keyed by name only; there is no "label" dimension yet
+  // (codex [P2]) so "save GEMINI_API_KEY" over an existing one replaces
+  // it. Flag that explicitly in the UI.
+  const existingKeys = useMemo(
+    () => new Set((entries ?? []).map((e) => e.key)),
+    [entries],
+  );
 
   // Map authored-app count into a rough "used-by" signal: if any of the
   // user's authored apps reference this key, show that count. If no data
@@ -405,12 +413,19 @@ export function MeSecretsPage() {
       setSaveError('Value is required');
       return;
     }
+    // If the key already exists, require explicit overwrite confirmation.
+    // The vault is keyed by name — saving replaces the old value; there
+    // are no aliases. Fixes codex [P2].
+    if (existingKeys.has(key)) {
+      if (!window.confirm(`${key} is already saved. Saving now replaces the stored value. Continue?`)) {
+        return;
+      }
+    }
     setSaveError(null);
     setSaving(true);
     try {
       await save(key, valueField);
       setValueField('');
-      setLabelField('');
       setAddOpen(false);
       // keep the name so a repeat-add is cheap
     } catch (err) {
@@ -525,7 +540,15 @@ export function MeSecretsPage() {
                 );
               })}
             </div>
-            <div style={{ ...s.addGrid, gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 720 ? '1fr' : '160px minmax(0, 1fr) 1fr' }}>
+            <div
+              style={{
+                ...s.addGrid,
+                gridTemplateColumns:
+                  typeof window !== 'undefined' && window.innerWidth < 720
+                    ? '1fr'
+                    : '200px minmax(0, 1fr)',
+              }}
+            >
               <div>
                 <label style={s.fieldLabel} htmlFor="secret-name">Name</label>
                 <input
@@ -553,22 +576,14 @@ export function MeSecretsPage() {
                 />
                 <div style={s.fieldHint}>
                   Encrypted with Cloud KMS. Never logged, never shown again after save.
-                </div>
-              </div>
-              <div>
-                <label style={s.fieldLabel} htmlFor="secret-label">
-                  Label · <span style={{ color: 'var(--muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>optional</span>
-                </label>
-                <input
-                  id="secret-label"
-                  style={s.field}
-                  value={labelField}
-                  onChange={(e) => setLabelField(e.target.value)}
-                  placeholder="e.g. Personal Gemini, Team Gemini…"
-                  data-testid="me-secrets-label"
-                />
-                <div style={s.fieldHint}>
-                  Helps you pick between multiple keys at run time.
+                  {nameField && existingKeys.has(nameField.trim()) ? (
+                    <>
+                      {' '}
+                      <strong style={{ color: 'var(--ink)', fontWeight: 600 }}>
+                        {nameField} is already saved — saving will replace the stored value.
+                      </strong>
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
