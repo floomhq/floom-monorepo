@@ -84,17 +84,28 @@ async function removeSecret(key: string): Promise<void> {
   }
 }
 
-export function useSecrets(): CacheState & {
+/**
+ * Subscribe to the vault cache.
+ *
+ * `options.enabled` gates the auto-fetch; callers pass `false` when there
+ * is no authenticated cloud session (eg. /me in signed-out preview) to
+ * avoid hitting GET /api/secrets and caching the 401 error, which would
+ * otherwise permanently short-circuit future refreshes until the SPA
+ * reloads. Defaults to `true` for backward compat with existing callers.
+ */
+export function useSecrets(options?: { enabled?: boolean }): CacheState & {
   refresh: () => Promise<UserSecretEntry[] | null>;
   save: (key: string, value: string) => Promise<void>;
   remove: (key: string) => Promise<void>;
 } {
+  const enabled = options?.enabled ?? true;
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   useEffect(() => {
+    if (!enabled) return;
     if (!state.entries && !state.loading && !state.error) {
       void refreshSecrets();
     }
-  }, [state.entries, state.loading, state.error]);
+  }, [enabled, state.entries, state.loading, state.error]);
   return {
     ...state,
     refresh: refreshSecrets,

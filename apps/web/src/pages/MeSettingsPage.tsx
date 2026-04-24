@@ -71,6 +71,10 @@ type FieldState = 'idle' | 'saving' | 'saved' | 'error';
 export function MeSettingsPage() {
   const { data: session, isAuthenticated } = useSession();
   const navigate = useNavigate();
+  // Preserve the signed-out-preview shell path that /me/runs /me/apps /me/secrets
+  // already honor. Without this, the settings tab 302s to /login even though the
+  // other four tabs allow preview rendering. Fixes codex round 2 [P2].
+  const signedOutPreview = !!session && session.cloud_mode && session.user.is_local;
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = (searchParams.get('tab') || 'account') as SettingsTab;
   const activeTab: SettingsTab = VALID_TABS.includes(rawTab) ? rawTab : 'account';
@@ -238,7 +242,7 @@ export function MeSettingsPage() {
   };
 
   return (
-    <MeLayout activeTab="settings" title="Settings · Me · Floom">
+    <MeLayout activeTab="settings" title="Settings · Me · Floom" allowSignedOutShell={signedOutPreview}>
       <div data-testid="settings-page" style={{ maxWidth: 880 }}>
         <div
           style={{

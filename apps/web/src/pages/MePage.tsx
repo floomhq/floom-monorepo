@@ -476,19 +476,21 @@ export function MePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: sessionData, loading: sessionLoading, error: sessionError } = useSession();
   const { apps: myApps } = useMyApps();
-  const { entries: secretEntriesRaw } = useSecrets();
 
   const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
   const [runsError, setRunsError] = useState<string | null>(null);
 
   const sessionPending = sessionLoading || (sessionData === null && !sessionError);
   const signedOutPreview = !!sessionData && sessionData.cloud_mode && sessionData.user.is_local;
-  const canLoadPersonalData = !signedOutPreview;
+  const canLoadPersonalData = !signedOutPreview && !sessionPending;
 
-  // Gate vault reads on a real cloud session. The `useSecrets` hook keeps
-  // a module-level cache that survives logout until full SPA reload —
-  // without this gate, signing out would flash the previous account's
-  // secret count + provider badges on /me. Fixes codex [P1].
+  // Gate the vault hook on a real cloud session. `useSecrets` fires GET
+  // /api/secrets on first mount — in signed-out preview that 401s and
+  // `useSecrets` caches the error, short-circuiting future refreshes
+  // until full SPA reload. Also, even when the call succeeds, the
+  // module-level cache survives logout, so we mask the cached entries
+  // for the signed-out shell. Fixes codex round 1 [P1] + round 2 [P1].
+  const { entries: secretEntriesRaw } = useSecrets({ enabled: canLoadPersonalData });
   const secretEntries = canLoadPersonalData ? secretEntriesRaw : null;
 
   const deployEnabled = useDeployEnabled();

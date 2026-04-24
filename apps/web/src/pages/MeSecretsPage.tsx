@@ -368,9 +368,14 @@ const s: Record<string, CSSProperties> = {
 
 export function MeSecretsPage() {
   const { data: session } = useSession();
-  const { entries, loading, error, save, remove } = useSecrets();
-  const { apps: myApps } = useMyApps();
   const signedOutPreview = !!session && session.cloud_mode && session.user.is_local;
+  // Skip the GET /api/secrets fetch in signed-out preview; otherwise
+  // useSecrets caches the 401 error and never retries after login.
+  // See useSecrets() for the gate semantics.
+  const { entries, loading, error, save, remove } = useSecrets({
+    enabled: !signedOutPreview,
+  });
+  const { apps: myApps } = useMyApps();
 
   const [addOpen, setAddOpen] = useState(false);
   const [preset, setPreset] = useState<PresetKey>('GEMINI_API_KEY');
@@ -469,18 +474,24 @@ export function MeSecretsPage() {
         <Link to="/me" style={s.btn} data-testid="me-secrets-back">
           ← back to Me
         </Link>
-        <button
-          type="button"
-          onClick={() => setAddOpen((v) => !v)}
-          style={{ ...s.btn, ...s.btnAccent }}
-          data-testid="me-secrets-add-toggle"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add secret
-        </button>
+        {/* Hide Add secret in signed-out preview — every /api/secrets
+            mutation is gated by requireAuthenticatedInCloud() on the
+            server, so the drawer would silently fail on Save. Fixes
+            codex round 2 [P2]. */}
+        {!signedOutPreview && (
+          <button
+            type="button"
+            onClick={() => setAddOpen((v) => !v)}
+            style={{ ...s.btn, ...s.btnAccent }}
+            data-testid="me-secrets-add-toggle"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add secret
+          </button>
+        )}
       </div>
     </div>
   );
