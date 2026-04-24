@@ -296,7 +296,7 @@ A conformant `AuthAdapter` MUST pass:
 
 A conformant impl SHOULD support concurrent `getSession` calls without cross-request state leakage. It MAY expose richer features (MFA, passkeys, API key management) as adapter-internal details not visible to Floom.
 
-Reference test skeleton: `test/stress/test-adapters-auth-contract.mjs` (planned). Related coverage: `test/stress/test-auth-401-hints.mjs`, `test-auth-dynamic-baseurl.mjs`.
+Reference test skeleton: `test/stress/test-adapters-auth-contract.mjs` (ships on `protocol-v0.2`; today it is executable-as-spec — 4 assertions fail-expected until the Better Auth migration lands, 1 passes). Related coverage: `test/stress/test-auth-401-hints.mjs`, `test-auth-dynamic-baseurl.mjs`.
 
 ### SecretsAdapter
 
