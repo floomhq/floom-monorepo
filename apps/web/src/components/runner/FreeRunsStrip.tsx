@@ -282,11 +282,9 @@ export function FreeRunsStrip({ slug, refreshKey = 0, onOpenBYOK }: FreeRunsStri
           </svg>
         </span>
         <span>
-          <strong style={{ fontWeight: 600 }}>
-            {remaining} of {limit} free runs
-          </strong>{' '}
+          <strong style={{ fontWeight: 600 }}>Gemini on us</strong>{' '}
           <span style={{ color: 'var(--muted)' }}>
-            today · powered by Gemini · Floom's covering it
+            · {remaining} of {limit} free runs left today
           </span>
         </span>
         {/* Tiny inline progress bar — 90×4 track with remaining-coloured

@@ -741,7 +741,7 @@ export function AppPermalinkPage() {
             className="permalink-hero-row"
             style={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-start',
               gap: 14,
               padding: '18px 24px 16px',
               borderBottom: '1px solid var(--line)',
@@ -798,6 +798,82 @@ export function AppPermalinkPage() {
                   {headerDescription}
                 </p>
               )}
+              {/* v17 parity round 2 (2026-04-24, #644): meta row (version ·
+                  by @handle · age · rating) moved from the actions column
+                  into its own line under the description. Used to wrap
+                  onto 2+ rows when crammed next to the Share button on
+                  narrow widths. Now it sits on one line on desktop,
+                  wraps cleanly on mobile, and never fights the Share CTA
+                  for horizontal space. */}
+              <div
+                data-testid="hero-version-meta"
+                className="permalink-hero-version-meta"
+                style={{
+                  fontSize: 11,
+                  color: 'var(--muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  marginTop: 8,
+                  rowGap: 4,
+                }}
+              >
+                <span
+                  title="Published release of this app"
+                  data-testid="hero-version"
+                  style={{
+                    padding: '2px 7px',
+                    borderRadius: 6,
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    color: 'var(--ink)',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--line)',
+                    fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  v{app.version ?? '0.1.0'}
+                </span>
+                <span
+                  data-testid="hero-version-status"
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  {app.version_status ?? 'stable'}
+                </span>
+                {heroHandle && (
+                  <>
+                    <span aria-hidden="true" style={{ color: 'var(--line)' }}>·</span>
+                    <span data-testid="hero-handle" style={{ fontSize: 11 }}>
+                      by @{heroHandle}
+                    </span>
+                  </>
+                )}
+                {publishedRelative && (
+                  <>
+                    <span aria-hidden="true" style={{ color: 'var(--line)' }}>·</span>
+                    <span data-testid="hero-published" style={{ fontSize: 11 }}>
+                      {publishedRelative}
+                    </span>
+                  </>
+                )}
+                {summary && summary.count > 0 && (
+                  <>
+                    <span aria-hidden="true" style={{ color: 'var(--line)' }}>·</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <StarsRow value={summary.avg} size={12} />
+                      {summary.avg.toFixed(1)} ({summary.count})
+                    </span>
+                  </>
+                )}
+              </div>
               {capabilityChips.length > 0 && (
                 <div
                   data-testid="permalink-capability-chips"
@@ -843,98 +919,6 @@ export function AppPermalinkPage() {
                 flexWrap: 'wrap',
               }}
             >
-              <span
-                data-testid="hero-version-meta"
-                className="permalink-hero-version-meta"
-                style={{
-                  fontSize: 10.5,
-                  color: 'var(--muted)',
-                  fontFamily: 'JetBrains Mono, ui-monospace, monospace',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    textTransform: 'none',
-                    letterSpacing: 0,
-                  }}
-                >
-                  <span
-                    title="Published release of this app"
-                    style={{
-                      padding: '2px 7px',
-                      borderRadius: 999,
-                      fontSize: 9,
-                      fontWeight: 700,
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
-                      color: 'var(--muted)',
-                      background: 'var(--bg)',
-                      border: '1px solid var(--line)',
-                      fontFamily:
-                        'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
-                    }}
-                  >
-                    App version
-                  </span>
-                  <span
-                    data-testid="hero-version"
-                    style={{
-                      fontFamily: 'JetBrains Mono, ui-monospace, monospace',
-                      fontSize: 10.5,
-                      color: 'var(--muted)',
-                      letterSpacing: '0.06em',
-                    }}
-                  >
-                    v{app.version ?? '0.1.0'}
-                  </span>
-                </span>
-                <span aria-hidden="true">·</span>
-                <span data-testid="hero-version-status">{app.version_status ?? 'stable'}</span>
-                {heroHandle && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span data-testid="hero-handle">by @{heroHandle}</span>
-                  </>
-                )}
-                {publishedRelative && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    {/* Age label opts out of the meta row's uppercase +
-                        letter-spacing treatment. The formatter returns
-                        natural-cased values like "1d ago" / "3h ago"
-                        (see formatRelative below), and under the
-                        inherited `textTransform: uppercase` those
-                        rendered as "1D AGO" / "3H AGO" — which read as
-                        broken (it looks like the unit letter got eaten
-                        by the space). Keeping sentence-case here matches
-                        how the rating chip below already opts out. */}
-                    <span
-                      data-testid="hero-published"
-                      style={{ textTransform: 'none', letterSpacing: 0 }}
-                    >
-                      {publishedRelative}
-                    </span>
-                  </>
-                )}
-                {summary && summary.count > 0 && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textTransform: 'none', letterSpacing: 0 }}>
-                      <StarsRow value={summary.avg} size={12} />
-                      {summary.avg.toFixed(1)} ({summary.count})
-                    </span>
-                  </>
-                )}
-              </span>
               <button
                 type="button"
                 data-testid="cta-share"
