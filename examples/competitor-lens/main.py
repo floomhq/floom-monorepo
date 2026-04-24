@@ -686,10 +686,11 @@ async def _analyze_async(your_url: str, competitor_url: str) -> dict[str, Any]:
                 "Accept": "text/html,application/xhtml+xml",
             }
             timeout = httpx.Timeout(connect=2.0, read=FETCH_TIMEOUT_S, write=2.0, pool=1.0)
+            # HTTP/1.1 is fine for fetching 2 pages. Dropped http2=True to
+            # avoid the optional 'h2' dep that isn't in the runtime image.
             async with httpx.AsyncClient(
                 headers=headers,
                 timeout=timeout,
-                http2=True,
             ) as client:
                 _log("fetching URLs")
                 your_page, competitor_page = await asyncio.gather(
