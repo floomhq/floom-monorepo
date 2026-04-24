@@ -1,0 +1,45 @@
+# Floom
+
+> Floom is infrastructure for agentic work. Point it at an OpenAPI spec and it gives you an MCP server, an HTTP endpoint, and a shareable web form — all from the same manifest, with auth, rate limits, secret injection, and run history built in.
+
+Floom is open source (MIT) and self-hostable in a single Docker container. Hosted cloud lives at https://floom.dev.
+
+## Key pages
+
+- [Home](https://floom.dev/): Hero, three-surfaces pitch, and showcase apps.
+- [Apps directory](https://floom.dev/apps): Every published Floom app, runnable from the browser.
+- [Docs](https://floom.dev/docs): Quickstart, self-host guide, protocol reference.
+- [Pricing](https://floom.dev/pricing): Free during beta, self-host free forever, paid cloud plans soon.
+- [Install in Claude](https://floom.dev/install-in-claude): Add Floom to Claude Desktop, Claude Code, Cursor, or any MCP client.
+- [Build a new app](https://floom.dev/build): Paste an OpenAPI URL, publish in seconds.
+- [About](https://floom.dev/about): Why Floom exists, who it's for.
+
+## Showcase apps (live, runnable)
+
+- [Lead Scorer](https://floom.dev/p/lead-scorer): Scores a CSV of leads with Gemini, ranks and explains.
+- [Competitor Analyzer](https://floom.dev/p/competitor-analyzer): Pulls positioning, pricing, and weak spots from a list of competitor URLs.
+- [Resume Screener](https://floom.dev/p/resume-screener): Ranks resumes against a job description.
+
+## Machine-readable endpoints
+
+- **Backend OpenAPI spec**: https://floom.dev/openapi.json
+- **Apps directory (JSON)**: `GET https://floom.dev/api/hub`
+- **Single app metadata**: `GET https://floom.dev/api/hub/:slug`
+- **Run an app over HTTP**: `POST https://floom.dev/api/:slug/run` (or `POST https://floom.dev/api/:slug/:operation` for typed operations)
+- **MCP server for a single app**: `https://floom.dev/mcp/app/:slug` (SSE + HTTP)
+- **Floom Protocol spec**: https://floom.dev/protocol
+
+## Source + community
+
+- **Repo**: https://github.com/floomhq/floom (MIT license)
+- **Docker image**: https://github.com/floomhq/floom/pkgs/container/floom-monorepo
+- **Discord**: https://discord.gg/8fXGXjxcRz
+- **Issues**: https://github.com/floomhq/floom/issues
+
+## Self-host (one line)
+
+```
+docker run -p 3010:3010 ghcr.io/floomhq/floom-monorepo:latest
+```
+
+Full guide: https://github.com/floomhq/floom/blob/main/docs/SELF_HOST.md

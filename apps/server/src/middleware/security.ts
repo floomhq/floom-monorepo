@@ -205,3 +205,38 @@ export const securityHeaders: MiddlewareHandler = async (c, next) => {
     c.res.headers.set('Content-Security-Policy', TOP_LEVEL_CSP);
   }
 };
+
+/**
+ * Preview-environment index blocker (SEO #596).
+ *
+ * The preview deployment at `preview.floom.dev` serves the same build as prod
+ * but against a throwaway DB. We DO NOT want Google / Bing / social previewers
+ * indexing it — duplicate-content penalties, stale share cards, and the user
+ * being tricked into bookmarking the preview URL are all real risks.
+ *
+ * Detection: `PUBLIC_URL` contains `preview.` (matches preview.floom.dev and
+ * any other `preview.<domain>` we might run), OR `FLOOM_DISALLOW_INDEX=true`
+ * is set explicitly. Prod (`PUBLIC_URL=https://floom.dev`) falls through
+ * cleanly — no header emitted.
+ *
+ * We set both the HTTP header (covers non-HTML assets like /sitemap.xml,
+ * /robots.txt) and rely on the SSR meta-tag rewrite in index.ts to do the
+ * same for <head>. Either one alone is enough; shipping both gives us
+ * belt + braces coverage for crawlers that skip one or the other.
+ */
+function isPreviewEnv(): boolean {
+  if (process.env.FLOOM_DISALLOW_INDEX === 'true') return true;
+  const publicUrl = process.env.PUBLIC_URL || '';
+  return publicUrl.includes('preview.');
+}
+
+export const noIndexPreview: MiddlewareHandler = async (c, next) => {
+  await next();
+  if (isPreviewEnv() && !c.res.headers.get('X-Robots-Tag')) {
+    c.res.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  }
+};
+
+/** Exported for index.ts so the SSR HTML rewrite can also inject a
+ *  `<meta name="robots" content="noindex, nofollow">` on preview. */
+export { isPreviewEnv };

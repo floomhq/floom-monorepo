@@ -56,7 +56,7 @@ import { resolveUserContext } from './services/session.js';
 import { startJobWorker } from './services/worker.js';
 import { startTriggersWorker } from './services/triggers-worker.js';
 import { sweepZombieRuns, startZombieRunSweeper } from './services/runner.js';
-import { securityHeaders } from './middleware/security.js';
+import { securityHeaders, noIndexPreview, isPreviewEnv } from './middleware/security.js';
 import { runBodyLimit } from './middleware/body-size.js';
 import { meTriggersRouter, hubTriggersRouter } from './routes/triggers.js';
 import { webhookRouter } from './routes/webhook.js';
@@ -167,6 +167,12 @@ app.use('/renderer/*', openCors);
 // Mounted before routes so it wraps every response. Routes that own a
 // tighter CSP (renderer frame) are exempted inside the middleware.
 app.use('*', securityHeaders);
+
+// SEO #596: emit `X-Robots-Tag: noindex, nofollow` on every response from
+// preview deployments (PUBLIC_URL contains `preview.`) so Google never
+// indexes preview.floom.dev and creates duplicate-content competition for
+// the prod floom.dev URLs. Prod is a no-op.
+app.use('*', noIndexPreview);
 
 // Global error handler: forward uncaught exceptions to Sentry (if wired) and
 // surface a generic 500 to the caller. Hono's onError fires for any thrown
@@ -778,7 +784,21 @@ if (webDist) {
   // @hono/node-server's serveStatic only accepts paths relative to cwd, so we
   // do our own tiny static middleware using node:fs. Handles SPA fallback
   // (non-file paths under non-/api return index.html).
-  const indexHtml = readFileSync(join(webDist, 'index.html'), 'utf-8');
+  const rawIndexHtml = readFileSync(join(webDist, 'index.html'), 'utf-8');
+  // SEO #596: inject `<meta name="robots" content="noindex, nofollow">` at
+  // bootstrap when running on preview so every SSR-served HTML tells
+  // crawlers to skip regardless of any downstream rewrite. Belt + braces
+  // with the X-Robots-Tag header set by `noIndexPreview` middleware. Prod
+  // (`PUBLIC_URL=https://floom.dev`) gets the pristine HTML unchanged.
+  const indexHtml = isPreviewEnv()
+    ? rawIndexHtml.replace(
+        '<meta name="viewport"',
+        '<meta name="robots" content="noindex, nofollow" />\n    <meta name="viewport"',
+      )
+    : rawIndexHtml;
+  if (isPreviewEnv()) {
+    console.log('[web] preview deployment detected — injecting noindex meta + X-Robots-Tag');
+  }
 
   // Paths that must never be swallowed by the SPA wildcard. These reach
   // Hono's other route handlers or return a real 404. The order matters:
