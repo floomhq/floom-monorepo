@@ -33,7 +33,6 @@ import type {
   PickResult,
   RunRecord,
 } from '../../lib/types';
-import { AppIcon } from '../AppIcon';
 import { OutputPanel } from './OutputPanel';
 import { JobProgress } from './JobProgress';
 import { CustomRendererHost } from './CustomRendererHost';
@@ -1034,34 +1033,8 @@ function InputCard({
     return { required: req, optional: opt };
   }, [actionSpec.inputs]);
 
-  // Subtitle under the app name in the input card header. The old copy
-  // just echoed `app.category` ("growth", "hiring", …) which reads as
-  // noise because the category is already carried by the breadcrumb
-  // tint + the /apps directory filter. Federico audit 2026-04-24:
-  // drop it. When we DO have a per-action description (most OpenAPI
-  // imports carry one — e.g. "Score leads against your ICP" — and the
-  // featured apps' manifests have hand-written copy), use that
-  // instead; it tells the user what Run will do, which is the real
-  // question in this moment. When neither is available, we omit the
-  // row entirely rather than showing a placeholder.
-  const subtitle = actionSpec.description?.trim() || null;
-
   return (
     <div className="run-surface-card" data-testid="run-surface-input-card">
-      <header className="run-surface-card-header">
-        <div className="run-surface-icon" aria-hidden="true">
-          <AppIcon slug={app.slug} size={22} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="run-surface-app-title">{app.name}</div>
-          {subtitle && (
-            <div className="run-surface-app-sub" data-testid="run-surface-app-sub">
-              {subtitle}
-            </div>
-          )}
-        </div>
-      </header>
-
       {hasInputs ? (
         <form
           onSubmit={(e) => {
