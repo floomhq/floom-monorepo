@@ -97,7 +97,12 @@ export function LandingV17Page() {
   const deployEnabledFlag = useDeployEnabled();
   const deployEnabled = deployEnabledFlag ?? readDeployEnabled();
   const waitlistHeroHref = useMemo(() => waitlistHref('landing-hero'), []);
-  const runInClaudeHref = deployEnabled ? '/install' : '/install/lead-scorer';
+  // Route both modes to the shared /install picker. /install/lead-scorer has
+  // no static fallback (it hits the hub for the app row), so in degraded
+  // states — hub fetch failures, missing showcase rows — it 404s even while
+  // FALLBACK_STRIPES keeps the rest of the page healthy. /install is safe in
+  // both states and still pre-selects lead-scorer via the showcase gallery.
+  const runInClaudeHref = '/install';
 
   useEffect(() => {
     document.title = 'Ship AI apps fast · Floom';
