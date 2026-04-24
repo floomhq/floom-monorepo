@@ -21,3 +21,4 @@ screenshots-greenlight/
 
 # Internal planning / stash / ops material does not belong in this public repo.
 docs/internal/
+examples/ai-readiness-audit/__pycache__/
