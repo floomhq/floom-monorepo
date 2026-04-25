@@ -121,18 +121,18 @@ export const DEMOS: LaunchDemo[] = [
               label: 'Your URL',
               type: 'url',
               required: true,
-              placeholder: 'https://floom.dev',
+              placeholder: 'floom.dev',
               description:
-                'Your HTTPS homepage or product page. Max 200 chars.',
+                'Your homepage or product page. https:// is added automatically. Max 200 chars.',
             },
             {
               name: 'competitor_url',
               label: 'Competitor URL',
               type: 'url',
               required: true,
-              placeholder: 'https://n8n.io',
+              placeholder: 'n8n.io',
               description:
-                'One competitor HTTPS page on a different host. Max 200 chars.',
+                'One competitor page on a different host. https:// is added automatically. Max 200 chars.',
             },
           ],
           outputs: [
@@ -176,9 +176,9 @@ export const DEMOS: LaunchDemo[] = [
               label: 'Company URL',
               type: 'url',
               required: true,
-              placeholder: 'https://floom.dev',
+              placeholder: 'floom.dev',
               description:
-                'Public HTTPS URL only. Max 200 chars. Private / loopback / RFC1918 addresses are rejected server-side.',
+                'Public URL. https:// is added automatically. Max 200 chars. Private / loopback / RFC1918 addresses are rejected server-side.',
             },
           ],
           outputs: [

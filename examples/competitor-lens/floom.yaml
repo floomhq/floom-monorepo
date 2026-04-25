@@ -14,13 +14,13 @@ inputs:
     required: true
     label: Your URL
     description: Your HTTPS homepage or product page. Max 200 chars.
-    placeholder: https://floom.dev
+    placeholder: floom.dev
   - name: competitor_url
     type: url
     required: true
     label: Competitor URL
     description: One competitor HTTPS homepage or product page on a different host. Max 200 chars.
-    placeholder: https://n8n.io
+    placeholder: n8n.io
 
 output_type: json
 

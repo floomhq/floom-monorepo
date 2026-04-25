@@ -16,7 +16,7 @@ actions:
         label: Company URL
         type: url
         required: true
-        placeholder: https://floom.dev
+        placeholder: floom.dev
         description: Public HTTPS URL only. Max 200 characters. Private,
           loopback, and RFC1918 addresses are rejected server-side.
     outputs:
