@@ -17,7 +17,10 @@
 #   3. Bump image tag in /opt/floom-preview-launch/docker-compose.yml
 #   4. docker compose up -d --no-deps floom-preview-launch
 #   5. Health-check http://127.0.0.1:3052/api/health for up to 60s
-#   6. On failure: restore the preview compose backup and restart the
+#   6. Run launch-apps-real-run-gate.sh against :3052 and assert each
+#      launch app completes with dry_run=false and model!="dry-run"
+#      under the API budget.
+#   7. On failure: restore the preview compose backup and restart the
 #      preview container only. NEVER touches the prod compose or container.
 #
 # Env var differences are preserved in the compose files themselves — the
@@ -47,6 +50,8 @@ REMOTE_URL=https://github.com/floomhq/floom.git
 PREVIEW_COMPOSE_DIR=/opt/floom-preview-launch
 PREVIEW_SERVICE=floom-preview-launch
 PREVIEW_HEALTH_URL="http://127.0.0.1:3052/api/health"
+PREVIEW_GATE_BASE_URL="http://127.0.0.1:3052"
+GATE_SCRIPT="${REPO}/scripts/ops/launch-apps-real-run-gate.sh"
 
 # Bootstrap clone on first run
 if [ ! -d "$REPO/.git" ]; then
@@ -94,13 +99,18 @@ for i in $(seq 1 12); do
   sleep 5
 done
 
-if [ "$HEALTHY" = "1" ]; then
+if [ "$HEALTHY" = "1" ] && "$GATE_SCRIPT" --base-url "$PREVIEW_GATE_BASE_URL"; then
   echo "=== preview deploy done $(date --iso-8601=seconds) sha=${SHA} ==="
   exit 0
 fi
 
-echo "[health] FAILED ${PREVIEW_HEALTH_URL} after 60s"
-echo "=== HEALTHCHECK FAILED, rolling back preview (prod untouched) ==="
+if [ "$HEALTHY" != "1" ]; then
+  echo "[health] FAILED ${PREVIEW_HEALTH_URL} after 60s"
+  echo "=== HEALTHCHECK FAILED, rolling back preview (prod untouched) ==="
+else
+  echo "[gate] FAILED launch-app real-run gate on ${PREVIEW_GATE_BASE_URL}"
+  echo "=== POST-DEPLOY GATE FAILED, rolling back preview (prod untouched) ==="
+fi
 cp "$BACKUP" "${PREVIEW_COMPOSE_DIR}/docker-compose.yml"
 (cd "$PREVIEW_COMPOSE_DIR" && docker compose up -d --no-deps "$PREVIEW_SERVICE") || true
 
