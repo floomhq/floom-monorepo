@@ -1,3 +1,5 @@
+import './lib/sentry-init.js';
+
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -31,7 +33,7 @@ import { ghStarsRouter } from './routes/gh-stars.js';
 import { skillRouter } from './routes/skill.js';
 import { db } from './db.js';
 import { SERVER_VERSION } from './lib/server-version.js';
-import { initSentry, captureServerError } from './lib/sentry.js';
+import { captureServerError } from './lib/sentry.js';
 import { sendDiscordAlert, logAlertsBootState } from './lib/alerts.js';
 import { seedFromFile } from './services/seed.js';
 import { seedLaunchDemos } from './services/launch-demos.js';
@@ -67,8 +69,6 @@ import { isDeployEnabled } from './services/workspaces.js';
 const PORT = Number(process.env.PORT || 3051);
 const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 
-// Optional Sentry wiring. No-op when SENTRY_DSN is unset.
-initSentry();
 // Optional Discord alerts. No-op when DISCORD_ALERTS_WEBHOOK_URL is unset.
 // Logs one line at boot so operators can verify wiring via docker logs.
 logAlertsBootState();

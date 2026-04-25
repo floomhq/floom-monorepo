@@ -17,7 +17,7 @@ process.env.FLOOM_SEED_LAUNCH_DEMOS = 'false';
 // 3051 or any of the sibling stress tests.
 process.env.PORT = process.env.PORT || '38517';
 delete process.env.METRICS_TOKEN;
-delete process.env.SENTRY_DSN;
+delete process.env.SENTRY_SERVER_DSN;
 delete process.env.FLOOM_AUTH_TOKEN;
 
 let passed = 0;

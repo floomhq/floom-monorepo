@@ -93,6 +93,7 @@ app.get('/renderer/foo/frame.html', (c) => {
   const styleSrc = directiveValue(csp, 'style-src');
   const styleSrcElem = directiveValue(csp, 'style-src-elem');
   const styleSrcAttr = directiveValue(csp, 'style-src-attr');
+  const connectSrc = directiveValue(csp, 'connect-src');
   log(
     "landing: style-src contains self",
     styleSrc.includes("'self'"),
@@ -112,6 +113,17 @@ app.get('/renderer/foo/frame.html', (c) => {
     "landing: style-src-attr includes 'unsafe-inline' (intentional)",
     styleSrcAttr.includes("'unsafe-inline'"),
     `got=${styleSrcAttr}`,
+  );
+  log(
+    'landing: connect-src allows GitHub stars API',
+    connectSrc.includes('https://api.github.com'),
+    `got=${connectSrc}`,
+  );
+  log(
+    'landing: connect-src allows Sentry ingest',
+    connectSrc.includes('https://*.ingest.sentry.io') &&
+      connectSrc.includes('https://*.ingest.us.sentry.io'),
+    `got=${connectSrc}`,
   );
 
   // Pentest MED #379 — Permissions-Policy + Cross-Origin isolation family.

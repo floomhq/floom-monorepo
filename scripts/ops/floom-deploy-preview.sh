@@ -68,8 +68,22 @@ SHA=$(git rev-parse --short HEAD)
 TAG="floom-preview-local:auto-${SHA}"
 echo "[build] sha=${SHA} tag=${TAG}"
 
-# Build the image. Prod reuses this tag when promoted.
-docker build -t "$TAG" -f docker/Dockerfile .
+# Build the image. Prod reuses this tag when promoted. Sentry source-map
+# upload is optional and only runs when SENTRY_AUTH_TOKEN is present in this
+# script's environment; the Vite plugin keeps source maps local otherwise.
+BUILD_ARGS=(--build-arg "COMMIT_SHA=${SHA}")
+if [ -n "${VITE_SENTRY_WEB_DSN:-}" ]; then
+  BUILD_ARGS+=(--build-arg "VITE_SENTRY_WEB_DSN=${VITE_SENTRY_WEB_DSN}")
+fi
+if [ -n "${SENTRY_AUTH_TOKEN:-}" ]; then
+  BUILD_ARGS+=(--build-arg "SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}")
+  BUILD_ARGS+=(--build-arg "SENTRY_ORG=${SENTRY_ORG:-floom}")
+  BUILD_ARGS+=(--build-arg "SENTRY_PROJECT=${SENTRY_PROJECT:-floom-web}")
+  echo "[sentry] source-map upload enabled project=${SENTRY_PROJECT:-floom-web}"
+else
+  echo "[sentry] source-map upload skipped: SENTRY_AUTH_TOKEN not set"
+fi
+docker build "${BUILD_ARGS[@]}" -t "$TAG" -f docker/Dockerfile .
 
 TS=$(date +%s)
 BACKUP="${PREVIEW_COMPOSE_DIR}/docker-compose.yml.bak.auto-${TS}"

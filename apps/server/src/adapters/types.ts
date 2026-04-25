@@ -422,7 +422,7 @@ export interface SecretsAdapter {
  * Captures errors and emits counter / timing / gauge metrics.
  *
  * The reference impl is a split: `lib/sentry.ts` for error capture (no-op
- * when `SENTRY_DSN` is unset), and `lib/metrics-counters.ts` for
+ * when `SENTRY_SERVER_DSN` is unset), and `lib/metrics-counters.ts` for
  * in-process counters surfaced at `GET /api/metrics` in Prometheus text
  * format. Everything is optional — a Floom server with neither of these
  * wired up still runs; callers get a default no-op adapter.

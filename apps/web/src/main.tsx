@@ -95,15 +95,12 @@ import { RouteLoading } from './components/RouteLoading';
 import { WaitlistGuard } from './components/WaitlistGuard';
 import { primeSession, refreshSession } from './hooks/useSession';
 import { initPostHog, identifyFromSession, track } from './lib/posthog';
-import { initBrowserSentry } from './lib/sentry';
+import { BrowserSentryErrorBoundary, initBrowserSentry } from './lib/sentry';
 import type { SessionMePayload } from './lib/types';
 import './styles/globals.css';
 import './styles/csp-inline-style-migrations.css';
 
-// Browser Sentry (launch #311). Strict-opt-in — the SDK only boots when
-// the user picked "Accept all" AND VITE_SENTRY_DSN is set. See
-// apps/web/src/lib/sentry.ts for the gating contract; CookieBanner wires
-// the upgrade/downgrade transitions so the choice applies mid-session.
+// Browser Sentry. No-op when VITE_SENTRY_WEB_DSN is unset.
 initBrowserSentry();
 
 // Kick off the /api/session/me fetch as soon as the bundle loads so every
@@ -201,19 +198,20 @@ function RouteChangeTracker() {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <IconSprite />
-    <BrowserRouter>
-      <RouteChangeTracker />
-      {/* a11y 2026-04-20: WCAG 2.4.1 skip link. Hidden until keyboard
+    <BrowserSentryErrorBoundary fallback={<RouteLoading variant="full" />}>
+      <IconSprite />
+      <BrowserRouter>
+        <RouteChangeTracker />
+        {/* a11y 2026-04-20: WCAG 2.4.1 skip link. Hidden until keyboard
           focus lands on it (first Tab press from the URL bar). Target
           is the #main landmark set on PageShell's <main>. Styling
           lives in .skip-to-content in globals.css so we can toggle
           the visual offset on :focus without inline pseudo-classes. */}
-      <a href="#main" className="skip-to-content">
-        Skip to main content
-      </a>
-      <Suspense fallback={<RouteLoading variant="full" />}>
-      <Routes>
+        <a href="#main" className="skip-to-content">
+          Skip to main content
+        </a>
+        <Suspense fallback={<RouteLoading variant="full" />}>
+        <Routes>
         {/* Landing v17 (2026-04-22): rebuild to wireframe parity. */}
         <Route path="/" element={<LandingV17Page />} />
         {/* Apps directory. Mounted at both /apps (legacy canonical) and
@@ -385,8 +383,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/impressum" element={<Navigate to="/legal" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-      </Suspense>
-      <CookieBanner />
-    </BrowserRouter>
+        </Suspense>
+        <CookieBanner />
+      </BrowserRouter>
+    </BrowserSentryErrorBoundary>
   </React.StrictMode>,
 );

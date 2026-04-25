@@ -97,6 +97,7 @@ resolve_tag() {
 
 TAG=$(resolve_tag "$raw")
 echo "[resolve] IMAGE_TAG=${TAG}"
+echo "[sentry] prod promotes this prebuilt image; source maps are uploaded during the preview build for the same tag when SENTRY_AUTH_TOKEN is configured"
 
 if ! docker image inspect "$TAG" > /dev/null 2>&1; then
   echo "[image] FAILED: ${TAG} not found in local docker registry."

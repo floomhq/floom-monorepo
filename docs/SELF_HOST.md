@@ -796,7 +796,7 @@ nothing leaves the box until you opt in.
 Free-tier Sentry (5K errors/month) is plenty for internal-tooling scale.
 
 1. Sign up at [sentry.io](https://sentry.io), create a project, copy the DSN.
-2. Set `SENTRY_DSN` (server) and `VITE_SENTRY_DSN` (web) in your `.env`.
+2. Set `SENTRY_SERVER_DSN` (server) and `VITE_SENTRY_WEB_DSN` (web) in your `.env`.
 3. Restart the container. The server logs `[sentry] initialized` on boot.
 
 When either DSN is unset, the SDK is a no-op — safe to deploy without any
