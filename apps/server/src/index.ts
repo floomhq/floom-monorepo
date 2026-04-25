@@ -28,6 +28,7 @@ import { meAppsRouter } from './routes/me_apps.js';
 import { metricsRouter } from './routes/metrics.js';
 import { ogRouter } from './routes/og.js';
 import { ghStarsRouter } from './routes/gh-stars.js';
+import { skillRouter } from './routes/skill.js';
 import { db } from './db.js';
 import { SERVER_VERSION } from './lib/server-version.js';
 import { initSentry, captureServerError } from './lib/sentry.js';
@@ -331,6 +332,11 @@ app.route('/api/hub', hubTriggersRouter);
 app.route('/hook', webhookRouter);
 app.route('/api/apps', reviewsRouter);
 app.route('/api/feedback', feedbackRouter);
+// Anthropic Skills markdown surface:
+//   GET /skill.md
+//   GET /p/:slug/skill.md
+// Mounted before static+SPA handling so these routes never hit index.html.
+app.route('/', skillRouter);
 
 // W3.1: when FLOOM_CLOUD_MODE=true, mount the Better Auth handler on /auth/*.
 // In OSS mode (the default), `getAuth()` returns null and this block is a
