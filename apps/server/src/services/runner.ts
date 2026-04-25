@@ -148,7 +148,7 @@ interface EntrypointResult {
   logs?: string;
 }
 
-function parseEntrypointOutput(stdout: string): EntrypointResult | null {
+export function parseEntrypointOutput(stdout: string): EntrypointResult | null {
   const marker = '__FLOOM_RESULT__';
   const idx = stdout.lastIndexOf(marker);
   if (idx !== -1) {
@@ -229,7 +229,7 @@ export function detectSilentError(outputs: unknown): string | null {
   return null;
 }
 
-function extractUserLogs(stdout: string): string {
+export function extractUserLogs(stdout: string): string {
   const marker = '__FLOOM_RESULT__';
   const idx = stdout.lastIndexOf(marker);
   if (idx === -1) return stdout;

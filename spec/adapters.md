@@ -241,3 +241,191 @@ The runner parses the container's stdout for the `__FLOOM_RESULT__` marker (see 
 - Auth: [`apps/server/src/lib/better-auth.ts`](../apps/server/src/lib/better-auth.ts), [`lib/auth.ts`](../apps/server/src/lib/auth.ts), [`routes/workspaces.ts`](../apps/server/src/routes/workspaces.ts)
 - Secrets: [`apps/server/src/services/user_secrets.ts`](../apps/server/src/services/user_secrets.ts), [`services/app_creator_secrets.ts`](../apps/server/src/services/app_creator_secrets.ts)
 - Observability: [`apps/server/src/lib/sentry.ts`](../apps/server/src/lib/sentry.ts), [`lib/metrics-counters.ts`](../apps/server/src/lib/metrics-counters.ts)
+
+---
+
+## Conformance tests
+
+A Floom adapter is conformant iff a fresh server instance with that adapter selected passes the assertion suite for its concern. The reference server ships one integration test today (`test/stress/test-adapters-factory.mjs`); per-adapter contract suites are expected to live next to it as `test/stress/test-adapters-<name>-contract.mjs` and to be runnable against any registered impl via `FLOOM_<CONCERN>=<name>`.
+
+Language below follows RFC 2119: **MUST**, **SHOULD**, **MAY**.
+
+### RuntimeAdapter
+
+A conformant `RuntimeAdapter` MUST pass:
+
+- **success path**: given a no-op action that writes `__FLOOM_RESULT__ {"ok":true}` to stdout, `execute` resolves with `status: 'success'`, `outputs: { ok: true }`, `duration_ms >= 0`, no `error`, no `error_type`.
+- **timeout enforcement**: given `app.timeout_ms = 500` and an action that sleeps for 5s, `execute` resolves within 2s with `status: 'timeout'`, `error_type: 'timeout'`. The adapter MUST NOT leave an orphan process or container.
+- **error classification**: given an action that exits non-zero with a recognizable upstream error, the returned `error_type` is one of the 10 `ErrorType` enum values; an unclassified failure MUST map to `error_type: 'unknown_error'`, not omitted.
+- **secret non-leakage**: given `secrets: { API_KEY: 'sk-abc123' }` and an action that echoes its environment to stdout, the returned `logs` and `outputs` MUST NOT contain the string `sk-abc123`. (The adapter is allowed to redact; it is not allowed to pass through.)
+- **concurrent isolation**: two parallel `execute` calls for the same app with different inputs MUST each return their own `outputs` with no cross-contamination.
+- **stream callback ordering**: if `onOutput` is provided, chunks are delivered in the order the underlying process produced them; stderr and stdout are distinguishable via the `stream` argument.
+
+A conformant impl SHOULD also honor `app.memory_mb` as a hard cap; violation SHOULD return `error_type: 'oom_killed'`. This is SHOULD-level because not every substrate exposes OOM signals (e.g., serverless runtimes).
+
+An impl MAY skip the OOM test if it documents that memory limits are enforced out-of-band.
+
+Reference test skeleton: `test/stress/test-adapters-runtime-contract.mjs` (planned; does not exist yet).
+
+### StorageAdapter
+
+A conformant `StorageAdapter` MUST pass:
+
+- **round-trip CRUD** on each of the six core entities (apps, runs, jobs, workspaces, users, admin secrets): create, read back by primary key, list (with and without filter), update, delete. Assert that read-after-write returns structurally equal data.
+- **slug collision semantics**: `createApp` with an already-taken slug MUST either throw a deterministic error (`SlugCollision` or semantically equivalent) or upsert. The suite asserts one of the two, not both; the adapter declares which via a compile-time flag. Silent overwrite of an unrelated app is forbidden.
+- **missing-row lookup**: `getApp('does-not-exist')`, `getRun('nope')`, `getUser('nope')` MUST return `undefined` (not throw, not null-typed-as-unknown). Callers branch on `undefined`.
+- **updated_at refresh**: after `updateApp(slug, { manifest: '...' })`, the returned record's `updated_at` is strictly greater than its `updated_at` before the update. `created_at` MUST NOT change.
+- **FK cascade on delete**: after `deleteApp(slug)`, all `runs`, `jobs`, and admin secrets scoped to that app are gone; subsequent listRuns for that app returns `[]`.
+- **atomic job claim**: given one queued job and two parallel `claimNextJob` calls, exactly one returns the `JobRecord`; the other returns `undefined`. Run this assertion 50 times to catch races.
+- **tenant scoping**: records created under `workspace_id = 'A'` MUST NOT appear in listings filtered by `workspace_id = 'B'`, even if the caller omits the filter (the adapter decides whether the default is tenant-scoped or throws; "all-tenants leak" is non-conformant).
+- **transactional read-after-write**: `createRun` followed immediately by `getRun(id)` on another process/connection returns the row. In-flight buffering that lets another reader see a partial row is forbidden.
+- **idempotent delete**: deleting a non-existent row returns `false` (StorageAdapter) or equivalent, never throws.
+
+Reference test skeleton: `test/stress/test-adapters-storage-contract.mjs` (planned). Today's coverage lives in `test/stress/test-adapters-factory.mjs` (factory wiring) and `test/stress/test-adapters-seed-launchdemos.mjs` (end-to-end sanity through `adapters.storage`).
+
+### AuthAdapter
+
+A conformant `AuthAdapter` MUST pass:
+
+- **null on unauthenticated**: `getSession(new Request(url))` with no cookie / no Authorization header returns `null`. In OSS-single-user mode the adapter MAY return the synthetic local context instead; the suite detects mode via an env flag and skips this assertion under `FLOOM_DEPLOYMENT_MODE=oss`.
+- **sign-in then resolve**: `signIn({ email, password })` returns a session + cookie/token; a follow-up request carrying that cookie/token to `getSession` returns a `SessionContext` with the same `user_id`.
+- **sign-up creates a user**: `signUp({ email, password })` creates a row reachable via `storage.getUserByEmail(email)`.
+- **sign-out invalidates**: after `signOut(session)`, a request carrying the old cookie/token resolves to `null` via `getSession`.
+- **`onUserDelete` fires after deletion**: registered callbacks are invoked after the account row is gone, not before. The suite asserts ordering by attempting `storage.getUser(user_id)` inside the callback and expecting `undefined`.
+- **session shape invariants**: every non-null `SessionContext` has `user_id`, `workspace_id`, and (optionally) `email` as strings; `workspace_id` is always populated.
+
+A conformant impl SHOULD support concurrent `getSession` calls without cross-request state leakage. It MAY expose richer features (MFA, passkeys, API key management) as adapter-internal details not visible to Floom.
+
+Reference test skeleton: `test/stress/test-adapters-auth-contract.mjs` (ships on `protocol-v0.2`; today it is executable-as-spec — 4 assertions fail-expected until the Better Auth migration lands, 1 passes). Related coverage: `test/stress/test-auth-401-hints.mjs`, `test-auth-dynamic-baseurl.mjs`.
+
+### SecretsAdapter
+
+A conformant `SecretsAdapter` MUST pass:
+
+- **set / get / delete round-trip**: `set(ctx, 'KEY', 'value')` then `get(ctx, 'KEY')` returns `'value'`; after `delete(ctx, 'KEY')`, `get` returns `null`.
+- **`list` masks plaintext**: the returned array contains `key` and `updated_at` only; no `value`, no truncated preview of the plaintext, no ciphertext blob.
+- **`loadUserVaultForRun` filters by keys list**: given a vault with `KEY_A, KEY_B, KEY_C` and `keys = ['KEY_A']`, the returned record MUST contain `KEY_A` only. Extra keys MUST NOT leak.
+- **creator-override isolation**: keys written via creator-override (per-app) MUST NOT be returned by `loadUserVaultForRun`, and vice versa. The two namespaces are disjoint from the adapter's perspective.
+- **tenant isolation**: secrets set with `ctx.workspace_id = 'A'` MUST NOT be readable with `ctx.workspace_id = 'B'`, even if the key name matches.
+- **idempotent delete**: `delete(ctx, 'MISSING_KEY')` returns `false`, never throws.
+- **ciphertext opacity**: the adapter's backing store (sniffable via `storage.list*` or its native admin surface) MUST NOT contain the plaintext. This is a structural test: the suite writes `plaintext = 'CANARY_SECRET_aaa'` and greps the backing store for that string.
+
+A conformant impl SHOULD use authenticated encryption (AES-GCM, ChaCha20-Poly1305, or a vendor-managed equivalent). Raw AES-CBC without an HMAC is non-conformant.
+
+Reference test skeleton: `test/stress/test-adapters-secrets-contract.mjs` (planned). Related coverage: `test/stress/test-app-creator-secrets.mjs`.
+
+### ObservabilityAdapter
+
+A conformant `ObservabilityAdapter` MUST pass:
+
+- **never throws**: each of the four methods is called with malformed input (`captureError(undefined)`, `increment('', NaN)`, `timing('x', -1)`, `gauge('x', Infinity)`) and returns normally. An impl that throws is non-conformant; an impl that silently drops and logs a warning is conformant.
+- **secret scrubbing on error context**: `captureError(new Error('boom'), { password: 'hunter2', api_key: 'sk-abc' })` MUST NOT forward the literal values `hunter2` or `sk-abc` to the backend. The suite runs the adapter against a local capture stub and asserts the outbound payload is scrubbed.
+- **tag pass-through**: `increment('run.started', 1, { app_type: 'docker' })` forwards `app_type=docker` as a tag/label on the metric. Tag keys MUST NOT be renamed by the adapter.
+- **no-op fallback**: an adapter configured with no DSN / no endpoint MUST still satisfy the "never throws" and tag-pass-through contracts. A silent no-op is acceptable; a crash-on-missing-config is non-conformant.
+
+A conformant impl MAY batch, buffer, or sample internally. The suite does not assert delivery guarantees; it asserts the interface contract.
+
+Reference test skeleton: `test/stress/test-adapters-observability-contract.mjs` (planned).
+
+### Running the suite
+
+Today: `npx tsx test/stress/test-adapters-factory.mjs` exercises factory wiring against default impls. A per-adapter contract suite lands with the first third-party adapter (target: v0.3). Until then, third-party implementers SHOULD copy the assertion list above into a local harness and run it against their adapter directly.
+
+---
+
+## Third-party adapters
+
+Out-of-tree adapters are a v0.5 target. Today's registry is static in-tree (see `apps/server/src/adapters/factory.ts`); every registered impl is compiled into the server binary. This section specifies the protocol for dynamic registration so community implementers have a stable target to build against.
+
+### Discovery
+
+The target pattern for v0.5 is **npm-module-path resolution via the same five env vars used today for in-tree selection**:
+
+- `FLOOM_RUNTIME`, `FLOOM_STORAGE`, `FLOOM_AUTH`, `FLOOM_SECRETS`, `FLOOM_OBSERVABILITY`.
+
+Values starting with `@` or containing `/` are treated as npm module specifiers and resolved via dynamic `import()` at server boot. Values without those markers keep the current static-registry lookup. Examples:
+
+- `FLOOM_STORAGE=sqlite`: in-tree (today, unchanged).
+- `FLOOM_STORAGE=@floom-community/storage-postgres`: third-party npm package.
+- `FLOOM_STORAGE=./local-adapters/my-storage.js`: relative path to a local file (useful for private/internal adapters that never hit npm).
+
+The recommended community naming convention is `@floom-community/<concern>-<backend>`, e.g., `@floom-community/storage-postgres`, `@floom-community/runtime-k8s`, `@floom-community/secrets-vault`.
+
+### Registration pattern
+
+A third-party adapter module MUST default-export an object matching the registration shape:
+
+```ts
+export default {
+  kind: 'storage', // one of: 'runtime' | 'storage' | 'auth' | 'secrets' | 'observability'
+  name: 'postgres', // short identifier, informational (used in logs)
+  protocolVersion: '^0.2', // semver range of FLOOM_PROTOCOL_VERSION this adapter supports
+  adapter: postgresStorageAdapter, // the instance conforming to the corresponding type
+};
+```
+
+At boot, the factory:
+
+1. Reads `FLOOM_<CONCERN>`.
+2. If the value is a module specifier, calls `await import(value)` and reads `.default`.
+3. Validates `kind` matches the expected concern, rejects with a descriptive error otherwise.
+4. Validates `protocolVersion` is compatible with the server's `FLOOM_PROTOCOL_VERSION` constant (see below); rejects with a version-mismatch error otherwise.
+5. Registers `adapter` in the bundle.
+
+Validation failures MUST halt server boot. A Floom server MUST NOT start with a partially-loaded adapter bundle.
+
+### Version compatibility
+
+The server exposes `FLOOM_PROTOCOL_VERSION` as a compile-time constant (semver, e.g., `0.2.0`). A third-party adapter declares the range it supports via `protocolVersion` in its default export. The factory refuses to load an adapter whose declared range does not include the server's version.
+
+Semver expectation:
+
+- Pre-1.0: minor-version bumps (`0.2.x` to `0.3.x`) MAY be breaking. Adapters SHOULD declare a narrow range like `^0.2` that pins to a single minor.
+- Post-1.0: standard semver applies. `^1.x` ranges are safe across patch and minor bumps.
+
+The protocol version is bumped in the `floomhq/floom` repo under `apps/server/src/adapters/version.ts`.
+
+### Security
+
+Third-party adapters run **in-process with full server privileges**. There is no sandbox between an adapter and the rest of the server:
+
+- An adapter can read any env var, including `FLOOM_MASTER_KEY`.
+- An adapter can make outbound network calls, read/write the filesystem, spawn processes.
+- A malicious `StorageAdapter` can log every run's inputs to a remote server. A malicious `SecretsAdapter` can exfiltrate plaintext.
+
+Operators MUST treat third-party adapter packages as supply-chain dependencies equivalent to the server itself:
+
+- Pin exact versions (`@floom-community/storage-postgres@1.2.3`, not `^1`).
+- Review the source before upgrading.
+- Prefer adapters published under a trusted namespace (e.g., `@floomhq/*` is first-party; `@floom-community/*` is community-audited but not guaranteed).
+
+Floom does not currently run an audit program for community adapters. This is a v1.0 roadmap item; until then, the trust model is "read the code."
+
+### Example
+
+A minimal third-party `StorageAdapter` package looks like this:
+
+```ts
+// @floom-community/storage-postgres/src/index.ts
+import type { StorageAdapter } from '@floom/adapter-types';
+import { Pool } from 'pg';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const postgresStorageAdapter: StorageAdapter = {
+  getApp(slug) {
+    // SELECT ... FROM apps WHERE slug = $1
+    // return row or undefined
+  },
+  // ... rest of the StorageAdapter methods
+};
+
+export default {
+  kind: 'storage' as const,
+  name: 'postgres',
+  protocolVersion: '^0.2',
+  adapter: postgresStorageAdapter,
+};
+```
+
+The `@floom/adapter-types` package referenced above is **planned for v0.5**; today, adapter authors import interface types directly from the `floomhq/floom` repo (`apps/server/src/adapters/types.ts`) which requires vendoring or a git-dep. Publishing the types as a standalone package is tracked as a prerequisite for the third-party-adapter pattern.
