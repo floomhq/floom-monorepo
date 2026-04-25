@@ -75,44 +75,69 @@ READABLE_SELECTORS = (
 GEMINI_SCHEMA: dict[str, Any] = {
     "type": "OBJECT",
     "properties": {
-        "positioning_diff": {
-            "type": "OBJECT",
-            "properties": {
-                "your_angle": {"type": "STRING"},
-                "their_angle": {"type": "STRING"},
-                "contrast_1_liner": {"type": "STRING"},
-            },
-            "required": ["your_angle", "their_angle", "contrast_1_liner"],
-        },
-        "pricing_diff": {
-            "type": "OBJECT",
-            "properties": {
-                "your_pricing": {"type": "STRING"},
-                "their_pricing": {"type": "STRING"},
-                "insight": {"type": "STRING"},
-            },
-            "required": ["your_pricing", "their_pricing", "insight"],
-        },
-        "unique_angles": {
-            "type": "OBJECT",
-            "properties": {
-                "you_only_3": {
-                    "type": "ARRAY",
-                    "items": {"type": "STRING"},
-                    "minItems": 3,
-                    "maxItems": 3,
+        "positioning": {
+            "type": "ARRAY",
+            "minItems": 3,
+            "maxItems": 3,
+            "description": (
+                "Exactly three rows in this order: row 0 = your page's "
+                "positioning angle (perspective='You'); row 1 = the "
+                "competitor's positioning angle (perspective='Competitor'); "
+                "row 2 = the one-line contrast (perspective='Contrast')."
+            ),
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "perspective": {
+                        "type": "STRING",
+                        "enum": ["You", "Competitor", "Contrast"],
+                    },
+                    "angle": {"type": "STRING"},
                 },
-                "them_only_3": {
-                    "type": "ARRAY",
-                    "items": {"type": "STRING"},
-                    "minItems": 3,
-                    "maxItems": 3,
-                },
+                "required": ["perspective", "angle"],
             },
-            "required": ["you_only_3", "them_only_3"],
+        },
+        "pricing": {
+            "type": "ARRAY",
+            "minItems": 2,
+            "maxItems": 2,
+            "description": (
+                "Exactly two rows: row 0 for your page (who='You'); row 1 "
+                "for the competitor's page (who='Competitor')."
+            ),
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "who": {
+                        "type": "STRING",
+                        "enum": ["You", "Competitor"],
+                    },
+                    "pricing": {"type": "STRING"},
+                },
+                "required": ["who", "pricing"],
+            },
+        },
+        "pricing_insight": {"type": "STRING"},
+        "unique_to_you": {
+            "type": "ARRAY",
+            "items": {"type": "STRING"},
+            "minItems": 3,
+            "maxItems": 3,
+        },
+        "unique_to_competitor": {
+            "type": "ARRAY",
+            "items": {"type": "STRING"},
+            "minItems": 3,
+            "maxItems": 3,
         },
     },
-    "required": ["positioning_diff", "pricing_diff", "unique_angles"],
+    "required": [
+        "positioning",
+        "pricing",
+        "pricing_insight",
+        "unique_to_you",
+        "unique_to_competitor",
+    ],
 }
 
 
@@ -155,21 +180,14 @@ class FetchedPage:
     byte_count: int
 
 
-class PositioningDiff(BaseModel):
-    your_angle: str
-    their_angle: str
-    contrast_1_liner: str
+class PositioningRow(BaseModel):
+    perspective: str
+    angle: str
 
 
-class PricingDiff(BaseModel):
-    your_pricing: str
-    their_pricing: str
-    insight: str
-
-
-class UniqueAngles(BaseModel):
-    you_only_3: list[str]
-    them_only_3: list[str]
+class PricingRow(BaseModel):
+    who: str
+    pricing: str
 
 
 class MetaInfo(BaseModel):
@@ -179,9 +197,11 @@ class MetaInfo(BaseModel):
 
 
 class AnalyzeOutput(BaseModel):
-    positioning_diff: PositioningDiff
-    pricing_diff: PricingDiff
-    unique_angles: UniqueAngles
+    positioning: list[PositioningRow]
+    pricing: list[PricingRow]
+    pricing_insight: str
+    unique_to_you: list[str]
+    unique_to_competitor: list[str]
     meta: MetaInfo
 
 
@@ -469,7 +489,12 @@ def _require_text(data: Any, path: str, default: str | None = None) -> str:
     raise AnalysisError(f"Gemini returned an invalid `{path}` field.")
 
 
-def _require_string_list(data: Any, path: str) -> list[str]:
+def _require_string_list(
+    data: Any,
+    path: str,
+    *,
+    expected_count: int | None = None,
+) -> list[str]:
     if not isinstance(data, list):
         raise AnalysisError(f"Gemini returned an invalid `{path}` field.")
     values = []
@@ -479,9 +504,42 @@ def _require_string_list(data: Any, path: str) -> list[str]:
         cleaned = _clean_text(item)
         if cleaned:
             values.append(cleaned)
-    if len(values) < 1:
-        raise AnalysisError(f"Gemini returned an empty `{path}` field.")
-    return values[:3]
+    if expected_count is None:
+        if len(values) < 1:
+            raise AnalysisError(f"Gemini returned an empty `{path}` field.")
+        return values
+    if len(values) != expected_count:
+        raise AnalysisError(
+            f"Gemini returned `{path}` with {len(values)} items (expected {expected_count})."
+        )
+    return values
+
+
+def _require_table_rows(
+    data: Any,
+    path: str,
+    *,
+    first_key: str,
+    second_key: str,
+    expected_count: int,
+) -> list[dict[str, str]]:
+    if not isinstance(data, list):
+        raise AnalysisError(f"Gemini returned an invalid `{path}` field.")
+    rows: list[dict[str, str]] = []
+    for index, item in enumerate(data):
+        if not isinstance(item, dict):
+            raise AnalysisError(f"Gemini returned an invalid `{path}[{index}]` row.")
+        rows.append(
+            {
+                first_key: _require_text(item.get(first_key), f"{path}[{index}].{first_key}"),
+                second_key: _require_text(item.get(second_key), f"{path}[{index}].{second_key}"),
+            }
+        )
+    if len(rows) != expected_count:
+        raise AnalysisError(
+            f"Gemini returned `{path}` with {len(rows)} rows (expected {expected_count})."
+        )
+    return rows
 
 
 def _normalize_result(
@@ -494,36 +552,35 @@ def _normalize_result(
     if not isinstance(raw, dict):
         raise AnalysisError("Gemini returned a non-object response.")
 
-    positioning = raw.get("positioning_diff") or {}
-    pricing = raw.get("pricing_diff") or {}
-    unique = raw.get("unique_angles") or {}
-
     return {
-        "positioning_diff": {
-            "your_angle": _require_text(positioning.get("your_angle"), "positioning_diff.your_angle"),
-            "their_angle": _require_text(positioning.get("their_angle"), "positioning_diff.their_angle"),
-            "contrast_1_liner": _require_text(
-                positioning.get("contrast_1_liner"),
-                "positioning_diff.contrast_1_liner",
-            ),
-        },
-        "pricing_diff": {
-            "your_pricing": _require_text(
-                pricing.get("your_pricing"),
-                "pricing_diff.your_pricing",
-                default="Not visible on page.",
-            ),
-            "their_pricing": _require_text(
-                pricing.get("their_pricing"),
-                "pricing_diff.their_pricing",
-                default="Not visible on page.",
-            ),
-            "insight": _require_text(pricing.get("insight"), "pricing_diff.insight"),
-        },
-        "unique_angles": {
-            "you_only_3": _require_string_list(unique.get("you_only_3"), "unique_angles.you_only_3"),
-            "them_only_3": _require_string_list(unique.get("them_only_3"), "unique_angles.them_only_3"),
-        },
+        "positioning": _require_table_rows(
+            raw.get("positioning"),
+            "positioning",
+            first_key="perspective",
+            second_key="angle",
+            expected_count=3,
+        ),
+        "pricing": _require_table_rows(
+            raw.get("pricing"),
+            "pricing",
+            first_key="who",
+            second_key="pricing",
+            expected_count=2,
+        ),
+        "pricing_insight": _require_text(
+            raw.get("pricing_insight"),
+            "pricing_insight",
+        ),
+        "unique_to_you": _require_string_list(
+            raw.get("unique_to_you"),
+            "unique_to_you",
+            expected_count=3,
+        ),
+        "unique_to_competitor": _require_string_list(
+            raw.get("unique_to_competitor"),
+            "unique_to_competitor",
+            expected_count=3,
+        ),
         "meta": {
             "dry_run": dry_run,
             "cache_hit": cache_hit,
@@ -536,42 +593,55 @@ def _dry_run_stub(inputs: ValidatedInputs, model: str) -> dict[str, Any]:
     your_name = inputs.your_host.split(".")[0]
     competitor_name = inputs.competitor_host.split(".")[0]
     stub = {
-        "positioning_diff": {
-            "your_angle": (
-                f"{your_name.capitalize()} reads like a focused product page that pushes a single deployment outcome."
-            ),
-            "their_angle": (
-                f"{competitor_name.capitalize()} reads like a broader platform with more visible workflow surface area."
-            ),
-            "contrast_1_liner": (
-                f"{your_name.capitalize()} feels narrower and faster to grasp, while {competitor_name.capitalize()} feels broader and more configurable."
-            ),
-        },
-        "pricing_diff": {
-            "your_pricing": "Not visible on page.",
-            "their_pricing": "Not visible on page.",
-            "insight": (
-                "The dry-run path only compares page framing. Add GEMINI_API_KEY for a live structured read."
-            ),
-        },
-        "unique_angles": {
-            "you_only_3": [
-                "Tighter single-job framing",
-                "Faster time-to-value messaging",
-                "Less category sprawl on-page",
-            ],
-            "them_only_3": [
-                "Broader platform framing",
-                "More visible workflow breadth",
-                "More enterprise/platform cues",
-            ],
-        },
+        "positioning": [
+            {
+                "perspective": "You",
+                "angle": (
+                    f"{your_name.capitalize()} reads like a focused product page that pushes a single deployment outcome."
+                ),
+            },
+            {
+                "perspective": "Competitor",
+                "angle": (
+                    f"{competitor_name.capitalize()} reads like a broader platform with more visible workflow surface area."
+                ),
+            },
+            {
+                "perspective": "Contrast",
+                "angle": (
+                    f"{your_name.capitalize()} feels narrower and faster to grasp, while {competitor_name.capitalize()} feels broader and more configurable."
+                ),
+            },
+        ],
+        "pricing": [
+            {
+                "who": "You",
+                "pricing": "Not visible on page.",
+            },
+            {
+                "who": "Competitor",
+                "pricing": "Not visible on page.",
+            },
+        ],
+        "pricing_insight": (
+            "The dry-run path only compares page framing. Add GEMINI_API_KEY for a live structured read."
+        ),
+        "unique_to_you": [
+            "Tighter single-job framing",
+            "Faster time-to-value messaging",
+            "Less category sprawl on-page",
+        ],
+        "unique_to_competitor": [
+            "Broader platform framing",
+            "More visible workflow breadth",
+            "More enterprise/platform cues",
+        ],
     }
     return _normalize_result(stub, model=model, dry_run=True, cache_hit=False)
 
 
 def _build_prompt(your_page: FetchedPage, competitor_page: FetchedPage) -> str:
-    return f"""You are analyzing two product pages.
+    return f"""You are comparing two product pages: YOUR PAGE and the COMPETITOR PAGE.
 
 Use only the page extracts below. Do not invent pricing, packaging, or claims
 that are not supported by the supplied text. If pricing is missing, say
@@ -579,6 +649,18 @@ that are not supported by the supplied text. If pricing is missing, say
 
 Return ONLY JSON matching the provided schema. Keep the language concise and
 commercially useful.
+
+OUTPUT RULES (critical — schema enforces order):
+- positioning rows MUST be in this exact order:
+    1. perspective = "You"        → one sentence describing YOUR PAGE's positioning angle.
+    2. perspective = "Competitor" → one sentence describing the COMPETITOR PAGE's positioning angle.
+    3. perspective = "Contrast"   → one sentence comparing the two (what each leans into vs the other).
+- pricing rows MUST be in this exact order:
+    1. who = "You"        → YOUR PAGE's pricing as quoted on page (or "Not visible on page.").
+    2. who = "Competitor" → COMPETITOR PAGE's pricing (or "Not visible on page.").
+- pricing_insight: 1 sentence on what's interesting about the pricing diff (or about the absence).
+- unique_to_you: 3 distinct things YOUR PAGE highlights that the COMPETITOR doesn't.
+- unique_to_competitor: 3 distinct things the COMPETITOR highlights that YOUR PAGE doesn't.
 
 YOUR PAGE
 URL: {your_page.final_url}
