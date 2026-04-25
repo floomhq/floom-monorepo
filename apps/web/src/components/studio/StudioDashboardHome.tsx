@@ -6,6 +6,7 @@ import { useDeployEnabled } from '../../lib/flags';
 import { formatTime } from '../../lib/time';
 import { StudioSignedOutState } from './StudioSignedOutState';
 import { StudioCommandPalette } from './StudioCommandPalette';
+import { Sparkline } from './Sparkline';
 import { WaitlistModal } from '../WaitlistModal';
 import { AppIcon } from '../AppIcon';
 import { useSession } from '../../hooks/useSession';
@@ -165,10 +166,12 @@ export function StudioDashboardHome() {
                     onClick={() => setWaitlistOpen(true)}
                     style={primaryButtonStyle}
                   >
+                    <PlusIcon />
                     New app
                   </button>
                 ) : (
                   <Link to="/studio/build" style={primaryButtonStyle}>
+                    <PlusIcon />
                     New app
                   </Link>
                 )}
@@ -291,6 +294,27 @@ export function StudioDashboardHome() {
   );
 }
 
+function PlusIcon() {
+  // 13px white stroke plus, matches the wireframe's "+ New app" button.
+  return (
+    <svg
+      aria-hidden="true"
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 function StudioBrowserChrome() {
   return (
     <div
@@ -366,7 +390,21 @@ function StudioAppCard({ app }: { app: StudioAppSummary }) {
         <StatusPill live={live} />
       </div>
 
-      <div style={appCardRunsStyle}>{app.runs_7d.toLocaleString()} runs · 7d</div>
+      {/* Runs · 7d count + per-card sparkline. Mirrors v17/studio-home.html
+          where each app tile shows a 7-bar history beside the run total.
+          Reuses the existing <Sparkline> already shipped on /studio/apps
+          (one HTTP call per card to /api/hub/:slug/runs-by-day?days=7). */}
+      <div style={appCardRunsRowStyle}>
+        <span style={appCardRunsStyle}>
+          <strong style={appCardRunsStrongStyle}>
+            {app.runs_7d.toLocaleString()}
+          </strong>{' '}
+          runs · 7d
+        </span>
+        <div style={appCardSparkWrapStyle}>
+          <Sparkline slug={app.slug} days={7} muted={app.runs_7d === 0} />
+        </div>
+      </div>
 
       <div style={appActionsStyle}>
         <Link to={`/studio/${app.slug}`} style={appActionLinkStyle}>
@@ -424,6 +462,10 @@ function NewAppTile({
 }
 
 function ActivityRow({ run }: { run: StudioActivityRun }) {
+  // /studio/runs/:id doesn't exist as a route; the canonical run-detail
+  // surface is /me/runs/:id (also used by the /studio/apps activity
+  // feed). Keep both surfaces pointing at the same view.
+  const viewHref = `/me/runs/${run.id}`;
   return (
     <div
       data-testid={`studio-activity-row-${run.id}`}
@@ -450,6 +492,13 @@ function ActivityRow({ run }: { run: StudioActivityRun }) {
           ) : null}
         </div>
       </div>
+      <Link
+        to={viewHref}
+        data-testid={`studio-activity-view-${run.id}`}
+        style={activityViewLinkStyle}
+      >
+        View →
+      </Link>
     </div>
   );
 }
@@ -630,6 +679,7 @@ const primaryButtonStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
+  gap: 6,
   padding: '10px 14px',
   borderRadius: 12,
   background: 'var(--ink)',
@@ -643,16 +693,20 @@ const primaryButtonStyle: CSSProperties = {
 
 const statsGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
   gap: 12,
 };
 
+// v17 wireframe note: "quiet, 3 cells. Not a hero, just context." The
+// previous treatment used 18px radius + 32px value which read as a
+// second hero. Tightened to match _studio.css .stat-cell (10px radius,
+// 11/14px padding, ~26px value).
 const statCardStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 4,
-  padding: '16px 18px',
-  borderRadius: 18,
+  padding: '13px 16px',
+  borderRadius: 12,
   border: '1px solid var(--line)',
   background: 'var(--bg)',
 };
@@ -667,7 +721,7 @@ const statLabelStyle: CSSProperties = {
 
 const statValueStyle: CSSProperties = {
   fontFamily: 'JetBrains Mono, ui-monospace, monospace',
-  fontSize: 32,
+  fontSize: 26,
   fontWeight: 700,
   letterSpacing: '-0.04em',
   color: 'var(--ink)',
@@ -686,19 +740,22 @@ const sectionStyle: CSSProperties = {
 
 const sectionHeaderStyle: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-start',
+  alignItems: 'baseline',
   justifyContent: 'space-between',
   gap: 16,
   flexWrap: 'wrap',
 };
 
+// v17 wireframe: section title is 22px serif on the same baseline as
+// filter pills. Earlier passes used 28px but visually disconnects the
+// title from its controls.
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontFamily: 'var(--font-display)',
-  fontSize: 28,
+  fontSize: 22,
   fontWeight: 400,
-  letterSpacing: '-0.03em',
-  lineHeight: 1.05,
+  letterSpacing: '-0.02em',
+  lineHeight: 1.1,
   color: 'var(--ink)',
 };
 
@@ -808,10 +865,27 @@ const appCardMetaStyle: CSSProperties = {
   color: 'var(--muted)',
 };
 
+const appCardRunsRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+};
+
 const appCardRunsStyle: CSSProperties = {
   fontFamily: 'JetBrains Mono, ui-monospace, monospace',
   fontSize: 12,
   color: 'var(--muted)',
+};
+
+const appCardRunsStrongStyle: CSSProperties = {
+  color: 'var(--ink)',
+  fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+};
+
+const appCardSparkWrapStyle: CSSProperties = {
+  width: 84,
+  flexShrink: 0,
 };
 
 const appActionsStyle: CSSProperties = {
@@ -925,11 +999,19 @@ const activityListStyle: CSSProperties = {
 
 const activityRowStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '36px minmax(0, 1fr)',
+  gridTemplateColumns: '36px minmax(0, 1fr) auto',
   gap: 12,
   alignItems: 'center',
   padding: '14px 16px',
   borderBottom: '1px solid var(--line)',
+};
+
+const activityViewLinkStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  color: 'var(--accent)',
+  textDecoration: 'none',
+  whiteSpace: 'nowrap',
 };
 
 const activityIconWrapStyle: CSSProperties = {
