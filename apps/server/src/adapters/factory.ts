@@ -18,10 +18,9 @@
 //      boot with the list of supported values so a typo is caught
 //      before any request is served.
 //
-// Selection is compile-time-only in this PR. The five concrete
-// implementations are already compiled into the binary; the env var
-// only picks which one the factory returns. Dynamic plugin loading
-// (import-from-disk, registry-based) is out of scope.
+// Values without module markers use the static in-tree registry below.
+// Values starting with "@" or containing "/" are loaded dynamically via
+// import() at boot and validated before the server starts.
 //
 // Follow-on work: migrate the 50+ existing direct-import call sites in
 // `routes/*` and `services/*` to read from the module-level `adapters`
@@ -36,6 +35,8 @@ import type {
   StorageAdapter,
 } from './types.js';
 import semver from 'semver';
+import { isAbsolute, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { dockerRuntimeAdapter } from './runtime-docker.js';
 import { proxyRuntimeAdapter } from './runtime-proxy.js';
@@ -53,10 +54,52 @@ export interface AdapterBundle {
   observability: ObservabilityAdapter;
 }
 
-interface AdapterModuleExport {
-  name?: string;
-  protocolVersion?: string;
+type AdapterKind = keyof AdapterBundle;
+
+interface AdapterModuleExport<T = unknown> {
+  kind?: unknown;
+  name?: unknown;
+  protocolVersion?: unknown;
+  adapter?: T;
 }
+
+const EXPECTED_METHODS: Record<AdapterKind, readonly string[]> = {
+  runtime: ['execute'],
+  storage: [
+    'getApp',
+    'getAppById',
+    'listApps',
+    'createApp',
+    'updateApp',
+    'deleteApp',
+    'createRun',
+    'getRun',
+    'listRuns',
+    'updateRun',
+    'createJob',
+    'getJob',
+    'claimNextJob',
+    'updateJob',
+    'getWorkspace',
+    'listWorkspacesForUser',
+    'getUser',
+    'getUserByEmail',
+    'createUser',
+    'listAdminSecrets',
+    'upsertAdminSecret',
+    'deleteAdminSecret',
+  ],
+  auth: ['getSession', 'signIn', 'signUp', 'signOut', 'onUserDelete'],
+  secrets: [
+    'get',
+    'set',
+    'delete',
+    'list',
+    'loadUserVaultForRun',
+    'loadCreatorOverrideForRun',
+  ],
+  observability: ['captureError', 'increment', 'timing', 'gauge'],
+};
 
 const RUNTIME_IMPLS: Record<string, RuntimeAdapter> = {
   docker: dockerRuntimeAdapter,
@@ -104,7 +147,7 @@ function assertProtocolVersionCompatibility(
   moduleExport: AdapterModuleExport | undefined,
 ): void {
   const declaredRange = moduleExport?.protocolVersion;
-  if (!declaredRange) return;
+  if (typeof declaredRange !== 'string' || declaredRange.length === 0) return;
   let compatible = false;
   try {
     compatible = semver.satisfies(FLOOM_PROTOCOL_VERSION, declaredRange);
@@ -126,15 +169,144 @@ function assertProtocolVersionCompatibility(
   }
 }
 
-function pick<T>(
-  kind: string,
+function isDynamicSpecifier(value: string): boolean {
+  return value.startsWith('@') || value.includes('/');
+}
+
+function importTargetFor(value: string): string {
+  if (value.startsWith('file:')) return value;
+  if (value.startsWith('./') || value.startsWith('../')) {
+    return pathToFileURL(resolve(process.cwd(), value)).href;
+  }
+  if (isAbsolute(value)) return pathToFileURL(value).href;
+  return value;
+}
+
+function adapterName(moduleExport: AdapterModuleExport, fallback: string): string {
+  return typeof moduleExport.name === 'string' && moduleExport.name.length > 0
+    ? moduleExport.name
+    : fallback;
+}
+
+function assertAdapterSurface(
+  kind: AdapterKind,
+  key: string,
+  moduleExport: AdapterModuleExport,
+): void {
+  const adapter = moduleExport.adapter;
+  if (typeof adapter !== 'object' || adapter === null) {
+    throw new Error(
+      `[adapters] adapter '${adapterName(
+        moduleExport,
+        key,
+      )}' (kind=${kind}) is missing an adapter object`,
+    );
+  }
+
+  const missing = EXPECTED_METHODS[kind].filter(
+    (method) =>
+      typeof (adapter as Record<string, unknown>)[method] !== 'function',
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `[adapters] adapter '${adapterName(
+        moduleExport,
+        key,
+      )}' (kind=${kind}) is missing required methods: ${missing.join(', ')}`,
+    );
+  }
+}
+
+function validateDynamicModule<T>(
+  kind: AdapterKind,
+  key: string,
+  moduleExport: unknown,
+): T {
+  if (typeof moduleExport !== 'object' || moduleExport === null) {
+    throw new Error(
+      `[adapters] ${kind} adapter module ${JSON.stringify(
+        key,
+      )} is missing a default export object`,
+    );
+  }
+
+  const typed = moduleExport as AdapterModuleExport<T>;
+  if (typed.kind !== kind) {
+    throw new Error(
+      `[adapters] kind mismatch for ${kind} adapter ${JSON.stringify(
+        key,
+      )}: expected ${JSON.stringify(kind)}, got ${JSON.stringify(typed.kind)}`,
+    );
+  }
+
+  if (
+    typeof typed.protocolVersion !== 'string' ||
+    typed.protocolVersion.length === 0
+  ) {
+    throw new Error(
+      `[adapters] adapter '${adapterName(
+        typed,
+        key,
+      )}' (kind=${kind}) is missing protocolVersion`,
+    );
+  }
+
+  assertProtocolVersionCompatibility(kind, key, typed);
+  assertAdapterSurface(kind, key, typed);
+  return typed.adapter as T;
+}
+
+async function importDynamicAdapter<T>(
+  kind: AdapterKind,
+  env: string,
+  value: string,
+): Promise<T> {
+  try {
+    const imported = (await import(importTargetFor(value))) as {
+      default?: unknown;
+    };
+    if (!('default' in imported)) {
+      throw new Error(
+        `[adapters] ${kind} adapter module ${JSON.stringify(
+          value,
+        )} is missing a default export`,
+      );
+    }
+    return validateDynamicModule<T>(kind, value, imported.default);
+  } catch (e) {
+    if (
+      e instanceof Error &&
+      (e.message.includes('kind mismatch') ||
+        e.message.includes('protocolVersion') ||
+        e.message.includes('missing required methods') ||
+        e.message.includes('missing an adapter object') ||
+        e.message.includes('missing a default export'))
+    ) {
+      throw e;
+    }
+    const message = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `[adapters] failed to import ${kind} adapter from ${env}=${JSON.stringify(
+        value,
+      )}: ${message}`,
+      { cause: e },
+    );
+  }
+}
+
+async function pick<T>(
+  kind: AdapterKind,
   env: string,
   value: string,
   defaultKey: string,
   registry: Record<string, T>,
   moduleExports: Record<string, AdapterModuleExport | undefined>,
-): T {
+): Promise<T> {
   const effective = value || defaultKey;
+  if (isDynamicSpecifier(effective)) {
+    return importDynamicAdapter<T>(kind, env, effective);
+  }
+
   const impl = registry[effective];
   if (!impl) {
     const supported = Object.keys(registry).sort().join(', ');
@@ -147,8 +319,8 @@ function pick<T>(
   return impl;
 }
 
-export function createAdapters(): AdapterBundle {
-  const runtime = pick(
+export async function createAdapters(): Promise<AdapterBundle> {
+  const runtime = await pick(
     'runtime',
     'FLOOM_RUNTIME',
     process.env.FLOOM_RUNTIME || '',
@@ -156,7 +328,7 @@ export function createAdapters(): AdapterBundle {
     RUNTIME_IMPLS,
     RUNTIME_MODULE_EXPORTS,
   );
-  const storage = pick(
+  const storage = await pick(
     'storage',
     'FLOOM_STORAGE',
     process.env.FLOOM_STORAGE || '',
@@ -164,7 +336,7 @@ export function createAdapters(): AdapterBundle {
     STORAGE_IMPLS,
     STORAGE_MODULE_EXPORTS,
   );
-  const auth = pick(
+  const auth = await pick(
     'auth',
     'FLOOM_AUTH',
     process.env.FLOOM_AUTH || '',
@@ -172,7 +344,7 @@ export function createAdapters(): AdapterBundle {
     AUTH_IMPLS,
     AUTH_MODULE_EXPORTS,
   );
-  const secrets = pick(
+  const secrets = await pick(
     'secrets',
     'FLOOM_SECRETS',
     process.env.FLOOM_SECRETS || '',
@@ -180,7 +352,7 @@ export function createAdapters(): AdapterBundle {
     SECRETS_IMPLS,
     SECRETS_MODULE_EXPORTS,
   );
-  const observability = pick(
+  const observability = await pick(
     'observability',
     'FLOOM_OBSERVABILITY',
     process.env.FLOOM_OBSERVABILITY || '',

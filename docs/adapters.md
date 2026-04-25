@@ -6,7 +6,7 @@ This doc is about the **factory** that wires them.
 
 ## What the factory does
 
-At boot, `createAdapters()` in [`apps/server/src/adapters/factory.ts`](../apps/server/src/adapters/factory.ts) reads five env vars, looks each one up in a small per-concern registry, and returns an `AdapterBundle { runtime, storage, auth, secrets, observability }`. The bundle is exposed as a module-level singleton from [`apps/server/src/adapters/index.ts`](../apps/server/src/adapters/index.ts):
+At boot, `createAdapters()` in [`apps/server/src/adapters/factory.ts`](../apps/server/src/adapters/factory.ts) reads five env vars, resolves each one through the in-tree registry or dynamic `import()`, and returns an `AdapterBundle { runtime, storage, auth, secrets, observability }`. The bundle is exposed as a module-level singleton from [`apps/server/src/adapters/index.ts`](../apps/server/src/adapters/index.ts):
 
 ```ts
 import { adapters } from '../adapters/index.js';
@@ -17,7 +17,7 @@ adapters.observability.increment('health.check');
 const app = adapters.storage.getApp('lead-scorer');
 ```
 
-Zero behavior change under the default configuration. Every env var defaults to the impl the reference server has been using all along. Unknown values throw at boot with a list of supported values, so a typo surfaces before any request is served.
+Zero behavior change under the default configuration. Every env var defaults to the impl the reference server has been using all along. Unknown in-tree values throw at boot with a list of supported values; package/path import failures and adapter metadata mismatches also halt boot before any request is served.
 
 ## Supported values per env var
 
@@ -29,7 +29,14 @@ Zero behavior change under the default configuration. Every env var defaults to 
 | `FLOOM_SECRETS`          | `local`        | `local`           | `adapters/secrets-local.ts`                |
 | `FLOOM_OBSERVABILITY`    | `console`      | `console`         | `adapters/observability-console.ts`        |
 
-## Adding a new adapter (3 steps)
+Values starting with `@` or containing `/` are treated as third-party module specifiers and loaded with dynamic `import()` at boot:
+
+```bash
+FLOOM_STORAGE=@floom-community/storage-postgres
+FLOOM_STORAGE=./local-adapters/storage-postgres.js
+```
+
+## Adding a new in-tree adapter (3 steps)
 
 Say you want to add a Postgres `StorageAdapter`:
 
@@ -49,7 +56,6 @@ That's the whole pattern. The factory picks the impl, the adapter conforms to th
 
 - **Call-site migration.** Routes and services in `routes/*` and `services/*` still import `db`, `runner`, `userSecrets` directly. The adapter bundle exists and is callable, but the 50+ existing call sites are not refactored yet. That is deliberately scoped to a follow-on PR so this one can land fast.
 - **New concrete adapters.** Only the reference impls (`docker`, `proxy`, `sqlite`, `better-auth`, `local`, `console`) are registered. A Postgres `StorageAdapter` is the natural next target.
-- **Dynamic plugin loading.** Selection is compile-time-only. Every registered impl is compiled into the binary; the env var only picks which one the factory returns. Import-from-disk plugin registration is out of scope.
 
 ## Proof-of-pattern call site
 
@@ -59,7 +65,7 @@ That's the whole pattern. The factory picks the impl, the adapter conforms to th
 
 The protocol-level contract for out-of-tree adapters lives in [`spec/adapters.md` "Third-party adapters"](../spec/adapters.md#third-party-adapters). This section is the practical cookbook: what a developer actually does to build and ship one today.
 
-**Status today.** The dynamic-import registration path described in the spec is the target pattern for v0.5; it is not shipped yet. Until it lands, a third-party adapter is a local/private fork pattern: clone the Floom repo, add your module to the in-tree registry, run your server from that fork. Every section below calls out whether it works today or is planned.
+**Status today.** Dynamic-import registration is shipped for package and path specifiers. Publish your adapter as an ESM package or point the relevant `FLOOM_<CONCERN>` env var at a local `.js` file; the stock server imports it during boot and validates its default export.
 
 ### 1. Package skeleton
 
@@ -148,30 +154,29 @@ npx tsx test/stress/test-adapters-storage-contract.mjs
 
 Until that suite lands, copy the assertion list from `spec/adapters.md` "Conformance tests" into a local harness in your own repo (`test/contract.mjs`) and run it against your adapter directly. The `test/stress/test-adapters-factory.mjs` file in `floomhq/floom` is the closest working reference for how to spin up an adapter instance and drive it.
 
-### 4. Wire it into a local Floom server (today's path)
+### 4. Wire it into a local Floom server
 
-Until the dynamic-import factory lands, the working path is a local fork of `floomhq/floom`:
+Install or build the adapter where the server process can import it, set the relevant env var, and start the stock server:
 
-1. Clone `floomhq/floom`, add your adapter as a workspace dependency or vendor the source under `apps/server/src/adapters/storage-postgres.ts`.
-2. In `apps/server/src/adapters/factory.ts`, import your adapter and add it to `STORAGE_IMPLS`:
-   ```ts
-   import { postgresStorageAdapter } from './storage-postgres.js';
+```bash
+pnpm add @floom-community/storage-postgres
+export FLOOM_STORAGE=@floom-community/storage-postgres
+pnpm --filter @floom/server start
+```
 
-   const STORAGE_IMPLS: Record<string, StorageAdapter> = {
-     sqlite: sqliteStorageAdapter,
-     postgres: postgresStorageAdapter,
-   };
-   ```
-3. Set `FLOOM_STORAGE=postgres` and run the server.
+For private/internal adapters that are not published to npm, point at the built ESM file:
 
-Once the v0.5 dynamic-import path ships, the fork step goes away: you publish your adapter to npm, set `FLOOM_STORAGE=@floom-community/storage-postgres`, and the stock Floom server loads it at boot.
+```bash
+export FLOOM_STORAGE=./local-adapters/storage-postgres.js
+pnpm --filter @floom/server start
+```
 
 ### 5. Publish and announce
 
 When your adapter is ready:
 
 1. **Publish to npm** under the `@floom-community/` scope if you're aligning with community conventions, or your own scope if you prefer. Pin the `protocolVersion` range in your default export before publishing.
-2. **Add a PR against `floomhq/floom`** adding your package to the "Known adapters" list in `docs/adapters.md` (the list itself is planned for v0.5; until then, announce in Discord and the Floom team will surface it).
+2. **Add a PR against `floomhq/floom`** adding your package to the "Known adapters" list in `docs/adapters.md`.
 3. **Announce in Discord**: the Floom server at https://discord.gg/8fXGXjxcRz has a channel for community adapter releases.
 4. **Keep a CHANGELOG**: downstream operators pin exact versions for supply-chain reasons (see the security note in `spec/adapters.md`). A clear changelog is what lets them upgrade.
 

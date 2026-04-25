@@ -335,17 +335,17 @@ Today: `npx tsx test/stress/test-adapters-factory.mjs` exercises factory wiring 
 
 ## Third-party adapters
 
-Out-of-tree adapters are a v0.5 target. Today's registry is static in-tree (see `apps/server/src/adapters/factory.ts`); every registered impl is compiled into the server binary. This section specifies the protocol for dynamic registration so community implementers have a stable target to build against.
+Out-of-tree adapters load through the same env vars used for in-tree adapter selection (see `apps/server/src/adapters/factory.ts`). Built-in names still resolve through the static registry; package and path specifiers resolve through dynamic `import()` at server boot.
 
 ### Discovery
 
-The target pattern for v0.5 is **npm-module-path resolution via the same five env vars used today for in-tree selection**:
+The discovery pattern is **npm-module-path resolution via the same five env vars used for in-tree selection**:
 
 - `FLOOM_RUNTIME`, `FLOOM_STORAGE`, `FLOOM_AUTH`, `FLOOM_SECRETS`, `FLOOM_OBSERVABILITY`.
 
 Values starting with `@` or containing `/` are treated as npm module specifiers and resolved via dynamic `import()` at server boot. Values without those markers keep the current static-registry lookup. Examples:
 
-- `FLOOM_STORAGE=sqlite`: in-tree (today, unchanged).
+- `FLOOM_STORAGE=sqlite`: in-tree.
 - `FLOOM_STORAGE=@floom-community/storage-postgres`: third-party npm package.
 - `FLOOM_STORAGE=./local-adapters/my-storage.js`: relative path to a local file (useful for private/internal adapters that never hit npm).
 

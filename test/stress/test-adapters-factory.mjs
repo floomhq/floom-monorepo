@@ -12,11 +12,13 @@
 //
 // Run: tsx test/stress/test-adapters-factory.mjs
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const tmp = mkdtempSync(join(tmpdir(), 'floom-adapters-factory-'));
+const originalCwd = process.cwd();
+process.chdir(tmp);
 process.env.DATA_DIR = tmp;
 process.env.FLOOM_DISABLE_JOB_WORKER = 'true';
 process.env.FLOOM_MASTER_KEY =
@@ -37,6 +39,52 @@ const [{ createAdapters, __testing }, { FLOOM_PROTOCOL_VERSION }] = await Promis
   import('../../apps/server/src/adapters/factory.ts'),
   import('../../apps/server/src/adapters/version.ts'),
 ]);
+
+function storageModuleSource({ kind = 'storage', protocolVersion = '^0.2' } = {}) {
+  return `
+const adapter = {
+  getApp() { return undefined; },
+  getAppById() { return undefined; },
+  listApps() { return []; },
+  createApp(input) { return { ...input, created_at: 'now', updated_at: 'now' }; },
+  updateApp() { return undefined; },
+  deleteApp() { return false; },
+  createRun(input) { return { ...input, status: 'queued', created_at: 'now' }; },
+  getRun() { return undefined; },
+  listRuns() { return []; },
+  updateRun() {},
+  createJob(input) { return { ...input, attempts: 0, status: input.status || 'queued', created_at: 'now', started_at: null, finished_at: null }; },
+  getJob() { return undefined; },
+  claimNextJob() { return undefined; },
+  updateJob() {},
+  getWorkspace() { return undefined; },
+  listWorkspacesForUser() { return []; },
+  getUser() { return undefined; },
+  getUserByEmail() { return undefined; },
+  createUser(input) { return { ...input, created_at: 'now' }; },
+  listAdminSecrets() { return []; },
+  upsertAdminSecret() {},
+  deleteAdminSecret() { return false; },
+};
+
+export default {
+  kind: ${JSON.stringify(kind)},
+  name: 'tmp-storage',
+  protocolVersion: ${JSON.stringify(protocolVersion)},
+  adapter,
+};
+`;
+}
+
+writeFileSync(join(tmp, 'tmp-mock-storage.mjs'), storageModuleSource());
+writeFileSync(
+  join(tmp, 'tmp-mock-bad-kind.mjs'),
+  storageModuleSource({ kind: 'runtime' }),
+);
+writeFileSync(
+  join(tmp, 'tmp-mock-bad-version.mjs'),
+  storageModuleSource({ protocolVersion: '^0.3' }),
+);
 
 let passed = 0;
 let failed = 0;
@@ -63,7 +111,7 @@ log('OBSERVABILITY_IMPLS.console registered', typeof __testing.OBSERVABILITY_IMP
 process.env.FLOOM_RUNTIME = 'bogus';
 let thrown;
 try {
-  createAdapters();
+  await createAdapters();
 } catch (e) {
   thrown = e;
 }
@@ -76,7 +124,7 @@ log(
 );
 
 // ---- 3. method-surface completeness under defaults ----
-const bundle = createAdapters();
+const bundle = await createAdapters();
 log('bundle.runtime.execute is fn', typeof bundle.runtime.execute === 'function');
 log('bundle.storage.getApp is fn', typeof bundle.storage.getApp === 'function');
 log('bundle.auth.getSession is fn', typeof bundle.auth.getSession === 'function');
@@ -90,7 +138,7 @@ __testing.RUNTIME_MODULE_EXPORTS.docker = {
 };
 let compatibleRangeError;
 try {
-  createAdapters();
+  await createAdapters();
 } catch (e) {
   compatibleRangeError = e;
 }
@@ -102,7 +150,7 @@ __testing.RUNTIME_MODULE_EXPORTS.docker = {
 };
 let incompatibleRangeError;
 try {
-  createAdapters();
+  await createAdapters();
 } catch (e) {
   incompatibleRangeError = e;
 }
@@ -117,13 +165,97 @@ log(
 __testing.RUNTIME_MODULE_EXPORTS.docker = undefined;
 let missingFieldError;
 try {
-  createAdapters();
+  await createAdapters();
 } catch (e) {
   missingFieldError = e;
 }
 log('missing protocolVersion is back-compatible', missingFieldError === undefined);
 
+// ---- 5. dynamic import() module loading ----
+process.env.FLOOM_RUNTIME = 'docker';
+process.env.FLOOM_STORAGE = 'sqlite';
+process.env.FLOOM_AUTH = 'better-auth';
+process.env.FLOOM_SECRETS = 'local';
+process.env.FLOOM_OBSERVABILITY = 'console';
+let inTreeError;
+try {
+  await createAdapters();
+} catch (e) {
+  inTreeError = e;
+}
+for (const k of [
+  'FLOOM_RUNTIME',
+  'FLOOM_STORAGE',
+  'FLOOM_AUTH',
+  'FLOOM_SECRETS',
+  'FLOOM_OBSERVABILITY',
+]) {
+  delete process.env[k];
+}
+log('all explicit in-tree adapter keys still load', inTreeError === undefined);
+
+process.env.FLOOM_STORAGE = './tmp-mock-storage.mjs';
+let dynamicBundle;
+let dynamicLoadError;
+try {
+  dynamicBundle = await createAdapters();
+} catch (e) {
+  dynamicLoadError = e;
+}
+log(
+  'FLOOM_STORAGE=./tmp-mock-storage.mjs loads via import()',
+  dynamicLoadError === undefined &&
+    dynamicBundle &&
+    typeof dynamicBundle.storage.getApp === 'function',
+  dynamicLoadError instanceof Error ? dynamicLoadError.message : String(dynamicLoadError),
+);
+
+process.env.FLOOM_STORAGE = './tmp-mock-bad-kind.mjs';
+let badKindError;
+try {
+  await createAdapters();
+} catch (e) {
+  badKindError = e;
+}
+log(
+  'dynamic storage adapter kind mismatch throws',
+  badKindError instanceof Error && /kind mismatch/.test(badKindError.message),
+  badKindError instanceof Error ? badKindError.message : String(badKindError),
+);
+
+process.env.FLOOM_STORAGE = './tmp-mock-bad-version.mjs';
+let badVersionError;
+try {
+  await createAdapters();
+} catch (e) {
+  badVersionError = e;
+}
+log(
+  'dynamic storage adapter version mismatch throws with both versions',
+  badVersionError instanceof Error &&
+    badVersionError.message.includes('"^0.3"') &&
+    badVersionError.message.includes(`"${FLOOM_PROTOCOL_VERSION}"`),
+  badVersionError instanceof Error ? badVersionError.message : String(badVersionError),
+);
+
+process.env.FLOOM_STORAGE = './does-not-exist.mjs';
+let importFailureError;
+try {
+  await createAdapters();
+} catch (e) {
+  importFailureError = e;
+}
+log(
+  'dynamic storage adapter import failure is descriptive',
+  importFailureError instanceof Error &&
+    /failed to import storage adapter/.test(importFailureError.message) &&
+    /does-not-exist/.test(importFailureError.message),
+  importFailureError instanceof Error ? importFailureError.message : String(importFailureError),
+);
+delete process.env.FLOOM_STORAGE;
+
 // ---- cleanup ----
+process.chdir(originalCwd);
 rmSync(tmp, { recursive: true, force: true });
 
 console.log(`\n${passed} passed, ${failed} failed`);

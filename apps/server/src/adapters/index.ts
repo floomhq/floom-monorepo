@@ -11,6 +11,6 @@
 
 import { createAdapters } from './factory.js';
 
-export const adapters = createAdapters();
+export const adapters = await createAdapters();
 
 export type { AdapterBundle } from './factory.js';
