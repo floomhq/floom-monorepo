@@ -955,7 +955,7 @@ const SCOPED_CSS = `
      cue when the code still overflows at 375px. The fade is a pure CSS
      mask — doesn't eat a DOM node, doesn't affect desktop. */
   @media (max-width:640px){
-    [data-testid="hero-demo"] pre{font-size:11px !important;line-height:1.6 !important;padding:10px 12px !important;}
+    [data-testid="hero-demo"] pre{font-size:12px !important;line-height:1.6 !important;padding:10px 12px !important;}
     [data-testid="hero-demo"] [data-hd="deploy-grid"] > :first-child{padding:20px 18px;gap:14px}
     [data-testid="hero-demo"] [data-hd="editor-pane"]{
       -webkit-mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%);
@@ -969,7 +969,7 @@ const SCOPED_CSS = `
     }
   }
   @media (max-width:480px){
-    [data-testid="hero-demo"] pre{font-size:10.5px !important;padding:10px 10px !important;}
+    [data-testid="hero-demo"] pre{font-size:12px !important;padding:10px 10px !important;}
     [data-testid="hero-demo"] [data-hd="deploy-grid"] > :first-child{padding:20px 18px;gap:14px}
     /* Audit 2026-04-25: Increase tracker pill font size for legibility on small screens */
     [data-testid="hero-demo"] [data-hd="tracker-pill"] {
@@ -1616,7 +1616,7 @@ const RUN_FIELD: CSSProperties = {
 };
 
 const RUN_FIELD_LABEL: CSSProperties = {
-  fontSize: 10.5,
+  fontSize: 12,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
   color: '#8b8680',
@@ -1665,7 +1665,7 @@ const RUN_OUTPUT_HEADER: CSSProperties = {
 };
 
 const RUN_OUTPUT_LABEL: CSSProperties = {
-  fontSize: 10.5,
+  fontSize: 12,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
   color: '#8b8680',
@@ -1766,7 +1766,7 @@ const TIER_PILL: CSSProperties = {
   border: '1px solid #d1fae5',
   borderRadius: 999,
   padding: '3px 11px',
-  fontSize: 11.5,
+  fontSize: 12,
   fontWeight: 600,
   marginLeft: 4,
 };
@@ -1784,7 +1784,7 @@ const RUN_REASONS: CSSProperties = {
 };
 
 const RUN_REASONS_TITLE: CSSProperties = {
-  fontSize: 10.5,
+  fontSize: 12,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
   color: '#8b8680',
@@ -1801,7 +1801,7 @@ const RUN_REASONS_LIST: CSSProperties = {
 };
 
 const RUN_REASON_ITEM: CSSProperties = {
-  fontSize: 12.5,
+  fontSize: 14,
   color: '#2a2825',
   lineHeight: 1.45,
   display: 'flex',
@@ -1828,7 +1828,7 @@ const RUN_SECONDARY: CSSProperties = {
 
 const RUN_SEC_TAG: CSSProperties = {
   fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-  fontSize: 10.5,
+  fontSize: 12,
   color: '#8b8680',
   letterSpacing: '0.04em',
 };

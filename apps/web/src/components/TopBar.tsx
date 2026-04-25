@@ -50,9 +50,10 @@ const navLinkBase: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '7px 10px',
+  /* Standardize hit target to 44px
+  padding: '12px 10px',
   borderRadius: 6,
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 500,
   lineHeight: 1,
   textDecoration: 'none',
@@ -67,9 +68,10 @@ function navLinkStyle(active: boolean): CSSProperties {
 const signInStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  padding: '7px 14px',
+  /* Standardize hit target to 44px (issue #588) */
+  padding: '12px 14px',
   borderRadius: 6,
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 500,
   lineHeight: 1,
   textDecoration: 'none',
@@ -82,9 +84,10 @@ const signInStyle: CSSProperties = {
 const signUpStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  padding: '7px 14px',
+  /* Standardize hit target to 44px (issue #588) */
+  padding: '12px 14px',
   borderRadius: 6,
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 600,
   lineHeight: 1,
   textDecoration: 'none',
@@ -101,9 +104,10 @@ const signUpStyle: CSSProperties = {
 const publishCtaStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  padding: '7px 14px',
+  /* Standardize hit target to 44px (issue #588) */
+  padding: '12px 14px',
   borderRadius: 6,
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 600,
   lineHeight: 1,
   textDecoration: 'none',
@@ -117,8 +121,8 @@ const publishCtaStyle: CSSProperties = {
 
 const menuItemStyle: CSSProperties = {
   display: 'block',
-  padding: '8px 12px',
-  fontSize: 13,
+  padding: '10px 12px',
+  fontSize: 14,
   color: INK,
   textDecoration: 'none',
   borderRadius: 6,
