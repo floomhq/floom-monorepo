@@ -50,7 +50,6 @@ const navLinkBase: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  /* Standardize hit target to 44px
   padding: '12px 10px',
   borderRadius: 6,
   fontSize: 14,
