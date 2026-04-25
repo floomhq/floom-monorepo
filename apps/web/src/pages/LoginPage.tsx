@@ -542,9 +542,11 @@ export function LoginPage() {
                   to="/forgot-password"
                   data-testid="forgot-password-link"
                   style={{
-                    fontSize: 12,
+                    fontSize: 14,
                     color: 'var(--muted)',
                     textDecoration: 'underline',
+                    padding: '8px 0',
+                    display: 'inline-block',
                   }}
                 >
                   Forgot password?
@@ -589,7 +591,8 @@ export function LoginPage() {
               color: 'var(--accent)',
               fontWeight: 600,
               cursor: 'pointer',
-              padding: 0,
+              padding: '8px 4px',
+              margin: '-8px -4px',
               font: 'inherit',
             }}
           >

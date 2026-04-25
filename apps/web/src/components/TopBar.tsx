@@ -277,6 +277,9 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
             textDecoration: 'none',
             color: INK,
             flexShrink: 0,
+            /* Increase tap target to 44px (issue #559) */
+            padding: '11px 8px',
+            margin: '-11px -8px',
           }}
           aria-label="floom — home"
         >
@@ -538,7 +541,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: 700,
                     }}
                     data-testid="topbar-user-avatar-initial"
