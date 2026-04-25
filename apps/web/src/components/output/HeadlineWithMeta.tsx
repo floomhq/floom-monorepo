@@ -47,7 +47,14 @@ export function HeadlineWithMeta({ headline, headlineLabel, meta }: HeadlineWith
           fontWeight: isToken ? 500 : 450,
           color: 'var(--ink)',
           lineHeight: isToken ? 1.4 : 1.55,
+          // Token (≤64 chars no spaces) → break-all is fine for visual
+          // chunking. Prose → break on word boundaries. Long unbroken
+          // strings (JWTs, base64 >64 chars) fall to the prose branch;
+          // `overflowWrap: anywhere` keeps them inside the card on
+          // narrow viewports instead of overflowing horizontally.
+          // (codex review 2026-04-25)
           wordBreak: isToken ? 'break-all' : 'normal',
+          overflowWrap: 'anywhere',
           userSelect: 'all',
           paddingRight: headlineLabel ? 0 : 72,
           marginBottom: hasMeta ? 14 : 0,

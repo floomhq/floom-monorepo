@@ -264,24 +264,21 @@ function pluckMarkdownSidecar(outObj: Record<string, unknown>): string | null {
   return null;
 }
 
-// Output names that are "meta" — not user-facing artefacts. Skipped by
-// the multi-section composite path (issue #781, 2026-04-25): apps like
-// ai-readiness-audit declare `model` / `cache_hit` / `dry_run` as
-// outputs alongside the actual results. The model name belongs in the
-// bottom chip, the cache/dry-run flags are status, and surfacing the
-// audited URL as its own card is noise. Keep them off the stack.
+// Output names that are framework-injected status, not creator artefacts.
+// Skipped by the multi-section composite path (issue #781, 2026-04-25):
+// the model name renders in the bottom ModelChip, cache/dry-run flags
+// are transport state. Keep this list TIGHT — codex review (2026-04-25)
+// flagged that broader filtering (`total`, `scored`, `failed`,
+// `company_url`, etc.) silently drops legitimate creator-declared
+// outputs like hook-stats's `Total Commands` metric. The contract is:
+// if a creator declared it, surface it. We only filter what the
+// runtime adds for its own bookkeeping.
 const META_OUTPUT_NAMES = new Set([
   'model',
   'meta',
   'cache_hit',
   'dry_run',
   'cached',
-  'total',
-  'scored',
-  'failed',
-  'duration_ms',
-  'company_url',
-  'audited_url',
 ]);
 
 /**
