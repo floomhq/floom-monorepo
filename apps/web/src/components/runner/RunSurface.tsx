@@ -15,7 +15,8 @@
 //     cascade-picked renderer, and errors — all in the same slot.
 //   - Refine loop: after a successful run, the primary button flips from
 //     "Run" to "Refine" unless manifest.render.refinable === false.
-//   - Past runs live in a collapsed <details> below the grid (auth-only).
+//   - Past runs live in a collapsed <details> below the grid.
+//     Signed-out users see mode-aware CTA copy (waitlist vs sign-in).
 //     Clicking a run navigates to /p/:slug?run=<id> which hydrates the run
 //     via the PR #19 shared-run path.
 //   - The renderer cascade (PR #66) is reused wholesale via OutputPanel,
@@ -23,7 +24,7 @@
 //   - Async apps (is_async) route through JobProgress in the output slot.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import type {
   ActionSpec,
   AppDetail,
@@ -42,6 +43,8 @@ import { useSession } from '../../hooks/useSession';
 import * as api from '../../api/client';
 import { ApiError, CsvRowCapExceededError, FileInputTooLargeError } from '../../api/client';
 import { buildPublicRunPath, getRunStartErrorMessage } from '../../lib/publicPermalinks';
+import { useDeployEnabled } from '../../lib/flags';
+import { waitlistHref } from '../../lib/waitlistCta';
 import { BYOKModal } from '../BYOKModal';
 import { FreeRunsStrip, useFreeRunsRefresher } from './FreeRunsStrip';
 import { SampleOutputPreview, hasSampleForSlug } from './SampleOutputPreview';
@@ -1980,9 +1983,15 @@ function FriendlyStartupError({
 
 function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
   const { isAuthenticated } = useSession();
+  const deployEnabled = useDeployEnabled();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const loginHref = useMemo(
+    () => `/login?next=${encodeURIComponent(location.pathname + location.search)}`,
+    [location.pathname, location.search],
+  );
 
   useEffect(() => {
     if (!open || !isAuthenticated || runs !== null) return;
@@ -2005,7 +2014,37 @@ function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
     };
   }, [open, isAuthenticated, runs, appSlug]);
 
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated) {
+    return (
+      <details
+        className="run-surface-past"
+        data-testid="run-surface-past"
+        onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
+      >
+        <summary className="run-surface-past-summary">Earlier runs</summary>
+        <div className="run-surface-past-body">
+          {deployEnabled === true ? (
+            <div className="run-surface-past-hint">
+              Sign in to see your run history.{' '}
+              <Link to={loginHref} data-testid="run-surface-past-signin-link">
+                → Sign in
+              </Link>
+            </div>
+          ) : (
+            <div className="run-surface-past-hint">
+              Run history is saved when you join Floom Cloud.{' '}
+              <Link
+                to={waitlistHref('runs-history')}
+                data-testid="run-surface-past-waitlist-link"
+              >
+                → Join the waitlist
+              </Link>
+            </div>
+          )}
+        </div>
+      </details>
+    );
+  }
 
   return (
     <details
