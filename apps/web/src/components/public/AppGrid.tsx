@@ -467,7 +467,10 @@ function AppGridCard({
   const thumbnail = app.thumbnail_url ?? null;
   const isFeatured = variant === 'featured';
   const thumbHeight = isFeatured ? 140 : 120;
-  const titleSize = isFeatured ? 16 : 15;
+  // 2026-04-25 v17 store.html parity: default card title sized at
+  // 14.5px (matches `.app-card-title` in the wireframe). Featured
+  // variant keeps the 16px hero treatment for landing shelves.
+  const titleSize = isFeatured ? 16 : 14.5;
   // 2026-04-24 polish: hide the "0 stars" meta while the product has no
   // users — it reads as noise ("⭐ 0"). Show only when the count is > 0.
   // The "hot" accent still triggers at >= 100 through `isHot`.

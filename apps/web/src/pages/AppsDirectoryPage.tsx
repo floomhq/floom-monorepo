@@ -133,6 +133,31 @@ export function AppsDirectoryPage() {
     resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
+  // ⌘K / Ctrl-K focuses the search input — v17 store.html parity. Mirrors
+  // Studio's command-palette grammar so the same keybinding lands you in
+  // search across both surfaces. We only wire focus (no palette UI) on
+  // /apps because the page is a single-purpose directory; full command
+  // palette lives in /studio.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Detect Mac vs other platforms so the kbd hint reads ⌘K on macOS and
+  // Ctrl-K elsewhere. SSR-safe: defaults to ⌘ on the server (most common
+  // visitor), then re-renders on the client with the actual platform.
+  const isMac =
+    typeof navigator !== 'undefined' &&
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
+  const kbdHint = isMac ? '⌘K' : 'Ctrl K';
+
   // Audit 2026-04-24 (local-repro of /apps with API offline): the old
   // error path surfaced "Couldn't load apps — Check your connection and try
   // again" on the *first* failed fetch. That read as a hard failure and
@@ -435,6 +460,30 @@ export function AppsDirectoryPage() {
                 color: 'var(--ink)',
               }}
             />
+            {/* Keyboard-shortcut hint — v17 store.html parity. Mirrors the
+                Studio command palette affordance so the same chord lands
+                you in search on both surfaces. Hidden on touch viewports
+                where chords don't apply. */}
+            <kbd
+              data-testid="apps-search-kbd"
+              aria-hidden="true"
+              className="apps-search-kbd"
+              style={{
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontSize: 10.5,
+                fontWeight: 600,
+                color: 'var(--muted)',
+                background: 'var(--bg)',
+                border: '1px solid var(--line)',
+                borderRadius: 5,
+                padding: '2px 6px',
+                letterSpacing: '0.04em',
+                lineHeight: 1,
+                flexShrink: 0,
+              }}
+            >
+              {kbdHint}
+            </kbd>
             <button
               type="submit"
               data-testid="apps-search-submit"
@@ -630,6 +679,9 @@ export function AppsDirectoryPage() {
           [data-testid="apps-toolbar"] { padding: 14px 16px !important; gap: 10px !important; }
           [data-testid="apps-chips"] { gap: 6px !important; }
           [data-testid="apps-search"] { font-size: 16px !important; }
+          /* Hide the ⌘K hint on touch viewports — the chord doesn't apply
+             on phones, so the kbd just adds noise. */
+          .apps-search-kbd { display: none !important; }
           /* Results section: smaller gutter, smaller bottom padding. */
           [data-testid="apps-directory"] main > section:last-of-type { padding: 20px 16px 48px !important; }
         }
