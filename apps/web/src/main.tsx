@@ -98,6 +98,7 @@ import { initPostHog, identifyFromSession, track } from './lib/posthog';
 import { initBrowserSentry } from './lib/sentry';
 import type { SessionMePayload } from './lib/types';
 import './styles/globals.css';
+import './styles/csp-inline-style-migrations.css';
 
 // Browser Sentry (launch #311). Strict-opt-in — the SDK only boots when
 // the user picked "Accept all" AND VITE_SENTRY_DSN is set. See

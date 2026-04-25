@@ -427,26 +427,6 @@ export function AppGrid({ apps, variant = 'default' }: AppGridProps) {
           suppressHeroBadge={suppressHeroBadge}
         />
       ))}
-      <style>{`
-        @media (max-width: 1024px) {
-          /* Bounded max track so a single filtered card doesn't stretch
-             to fill the row on tablets (regression #679). */
-          .app-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 360px)) !important; }
-        }
-        @media (max-width: 760px) {
-          .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
-        }
-        @media (max-width: 480px) {
-          .app-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
-        }
-        /* Keyboard-focus ring on cards (hover is already wired via JS).
-           Uses the brand accent so it reads clearly against the card. */
-        [data-testid^="app-grid-card-"]:focus-visible {
-          outline: 2px solid var(--accent, #047857);
-          outline-offset: 2px;
-          border-color: var(--ink) !important;
-        }
-      `}</style>
     </div>
   );
 }

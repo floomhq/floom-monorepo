@@ -667,41 +667,6 @@ export function AppsDirectoryPage() {
       <PublicFooter />
       <FeedbackButton />
 
-      <style>{`
-        @media (max-width: 640px) {
-          /* v17 store.html: compact header on mobile.
-             Keep h1 at 28px so the wireframe's "34px" feels right on
-             desktop without crushing on phones. iOS-zoom guard: bump
-             search input to 16px+ on focus-able viewports (Safari
-             auto-zooms inputs <16px). */
-          .apps-headline { font-size: 28px !important; }
-          [data-testid="apps-header"] { padding: 28px 16px 12px !important; }
-          [data-testid="apps-toolbar"] { padding: 14px 16px !important; gap: 10px !important; }
-          [data-testid="apps-chips"] { gap: 6px !important; }
-          [data-testid="apps-search"] { font-size: 16px !important; }
-          /* Hide the ⌘K hint on touch viewports — the chord doesn't apply
-             on phones, so the kbd just adds noise. */
-          .apps-search-kbd { display: none !important; }
-          /* Results section: smaller gutter, smaller bottom padding. */
-          [data-testid="apps-directory"] main > section:last-of-type { padding: 20px 16px 48px !important; }
-        }
-        /* Mirror AppGrid breakpoints so the loading skeleton collapses the
-           same way as the real grid: 4 → 3 → 2 → 1. Keeps grid shape stable
-           across the load transition. */
-        @media (max-width: 1024px) {
-          .apps-grid-skeleton { grid-template-columns: repeat(3, 1fr) !important; }
-        }
-        @media (max-width: 760px) {
-          .apps-grid-skeleton { grid-template-columns: repeat(2, 1fr) !important; }
-        }
-        @media (max-width: 480px) {
-          .apps-grid-skeleton { grid-template-columns: 1fr !important; }
-        }
-        @keyframes apps-skeleton-shimmer {
-          0% { background-position: -200px 0; }
-          100% { background-position: calc(200px + 100%) 0; }
-        }
-      `}</style>
     </div>
   );
 }
