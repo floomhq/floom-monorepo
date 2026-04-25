@@ -1,0 +1,8 @@
+/.github/workflows/* @floomhq/maintainers
+/.github/CODEOWNERS @floomhq/maintainers
+/scripts/ops/** @floomhq/maintainers
+/docker/** @floomhq/maintainers
+/Dockerfile* @floomhq/maintainers
+/apps/server/src/middleware/** @floomhq/maintainers
+/apps/server/src/lib/better-auth.ts @floomhq/maintainers
+/apps/server/src/lib/rate-limit.ts @floomhq/maintainers
