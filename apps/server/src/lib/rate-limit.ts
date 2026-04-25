@@ -47,6 +47,10 @@ export const defaultPerAppPerHour = (): number =>
   envNumber('FLOOM_RATE_LIMIT_APP_PER_HOUR', 500);
 export const defaultMcpIngestPerDay = (): number =>
   envNumber('FLOOM_RATE_LIMIT_MCP_INGEST_PER_DAY', 10);
+export const defaultWriteAnonPerMinute = (): number =>
+  envNumber('FLOOM_WRITE_RATE_LIMIT_IP_PER_MINUTE', 30);
+export const defaultWriteUserPerMinute = (): number =>
+  envNumber('FLOOM_WRITE_RATE_LIMIT_USER_PER_MINUTE', 60);
 
 // Re-export: historical import path is ../lib/rate-limit.js
 export { extractIp } from './client-ip.js';
@@ -237,6 +241,31 @@ function rateLimitResponse(
   );
 }
 
+function writeRateLimitResponse(
+  c: Context,
+  scope: Scope,
+  result: CheckResult,
+  limit: number,
+): Response {
+  recordRateLimitHit(scope);
+  noteRateLimitHitForAbuse(extractIp(c), scope, Date.now());
+  const retryAfter = clampRetryAfter(result.retryAfterSec);
+  return c.json(
+    {
+      error: 'rate_limit_exceeded',
+      retryAfter,
+    },
+    429,
+    {
+      'Retry-After': String(retryAfter),
+      'X-RateLimit-Limit': String(limit),
+      'X-RateLimit-Remaining': '0',
+      'X-RateLimit-Reset': String(result.resetAt),
+      'X-RateLimit-Scope': scope,
+    },
+  );
+}
+
 /**
  * Attach X-RateLimit-* headers to a successful response so clients can back
  * off pre-emptively. Hono sets response headers on `c.header()` before the
@@ -252,6 +281,28 @@ function applyLimitHeaders(
   c.header('X-RateLimit-Remaining', String(result.remaining));
   c.header('X-RateLimit-Reset', String(result.resetAt));
   c.header('X-RateLimit-Scope', scope);
+}
+
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const WRITE_RATE_LIMIT_SKIP_PATHS = new Set([
+  '/api/run',
+  '/api/hub/ingest',
+  '/api/feedback',
+  '/api/waitlist',
+  '/api/deploy-waitlist',
+]);
+const WRITE_RATE_LIMIT_SKIP_PATTERNS = [
+  /^\/api\/[^/]+\/run\/?$/,
+  /^\/api\/[^/]+\/jobs\/?$/,
+];
+
+export function isWriteRateLimitSkippedPath(pathname: string): boolean {
+  const normalized =
+    pathname.length > 1 && pathname.endsWith('/')
+      ? pathname.slice(0, -1)
+      : pathname;
+  if (WRITE_RATE_LIMIT_SKIP_PATHS.has(normalized)) return true;
+  return WRITE_RATE_LIMIT_SKIP_PATTERNS.some((rx) => rx.test(normalized));
 }
 
 // ---------- middleware ----------
@@ -300,6 +351,47 @@ export function runRateLimitMiddleware(
     } else {
       applyLimitHeaders(c, p, primaryCap, primaryScope);
     }
+    return next();
+  };
+}
+
+/**
+ * Global write limiter for /api/* mutation routes.
+ *
+ * Default budgets (env-configurable):
+ *   - anonymous callers: 30 writes/min per IP
+ *   - authed callers: 60 writes/min per user
+ *
+ * Existing per-route limiters (run surfaces, waitlist, feedback) are skipped
+ * to avoid double-throttling.
+ */
+export function writeRateLimitMiddleware(
+  resolveCtx: (c: Context) => Promise<SessionContext>,
+): MiddlewareHandler {
+  return async (c, next) => {
+    if (isRateLimitDisabled()) return next();
+    const method = c.req.method.toUpperCase();
+    if (!WRITE_METHODS.has(method)) return next();
+    const pathname = new URL(c.req.url).pathname;
+    if (!pathname.startsWith('/api/')) return next();
+    if (isWriteRateLimitSkippedPath(pathname)) return next();
+    if (hasValidAdminBearer(c)) return next();
+
+    const now = Date.now();
+    const ip = extractIp(c);
+    const ctx = await resolveCtx(c);
+    const scope: Scope = ctx.is_authenticated ? 'user' : 'ip';
+    const limit = ctx.is_authenticated
+      ? defaultWriteUserPerMinute()
+      : defaultWriteAnonPerMinute();
+    const key = ctx.is_authenticated
+      ? `write:user:${ctx.user_id}`
+      : `write:ip:${ip}`;
+    const result = incrementAndCheck(key, limit, 60 * 1000, now);
+    if (!result.allowed) {
+      return writeRateLimitResponse(c, scope, result, limit);
+    }
+    applyLimitHeaders(c, result, limit, scope);
     return next();
   };
 }

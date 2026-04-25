@@ -48,7 +48,7 @@ import {
 } from './lib/better-auth.js';
 import { sanitizeAuthResponse } from './lib/auth-response.js';
 import { padToFloor, shouldPadAuthTiming } from './lib/auth-response-guard.js';
-import { runRateLimitMiddleware } from './lib/rate-limit.js';
+import { runRateLimitMiddleware, writeRateLimitMiddleware } from './lib/rate-limit.js';
 import {
   applyProgressiveSigninDelayFromContext,
   parseEmailForSigninProgressiveDelay,
@@ -238,6 +238,7 @@ if (process.env.FLOOM_AUTH_TOKEN) {
 // The MCP admin root (/mcp) is rate-limited separately inside the tool
 // handler (ingest_app only, 10/day).
 const rateLimit = runRateLimitMiddleware(resolveUserContext);
+const writeRateLimit = writeRateLimitMiddleware(resolveUserContext);
 // Body-size guard runs BEFORE the rate-limit check so an attacker can't
 // burn rate-limit budget with oversized bodies (we reject 413 before
 // incrementing the counter). Launch-hardening 2026-04-23 for the 3 hero
@@ -253,6 +254,10 @@ app.use('/mcp/app/:slug', runBodyLimit, rateLimit);
 // uncapped. Route covers only POST (other hub paths are reads / owner-
 // scoped writes and route through their own auth).
 app.use('/api/hub/ingest', runBodyLimit, rateLimit);
+// Security launch-week #600: global write limiter for all /api mutations.
+// Existing per-route limiters are explicitly skipped inside the middleware
+// to avoid double-throttling (run surfaces, feedback, waitlist).
+app.use('/api/*', writeRateLimit);
 
 // API routes
 app.route('/api/health', healthRouter);
@@ -444,7 +449,7 @@ app.get('/openapi.json', (c) =>
       title: 'Floom self-host API',
       version: SERVER_VERSION,
       description:
-        'Floom lists registered apps at GET /api/hub. Each app is callable over MCP at /mcp/app/{slug} and via HTTP POST /api/{slug}/run; use each app manifest for tool names and parameters. When enabled, POST /mcp exposes admin tools (ingest_app, list_apps, search_apps, get_app) for ingest and discovery without the web UI. Optional routes depend on deployment: per-user memory (/api/memory), encrypted secrets (/api/secrets), OAuth connections (/api/connections), Stripe Connect (/api/stripe), workspaces (/api/workspaces), session (/api/session). Product UI for some features may be deferred; backend routes may still exist. Rate limits apply to run surfaces unless disabled (FLOOM_RATE_LIMIT_DISABLED=true); see docs/SELF_HOST.md#rate-limits.',
+        'Floom lists registered apps at GET /api/hub. Each app is callable over MCP at /mcp/app/{slug} and via HTTP POST /api/{slug}/run; use each app manifest for tool names and parameters. When enabled, POST /mcp exposes admin tools (ingest_app, list_apps, search_apps, get_app) for ingest and discovery without the web UI. Optional routes depend on deployment: per-user memory (/api/memory), encrypted secrets (/api/secrets), OAuth connections (/api/connections), Stripe Connect (/api/stripe), workspaces (/api/workspaces), session (/api/session). Product UI for some features may be deferred; backend routes may still exist. Rate limits apply to run surfaces and /api write endpoints unless disabled (FLOOM_RATE_LIMIT_DISABLED=true); see docs/SELF_HOST.md#rate-limits.',
     },
     paths: {
       '/api/health': {
