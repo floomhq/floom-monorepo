@@ -82,6 +82,7 @@ async function loadAuthorizedRunApp(
   const ctx = await resolveUserContext(c);
   const blocked = checkAppVisibility(c, app.visibility || 'public', {
     app_id: app.id,
+    slug: app.slug,
     author: app.author,
     workspace_id: app.workspace_id,
     link_share_token: app.link_share_token,
@@ -220,6 +221,7 @@ runRouter.post('/', async (c) => {
   const ctx = await resolveUserContext(c);
   const blocked = checkAppVisibility(c, row.visibility || 'public', {
     app_id: row.id,
+    slug: row.slug,
     author: row.author,
     workspace_id: row.workspace_id,
     link_share_token: row.link_share_token,
@@ -593,6 +595,7 @@ slugRunRouter.post('/', async (c) => {
   const ctx = await resolveUserContext(c);
   const blocked = checkAppVisibility(c, row.visibility || 'public', {
     app_id: row.id,
+    slug: row.slug,
     author: row.author,
     workspace_id: row.workspace_id,
     link_share_token: row.link_share_token,

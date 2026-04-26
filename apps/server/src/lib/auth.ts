@@ -140,6 +140,7 @@ export function checkAppVisibility(
   visibility: AppVisibility | string | null | undefined,
   owner?: {
     app_id?: string | null;
+    slug?: string | null;
     author?: string | null;
     workspace_id?: string | null;
     link_share_token?: string | null;
@@ -158,6 +159,7 @@ export function checkAppVisibility(
     const ok = canAccessApp(
       {
         id: appId,
+        slug: owner?.slug ?? null,
         author: owner?.author ?? null,
         workspace_id: owner?.workspace_id ?? 'local',
         visibility: v,

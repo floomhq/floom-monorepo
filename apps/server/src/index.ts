@@ -1475,10 +1475,11 @@ if (webDist) {
     const slugMatch = pathname.match(pSlugPattern);
     if (slugMatch && slugMatch[1]) {
       const appRow = db
-        .prepare('SELECT id, author, workspace_id, visibility, link_share_token FROM apps WHERE slug = ?')
+        .prepare('SELECT id, slug, author, workspace_id, visibility, link_share_token FROM apps WHERE slug = ?')
         .get(slugMatch[1]) as
         | {
             id: string;
+            slug: string;
             author: string | null;
             workspace_id: string;
             visibility: string | null;

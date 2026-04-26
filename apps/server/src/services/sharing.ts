@@ -104,6 +104,14 @@ export function generateLinkShareToken(): string {
   return token;
 }
 
+export function verifyLinkToken(slug: string, providedKey: string | null | undefined): boolean {
+  if (!providedKey) return false;
+  const row = db
+    .prepare(`SELECT link_share_token FROM apps WHERE slug = ?`)
+    .get(slug) as { link_share_token: string | null } | undefined;
+  return Boolean(row?.link_share_token && row.link_share_token === providedKey);
+}
+
 function ownerMatches(app: Pick<AppRecord, 'author' | 'workspace_id'>, ctx: SessionContext): boolean {
   if (app.author && app.author === ctx.user_id) return true;
   return !ctx.is_authenticated && ctx.workspace_id === 'local' && app.workspace_id === 'local';
@@ -134,6 +142,7 @@ export function userHasAcceptedInvite(appId: string, userId: string | null | und
 
 export function canAccessApp(
   app: Pick<AppRecord, 'id' | 'author' | 'workspace_id' | 'link_share_token'> & {
+    slug?: string | null;
     visibility: AppVisibility | string | null | undefined;
   },
   ctx: SessionContext,
@@ -146,6 +155,7 @@ export function canAccessApp(
     return readOwnerMatches(app, ctx);
   }
   if (visibility === 'link') {
+    if (app.slug) return verifyLinkToken(app.slug, linkToken);
     return Boolean(app.link_share_token && linkToken && app.link_share_token === linkToken);
   }
   if (visibility === 'invited') {
