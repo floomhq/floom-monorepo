@@ -42,6 +42,10 @@ const creatorSecrets = await import(
   '../../apps/server/src/services/app_creator_secrets.ts'
 );
 const secrets = adapters.secrets;
+const setCreatorOverrideForTests =
+  typeof secrets.__setCreatorOverrideForTests === 'function'
+    ? secrets.__setCreatorOverrideForTests.bind(secrets)
+    : null;
 
 let passed = 0;
 let failed = 0;
@@ -147,12 +151,21 @@ try {
     secrets.set(ctx, 'NO_FALLBACK', 'user-fallback-must-not-load');
     creatorSecrets.setPolicy('secrets-contract-app', 'CREATOR_ONLY', 'creator_override');
     creatorSecrets.setPolicy('secrets-contract-app', 'NO_FALLBACK', 'creator_override');
-    creatorSecrets.setCreatorSecret(
-      'secrets-contract-app',
-      DEFAULT_WORKSPACE_ID,
-      'CREATOR_ONLY',
-      'creator-only-value',
-    );
+    if (setCreatorOverrideForTests) {
+      setCreatorOverrideForTests(
+        'secrets-contract-app',
+        DEFAULT_WORKSPACE_ID,
+        'CREATOR_ONLY',
+        'creator-only-value',
+      );
+    } else {
+      creatorSecrets.setCreatorSecret(
+        'secrets-contract-app',
+        DEFAULT_WORKSPACE_ID,
+        'CREATOR_ONLY',
+        'creator-only-value',
+      );
+    }
     const creatorLoaded = secrets.loadCreatorOverrideForRun(
       'secrets-contract-app',
       DEFAULT_WORKSPACE_ID,

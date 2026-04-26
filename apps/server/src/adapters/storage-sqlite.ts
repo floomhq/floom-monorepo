@@ -46,7 +46,11 @@ import type {
 } from '../types.js';
 import type {
   AppListFilter,
+  CreatorSecretCiphertextRow,
+  CreatorSecretCiphertextWriteInput,
   RunListFilter,
+  SecretCiphertextRow,
+  SecretCiphertextWriteInput,
   StorageAdapter,
   UserWriteColumn,
   UserWriteInput,
@@ -401,5 +405,153 @@ export const sqliteStorageAdapter: StorageAdapter = {
       .prepare('DELETE FROM secrets WHERE name = ? AND app_id = ?')
       .run(name, app_id);
     return res.changes > 0;
+  },
+
+  // ---------- encrypted per-user / creator secret rows ----------
+  getUserSecretRow(
+    workspace_id: string,
+    user_id: string,
+    key: string,
+  ): SecretCiphertextRow | undefined {
+    return db
+      .prepare(
+        `SELECT workspace_id, user_id, key, ciphertext, nonce, auth_tag,
+                encrypted_dek, updated_at
+           FROM user_secrets
+          WHERE workspace_id = ?
+            AND user_id = ?
+            AND key = ?`,
+      )
+      .get(workspace_id, user_id, key) as SecretCiphertextRow | undefined;
+  },
+
+  listUserSecretRows(
+    workspace_id: string,
+    user_id: string,
+    keys: string[],
+  ): SecretCiphertextRow[] {
+    if (keys.length === 0) return [];
+    const placeholders = keys.map(() => '?').join(', ');
+    return db
+      .prepare(
+        `SELECT workspace_id, user_id, key, ciphertext, nonce, auth_tag,
+                encrypted_dek, updated_at
+           FROM user_secrets
+          WHERE workspace_id = ?
+            AND user_id = ?
+            AND key IN (${placeholders})`,
+      )
+      .all(workspace_id, user_id, ...keys) as SecretCiphertextRow[];
+  },
+
+  listUserSecretMetadata(
+    workspace_id: string,
+    user_id: string,
+  ): Array<{ key: string; updated_at: string }> {
+    return db
+      .prepare(
+        `SELECT key, updated_at
+           FROM user_secrets
+          WHERE workspace_id = ?
+            AND user_id = ?
+          ORDER BY key`,
+      )
+      .all(workspace_id, user_id) as Array<{ key: string; updated_at: string }>;
+  },
+
+  upsertUserSecretRow(row: SecretCiphertextWriteInput): void {
+    db.prepare(
+      `INSERT INTO user_secrets
+         (workspace_id, user_id, key, ciphertext, nonce, auth_tag, encrypted_dek, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT (workspace_id, user_id, key)
+         DO UPDATE SET ciphertext = excluded.ciphertext,
+                       nonce = excluded.nonce,
+                       auth_tag = excluded.auth_tag,
+                       encrypted_dek = excluded.encrypted_dek,
+                       updated_at = datetime('now')`,
+    ).run(
+      row.workspace_id,
+      row.user_id,
+      row.key,
+      row.ciphertext,
+      row.nonce,
+      row.auth_tag,
+      row.encrypted_dek,
+    );
+  },
+
+  deleteUserSecretRow(
+    workspace_id: string,
+    user_id: string,
+    key: string,
+  ): boolean {
+    const res = db
+      .prepare(
+        `DELETE FROM user_secrets
+          WHERE workspace_id = ?
+            AND user_id = ?
+            AND key = ?`,
+      )
+      .run(workspace_id, user_id, key);
+    return res.changes > 0;
+  },
+
+  setSecretPolicy(
+    app_id: string,
+    key: string,
+    policy: 'user_vault' | 'creator_override',
+  ): void {
+    db.prepare(
+      `INSERT INTO app_secret_policies (app_id, key, policy, updated_at)
+       VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT (app_id, key)
+         DO UPDATE SET policy = excluded.policy,
+                       updated_at = datetime('now')`,
+    ).run(app_id, key, policy);
+  },
+
+  upsertCreatorSecretRow(row: CreatorSecretCiphertextWriteInput): void {
+    db.prepare(
+      `INSERT INTO app_creator_secrets
+         (app_id, workspace_id, key, ciphertext, nonce, auth_tag, encrypted_dek, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT (app_id, key)
+         DO UPDATE SET workspace_id = excluded.workspace_id,
+                       ciphertext = excluded.ciphertext,
+                       nonce = excluded.nonce,
+                       auth_tag = excluded.auth_tag,
+                       encrypted_dek = excluded.encrypted_dek,
+                       updated_at = datetime('now')`,
+    ).run(
+      row.app_id,
+      row.workspace_id,
+      row.key,
+      row.ciphertext,
+      row.nonce,
+      row.auth_tag,
+      row.encrypted_dek,
+    );
+  },
+
+  listCreatorOverrideSecretRowsForRun(
+    app_id: string,
+    keys: string[],
+  ): CreatorSecretCiphertextRow[] {
+    if (keys.length === 0) return [];
+    const placeholders = keys.map(() => '?').join(', ');
+    return db
+      .prepare(
+        `SELECT s.app_id, s.workspace_id, s.key, s.ciphertext, s.nonce,
+                s.auth_tag, s.encrypted_dek, s.updated_at
+           FROM app_creator_secrets s
+           INNER JOIN app_secret_policies p
+             ON p.app_id = s.app_id
+            AND p.key = s.key
+            AND p.policy = 'creator_override'
+          WHERE s.app_id = ?
+            AND s.key IN (${placeholders})`,
+      )
+      .all(app_id, ...keys) as CreatorSecretCiphertextRow[];
   },
 };

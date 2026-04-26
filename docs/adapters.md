@@ -26,7 +26,7 @@ Zero behavior change under the default configuration. Every env var defaults to 
 | `FLOOM_RUNTIME`          | `docker`       | `docker`, `proxy` | `adapters/runtime-docker.ts`, `adapters/runtime-proxy.ts` |
 | `FLOOM_STORAGE`          | `sqlite`       | `sqlite`          | `adapters/storage-sqlite.ts`               |
 | `FLOOM_AUTH`             | `better-auth`  | `better-auth`     | `adapters/auth-better-auth.ts`             |
-| `FLOOM_SECRETS`          | `local`        | `local`           | `adapters/secrets-local.ts`                |
+| `FLOOM_SECRETS`          | `local`        | `local`           | `adapters/secrets-local.ts`; package option `@floomhq/secrets-gcp-kms` |
 | `FLOOM_OBSERVABILITY`    | `console`      | `console`         | `adapters/observability-console.ts`        |
 
 Values starting with `@` or containing `/` are treated as third-party module specifiers and loaded with dynamic `import()` at boot:
@@ -126,6 +126,19 @@ export default {
 };
 ```
 
+Adapters that need factory-provided dependencies can export `create` instead
+of a ready `adapter` object. Secrets adapters receive the selected
+`storage` adapter:
+
+```ts
+export default {
+  kind: 'secrets' as const,
+  name: 'gcp-kms',
+  protocolVersion: '^0.2',
+  create: ({ storage }) => createGcpKmsSecretsAdapter({ keyName, storage }),
+};
+```
+
 ### 3. Run the conformance tests locally
 
 The per-adapter contract suites live at `test/stress/test-adapters-<concern>-contract.mjs`. Use the runner from a Floom checkout so it selects your adapter through the same env var path the server uses:
@@ -176,7 +189,8 @@ When your adapter is ready:
 
 ### Known adapters
 
-The known-adapters list will live here once the first out-of-tree adapter ships. Empty today.
+- `@floomhq/storage-postgres`: first-party Postgres `StorageAdapter`.
+- `@floomhq/secrets-gcp-kms`: first-party GCP Cloud KMS `SecretsAdapter` using per-secret AES-256-GCM envelope encryption and KMS-wrapped DEKs.
 
 ## Current migration targets
 

@@ -191,6 +191,13 @@ interface SecretsAdapter {
 
 Adapters are free to use HashiCorp Vault, AWS Secrets Manager, GCP Secret Manager, Bitwarden, or env vars on a single-user box. Floom never reads the plaintext outside the moment of injection — that's what lets the store be fully opaque.
 
+Cloud-KMS adapters use envelope encryption: generate a random per-secret
+256-bit DEK locally, AES-GCM-encrypt the plaintext locally with that DEK,
+ask the cloud KMS to wrap only the DEK, then persist ciphertext + nonce +
+auth tag + wrapped DEK in the backing store. KMS never receives the secret
+plaintext; deleting the row deletes the only copy of the wrapped per-secret
+DEK.
+
 ---
 
 ## ObservabilityAdapter
@@ -375,6 +382,18 @@ export default {
   name: 'postgres', // short identifier, informational (used in logs)
   protocolVersion: '^0.2', // semver range of FLOOM_PROTOCOL_VERSION this adapter supports
   adapter: postgresStorageAdapter, // the instance conforming to the corresponding type
+};
+```
+
+Adapters that need the already-selected storage adapter can export `create`
+instead of `adapter`:
+
+```ts
+export default {
+  kind: 'secrets' as const,
+  name: 'gcp-kms',
+  protocolVersion: '^0.2',
+  create: ({ storage }) => createGcpKmsSecretsAdapter({ keyName, storage }),
 };
 ```
 

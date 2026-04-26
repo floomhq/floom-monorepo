@@ -61,6 +61,11 @@ interface AdapterModuleExport<T = unknown> {
   name?: unknown;
   protocolVersion?: unknown;
   adapter?: T;
+  create?: unknown;
+}
+
+interface AdapterCreateOptions {
+  storage?: StorageAdapter;
 }
 
 const EXPECTED_METHODS: Record<AdapterKind, readonly string[]> = {
@@ -193,8 +198,9 @@ function assertAdapterSurface(
   kind: AdapterKind,
   key: string,
   moduleExport: AdapterModuleExport,
+  adapterOverride?: unknown,
 ): void {
-  const adapter = moduleExport.adapter;
+  const adapter = adapterOverride ?? moduleExport.adapter;
   if (typeof adapter !== 'object' || adapter === null) {
     throw new Error(
       `[adapters] adapter '${adapterName(
@@ -222,6 +228,7 @@ function validateDynamicModule<T>(
   kind: AdapterKind,
   key: string,
   moduleExport: unknown,
+  createOptions: AdapterCreateOptions,
 ): T {
   if (typeof moduleExport !== 'object' || moduleExport === null) {
     throw new Error(
@@ -253,14 +260,28 @@ function validateDynamicModule<T>(
   }
 
   assertProtocolVersionCompatibility(kind, key, typed);
-  assertAdapterSurface(kind, key, typed);
-  return typed.adapter as T;
+  if (typed.adapter !== undefined) {
+    assertAdapterSurface(kind, key, typed);
+    return typed.adapter as T;
+  }
+  if (typeof typed.create === 'function') {
+    const adapter = typed.create(createOptions) as T;
+    assertAdapterSurface(kind, key, typed, adapter);
+    return adapter;
+  }
+  throw new Error(
+    `[adapters] adapter '${adapterName(
+      typed,
+      key,
+    )}' (kind=${kind}) is missing an adapter object or create function`,
+  );
 }
 
 async function importDynamicAdapter<T>(
   kind: AdapterKind,
   env: string,
   value: string,
+  createOptions: AdapterCreateOptions,
 ): Promise<T> {
   try {
     const imported = (await import(importTargetFor(value))) as {
@@ -273,7 +294,7 @@ async function importDynamicAdapter<T>(
         )} is missing a default export`,
       );
     }
-    return validateDynamicModule<T>(kind, value, imported.default);
+    return validateDynamicModule<T>(kind, value, imported.default, createOptions);
   } catch (e) {
     if (
       e instanceof Error &&
@@ -281,6 +302,7 @@ async function importDynamicAdapter<T>(
         e.message.includes('protocolVersion') ||
         e.message.includes('missing required methods') ||
         e.message.includes('missing an adapter object') ||
+        e.message.includes('missing an adapter object or create function') ||
         e.message.includes('missing a default export'))
     ) {
       throw e;
@@ -302,10 +324,11 @@ async function pick<T>(
   defaultKey: string,
   registry: Record<string, T>,
   moduleExports: Record<string, AdapterModuleExport | undefined>,
+  createOptions: AdapterCreateOptions = {},
 ): Promise<T> {
   const effective = value || defaultKey;
   if (isDynamicSpecifier(effective)) {
-    return importDynamicAdapter<T>(kind, env, effective);
+    return importDynamicAdapter<T>(kind, env, effective, createOptions);
   }
 
   const impl = registry[effective];
@@ -352,6 +375,7 @@ export async function createAdapters(): Promise<AdapterBundle> {
     'local',
     SECRETS_IMPLS,
     SECRETS_MODULE_EXPORTS,
+    { storage },
   );
   const observability = await pick(
     'observability',
