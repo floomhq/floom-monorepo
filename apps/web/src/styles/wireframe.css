@@ -3529,6 +3529,8 @@ input { font-family: inherit; }
   flex-shrink: 0;
 }
 
+/* Orphan from rebase union merge — duplicated installed-pill rules. Wrap in stub selector. */
+.me-apps-page .ma-card .pill.pill-accent.installed-pill-clone {
   font-size: 10.5px;
   font-weight: 600;
   color: var(--accent);
