@@ -2389,6 +2389,10 @@ input { font-family: inherit; }
 }
 .studio-page .pill:hover { border-color: var(--line-hover); color: var(--ink); }
 .studio-page .pill.pill-ink {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
 /* ── /studio/build v23 (PR-I) ───────────────────────────────
    10-state machine: paste / detecting / detected / running /
    previewed / publishing / done / conflict / private-repo /
@@ -2597,6 +2601,11 @@ input { font-family: inherit; }
   font-size: 14.5px;
   font-weight: 700;
   line-height: 1.3;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .build-stages .stage.done {
   background: var(--accent-soft);
   color: var(--accent);
@@ -3513,6 +3522,15 @@ input { font-family: inherit; }
   margin-top: auto;
 }
 .studio-page .templates-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 14px;
+  text-align: center;
+}
 .url-row button {
   background: var(--card);
   border: 1px solid var(--line);
