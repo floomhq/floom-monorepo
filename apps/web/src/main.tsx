@@ -35,7 +35,7 @@ const MeRunsPage = lazy(() => import('./pages/MeRunsPage').then(m => ({ default:
 const MeSecretsPage = lazy(() => import('./pages/MeSecretsPage').then(m => ({ default: m.MeSecretsPage })));
 const MeRunDetailPage = lazy(() => import('./pages/MeRunDetailPage').then(m => ({ default: m.MeRunDetailPage })));
 const MeSettingsPage = lazy(() => import('./pages/MeSettingsPage').then(m => ({ default: m.MeSettingsPage })));
-const MeSettingsTokensPage = lazy(() => import('./pages/MeSettingsTokensPage').then(m => ({ default: m.MeSettingsTokensPage })));
+const MeAgentKeysPage = lazy(() => import('./pages/MeAgentKeysPage').then(m => ({ default: m.MeAgentKeysPage })));
 // MeAppPage + MeAppSecretsPage still live on disk for shared component
 // exports (AppHeader, TabBar) used by the Studio pages; the routes that
 // mounted them directly now redirect into /studio/*.
@@ -270,15 +270,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         {/* /me/agent-keys — canonical location for "Agent tokens"
             (vocabulary lock per `keys-decision.md`: "API keys" is banned
             from user-visible copy on this surface, including the URL).
-            The underlying page component file rename
-            MeSettingsTokensPage.tsx → MeAgentKeysPage.tsx happens in PR-G
-            (keys impl); this PR-A only flips the route URL + adds the
-            back-compat redirect. Both routes serve the same page for 30
-            days; old URL is then deprecated.
+            File renamed MeSettingsTokensPage.tsx → MeAgentKeysPage.tsx
+            in PR-G (keys impl). Both old + new routes serve the same
+            page; old URL is deprecated.
             /me/api-keys redirects → /me/agent-keys.
             /me/settings/tokens redirects directly → /me/agent-keys (no
             double-hop) so existing docs/links land in one redirect. */}
-        <Route path="/me/agent-keys" element={<WaitlistGuard source="me"><MeSettingsTokensPage /></WaitlistGuard>} />
+        <Route path="/me/agent-keys" element={<WaitlistGuard source="me"><MeAgentKeysPage /></WaitlistGuard>} />
         <Route
           path="/me/api-keys"
           element={<Navigate to="/me/agent-keys" replace />}

@@ -2,7 +2,13 @@ import type { CSSProperties, ReactNode } from 'react';
 import { PageShell } from '../PageShell';
 import { useSession } from '../../hooks/useSession';
 
-export type MeTabId = 'overview' | 'apps' | 'runs' | 'secrets' | 'settings';
+export type MeTabId =
+  | 'overview'
+  | 'apps'
+  | 'runs'
+  | 'secrets'
+  | 'agent-keys'
+  | 'settings';
 
 interface MeLayoutProps {
   activeTab?: MeTabId;
@@ -22,6 +28,12 @@ interface MeLayoutProps {
    *            same visual rhythm as the wireframe.
    */
   headerVariant?: 'default' | 'inline' | 'none';
+  /**
+   * Per-page max-width override. Defaults to MeLayout's wider 1080
+   * shell. Keys pages (BYOK + Agent tokens) pin to 880 to match the v23
+   * wireframe — list-form layouts read better at narrower widths.
+   */
+  maxWidth?: number;
   children: ReactNode;
 }
 
@@ -150,6 +162,7 @@ export function MeLayout({
   subtitle,
   actions,
   headerVariant = 'default',
+  maxWidth,
   children,
 }: MeLayoutProps) {
   const { data: session } = useSession();
@@ -157,6 +170,9 @@ export function MeLayout({
   const greeting = deriveGreeting(session?.user);
   const resolvedEyebrow = eyebrow === undefined ? greeting.eyebrow : eyebrow;
   const resolvedHeading = heading || greeting.heading;
+  const shellStyle: CSSProperties = maxWidth
+    ? { ...s.shell, maxWidth }
+    : s.shell;
 
   return (
     <PageShell
@@ -166,7 +182,7 @@ export function MeLayout({
       allowSignedOutShell={allowSignedOutShell || signedOutPreview}
       noIndex
     >
-      <div data-testid="me-layout" style={s.shell}>
+      <div data-testid="me-layout" style={shellStyle}>
         {headerVariant === 'none' ? null : headerVariant === 'inline' ? (
           <header style={s.inlineHeader}>
             <h1 data-testid="me-greeting-name" style={s.inlineHeading}>
