@@ -35,6 +35,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { adapters } from '../adapters/index.js';
 import { db } from '../db.js';
 import { alertLaunchDemoInactive } from '../lib/alerts.js';
 import { newAppId, newSecretId } from '../lib/ids.js';
@@ -69,6 +70,9 @@ interface SeedLaunchDemosOptions {
   logger?: SeedLogger;
   repoRoot?: string | null;
 }
+
+type AppCreateInput = Parameters<typeof adapters.storage.createApp>[0];
+type AppPatch = Parameters<typeof adapters.storage.updateApp>[1];
 
 interface LaunchDemo {
   slug: string;
@@ -484,13 +488,9 @@ export async function resolveDemoImageTag(opts: {
 // guard below makes it a no-op. Network post is best-effort inside
 // alertLaunchDemoInactive; a webhook outage never blocks seeding.
 function markLaunchDemoInactive(slug: string, detail: string): void {
-  const row = db
-    .prepare('SELECT id, status FROM apps WHERE slug = ?')
-    .get(slug) as { id: string; status: string } | undefined;
+  const row = adapters.storage.getApp(slug) as { id: string; status: string } | undefined;
   if (!row || row.status === 'inactive') return;
-  db.prepare(
-    "UPDATE apps SET status = 'inactive', updated_at = datetime('now') WHERE id = ?",
-  ).run(row.id);
+  adapters.storage.updateApp(slug, { status: 'inactive' } as unknown as AppPatch);
   console.warn(`[launch-demos] ${slug}: marking inactive (${detail})`);
   alertLaunchDemoInactive(slug, detail);
 }
@@ -537,9 +537,6 @@ export async function seedLaunchDemos(
     return { apps_added: 0, apps_existing: 0, apps_failed: 0 };
   }
 
-  const existsBySlug = db.prepare(
-    'SELECT id, status, docker_image FROM apps WHERE slug = ?',
-  );
   // Launch-demo apps are first-party showcases — always 'published'. User
   // ingestion paths (openapi-ingest / docker-image-ingest) go through the
   // manual review gate (publish_status='pending_review' by default).
@@ -558,34 +555,11 @@ export async function seedLaunchDemos(
   // then tried to POST HTTP to the dead proxied URL instead of running
   // the Docker image, and /api/hub filtered the private row out. Force
   // the showcase shape on every seed so stale rows heal themselves.
-  const insertApp = db.prepare(
-    `INSERT INTO apps (id, slug, name, description, manifest, status, docker_image, code_path, category, author, icon, publish_status, hero, app_type, visibility, base_url)
-     VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, 'published', 1, 'docker', 'public', NULL)`,
-  );
-  const updateApp = db.prepare(
-    `UPDATE apps
-       SET name = ?,
-           description = ?,
-           manifest = ?,
-           status = 'active',
-           docker_image = ?,
-           code_path = ?,
-           category = ?,
-           author = ?,
-           icon = ?,
-           hero = 1,
-           app_type = 'docker',
-           visibility = 'public',
-           base_url = NULL,
-           updated_at = datetime('now')
-     WHERE id = ?`,
-  );
-  const markAppActive = db.prepare(
-    `UPDATE apps
-       SET status = 'active',
-           updated_at = datetime('now')
-     WHERE id = ?`,
-  );
+  const launchDemoForcedShape = {
+    app_type: 'docker',
+    visibility: 'public',
+    base_url: null,
+  } as const;
 
   let added = 0;
   let existing = 0;
@@ -603,15 +577,12 @@ export async function seedLaunchDemos(
     'competitor-analyzer',
     'resume-screener',
   ];
-  const markPreviousInactive = db.prepare(
-    `UPDATE apps
-       SET status = 'inactive',
-           updated_at = datetime('now')
-     WHERE slug = ? AND status != 'inactive'`,
-  );
   for (const oldSlug of PREVIOUS_SHOWCASE_SLUGS) {
-    const info = markPreviousInactive.run(oldSlug) as { changes: number };
-    if (info.changes > 0) {
+    const row = adapters.storage.getApp(oldSlug) as
+      | { id: string; status: string }
+      | undefined;
+    if (row && row.status !== 'inactive') {
+      adapters.storage.updateApp(oldSlug, { status: 'inactive' } as unknown as AppPatch);
       logger.log(
         `[launch-demos] ${oldSlug}: marked inactive (2026-04-25 roster swap)`,
       );
@@ -634,7 +605,7 @@ export async function seedLaunchDemos(
 
     // Insert the DB row if missing. Existing launch demos are refreshed in
     // place so preview picks up current manifests + image tags after deploy.
-    const row = existsBySlug.get(demo.slug) as
+    const row = adapters.storage.getApp(demo.slug) as
       | { id: string; status: string; docker_image: string | null }
       | undefined;
     const resolvedImage = await resolveDemoImageTag({
@@ -646,7 +617,11 @@ export async function seedLaunchDemos(
     });
     if (resolvedImage.kind === 'keep_previous') {
       if (row) {
-        markAppActive.run(row.id);
+        adapters.storage.updateApp(demo.slug, {
+          status: 'active',
+          hero: 1,
+          ...launchDemoForcedShape,
+        } as AppPatch);
         keptPrevious++;
         existing++;
         logger.warn(
@@ -683,17 +658,19 @@ export async function seedLaunchDemos(
     const codePath = `reused:launch-demo:${demo.slug}:${imageTag.split(':')[1]}`;
     const manifestJson = JSON.stringify(demo.manifest);
     if (row) {
-      updateApp.run(
-        demo.name,
-        demo.description,
-        manifestJson,
-        imageTag,
-        codePath,
-        demo.category,
-        demo.author,
-        demo.icon,
-        row.id,
-      );
+      adapters.storage.updateApp(demo.slug, {
+        name: demo.name,
+        description: demo.description,
+        manifest: manifestJson,
+        status: 'active',
+        docker_image: imageTag,
+        code_path: codePath,
+        category: demo.category,
+        author: demo.author,
+        icon: demo.icon,
+        hero: 1,
+        ...launchDemoForcedShape,
+      } as AppPatch);
       if (row.docker_image !== imageTag) {
         logger.log(
           `[launch-demos] ${demo.slug}: refreshed existing app to ${imageTag}`,
@@ -707,18 +684,22 @@ export async function seedLaunchDemos(
       continue;
     }
     const appId = newAppId();
-    insertApp.run(
-      appId,
-      demo.slug,
-      demo.name,
-      demo.description,
-      manifestJson,
-      imageTag,
-      codePath,
-      demo.category,
-      demo.author,
-      demo.icon,
-    );
+    adapters.storage.createApp({
+      id: appId,
+      slug: demo.slug,
+      name: demo.name,
+      description: demo.description,
+      manifest: manifestJson,
+      status: 'active',
+      docker_image: imageTag,
+      code_path: codePath,
+      category: demo.category,
+      author: demo.author,
+      icon: demo.icon,
+      publish_status: 'published',
+      hero: 1,
+      ...launchDemoForcedShape,
+    } as AppCreateInput);
     added++;
     logger.log(`[launch-demos] ${demo.slug}: inserted (app_id=${appId})`);
   }

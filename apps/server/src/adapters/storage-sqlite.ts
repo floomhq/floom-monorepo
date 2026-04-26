@@ -21,26 +21,6 @@
 // delete the duplicated SQL in routes and leave this wrapper as the
 // single source of truth.
 //
-// -------------------------------------------------------------------------
-// DRIFT WARNING: SQL duplicated between this wrapper and the original call
-// sites. Until the follow-on migration lands, schema changes MUST be
-// reflected in both places or the wrapper will silently diverge from what
-// routes actually execute. Greppable list of current duplicate sites:
-//   - apps/server/src/services/launch-demos.ts          (INSERT/UPDATE apps with
-//     forced app_type='docker' + visibility='public' + base_url=NULL — see
-//     production-incident comment in that file. Migration deferred until
-//     the wrapper supports field-forcing parameters.)
-// Migrated to adapters.storage.* (no longer duplicating this wrapper):
-//   - apps/server/src/services/seed.ts
-//   - apps/server/src/services/openapi-ingest.ts  (ingestOpenApiApps
-//     formerly :1612 INSERT/UPDATE apps; ingestAppFromSpec formerly
-//     :2397 INSERT + paired UPDATE apps)
-//   - apps/server/src/services/docker-image-ingest.ts  (formerly :482
-//     INSERT + paired UPDATE apps)
-//   - apps/server/src/lib/better-auth.ts     (formerly :434 INSERT/UPDATE users)
-//   - apps/server/src/services/session.ts    (formerly :174 INSERT/UPDATE users)
-// -------------------------------------------------------------------------
-
 import { db } from '../db.js';
 import {
   createJob as jobsCreateJob,
