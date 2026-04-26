@@ -373,6 +373,131 @@ The decisions above incorporate corrections from a codex consult (gpt-5.5) that 
 
 ---
 
+## ADR-020 — Comprehensive backend testing is a hard merge gate
+
+**Date locked:** 2026-04-26
+**Decision:** Every backend PR (any change to `apps/server/src/`) MUST include comprehensive tests covering happy paths + unhappy paths + edge cases. Codex review verifies. PR is FAIL-gated until tests are comprehensive.
+
+**Why:** Federico's bar: "EVERYTHING tested. Cases. Happy and unhappy paths. Edge cases." Silent breakage is the worst kind of regression.
+
+### What "comprehensive" means
+
+For every endpoint or public function added/modified:
+
+**Happy paths** (3+ tests typical): standard success for every input variant; multi-step flows; idempotent re-runs return same result.
+
+**Unhappy paths** (10+ tests typical):
+- Auth missing → 401 / wrong/expired/revoked → 401 / wrong scope → 403
+- Resource not found → 404
+- Each required input missing or wrong type → 400 with clear validation
+- Body too large → 413
+- Rate limit exceeded → 429 with Retry-After
+- Method not allowed → 405
+- Conflict (duplicate slug, illegal state transition) → 409
+
+**Edge cases** (5+ tests typical):
+- Empty / single-char / unicode-emoji / very-long (10K+) / SQL-injection-style / path-traversal inputs
+- Null/undefined where required
+- Concurrent requests (race conditions)
+- Time/numeric boundaries
+
+**Concurrency / state** (3+ tests for stateful endpoints):
+- Two concurrent writes — both succeed without collision OR enforced state machine wins
+- Cleanup sweepers running while user is active — no data corruption
+- Token boundary conditions (just-expired, just-issued, near-revoke)
+
+**Hard rule:** No PR merges until codex review confirms tests cover all four categories for every changed surface.
+
+**Implementation track:** Comprehensive test coverage audit + gap fills shipped via PR `codex/comprehensive-test-coverage` (audit doc + new test files). After that PR lands, every future backend PR follows this policy.
+
+---
+
+## ADR-021 — Full launch readiness checklist
+
+**Date locked:** 2026-04-26
+**Decision:** Backend is "launch-ready" when ALL six gates below pass. Every gate is checkable; no subjective sign-off.
+
+### Gate 1 — All architectural decisions implemented (not just locked)
+
+| ADR | Implementation status required |
+|---|---|
+| ADR-008 sharing | 4-tier visibility + state machine + invites + review queue (PR #790, in flight) |
+| ADR-009 agents-native | Phase 2A token primitive (#786, merged) + Phase 2B MCP read/run (#789, in flight) |
+| ADR-010 email | Resend wired + production hard-fail on missing key (in flight) |
+| ADR-011 retention | Per-app `max_run_retention_days` + user delete + sweeper (in flight) |
+| ADR-012 account deletion | Soft-delete tombstone + 30d undo + cascade (queued post-#790) |
+| ADR-013 audit log | Audit table + writes from every state-change endpoint (queued post-#790) |
+| ADR-014 DDoS | Rate limits per IP + user + token (#783 + #786 merged) |
+| ADR-015 GitHub deploy | Public-repos paste-URL flow + webhook (in flight) |
+| ADR-016 trust+safety | Outbound network deny default + floom.yaml allowlist (in flight) |
+
+### Gate 2 — Comprehensive testing (per ADR-020)
+
+- Every changed backend file has happy + unhappy + edge tests
+- Total test count ≥ 500 across `test/stress/*.mjs`
+- Full regression run: green
+- No flaky tests (deterministic over 5 consecutive full runs)
+
+### Gate 3 — Operational readiness
+
+- Backups working: PR #785 merged + DSN env vars set + verified end-to-end (test backup + test restore once)
+- Observability: PR #787 merged + Sentry DSN env vars in prod + first error captured in Sentry dashboard
+- Discord webhook alerts firing on real errors (already shipped)
+- `/api/health` returns 200 + meaningful liveness signal
+- Post-deploy smoke gate (PR #782) firing on every deploy
+
+### Gate 4 — Documentation complete
+
+- `docs/ARCHITECTURE-DECISIONS.md` (this file, current)
+- `docs/testing/coverage-policy.md` (ADR-020 spec)
+- `docs/security/network-policy.md` (ADR-016)
+- `docs/ops/db-backup.md` (PR #785)
+- `docs/ops/sentry.md` (PR #787)
+- `docs/agents/quickstart.md` + `docs/agents/mcp-tools.md`
+- `docs/sharing.md` + `docs/admin/review-queue.md`
+
+### Gate 5 — Security
+
+- All launch-week security issues closed (#767, #765, #380, #691, #779, #781, #783, #786 — done)
+- No new security issues opened during the launch sprint
+- Trust+safety policy live (ADR-016)
+- Account deletion flow verified end-to-end (ADR-012)
+
+### Gate 6 — Performance baseline
+
+- Cold-start on prod: < 3s
+- Sync run latency: < 5min hard timeout (ADR-004)
+- DB query timing: no N+1 on hot paths (verify via slow-query log)
+
+**When all 6 gates pass, backend is launch-ready. Until then, NOT launch-ready, no excuses.**
+
+---
+
+## ADR-022 — No UI code changes until v19 is locked + Federico-approved
+
+**Date locked:** 2026-04-26
+**Decision:** Zero changes to `apps/web/` source code until v19 wireframes are:
+1. Drafted by the v19 agent
+2. Codex-consult-reviewed (adversarial pass)
+3. Federico-spot-checked + signed off
+4. Locked as the final design source of truth
+
+**Why:** Federico's exact words: "v19 to be perfect before we do UI changes." UI code based on half-baked spec creates rework loops. Lock the design first, build once.
+
+**Concretely until v19 lock:**
+- v19 wireframes in flight (Claude sonnet agent at `/var/www/wireframes-floom/v19/`)
+- After agent returns: codex consult adversarial review against ADRs + saaspo bar + anti-patterns
+- Codex flags → v19 v2 patches
+- Federico spot-checks 5 priority pages in browser
+- When Federico says "ship this design", UI code unfreezes
+- Shadcn migration (ADR-017) happens AFTER UI unfreeze, in v1.1 sequence
+
+**Hard rule:** No exceptions. Bugfixes to UI wait until v19 lock UNLESS they're scoped to non-visual changes (a11y fix that doesn't touch layout, console-warning silencing, dependency upgrade with no visual impact).
+
+**Single exception class:** Critical security fixes that happen to live in UI code (e.g., XSS in a render path) — fix immediately, design can catch up.
+
+---
+
 ## How to add a new ADR
 
 1. Append to bottom (don't insert mid-doc).
