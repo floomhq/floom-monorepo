@@ -150,7 +150,14 @@ export function validateNetworkPolicy(raw: unknown, field = 'network'): NetworkP
   return { allowed_domains: normalized };
 }
 
-export function getEffectiveAllowedDomains(manifest: NormalizedManifest): string[] {
+export function getEffectiveAllowedDomains(manifest: NormalizedManifest | undefined | null): string[] {
+  // Defensive guard: callers like runAppContainer in some test paths
+  // (test-file-inputs-docker.mjs) invoke without a manifest. Treat
+  // missing-manifest as legacy default — same behavior as legacy apps
+  // that pre-date the network.allowed_domains field.
+  if (!manifest) {
+    return [...LEGACY_DEFAULT_ALLOWED_DOMAINS];
+  }
   if (manifest.network && Array.isArray(manifest.network.allowed_domains)) {
     return manifest.network.allowed_domains;
   }
