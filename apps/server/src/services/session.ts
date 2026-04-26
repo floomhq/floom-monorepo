@@ -19,6 +19,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Context } from 'hono';
 import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
+import { adapters } from '../adapters/index.js';
 import { getAuth, isCloudMode } from '../lib/better-auth.js';
 import type { RekeyResult, SessionContext } from '../types.js';
 import {
@@ -167,22 +168,19 @@ export async function resolveUserContext(c: Context): Promise<SessionContext> {
   }
 
   // Mirror the Better Auth user into Floom's users table on first sight.
-  // Idempotent — uses ON CONFLICT to keep the auth_provider/auth_subject
-  // columns coherent on subsequent calls.
+  // Idempotent: inserts auth_provider/auth_subject on first sight, then
+  // refreshes profile fields on subsequent calls.
   const userId = session.user.id;
-  db.prepare(
-    `INSERT INTO users (id, email, name, image, auth_provider, auth_subject)
-     VALUES (?, ?, ?, ?, 'better-auth', ?)
-     ON CONFLICT (id) DO UPDATE SET
-       email = excluded.email,
-       name = excluded.name,
-       image = excluded.image`,
-  ).run(
-    userId,
-    session.user.email,
-    session.user.name || null,
-    session.user.image || null,
-    userId,
+  adapters.storage.upsertUser(
+    {
+      id: userId,
+      email: session.user.email,
+      name: session.user.name || null,
+      image: session.user.image || null,
+      auth_provider: 'better-auth',
+      auth_subject: userId,
+    },
+    ['email', 'name', 'image'],
   );
 
   // Resolve the active workspace. If the user has none yet (brand-new

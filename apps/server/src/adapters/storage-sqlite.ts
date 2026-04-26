@@ -30,8 +30,6 @@
 //     forced app_type='docker' + visibility='public' + base_url=NULL — see
 //     production-incident comment in that file. Migration deferred until
 //     the wrapper supports field-forcing parameters.)
-//   - apps/server/src/lib/better-auth.ts:434            (INSERT/UPDATE users)
-//   - apps/server/src/services/session.ts:174           (INSERT/UPDATE users)
 // Migrated to adapters.storage.* (no longer duplicating this wrapper):
 //   - apps/server/src/services/seed.ts
 //   - apps/server/src/services/openapi-ingest.ts  (ingestOpenApiApps
@@ -39,6 +37,8 @@
 //     :2397 INSERT + paired UPDATE apps)
 //   - apps/server/src/services/docker-image-ingest.ts  (formerly :482
 //     INSERT + paired UPDATE apps)
+//   - apps/server/src/lib/better-auth.ts     (formerly :434 INSERT/UPDATE users)
+//   - apps/server/src/services/session.ts    (formerly :174 INSERT/UPDATE users)
 // -------------------------------------------------------------------------
 
 import { db } from '../db.js';

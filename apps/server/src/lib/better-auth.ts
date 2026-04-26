@@ -28,6 +28,7 @@ import { getMigrations } from 'better-auth/db/migration';
 import { organization } from 'better-auth/plugins';
 import { apiKey } from '@better-auth/api-key';
 import { db } from '../db.js';
+import type { UserWriteColumn, UserWriteInput } from '../adapters/types.js';
 import { cleanupUserOrphans } from '../services/cleanup.js';
 import {
   renderResetPasswordEmail,
@@ -75,6 +76,14 @@ export interface FloomAuth {
 type UserDeleteListener = (user_id: string) => void | Promise<void>;
 
 const userDeleteListeners: UserDeleteListener[] = [];
+
+async function upsertFloomUser(
+  input: UserWriteInput,
+  updateColumns: UserWriteColumn[],
+): Promise<void> {
+  const { adapters } = await import('../adapters/index.js');
+  adapters.storage.upsertUser(input, updateColumns);
+}
 
 export function registerAuthUserDeleteListener(cb: UserDeleteListener): void {
   userDeleteListeners.push(cb);
@@ -472,13 +481,16 @@ function buildAuthOptions(_overrideBaseURL?: string): any {
             try {
               // Priority 1: Mirror user into Floom's users table.
               // auth_provider 'better-auth' identifies these as cloud-managed accounts.
-              db.prepare(
-                `INSERT INTO users (id, email, name, auth_provider, auth_subject)
-                 VALUES (?, ?, ?, 'better-auth', ?)
-                 ON CONFLICT (id) DO UPDATE SET
-                   email = excluded.email,
-                   name = excluded.name`,
-              ).run(user.id, user.email, user.name || null, user.id);
+              await upsertFloomUser(
+                {
+                  id: user.id,
+                  email: user.email,
+                  name: user.name || null,
+                  auth_provider: 'better-auth',
+                  auth_subject: user.id,
+                },
+                ['email', 'name'],
+              );
 
               // Priority 2: Provision the personal workspace.
               // provisionPersonalWorkspace is idempotent: if the user somehow
