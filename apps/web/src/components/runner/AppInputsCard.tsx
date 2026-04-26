@@ -1,8 +1,6 @@
-import type { ActionSpec, InputSpec, PickResult } from '../../lib/types';
-import { credentialInputNameLooksSensitive } from '../../lib/credential-field';
+import type { ActionSpec, PickResult } from '../../lib/types';
 import { AppIcon } from '../AppIcon';
 import { DescriptionMarkdown } from '../DescriptionMarkdown';
-import { SecretInput } from '../forms/SecretInput';
 
 import { InputField } from './InputField';
 
