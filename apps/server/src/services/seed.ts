@@ -139,8 +139,8 @@ export async function seedFromFile(): Promise<{
   // ON CONFLICT refreshes seed-owned fields only; we do not overwrite
   // publish_status, stars, featured, hero, etc.
   const upsertApp = db.prepare(
-    `INSERT INTO apps (id, slug, name, description, manifest, status, docker_image, code_path, category, author, icon, publish_status)
-     VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, 'published')
+    `INSERT INTO apps (id, slug, name, description, manifest, status, docker_image, code_path, category, author, icon, visibility, publish_status)
+     VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, 'public_live', 'published')
      ON CONFLICT(slug) DO UPDATE SET
        name = excluded.name,
        description = excluded.description,
