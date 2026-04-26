@@ -32,6 +32,12 @@ const INPUT_TYPES: InputType[] = [
   'boolean',
   'date',
   'file',
+  'file/csv',
+  'file/image',
+  'file/pdf',
+  'file/audio',
+  'array',
+  'object',
 ];
 
 const OUTPUT_TYPES: OutputType[] = [

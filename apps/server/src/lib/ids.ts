@@ -13,6 +13,7 @@ export const newSecretId = makeId('sec');
 export const newThreadId = makeId('thr');
 export const newTurnId = makeId('trn');
 export const newJobId = makeId('job');
+export const newBuildId = makeId('bld');
 export const newConnectionId = makeId('con');
 export const newAppInviteId = makeId('ainv');
 export const newVisibilityAuditId = makeId('vaud');
