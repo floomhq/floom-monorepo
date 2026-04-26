@@ -35,6 +35,7 @@ import { ogRouter } from './routes/og.js';
 import { ghStarsRouter } from './routes/gh-stars.js';
 import { skillRouter } from './routes/skill.js';
 import { studioBuildRouter } from './routes/studio-build.js';
+import { createEmbedRouter } from './routes/embed.js';
 import { db } from './db.js';
 import { SERVER_VERSION } from './lib/server-version.js';
 import { captureServerError } from './lib/sentry.js';
@@ -1434,6 +1435,10 @@ if (webDist) {
       },
     });
   });
+
+  app.route('/embed', createEmbedRouter({
+    getIndexHtml: () => getIndexHtmlForDeployFlag(true),
+  }));
 
   app.use('/*', async (c, next) => {
     const url = new URL(c.req.url);

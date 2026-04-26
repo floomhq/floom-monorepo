@@ -100,15 +100,12 @@ async function anonFlow() {
   log('/og/<slug>.svg returns 200', res.status === 200);
   log('/og/<slug>.svg is svg', res.headers.get('content-type')?.includes('svg'));
 
-  // Embed surface — KNOWN GAP: /embed/<slug> route not implemented server-side.
-  // Per docs/BACKEND-LAUNCH-READINESS.md gap #2, this is a v1.1 deliverable.
-  // Don't fail the smoke on it; surface it as an info-level note.
   res = await fetchWithTimeout(`${BASE}/embed/competitor-lens`);
-  if (res.status === 404) {
-    console.log('  info  /embed/<slug> returns 404 (known gap, v1.1 deliverable)');
-  } else {
-    log('/embed/<slug> returns 200', res.status === 200);
-  }
+  log('/embed/<slug> returns 200', res.status === 200);
+  log(
+    '/embed/<slug> allows framing',
+    res.headers.get('content-security-policy')?.includes('frame-ancestors *'),
+  );
 }
 
 // =============== ANON RUN FLOW ===============

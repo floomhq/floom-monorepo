@@ -93,6 +93,7 @@ import { IconSprite } from './components/IconSprite';
 import { CookieBanner } from './components/CookieBanner';
 import { RouteLoading } from './components/RouteLoading';
 import { WaitlistGuard } from './components/WaitlistGuard';
+import { EmbedShell } from './components/EmbedShell';
 import { primeSession, refreshSession } from './hooks/useSession';
 import { initPostHog, identifyFromSession, track } from './lib/posthog';
 import { BrowserSentryErrorBoundary, initBrowserSentry } from './lib/sentry';
@@ -196,7 +197,34 @@ function RouteChangeTracker() {
   return null;
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const isEmbedMode =
+  typeof document !== 'undefined' &&
+  (document.body.dataset.embed === '1' || window.location.pathname.startsWith('/embed/'));
+
+function EmbedApp() {
+  return (
+    <React.StrictMode>
+      <BrowserSentryErrorBoundary fallback={<RouteLoading variant="full" />}>
+        <IconSprite />
+        <BrowserRouter>
+          <RouteChangeTracker />
+          <EmbedShell>
+            <Suspense fallback={<RouteLoading variant="full" />}>
+              <Routes>
+                <Route path="/embed/:slug" element={<AppPermalinkPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+          </EmbedShell>
+        </BrowserRouter>
+      </BrowserSentryErrorBoundary>
+    </React.StrictMode>
+  );
+}
+
+function App() {
+  if (isEmbedMode) return <EmbedApp />;
+  return (
   <React.StrictMode>
     <BrowserSentryErrorBoundary fallback={<RouteLoading variant="full" />}>
       <IconSprite />
@@ -395,5 +423,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <CookieBanner />
       </BrowserRouter>
     </BrowserSentryErrorBoundary>
-  </React.StrictMode>,
-);
+  </React.StrictMode>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
