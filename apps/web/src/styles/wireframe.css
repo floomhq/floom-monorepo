@@ -2444,6 +2444,7 @@ input { font-family: inherit; }
   position: relative;
   background: linear-gradient(135deg, var(--bg) 0%, var(--studio) 100%);
   border-bottom: 1px solid var(--line);
+}
 /* ── /me/apps (v23 PR-J — installed apps) ───────────────────
    Editorial staggered grid with hero card + compact tiles. All
    styles scoped to `.me-apps-page` so they don't bleed into other
@@ -2608,6 +2609,7 @@ input { font-family: inherit; }
   overflow: hidden;
 }
 .studio-page .apps-grid .app .thumb .cat-badge {
+}
 .me-apps-page .ma-card-hero .thumb.app-banner {
   height: 240px;
 }
