@@ -37,8 +37,17 @@ import {
   checkAppVisibility,
 } from '../lib/auth.js';
 import { checkMcpIngestLimit, extractIp } from '../lib/rate-limit.js';
+import { runGate } from '../lib/run-gate.js';
 import { filterTestFixtures } from '../lib/hub-filter.js';
 import { recordMcpToolCall } from '../lib/metrics-counters.js';
+import {
+  agentToolErrorBody,
+  discoverApps,
+  getAgentRun,
+  getAppSkill,
+  listMyRuns,
+  runApp,
+} from '../services/agent_read_tools.js';
 import type {
   ActionSpec,
   AppRecord,
@@ -174,6 +183,7 @@ function buildZodSchema(
 }
 
 function createPerAppMcpServer(
+  c: Context,
   app: AppRecord,
   ctx?: SessionContext,
 ): McpServer {
@@ -219,6 +229,20 @@ function createPerAppMcpServer(
             isError: true,
             content: [{ type: 'text' as const, text: `App is ${fresh.status}, cannot run` }],
           };
+        }
+        if (ctx) {
+          const gate = runGate(c, ctx, { slug: fresh.slug });
+          if (!gate.ok) {
+            return {
+              isError: true,
+              content: [
+                {
+                  type: 'text' as const,
+                  text: JSON.stringify({ ...gate.body, status: gate.status }, null, 2),
+                },
+              ],
+            };
+          }
         }
 
         // Extract the Floom MCP _auth extension from the raw inputs before
@@ -1008,6 +1032,148 @@ function createSearchMcpServer(baseUrl: string): McpServer {
   return server;
 }
 
+function mcpJson(payload: unknown) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+  };
+}
+
+function mcpError(err: unknown) {
+  const { status, body } = agentToolErrorBody(err);
+  return {
+    isError: true,
+    content: [
+      {
+        type: 'text' as const,
+        text: JSON.stringify({ ...body, status }, null, 2),
+      },
+    ],
+  };
+}
+
+function createAgentReadMcpServer(c: Context, ctx: SessionContext): McpServer {
+  const server = new McpServer({
+    name: 'floom-agent-read',
+    version: '0.5.0',
+  });
+
+  server.registerTool(
+    'discover_apps',
+    {
+      title: 'Discover Floom apps',
+      description:
+        'List apps this agent token can discover. Returns public live apps plus apps owned by the token user.',
+      inputSchema: {
+        category: z.string().max(48).optional(),
+        q: z.string().max(120).optional(),
+        limit: z.number().int().min(1).max(200).optional(),
+        cursor: z.string().optional(),
+      },
+    },
+    async ({ category, q, limit, cursor }) => {
+      recordMcpToolCall('discover_apps');
+      try {
+        return mcpJson(discoverApps(c, ctx, { category, q, limit, cursor }));
+      } catch (err) {
+        return mcpError(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_app_skill',
+    {
+      title: 'Get app skill',
+      description:
+        'Return the markdown skill text for one accessible app, wrapped in an MCP tool result.',
+      inputSchema: {
+        slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+      },
+    },
+    async ({ slug }) => {
+      recordMcpToolCall('get_app_skill');
+      try {
+        return mcpJson(getAppSkill(c, ctx, slug));
+      } catch (err) {
+        return mcpError(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    'run_app',
+    {
+      title: 'Run app',
+      description:
+        'Run a Floom app through the same runner path as POST /api/run. read tokens can run public live apps; read-write tokens can also run owned private apps.',
+      inputSchema: {
+        slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        action: z.string().min(1).max(120).optional(),
+        inputs: z.record(z.unknown()).optional(),
+      },
+    },
+    async ({ slug, action, inputs }) => {
+      recordMcpToolCall('run_app');
+      try {
+        return mcpJson(
+          await runApp(c, ctx, {
+            slug,
+            action,
+            inputs: inputs as Record<string, unknown> | undefined,
+          }),
+        );
+      } catch (err) {
+        return mcpError(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_run',
+    {
+      title: 'Get run',
+      description:
+        'Fetch a previous run by id when this token user owns it, or when the run has been explicitly shared from a public live app.',
+      inputSchema: {
+        run_id: z.string().min(1).max(128),
+      },
+    },
+    async ({ run_id }) => {
+      recordMcpToolCall('get_run');
+      try {
+        return mcpJson(getAgentRun(ctx, run_id));
+      } catch (err) {
+        return mcpError(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    'list_my_runs',
+    {
+      title: 'List my runs',
+      description:
+        'Paginated run history for runs performed by this token user.',
+      inputSchema: {
+        slug: z.string().min(1).max(48).optional(),
+        limit: z.number().int().min(1).max(200).optional(),
+        cursor: z.string().optional(),
+        since_ts: z.string().optional(),
+      },
+    },
+    async ({ slug, limit, cursor, since_ts }) => {
+      recordMcpToolCall('list_my_runs');
+      try {
+        return mcpJson(listMyRuns(ctx, { slug, limit, cursor, since_ts }));
+      } catch (err) {
+        return mcpError(err);
+      }
+    },
+  );
+
+  return server;
+}
+
 async function handleMcp(server: McpServer, rawRequest: Request): Promise<Response> {
   const transport = new WebStandardStreamableHTTPServerTransport({
     enableJsonResponse: true,
@@ -1021,6 +1187,9 @@ async function handleMcp(server: McpServer, rawRequest: Request): Promise<Respon
 // per-app handler as the empty slug "".
 mcpRouter.all('/', async (c: Context) => {
   const ctx = await resolveUserContext(c);
+  if (ctx.agent_token_id) {
+    return handleMcp(createAgentReadMcpServer(c, ctx), c.req.raw);
+  }
   const ip = extractIp(c);
   const baseUrl = getPublicBaseUrl(c);
   const server = createAdminMcpServer({ ctx, ip, baseUrl });
@@ -1063,6 +1232,6 @@ mcpRouter.all('/app/:slug', async (c) => {
   // Reuse the ctx we already resolved for the visibility check. The MCP
   // tool handler forwards it to dispatchRun so per-user vault secrets
   // reach the runner, matching POST /api/run + POST /api/:slug/run.
-  const server = createPerAppMcpServer(row, ctx);
+  const server = createPerAppMcpServer(c, row, ctx);
   return handleMcp(server, c.req.raw);
 });
