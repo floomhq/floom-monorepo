@@ -304,6 +304,75 @@ The decisions above incorporate corrections from a codex consult (gpt-5.5) that 
 
 ---
 
+## ADR-017 — Shadcn UI adoption (post-launch v1.1, prep tooling now)
+
+**Date locked:** 2026-04-26
+**Decision:**
+- ADOPT Shadcn for commodity UI primitives: Dialog, Tabs, Dropdown, Command palette (cmdk), Toast (sonner), Popover, Sheet (vaul), Select, Switch / Checkbox / Radio.
+- KEEP custom for Floom-voice surfaces: HeroDemo (3-state morphing canvas), output renderer cascade (#768), hero metric tile (`/me`, `/studio`, `/studio/:slug`), app cards (showcase + dashboard), sharing visibility ladder (4-tier + 6 states), agent-tokens display, studio rail (sidebar with workspace switcher).
+- TIMING: post-launch (v1.1), NOT in the launch sprint. v1 ships on current custom code.
+
+**Why post-launch (Option A from codex consult):**
+- Migration surface is bigger than headline: 11 dialog-like surfaces (not 3), 8 tablist surfaces, **2,519 inline-style hits** across `apps/web/src/`.
+- `apps/web/src/styles/wireframe.css` is load-bearing global CSS that owns "every component" — fights Shadcn's token shape if not migrated together.
+- Tuesday 2026-04-28 launch is in <2 days. Migration risk beats engineering neatness.
+- Bundle delta estimate (codex): +25-45 KB gzip if careful, +50-75 KB if shared barrel.
+- Saaspo bar (Federico's anchor) is visual polish + curation, not just primitives.
+
+**Hard rule: theme aggressively or it'll scream "AI-template SaaS".** Override every Shadcn default with Floom's `wireframe.css` tokens (`--bg`, `--card`, `--ink`, `--muted`, `--line`, `--accent`, Inter heavy 800 with tight tracking, hairline shadow `0 1px 0 rgba(17,24,39,0.02)`, radius scale 16/20px). Strip all `shadow-sm` + slate/zinc defaults.
+
+**Tooling shipped tonight (prep for v1.1):**
+- Shadcn MCP server connected to Claude Code: `shadcn: npx shadcn@latest mcp`
+- `/shadcn` skill at `~/.claude/skills/shadcn/SKILL.md` — Floom-themed scaffolding workflow + Shadcn-vs-custom decision rules
+- `/saaspo` skill at `~/.claude/skills/saaspo/SKILL.md` — design reference workflow (saaspo.com curated SaaS gallery)
+- Codex prompt template at `docs/ops/codex-shadcn-prompts.md` (codex doesn't have skill-loading; documented prompts achieve the same)
+- Mirror skills to Clawdbot at `/opt/clawdbot/data/skills/{shadcn,saaspo}/`
+
+**v1.1 migration sequence:**
+- Day 1: init shadcn + 4 modal retrofits (BYOK, Waitlist, Share, Skill-install)
+- Day 2-3: Command palette (cmdk) + Toast (sonner)
+- Day 4-5: Tabs migration across `/p/:slug` + `/me` + `/studio/:slug` (parallel)
+- Week 2: Sheet (vaul) for mobile drawer, then Dropdown / Popover / Select rollout
+- Long-tail: 2,519 inline-style hits → Tailwind utility migration via codex codemod
+
+**Saaspo bar test:** before merging a Shadcn-themed component, ask "would Linear / Vercel / Resend / Supabase ship this exact component?" If yes → ship. If looks like a Vercel template, theme isn't aggressive enough.
+
+---
+
+## ADR-018 — Mobile coverage: inline per page, not separate files
+
+**Date locked:** 2026-04-26
+**Decision:** Every wireframe shows BOTH desktop AND mobile (375px) viewports in the same file, side-by-side or stacked. NO separate `*-mobile.html` files.
+
+**Why:** v18 v4 had only 3 mobile files (landing-mobile, me-mobile, studio-home-mobile) out of 80 wireframes. Federico's read: "mobile is not just one out of six stickers... for each desktop version there also has to be a mobile version." Mobile is a state of every page, not an optional companion file. Forcing it inline guarantees coverage at the wireframe stage instead of as an afterthought.
+
+**Implementation pattern:** v19 wireframes use a 2-column layout in the wireframe scaffold — desktop (1280-1440px viewport mock) on the left, mobile (375px viewport mock) on the right. Same page, same content, two breakpoints. Tablet (768px) optional but recommended for pages with significant mid-breakpoint behavior.
+
+**Anti-pattern banned:** wrapping mobile views inside fake iPhone illustrations (rounded corners, device chrome). Mobile shows the actual 375px viewport rendering, no illustration scaffolding.
+
+---
+
+## ADR-019 — Wireframe versioning: freeze old, fresh number for next
+
+**Date locked:** 2026-04-26
+**Decision:** When a wireframe iteration hits "good enough as a reference for code" or when significant rework would create legacy/iteration confusion, archive the current version directory READ-ONLY and start the next iteration in a fresh-numbered directory.
+
+- v17 → archived at `/var/www/wireframes-floom/v17/`, frozen
+- v18 (v1, v2, v3, v4 sub-iterations all done) → archive at `/var/www/wireframes-floom/v18/`, frozen
+- v19 → fresh start at `/var/www/wireframes-floom/v19/` for the next round
+
+**Why:** Federico's read: "we should not have legacy + v4, it's confusing. Let's just make the next v v19 to avoid these confusions." Sub-iteration naming (v1, v2, v3, v4) was useful in-flight but creates ambiguity once shipped. Fresh major numbers eliminate that.
+
+**Process:**
+- Archive previous version as read-only on the static host. Old links keep working forever.
+- Each major version has its own design-system, IA, changelog, audit, index.
+- The CHANGELOG carries forward critical decisions but doesn't try to be a unified history — that's what this ADR doc is for.
+- Sub-iteration files (`vN-AUDIT.md`, `vN-CHANGELOG.md`) live INSIDE the major-version directory, not at the root.
+
+**No more naming like "v18 v4" or "legacy". Either it's the active version or it's archived.**
+
+---
+
 ## How to add a new ADR
 
 1. Append to bottom (don't insert mid-doc).
