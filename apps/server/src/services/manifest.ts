@@ -8,6 +8,7 @@ import type {
   OutputSpec,
   OutputType,
 } from '../types.js';
+import { validateNetworkPolicy } from './network-policy.js';
 import {
   assertFileEnvelope,
   countCsvRowsFast,
@@ -186,7 +187,10 @@ function validateAction(raw: unknown, actionName: string): ActionSpec {
  * Parse + validate a manifest. Accepts both v1.0 (single-action, flat shape)
  * and v2.0 (multi-action). Returns the normalized v2 shape.
  */
-export function normalizeManifest(raw: unknown): NormalizedManifest {
+export function normalizeManifest(
+  raw: unknown,
+  opts: { requireNetworkDeclaration?: boolean } = {},
+): NormalizedManifest {
   assertObject(raw, 'manifest');
   assertString(raw.name, 'name');
   assertString(raw.description, 'description');
@@ -234,6 +238,17 @@ export function normalizeManifest(raw: unknown): NormalizedManifest {
   if (raw.secrets_needed !== undefined) {
     assertStringArray(raw.secrets_needed, 'secrets_needed');
     secrets_needed.push(...raw.secrets_needed);
+  }
+
+  const network =
+    raw.network !== undefined
+      ? validateNetworkPolicy(raw.network, 'network')
+      : undefined;
+  if (raw.network === undefined && opts.requireNetworkDeclaration) {
+    throw new ManifestError(
+      'network.allowed_domains must be declared explicitly for new apps',
+      'network.allowed_domains',
+    );
   }
 
   let actions: Record<string, ActionSpec>;
@@ -289,6 +304,7 @@ export function normalizeManifest(raw: unknown): NormalizedManifest {
     node_dependencies,
     secrets_needed,
     manifest_version: version as '1.0' | '2.0',
+    ...(network ? { network } : {}),
     ...(apt_packages.length > 0 && { apt_packages }),
     ...(typeof raw.license === 'string' && raw.license.trim().length > 0
       ? { license: raw.license.trim() }
