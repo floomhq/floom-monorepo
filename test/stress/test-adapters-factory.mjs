@@ -62,6 +62,7 @@ const adapter = {
   getUser() { return undefined; },
   getUserByEmail() { return undefined; },
   createUser(input) { return { ...input, created_at: 'now' }; },
+  upsertUser(input) { return { ...input, created_at: 'now' }; },
   listAdminSecrets() { return []; },
   upsertAdminSecret() {},
   deleteAdminSecret() { return false; },

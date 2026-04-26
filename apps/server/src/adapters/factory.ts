@@ -85,6 +85,7 @@ const EXPECTED_METHODS: Record<AdapterKind, readonly string[]> = {
     'getUser',
     'getUserByEmail',
     'createUser',
+    'upsertUser',
     'listAdminSecrets',
     'upsertAdminSecret',
     'deleteAdminSecret',

@@ -68,7 +68,36 @@ import type {
   AppListFilter,
   RunListFilter,
   StorageAdapter,
+  UserWriteColumn,
+  UserWriteInput,
 } from './types.js';
+
+const USER_WRITE_COLUMNS = new Set<keyof UserWriteInput>([
+  'id',
+  'workspace_id',
+  'email',
+  'name',
+  'auth_provider',
+  'auth_subject',
+  'image',
+  'composio_user_id',
+]);
+
+function userInsertKeys(input: UserWriteInput): Array<keyof UserWriteInput> {
+  return (Object.keys(input) as Array<keyof UserWriteInput>).filter((key) => {
+    if (!USER_WRITE_COLUMNS.has(key)) {
+      throw new Error(`Unknown users column: ${String(key)}`);
+    }
+    return input[key] !== undefined;
+  });
+}
+
+function userInsertValues(
+  input: UserWriteInput,
+  keys: Array<keyof UserWriteInput>,
+): Array<string | null | undefined> {
+  return keys.map((key) => input[key]);
+}
 
 export const sqliteStorageAdapter: StorageAdapter = {
   // ---------- apps ----------
@@ -282,13 +311,36 @@ export const sqliteStorageAdapter: StorageAdapter = {
       .get(email) as UserRecord | undefined;
   },
 
-  createUser(input: Omit<UserRecord, 'created_at'>): UserRecord {
-    const keys = Object.keys(input);
+  createUser(input: UserWriteInput): UserRecord {
+    const keys = userInsertKeys(input);
     const placeholders = keys.map(() => '?').join(', ');
     db.prepare(
       `INSERT INTO users (${keys.join(', ')}) VALUES (${placeholders})`,
-    ).run(...keys.map((k) => (input as Record<string, unknown>)[k]));
-    return this.getUser((input as { id: string }).id) as UserRecord;
+    ).run(...userInsertValues(input, keys));
+    return this.getUser(input.id) as UserRecord;
+  },
+
+  upsertUser(input: UserWriteInput, updateColumns: UserWriteColumn[]): UserRecord {
+    const keys = userInsertKeys(input);
+    const keySet = new Set(keys);
+    for (const column of updateColumns) {
+      if (!USER_WRITE_COLUMNS.has(column)) {
+        throw new Error(`Unknown users column: ${String(column)}`);
+      }
+      if (!keySet.has(column)) {
+        throw new Error(`Cannot upsert users.${String(column)} from an omitted value`);
+      }
+    }
+    const placeholders = keys.map(() => '?').join(', ');
+    const updates = updateColumns
+      .map((column) => `${column} = excluded.${column}`)
+      .join(', ');
+    db.prepare(
+      `INSERT INTO users (${keys.join(', ')}) VALUES (${placeholders})
+       ON CONFLICT (id) DO UPDATE SET
+         ${updates}`,
+    ).run(...userInsertValues(input, keys));
+    return this.getUser(input.id) as UserRecord;
   },
 
   // ---------- admin secret pointers ----------

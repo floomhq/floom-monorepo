@@ -247,7 +247,8 @@ export interface StorageAdapter {
   listWorkspacesForUser(user_id: string): Array<WorkspaceRecord & { role: WorkspaceRole }>;
   getUser(id: string): UserRecord | undefined;
   getUserByEmail(email: string): UserRecord | undefined;
-  createUser(input: Omit<UserRecord, 'created_at'>): UserRecord;
+  createUser(input: UserWriteInput): UserRecord;
+  upsertUser(input: UserWriteInput, updateColumns: UserWriteColumn[]): UserRecord;
 
   // ---------- admin secret pointers ----------
   // Ciphertext for user/creator secrets is owned by SecretsAdapter. This
@@ -257,6 +258,19 @@ export interface StorageAdapter {
   upsertAdminSecret(name: string, value: string, app_id?: string | null): void;
   deleteAdminSecret(name: string, app_id?: string | null): boolean;
 }
+
+export interface UserWriteInput {
+  id: string;
+  workspace_id?: string | null;
+  email?: string | null;
+  name?: string | null;
+  auth_provider?: string;
+  auth_subject?: string | null;
+  image?: string | null;
+  composio_user_id?: string | null;
+}
+
+export type UserWriteColumn = Exclude<keyof UserWriteInput, 'id'>;
 
 // =====================================================================
 // 3. AuthAdapter
