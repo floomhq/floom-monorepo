@@ -64,7 +64,9 @@ interface AdapterModuleExport<T = unknown> {
   create?: unknown;
 }
 
-type AdapterCreateOptions = Record<string, unknown>;
+type AdapterCreateOptions = Record<string, unknown> & {
+  storage?: StorageAdapter;
+};
 
 const EXPECTED_METHODS: Record<AdapterKind, readonly string[]> = {
   runtime: ['execute'],
@@ -411,6 +413,7 @@ export async function createAdapters(): Promise<AdapterBundle> {
     'local',
     SECRETS_IMPLS,
     SECRETS_MODULE_EXPORTS,
+    { storage },
   );
   const observability = await pick(
     'observability',

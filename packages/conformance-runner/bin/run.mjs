@@ -112,6 +112,12 @@ const env = {
   FLOOM_CONFORMANCE_ADAPTER: args.adapter,
 };
 
+if (args.concern === 'secrets' && args.adapter === '@floomhq/secrets-gcp-kms') {
+  env.FLOOM_GCP_KMS_MOCK = '1';
+  env.FLOOM_GCP_KMS_KEY_NAME =
+    'projects/test/locations/global/keyRings/test/cryptoKeys/test';
+}
+
 console.log(
   `[conformance:${args.concern}] adapter=${args.adapter} suite=${suite}`,
 );

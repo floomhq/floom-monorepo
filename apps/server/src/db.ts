@@ -694,11 +694,18 @@ db.exec(`
     ciphertext TEXT NOT NULL,
     nonce TEXT NOT NULL,
     auth_tag TEXT NOT NULL,
+    encrypted_dek TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (workspace_id, user_id, key)
   );
 `);
+const userSecretCols = (db.prepare(`PRAGMA table_info(user_secrets)`).all() as { name: string }[]).map(
+  (r) => r.name,
+);
+if (!userSecretCols.includes('encrypted_dek')) {
+  db.exec(`ALTER TABLE user_secrets ADD COLUMN encrypted_dek TEXT`);
+}
 
 // ---------- agent_tokens: scoped machine credentials for agents ----------
 // Token plaintext is shown exactly once by the mint endpoint. The database
@@ -1160,6 +1167,7 @@ db.exec(`
     ciphertext TEXT NOT NULL,
     nonce TEXT NOT NULL,
     auth_tag TEXT NOT NULL,
+    encrypted_dek TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (app_id, key)
@@ -1169,6 +1177,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_app_creator_secrets_workspace
     ON app_creator_secrets(workspace_id);
 `);
+const creatorSecretCols = (db.prepare(`PRAGMA table_info(app_creator_secrets)`).all() as { name: string }[]).map(
+  (r) => r.name,
+);
+if (!creatorSecretCols.includes('encrypted_dek')) {
+  db.exec(`ALTER TABLE app_creator_secrets ADD COLUMN encrypted_dek TEXT`);
+}
 
 // ---------------------------------------------------------------------
 // Idempotent data migrations (audit 2026-04-20, Fix 3)

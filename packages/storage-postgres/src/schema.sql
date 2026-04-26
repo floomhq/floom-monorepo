@@ -187,6 +187,7 @@ CREATE TABLE IF NOT EXISTS user_secrets (
   ciphertext TEXT NOT NULL,
   nonce TEXT NOT NULL,
   auth_tag TEXT NOT NULL,
+  encrypted_dek TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (workspace_id, user_id, key)
@@ -317,6 +318,7 @@ CREATE TABLE IF NOT EXISTS app_creator_secrets (
   ciphertext TEXT NOT NULL,
   nonce TEXT NOT NULL,
   auth_tag TEXT NOT NULL,
+  encrypted_dek TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (app_id, key)

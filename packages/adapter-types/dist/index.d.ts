@@ -256,7 +256,40 @@ export interface StorageAdapter {
     listAdminSecrets(app_id?: string | null): Promise<SecretRecord[]>;
     upsertAdminSecret(name: string, value: string, app_id?: string | null): Promise<void>;
     deleteAdminSecret(name: string, app_id?: string | null): Promise<boolean>;
+    getUserSecretRow?(workspace_id: string, user_id: string, key: string): SecretCiphertextRow | undefined;
+    listUserSecretRows?(workspace_id: string, user_id: string, keys: string[]): SecretCiphertextRow[];
+    listUserSecretMetadata?(workspace_id: string, user_id: string): Array<{
+        key: string;
+        updated_at: string;
+    }>;
+    upsertUserSecretRow?(row: SecretCiphertextWriteInput): void;
+    deleteUserSecretRow?(workspace_id: string, user_id: string, key: string): boolean;
+    setSecretPolicy?(app_id: string, key: string, policy: 'user_vault' | 'creator_override'): void;
+    upsertCreatorSecretRow?(row: CreatorSecretCiphertextWriteInput): void;
+    listCreatorOverrideSecretRowsForRun?(app_id: string, keys: string[]): CreatorSecretCiphertextRow[];
 }
+export interface SecretCiphertextRow {
+    workspace_id: string;
+    user_id: string;
+    key: string;
+    ciphertext: string;
+    nonce: string;
+    auth_tag: string;
+    encrypted_dek: string | null;
+    updated_at: string;
+}
+export type SecretCiphertextWriteInput = Omit<SecretCiphertextRow, 'updated_at'>;
+export interface CreatorSecretCiphertextRow {
+    app_id: string;
+    workspace_id: string;
+    key: string;
+    ciphertext: string;
+    nonce: string;
+    auth_tag: string;
+    encrypted_dek: string | null;
+    updated_at: string;
+}
+export type CreatorSecretCiphertextWriteInput = Omit<CreatorSecretCiphertextRow, 'updated_at'>;
 export interface UserWriteInput {
     id: string;
     workspace_id?: string | null;
