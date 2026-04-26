@@ -92,6 +92,14 @@ export interface NormalizedManifest {
    */
   license?: string;
   /**
+   * ADR-016: outbound network policy for hosted Docker apps. New manifests
+   * declare this explicitly; legacy persisted manifests may omit it and are
+   * handled by the runtime compatibility allowlist.
+   */
+  network?: {
+    allowed_domains: string[];
+  };
+  /**
    * v16 renderer cascade: optional creator-declared hint for which stock
    * library component to mount on the run output. See
    * apps/web/src/components/output/ for the available components and

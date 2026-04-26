@@ -122,6 +122,7 @@ function synthesizeDefaultManifest(
     node_dependencies: {},
     secrets_needed: secrets,
     manifest_version: '2.0',
+    network: { allowed_domains: [] },
   };
 }
 
@@ -393,7 +394,7 @@ export async function ingestAppFromDockerImage(args: {
   let manifest: NormalizedManifest;
   if (args.manifest !== undefined) {
     try {
-      manifest = normalizeManifest(args.manifest);
+      manifest = normalizeManifest(args.manifest, { requireNetworkDeclaration: true });
     } catch (err) {
       if (err instanceof ManifestError) throw err;
       throw new DockerImageIngestError(

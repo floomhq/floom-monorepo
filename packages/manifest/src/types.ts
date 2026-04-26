@@ -92,6 +92,14 @@ export interface Manifest {
 
   /** Optional per-app run retention in days. Omitted means indefinite. */
   max_run_retention_days?: number;
+
+  /**
+   * ADR-016 outbound policy for hosted app containers. Empty means no
+   * outbound network. Domains can be exact names or "*.example.com" globs.
+   */
+  network?: {
+    allowed_domains: string[];
+  };
 }
 
 export interface RunTiming {
