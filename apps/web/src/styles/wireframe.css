@@ -1699,6 +1699,38 @@ input { font-family: inherit; }
   }
 }
 
+/* ── Landing v23 showcase grid responsive ────────────────── */
+/* Editorial 1-hero + 2-compact grid collapses cleanly on tablet and
+   phone widths. Mobile (≤600px): single column with hero card on top.
+   Tablet (601–960px): hero spans both columns above the two compact
+   cards. Desktop (>960px): default 1.6fr 1fr 1fr inline grid. */
+@media (max-width: 960px) {
+  .showcase-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .showcase-grid > a:first-child {
+    grid-column: span 2;
+  }
+  .showcase-grid > a:first-child .app-banner {
+    height: 200px !important;
+  }
+}
+@media (max-width: 600px) {
+  .showcase-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .showcase-grid > a:first-child {
+    grid-column: span 1;
+  }
+  .showcase-grid > a .app-banner {
+    height: 180px !important;
+  }
+  .showcase-header {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+}
+
 /* ── Reduced motion ──────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   * {
