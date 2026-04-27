@@ -10,6 +10,7 @@ import { useDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
 import { GitHubStarsBadge } from './GitHubStarsBadge';
 import { CopyForClaudeButton } from './CopyForClaudeButton';
+import { MobileDrawer } from './MobileDrawer';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface Props {
@@ -133,7 +134,7 @@ const menuItemStyle: CSSProperties = {
 //     Right (waitlist): GH stars · Publish (CTA) · Join waitlist
 //
 //   Authenticated (deploy mode):
-//     Centre: Studio · My account                                    (2 items)
+//     Centre: Studio · Run                                           (2 items)
 //     Right:  GH stars · Copy for Claude · + New app · avatar dropdown
 //     Avatar dropdown: header (name + email) · Apps store · BYOK keys ·
 //                      Agent tokens · Settings · — · Pricing · Docs ·
@@ -143,7 +144,7 @@ const menuItemStyle: CSSProperties = {
 // so much when I am already logged in, so the nav and the priorities of
 // what to click next change." Discovery items demote to the dropdown for
 // authed users; the centre nav surfaces only their day-to-day work
-// surfaces. MECE labelling: /me = "My account" (consumer, v23 rename
+// surfaces. MECE labelling: /run = "Run" (consumer, v24 rename
 // 2026-04-26), /studio = "Studio" (creator). URL slugs stay; only the
 // visible label changes.
 //
@@ -246,6 +247,12 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
     location.pathname.startsWith('/docs');
   const isStudio = location.pathname.startsWith('/studio');
   const isMe = location.pathname.startsWith('/me');
+  const isRun =
+    location.pathname === '/run' ||
+    location.pathname.startsWith('/run/') ||
+    location.pathname.startsWith('/settings/') ||
+    location.pathname === '/account/settings' ||
+    isMe;
   const isPublishNav =
     location.pathname === '/studio/build' || location.pathname === '/deploy';
 
@@ -337,7 +344,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
 
         {/* Centre nav — branches on auth state (project_floom_nav_ia.md).
             Anonymous: Apps · Docs · Pricing (discovery surfaces).
-            Authenticated: Studio · My runs (work surfaces). Pricing/Docs
+            Authenticated: Run · Studio (work surfaces). Pricing/Docs
             move to the avatar dropdown — 1 click away when needed. */}
         <nav
           className="topbar-links topbar-links-desktop topbar-centre-nav"
@@ -356,20 +363,20 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           {showAuthedChrome ? (
             <>
               <Link
+                to="/run"
+                data-testid="topbar-run"
+                aria-current={isRun ? 'page' : undefined}
+                style={navLinkStyle(isRun)}
+              >
+                Run
+              </Link>
+              <Link
                 to="/studio"
                 data-testid="topbar-studio"
                 aria-current={isStudio ? 'page' : undefined}
                 style={navLinkStyle(isStudio)}
               >
                 {studioNavLabel}
-              </Link>
-              <Link
-                to="/me"
-                data-testid="topbar-my-runs"
-                aria-current={isMe ? 'page' : undefined}
-                style={navLinkStyle(isMe)}
-              >
-                My account
               </Link>
             </>
           ) : (
@@ -423,7 +430,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               2026-04-26). Hidden only on auth pages so they stay focused.
               The popover handles its own state, click-outside, and Esc.
               Anon centre nav: Apps · Docs · Pricing → Copy-for-Claude →
-              Sign in / Sign up. Authed: Studio · My account →
+              Sign in / Sign up. Authed: Run · Studio →
               Copy-for-Claude → + New app → avatar. */}
           {!isLoginPage && <CopyForClaudeButton />}
 
@@ -611,7 +618,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                       Agent tokens · Settings · — · Pricing · Docs · — ·
                       Sign out. Counts after labels (Apps · 5 etc) when
                       session caches are populated; omit gracefully
-                      otherwise. Vocabulary lock: NEVER write "API keys"
+                      otherwise. Vocabulary lock: use "Agent tokens"
                       in user-visible copy on this surface. */}
                   <div
                     style={{
@@ -658,6 +665,13 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                     aria-hidden="true"
                   />
                   <DropdownItem
+                    to="/run"
+                    label="Workspace Run"
+                    testId="topbar-user-workspace-run"
+                    onSelect={() => setDropOpen(false)}
+                    active={isRun}
+                  />
+                  <DropdownItem
                     to="/apps"
                     label="Apps store"
                     count={myApps?.length}
@@ -669,16 +683,17 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                     onSelect={() => setDropOpen(false)}
                   />
                   <DropdownItem
-                    to="/me/agent-keys"
+                    to="/settings/agent-tokens"
                     label="Agent tokens"
                     testId="topbar-user-agent-tokens"
                     onSelect={() => setDropOpen(false)}
                   />
                   <DropdownItem
-                    to="/me/settings"
-                    label="Settings"
+                    to="/account/settings"
+                    label="Account settings"
                     testId="topbar-user-settings"
                     onSelect={() => setDropOpen(false)}
+                    active={location.pathname === '/account/settings'}
                   />
                   <div
                     style={{
@@ -764,286 +779,13 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
         </div>
       )}
 
-      {/* Mobile menu drawer */}
-      {menuOpen && (
-        <>
-          <div
-            className="topbar-mobile-scrim"
-            role="presentation"
-            aria-hidden="true"
-            onClick={() => setMenuOpen(false)}
-          />
-          <div
-            className="topbar-mobile-menu"
-            role="menu"
-            aria-label="Mobile navigation"
-            data-testid="topbar-mobile-menu"
-          >
-            <div className="topbar-mobile-menu-head">
-              <button
-                type="button"
-                className="topbar-mobile-close"
-                aria-label="Close menu"
-                onClick={() => setMenuOpen(false)}
-                data-testid="topbar-mobile-close"
-              >
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Mobile menu — branches on auth state, same split as desktop
-                (project_floom_nav_ia.md). Anonymous: Apps · Docs · Pricing
-                + Publish CTA. Authenticated: Studio · My runs · + New app
-                · Pricing · Docs · API keys · Settings · Sign out. */}
-            {showAuthedChrome ? (
-              <>
-                <Link
-                  to="/studio"
-                  className="topbar-mobile-link topbar-mobile-link-primary"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-studio"
-                  aria-current={isStudio ? 'page' : undefined}
-                >
-                  <MobileAppsIcon />
-                  <span>{studioNavLabel}</span>
-                </Link>
-                <Link
-                  to="/me"
-                  className="topbar-mobile-link"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-my-runs"
-                  aria-current={isMe ? 'page' : undefined}
-                >
-                  My account
-                </Link>
-                {!isLoginPage && (
-                  <Link
-                    to="/studio/build"
-                    className="topbar-mobile-cta"
-                    role="menuitem"
-                    onClick={() => setMenuOpen(false)}
-                    data-testid="topbar-mobile-new-app"
-                    aria-current={isPublishNav ? 'page' : undefined}
-                    style={{
-                      background: ACCENT,
-                      borderColor: ACCENT,
-                      color: '#fff',
-                    }}
-                  >
-                    + New app
-                  </Link>
-                )}
-                <Link
-                  to="/pricing"
-                  className="topbar-mobile-link"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-pricing"
-                  aria-current={isPricing ? 'page' : undefined}
-                >
-                  Pricing
-                </Link>
-                <Link
-                  to="/docs"
-                  className="topbar-mobile-link"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-docs"
-                  aria-current={isDocs ? 'page' : undefined}
-                >
-                  Docs
-                </Link>
-                <Link
-                  to="/apps"
-                  className="topbar-mobile-link"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-apps-store"
-                >
-                  Apps store
-                </Link>
-                <Link
-                  to="/me/secrets"
-                  className="topbar-mobile-link"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-byok-keys"
-                >
-                  BYOK keys
-                </Link>
-                <Link
-                  to="/me/agent-keys"
-                  className="topbar-mobile-link"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-agent-tokens"
-                >
-                  Agent tokens
-                </Link>
-                <Link
-                  to="/me/settings"
-                  className="topbar-mobile-link"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-settings"
-                >
-                  Settings
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  to="/apps"
-                  className="topbar-mobile-link topbar-mobile-link-primary"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-apps"
-                  aria-current={isApps ? 'page' : undefined}
-                >
-                  <MobileAppsIcon />
-                  <span>Apps</span>
-                </Link>
-
-                <Link
-                  to="/docs"
-                  className="topbar-mobile-link"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-docs"
-                  aria-current={isDocs ? 'page' : undefined}
-                >
-                  Docs
-                </Link>
-
-                <Link
-                  to="/pricing"
-                  className="topbar-mobile-link"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  data-testid="topbar-mobile-pricing"
-                  aria-current={isPricing ? 'page' : undefined}
-                >
-                  Pricing
-                </Link>
-
-                {/* Publish CTA — anon-only primary action on mobile. */}
-                {!isLoginPage && deployEnabled && (
-                  <Link
-                    to="/studio/build"
-                    className="topbar-mobile-cta"
-                    role="menuitem"
-                    onClick={() => setMenuOpen(false)}
-                    data-testid="topbar-mobile-publish"
-                    aria-current={isPublishNav ? 'page' : undefined}
-                    style={{
-                      background: ACCENT,
-                      borderColor: ACCENT,
-                      color: '#fff',
-                    }}
-                  >
-                    Publish
-                  </Link>
-                )}
-                {!isLoginPage && waitlistMode && (
-                  <button
-                    type="button"
-                    className="topbar-mobile-cta"
-                    role="menuitem"
-                    data-testid="topbar-mobile-publish-waitlist"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      goWaitlistPublish('topbar-publish-mobile');
-                    }}
-                    style={{
-                      background: ACCENT,
-                      borderColor: ACCENT,
-                      color: '#fff',
-                      cursor: 'pointer',
-                      font: 'inherit',
-                    }}
-                  >
-                    Publish
-                  </button>
-                )}
-              </>
-            )}
-
-            {!isAuthenticated && !isLoginPage && deployEnabled && (
-              <Link
-                to="/login"
-                className="topbar-mobile-link"
-                role="menuitem"
-                onClick={() => setMenuOpen(false)}
-                data-testid="topbar-mobile-signin"
-              >
-                Sign in
-              </Link>
-            )}
-
-            {!isAuthenticated && deployEnabled && (
-              <Link
-                to="/signup"
-                className="topbar-mobile-cta"
-                role="menuitem"
-                onClick={() => setMenuOpen(false)}
-                data-testid="topbar-mobile-signup"
-              >
-                Sign up
-              </Link>
-            )}
-
-            {!isAuthenticated && waitlistMode && (
-              <Link
-                to={waitlistHref('topbar-mobile-waitlist')}
-                className="topbar-mobile-cta"
-                role="menuitem"
-                onClick={() => setMenuOpen(false)}
-                data-testid="topbar-mobile-waitlist"
-                style={{
-                  // Ink pill so the green Publish CTA stays the single
-                  // primary action in the mobile menu — same hierarchy
-                  // the desktop right-rail already establishes.
-                  background: INK,
-                  borderColor: INK,
-                  color: '#fff',
-                  boxShadow: 'none',
-                }}
-              >
-                Join waitlist
-              </Link>
-            )}
-
-            {isAuthenticated && (
-              <button
-                type="button"
-                className="topbar-mobile-link topbar-mobile-link-signout"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  void handleLogout();
-                }}
-              >
-                Sign out
-              </button>
-            )}
-          </div>
-        </>
-      )}
+      <MobileDrawer
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onSignOut={() => {
+          void handleLogout();
+        }}
+      />
     </header>
   );
 }
@@ -1056,7 +798,7 @@ function ByokKeysDropdownItem({ onSelect }: { onSelect: () => void }) {
   const { entries } = useSecrets();
   return (
     <DropdownItem
-      to="/me/secrets"
+      to="/settings/byok-keys"
       label="BYOK keys"
       count={entries?.length}
       testId="topbar-user-byok-keys"
@@ -1118,28 +860,5 @@ function DropdownItem({
         </span>
       )}
     </Link>
-  );
-}
-
-// Grid-of-squares glyph leading the primary Apps row in the mobile menu.
-function MobileAppsIcon() {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{ flexShrink: 0 }}
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
   );
 }
