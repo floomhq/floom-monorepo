@@ -621,6 +621,7 @@ export interface UserWriteInput {
 export type UserWriteColumn = Exclude<keyof UserWriteInput, 'id'>;
 export interface AuthAdapter extends AdapterLifecycle {
     getSession(request: Request): Promise<SessionContext | null>;
+    mountHttp?(app: unknown, basePath: string): void | Promise<void>;
     signIn(input: {
         email: string;
         password?: string;

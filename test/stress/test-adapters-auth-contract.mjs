@@ -51,8 +51,15 @@ for (const k of [
 
 const { db } = await import('../../apps/server/src/db.ts');
 const betterAuth = await import('../../apps/server/src/lib/better-auth.ts');
+const { betterAuthAdapter } = await import(
+  '../../apps/server/src/adapters/auth-better-auth.ts'
+);
 const { adapters } = await import(
   '../../apps/server/src/adapters/index.ts'
+);
+const { Hono } = await import('../../apps/server/node_modules/hono/dist/index.js');
+const { createMagicLinkAuthAdapter } = await import(
+  '../../packages/auth-magic-link/src/index.ts'
 );
 
 // Boot Better Auth's tables (user/session/account/verification/...) so a
@@ -63,6 +70,8 @@ await betterAuth.runAuthMigrations();
 let passed = 0;
 let skipped = 0;
 let failed = 0;
+let httpPassed = 0;
+let httpFailed = 0;
 
 function ok(label) {
   passed++;
@@ -77,6 +86,16 @@ function fail(label, reason) {
 function skip(label, reason) {
   skipped++;
   console.log(`  skip  ${label}: ${reason}`);
+}
+
+function httpOk(label) {
+  httpPassed++;
+  console.log(`  ok    http: ${label}`);
+}
+
+function httpFail(label, reason) {
+  httpFailed++;
+  console.log(`  FAIL  http: ${label}: ${reason}`);
 }
 
 function isSessionResult(result) {
@@ -412,6 +431,112 @@ try {
       fail(label, err && err.message ? err.message : String(err));
     }
   }
+
+  // ========================================================================
+  // HTTP-level AuthAdapter.mountHttp contract
+  // ========================================================================
+  {
+    const label = 'Better Auth mountHttp exposes session endpoint';
+    try {
+      const app = new Hono();
+      await betterAuthAdapter.mountHttp(app, '/auth');
+      const res = await app.request('http://localhost:3051/auth/session', {
+        method: 'GET',
+        headers: { host: 'localhost:3051' },
+      });
+      const body = await res.clone().text();
+      if (res.status === 200 && body === 'null') {
+        httpOk(label);
+      } else {
+        httpFail(label, `status=${res.status}, body=${body}`);
+      }
+    } catch (err) {
+      httpFail(label, err && err.message ? err.message : String(err));
+    }
+  }
+
+  {
+    const label = 'magic-link mountHttp requests and verifies session';
+    const sentEmails = [];
+    try {
+      const auth = createMagicLinkAuthAdapter({
+        storage: adapters.storage,
+        resendApiKey: 'test-resend-key',
+        fromEmail: 'Floom <login@example.com>',
+        jwtSecret: process.env.BETTER_AUTH_SECRET,
+        jwtIssuer: 'floom-contract',
+        baseUrl: 'http://localhost:3051',
+        resendClient: {
+          emails: {
+            send: async (payload) => {
+              sentEmails.push(payload);
+              return { id: 'mock-email' };
+            },
+          },
+        },
+      });
+      const app = new Hono();
+      await auth.mountHttp(app, '/auth');
+      const email = `http-magic-${Date.now()}@example.com`;
+      const requestRes = await app.request(
+        'http://localhost:3051/auth/magic-link/request',
+        {
+          method: 'POST',
+          headers: {
+            host: 'localhost:3051',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ email, name: 'HTTP Magic' }),
+        },
+      );
+      if (requestRes.status === 202) {
+        httpOk('magic-link request returns 202');
+      } else {
+        httpFail('magic-link request returns 202', `status=${requestRes.status}`);
+      }
+      if (sentEmails.length === 1 && sentEmails[0]?.to === email) {
+        httpOk('magic-link request enqueues email');
+      } else {
+        httpFail(
+          'magic-link request enqueues email',
+          `sentEmails=${JSON.stringify(sentEmails)}`,
+        );
+      }
+      const tokenMatch = String(sentEmails[0]?.html || '').match(/token=([^"&<]+)/);
+      const token = tokenMatch ? decodeURIComponent(tokenMatch[1]) : '';
+      const verifyRes = await app.request(
+        `http://localhost:3051/auth/magic-link/verify?token=${encodeURIComponent(token)}`,
+        {
+          method: 'GET',
+          headers: { host: 'localhost:3051' },
+        },
+      );
+      const setCookie = verifyRes.headers.get('set-cookie');
+      const cookie = firstCookieFromSetCookie(setCookie);
+      const session = cookie
+        ? await auth.getSession(
+            new Request('http://localhost:3051/auth/session', {
+              headers: new Headers({ cookie, host: 'localhost:3051' }),
+            }),
+          )
+        : null;
+      if (
+        verifyRes.status === 302 &&
+        verifyRes.headers.get('location') === 'http://localhost:3051' &&
+        session?.email === email &&
+        session.is_authenticated === true
+      ) {
+        httpOk('magic-link verify sets cookie and getSession resolves user');
+      } else {
+        httpFail(
+          'magic-link verify sets cookie and getSession resolves user',
+          `status=${verifyRes.status}, location=${verifyRes.headers.get('location')}, cookie=${setCookie}, session=${JSON.stringify(session)}`,
+        );
+      }
+    } catch (err) {
+      httpFail(label, err && err.message ? err.message : String(err));
+    }
+  }
 } finally {
   try {
     db.close();
@@ -424,4 +549,7 @@ try {
 console.log(
   `\n${passed} passing, ${skipped} skipped, ${failed} failing`,
 );
-process.exit(failed === 0 ? 0 : 1);
+console.log(
+  `${httpPassed} HTTP-level auth contract passing, ${httpFailed} failing`,
+);
+process.exit(failed === 0 && httpFailed === 0 ? 0 : 1);

@@ -10,6 +10,17 @@ export interface MagicLinkAuthAdapterOptions {
     magicLinkTtlSeconds?: number;
     sendEmail?: boolean;
     exposeTokenForTests?: boolean;
+    resendClient?: MagicLinkEmailClient;
+}
+interface MagicLinkEmailClient {
+    emails: {
+        send(input: {
+            from: string;
+            to: string;
+            subject: string;
+            html: string;
+        }): Promise<unknown> | unknown;
+    };
 }
 export declare function createMagicLinkAuthAdapter(opts: MagicLinkAuthAdapterOptions): AuthAdapter;
 declare const _default: {
