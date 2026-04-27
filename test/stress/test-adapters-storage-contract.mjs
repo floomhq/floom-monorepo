@@ -288,6 +288,32 @@ try {
     assert(touched?.id === thread.id, 'touch returned missing thread');
   });
 
+  await check('run turn append is safe across 50 parallel appends', async () => {
+    const thread = await storage.createRunThread({
+      id: 'thread-parallel-turns-1',
+      title: null,
+      workspace_id: DEFAULT_WORKSPACE_ID,
+      user_id: 'local',
+      device_id: 'device-parallel-turns-1',
+    });
+    const created = await Promise.all(
+      Array.from({ length: 50 }, (_, i) =>
+        storage.appendRunTurn({
+          id: `turn-parallel-${i}`,
+          thread_id: thread.id,
+          kind: i % 2 === 0 ? 'user' : 'assistant',
+          payload: json({ i }),
+        }),
+      ),
+    );
+    const createdIndices = created.map((turn) => turn.turn_index);
+    assert(new Set(createdIndices).size === 50, `duplicate created indices=${json(createdIndices)}`);
+    const turns = await storage.listRunTurns(thread.id);
+    assert(turns.length === 50, `turns=${turns.length}`);
+    const indices = turns.map((turn) => turn.turn_index);
+    assert(json(indices) === json(Array.from({ length: 50 }, (_, i) => i)), `indices=${json(indices)}`);
+  });
+
   await check('agent tokens round-trip with idempotent revoke', async () => {
     const user = await storage.createUser({
       id: 'agent-user-1',
@@ -731,8 +757,12 @@ try {
     const run = await storage.createRun({ id: 'run-raw-1', app_id: app.id, action: 'run', inputs: { ok: true } });
     const independent = await createIndependentStorageAdapter();
     if (independent) {
-      const row = await independent.getRun(run.id);
-      assert(row?.id === run.id && row.app_id === app.id && row.action === 'run', `row=${json(row)}`);
+      try {
+        const row = await independent.getRun(run.id);
+        assert(row?.id === run.id && row.app_id === app.id && row.action === 'run', `row=${json(row)}`);
+      } finally {
+        await independent.close?.();
+      }
     } else {
       const Database = require('../../apps/server/node_modules/better-sqlite3');
       const second = new Database(join(tmp, 'floom-chat.db'));
@@ -750,6 +780,11 @@ try {
     assert((await storage.deleteAdminSecret('missing-delete-secret', null)) === false, 'deleteAdminSecret missing did not return false');
   });
 } finally {
+  try {
+    await storage.close?.();
+  } catch {
+    // best effort
+  }
   try {
     db.close();
   } catch {

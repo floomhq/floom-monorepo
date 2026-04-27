@@ -127,9 +127,24 @@ CREATE TABLE IF NOT EXISTS run_turns (
   turn_index INTEGER NOT NULL,
   kind TEXT NOT NULL,
   payload TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(thread_id, turn_index)
 );
 CREATE INDEX IF NOT EXISTS idx_run_turns_thread ON run_turns(thread_id, turn_index);
+WITH ranked AS (
+  SELECT id,
+         (ROW_NUMBER() OVER (
+           PARTITION BY thread_id
+           ORDER BY turn_index ASC, created_at ASC, id ASC
+         ) - 1)::integer AS new_turn_index
+    FROM run_turns
+)
+UPDATE run_turns
+   SET turn_index = ranked.new_turn_index
+  FROM ranked
+ WHERE run_turns.id = ranked.id
+   AND run_turns.turn_index <> ranked.new_turn_index;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_run_turns_thread_turn_index ON run_turns(thread_id, turn_index);
 
 CREATE TABLE IF NOT EXISTS embeddings (
   app_id TEXT PRIMARY KEY REFERENCES apps(id) ON DELETE CASCADE,

@@ -461,6 +461,18 @@ function magicLinkAuthFactoryOptions(storage: StorageAdapter): AdapterCreateOpti
   };
 }
 
+async function readyAdapter(kind: AdapterKind, adapter: AdapterBundle[AdapterKind]): Promise<void> {
+  if (typeof adapter.ready !== 'function') return;
+  try {
+    await adapter.ready();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`[adapters] ${kind} adapter ready() failed: ${message}`, {
+      cause: err,
+    });
+  }
+}
+
 export async function createAdapters(): Promise<AdapterBundle> {
   const runtime = await pick(
     'runtime',
@@ -505,7 +517,13 @@ export async function createAdapters(): Promise<AdapterBundle> {
     OBSERVABILITY_MODULE_EXPORTS,
   );
 
-  return { runtime, storage, auth, secrets, observability };
+  const bundle = { runtime, storage, auth, secrets, observability };
+  for (const [kind, adapter] of Object.entries(bundle) as Array<
+    [AdapterKind, AdapterBundle[AdapterKind]]
+  >) {
+    await readyAdapter(kind, adapter);
+  }
+  return bundle;
 }
 
 // --- test-only registry peek ------------------------------------------------

@@ -354,6 +354,15 @@ export interface SessionContext {
     agent_token_scope?: AgentTokenScope;
     agent_token_rate_limit_per_minute?: number;
 }
+export interface AdapterHealth {
+    ok: boolean;
+    details?: Record<string, unknown>;
+}
+export interface AdapterLifecycle {
+    ready?(): Promise<void>;
+    health?(): Promise<AdapterHealth>;
+    close?(): Promise<void>;
+}
 export interface RuntimeResult {
     status: RunStatus;
     outputs: unknown;
@@ -385,10 +394,10 @@ export interface RunListFilter {
     limit?: number;
     offset?: number;
 }
-export interface RuntimeAdapter {
+export interface RuntimeAdapter extends AdapterLifecycle {
     execute(app: AppRecord, manifest: NormalizedManifest, action: string, inputs: Record<string, unknown>, secrets: Record<string, string>, ctx: SessionContext, onOutput?: (chunk: string, stream: 'stdout' | 'stderr') => void, runContext?: RuntimeExecutionContext): Promise<RuntimeResult>;
 }
-export interface StorageAdapter {
+export interface StorageAdapter extends AdapterLifecycle {
     getApp(slug: string): Promise<AppRecord | undefined>;
     getAppById(id: string): Promise<AppRecord | undefined>;
     listApps(filter?: AppListFilter, ctx?: SessionContext): Promise<AppRecord[]>;
@@ -610,7 +619,7 @@ export interface UserWriteInput {
     composio_user_id?: string | null;
 }
 export type UserWriteColumn = Exclude<keyof UserWriteInput, 'id'>;
-export interface AuthAdapter {
+export interface AuthAdapter extends AdapterLifecycle {
     getSession(request: Request): Promise<SessionContext | null>;
     signIn(input: {
         email: string;
@@ -636,7 +645,7 @@ export interface AuthMagicLinkSentResult {
     status: 'magic-link-sent';
     email: string;
 }
-export interface SecretsAdapter {
+export interface SecretsAdapter extends AdapterLifecycle {
     get(ctx: SessionContext, key: string): Promise<string | null>;
     set(ctx: SessionContext, key: string, plaintext: string): Promise<void>;
     delete(ctx: SessionContext, key: string): Promise<boolean>;
@@ -647,7 +656,7 @@ export interface SecretsAdapter {
     loadUserVaultForRun(ctx: SessionContext, keys: string[]): Promise<Record<string, string>>;
     loadCreatorOverrideForRun(app_id: string, workspace_id: string, keys: string[]): Promise<Record<string, string>>;
 }
-export interface ObservabilityAdapter {
+export interface ObservabilityAdapter extends AdapterLifecycle {
     captureError(err: unknown, context?: Record<string, unknown>): void;
     increment(metric: string, amount?: number, tags?: Record<string, string>): void;
     timing(metric: string, ms: number, tags?: Record<string, string>): void;

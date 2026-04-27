@@ -85,12 +85,12 @@ import {
   softDeletedSignInBody,
   startAccountDeleteSweeper,
 } from './services/account-deletion.js';
-// Side-effect import: instantiates the adapter bundle at module load so
+// Instantiates the adapter bundle at module load so
 // misconfigured env vars fail fast at boot (before any request is served).
 // The bundle is exported from `adapters/index.ts`; route modules import
 // `adapters` from there rather than `src/index.ts` to avoid an import
 // cycle with this bootstrap file. See docs/adapters.md.
-import './adapters/index.js';
+import { adapters } from './adapters/index.js';
 
 const PORT = Number(process.env.PORT || 3051);
 const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
@@ -103,6 +103,48 @@ logAlertsBootState();
 
 const app = new Hono();
 app.use('*', logger());
+
+let server: ReturnType<typeof serve> | null = null;
+let shutdownStarted = false;
+
+async function closeAdapters(): Promise<boolean> {
+  const results = await Promise.allSettled(
+    Object.values(adapters).map((adapter) => adapter.close?.()),
+  );
+  let ok = true;
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      ok = false;
+      console.error('[server] adapter close failed:', result.reason);
+    }
+  }
+  return ok;
+}
+
+async function shutdown(signal: NodeJS.Signals): Promise<void> {
+  if (shutdownStarted) return;
+  shutdownStarted = true;
+  console.log(`[server] ${signal} received, shutting down`);
+  await new Promise<void>((resolve) => {
+    if (!server) {
+      resolve();
+      return;
+    }
+    server.close((err?: Error) => {
+      if (err) console.error('[server] HTTP server close failed:', err);
+      resolve();
+    });
+  });
+  const adaptersClosed = await closeAdapters();
+  process.exit(adaptersClosed ? 0 : 1);
+}
+
+process.once('SIGINT', () => {
+  void shutdown('SIGINT');
+});
+process.once('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
 
 // CORS (2026-04-20 security audit P2): split policy.
 //
@@ -1749,7 +1791,7 @@ async function boot(): Promise<void> {
     console.error('[fast-apps] boot failed:', err);
   });
 
-  serve({ fetch: app.fetch, port: PORT }, (info) => {
+  server = serve({ fetch: app.fetch, port: PORT }, (info) => {
     console.log(`[server] listening on http://localhost:${info.port}`);
     console.log(`[server] public url: ${PUBLIC_URL}`);
   });

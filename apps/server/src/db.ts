@@ -542,9 +542,23 @@ db.exec(`
     turn_index INTEGER NOT NULL,
     kind TEXT NOT NULL,
     payload TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(thread_id, turn_index)
   );
   CREATE INDEX IF NOT EXISTS idx_run_turns_thread ON run_turns(thread_id, turn_index);
+  UPDATE run_turns
+     SET turn_index = ranked.new_turn_index
+    FROM (
+      SELECT id,
+             ROW_NUMBER() OVER (
+               PARTITION BY thread_id
+               ORDER BY turn_index ASC, created_at ASC, id ASC
+             ) - 1 AS new_turn_index
+        FROM run_turns
+    ) AS ranked
+   WHERE run_turns.id = ranked.id
+     AND run_turns.turn_index != ranked.new_turn_index;
+  CREATE UNIQUE INDEX IF NOT EXISTS uniq_run_turns_thread_turn_index ON run_turns(thread_id, turn_index);
 `);
 
 // ---------- embeddings (for the app picker) ----------
