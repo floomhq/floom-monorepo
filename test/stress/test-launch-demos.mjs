@@ -101,5 +101,12 @@ for (const slug of BYOK_GATED) {
   );
 }
 
+const linkedinRoaster = DEMOS.find((d) => d.slug === 'linkedin-roaster');
+log(
+  'launch demo linkedin-roaster is present in seeder',
+  linkedinRoaster !== undefined,
+  linkedinRoaster ? undefined : 'DEMOS missing the slug entry',
+);
+
 console.log(`\npassed=${passed} failed=${failed}`);
 if (failed > 0) process.exit(1);

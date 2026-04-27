@@ -591,7 +591,7 @@ slugRunRouter.post('/', async (c) => {
   const body = parsed.value as {
     action?: unknown;
     inputs?: unknown;
-  };
+  } & Record<string, unknown>;
 
   const actionNames = Object.keys(manifest.actions);
   const actionName =
@@ -604,9 +604,16 @@ slugRunRouter.post('/', async (c) => {
 
   let validated: Record<string, unknown>;
   try {
+    const topLevelInputs = Object.fromEntries(
+      Object.entries(body).filter(([key]) => key !== 'action' && key !== 'inputs'),
+    );
+    const inputPayload =
+      body.inputs && typeof body.inputs === 'object' && !Array.isArray(body.inputs)
+        ? (body.inputs as Record<string, unknown>)
+        : topLevelInputs;
     validated = validateInputs(
       actionSpec,
-      (body.inputs as Record<string, unknown>) ?? {},
+      inputPayload,
     );
   } catch (err) {
     const e = err as ManifestError;
