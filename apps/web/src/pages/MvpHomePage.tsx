@@ -444,10 +444,9 @@ export function MvpHomePage() {
     if (isAuthenticated === false) navigate('/login', { replace: true });
   }, [isAuthenticated, navigate]);
 
-  // Placeholder token for install snippets when none minted yet
-  const installToken = tokens?.[0]
-    ? `floom_agent_••••••• (mint your token above)`
-    : 'floom_agent_<your_token>';
+  const hasToken = tokens !== null && tokens.length > 0;
+  // Use masked placeholder once token exists (actual raw token is only shown on mint in TokenCard)
+  const installToken = hasToken ? 'floom_agent_••••••••' : '';
 
   return (
     <MvpAuthShell>
@@ -457,7 +456,25 @@ export function MvpHomePage() {
         <h2 style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: INK, margin: '36px 0 12px' }}>
           Install
         </h2>
-        <InstallTabs token={installToken} />
+        {hasToken ? (
+          <InstallTabs token={installToken} />
+        ) : (
+          <div
+            data-testid="install-no-token"
+            style={{
+              border: `1px solid ${LINE}`,
+              borderRadius: 12,
+              background: CARD,
+              padding: '28px 24px',
+              textAlign: 'center' as const,
+              opacity: 0.6,
+            }}
+          >
+            <p style={{ fontSize: 13, color: MUTED, margin: 0, lineHeight: 1.6 }}>
+              Mint your first token above to see the install snippet.
+            </p>
+          </div>
+        )}
       </div>
     </MvpAuthShell>
   );
