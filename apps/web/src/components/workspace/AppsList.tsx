@@ -481,10 +481,10 @@ function EmptyApps({ mode }: { mode: 'run' | 'studio' }) {
             margin: '0 0 10px',
           }}
         >
-          No apps installed yet.
+          No apps in your workspace yet.
         </h2>
         <p style={{ margin: '0 auto 22px', maxWidth: 420, fontSize: 15, lineHeight: 1.65, color: 'var(--muted)' }}>
-          Browse the public store to install your first app.
+          Browse the public store and run your first one — it lands here automatically.
         </p>
         <Link
           to="/apps"
