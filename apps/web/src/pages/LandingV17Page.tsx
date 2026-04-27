@@ -48,6 +48,7 @@ import type { HubApp } from '../lib/types';
 import { publicHubApps } from '../lib/hub-filter';
 import { readDeployEnabled, useDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
+import { useSession } from '../hooks/useSession';
 
 interface Stripe {
   slug: string;
@@ -99,6 +100,9 @@ export function LandingV17Page() {
   const [stripes, setStripes] = useState<Stripe[]>(FALLBACK_STRIPES);
   const deployEnabledFlag = useDeployEnabled();
   const deployEnabled = deployEnabledFlag ?? readDeployEnabled();
+  // v26 §3 option C: logged-in-aware landing.
+  // When authenticated user hits "/", show a "Resume in {workspaceName} →" banner.
+  const { data: session, isAuthenticated } = useSession();
   const waitlistHeroHref = useMemo(() => waitlistHref('landing-hero'), []);
   // Route both modes to /install-in-claude (the 4-tab Claude install flow).
   // /install is self-host Docker docs, /install/lead-scorer 404s when the
@@ -127,6 +131,44 @@ export function LandingV17Page() {
       style={{ minHeight: '100vh', background: 'var(--bg)' }}
     >
       <TopBar />
+
+      {/* v26 §3 option C: resume banner for authenticated users.
+          Only shown when session is confirmed authenticated (not while loading).
+          Logged-out users never see this. */}
+      {isAuthenticated && session && (
+        <div
+          data-testid="landing-resume-banner"
+          style={{
+            background: 'var(--card)',
+            borderBottom: '1px solid var(--line)',
+            padding: '10px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+            You're signed in.
+          </span>
+          <Link
+            to="/run/apps"
+            data-testid="landing-resume-cta"
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--accent)',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            Resume in{' '}
+            {session.active_workspace?.name?.trim() || 'your workspace'} →
+          </Link>
+        </div>
+      )}
 
       <main id="main" style={{ display: 'block' }}>
         {/* HERO — wireframe: .hero-shell > .hero
