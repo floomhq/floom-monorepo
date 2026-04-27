@@ -910,9 +910,16 @@ function createAdminMcpServer({ ctx, ip, baseUrl }: AdminToolContext): McpServer
       // MCP list_apps exposes public apps plus the caller's own apps. This
       // keeps freshly-ingested private apps discoverable to the creator without
       // leaking another user's private slug.
+      // #868: public branches require publish_status = 'published' so that
+      // unpublished apps are not surfaced to anonymous/external callers.
+      // The author = ? arm (creator's own workspace) is unrestricted so Studio
+      // can discover its own draft apps via MCP without extra friction.
       let sql =
         "SELECT * FROM apps WHERE status = 'active'" +
-        " AND (visibility = 'public_live' OR visibility = 'public' OR visibility IS NULL OR author = ?)" +
+        " AND (visibility = 'public_live'" +
+        " OR (visibility = 'public' AND publish_status = 'published')" +
+        " OR (visibility IS NULL AND publish_status = 'published')" +
+        ' OR author = ?)' +
         (category ? ' AND category = ?' : '') +
         ' ORDER BY featured DESC, name ASC';
       const rows = (category
