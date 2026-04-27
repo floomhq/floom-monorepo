@@ -224,6 +224,14 @@ log('bundle.storage.listEncryptedSecrets is fn', typeof bundle.storage.listEncry
 log('bundle.storage.deleteEncryptedSecret is fn', typeof bundle.storage.deleteEncryptedSecret === 'function');
 log('bundle.auth.getSession is fn', typeof bundle.auth.getSession === 'function');
 log('bundle.secrets.get is fn', typeof bundle.secrets.get === 'function');
+log('bundle.secrets.setAdminSecret is fn', typeof bundle.secrets.setAdminSecret === 'function');
+log('bundle.secrets.getAdminSecret is fn', typeof bundle.secrets.getAdminSecret === 'function');
+log('bundle.secrets.listAdminSecrets is fn', typeof bundle.secrets.listAdminSecrets === 'function');
+log('bundle.secrets.deleteAdminSecret is fn', typeof bundle.secrets.deleteAdminSecret === 'function');
+log('bundle.secrets.setCreatorPolicy is fn', typeof bundle.secrets.setCreatorPolicy === 'function');
+log('bundle.secrets.getCreatorPolicy is fn', typeof bundle.secrets.getCreatorPolicy === 'function');
+log('bundle.secrets.listCreatorPolicies is fn', typeof bundle.secrets.listCreatorPolicies === 'function');
+log('bundle.secrets.deleteCreatorPolicy is fn', typeof bundle.secrets.deleteCreatorPolicy === 'function');
 log('bundle.observability.increment is fn', typeof bundle.observability.increment === 'function');
 
 __testing.STORAGE_IMPLS['static-missing-one'] = { ...__testing.STORAGE_IMPLS.sqlite };
