@@ -7,6 +7,7 @@ const TOKEN_PREFIX = 'floom_agent_';
 const TOKEN_RANDOM_LENGTH = 32;
 const PREFIX_RANDOM_LENGTH = 8;
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+const LEGACY_TOKEN_RE = /^floom_(?!agent_)[0-9A-Za-z+/=]{32,128}$/;
 const LAST_USED_DEBOUNCE_MS = 60_000;
 
 export interface AgentTokenAuthContext {
@@ -25,11 +26,15 @@ export function getPresentedAgentToken(c: Context): string | null {
   const match = /^Bearer\s+(.+)$/.exec(header);
   if (!match) return null;
   const token = match[1].trim();
-  return token.startsWith(TOKEN_PREFIX) ? token : null;
+  return isAgentTokenString(token) || isLegacyAgentTokenString(token) ? token : null;
 }
 
 export function isAgentTokenString(value: string): boolean {
   return new RegExp(`^${TOKEN_PREFIX}[0-9A-Za-z]{${TOKEN_RANDOM_LENGTH}}$`).test(value);
+}
+
+function isLegacyAgentTokenString(value: string): boolean {
+  return LEGACY_TOKEN_RE.test(value);
 }
 
 export function isValidAgentTokenScope(value: unknown): value is AgentTokenScope {
@@ -91,7 +96,7 @@ export function agentContextToSessionContext(
 }
 
 export function lookupAgentToken(rawToken: string): AgentTokenRecord | null {
-  if (!isAgentTokenString(rawToken)) return null;
+  if (!isAgentTokenString(rawToken) && !isLegacyAgentTokenString(rawToken)) return null;
   const hash = hashAgentToken(rawToken);
   const row = db
     .prepare(
