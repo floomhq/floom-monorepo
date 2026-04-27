@@ -203,7 +203,7 @@ runRouter.post('/', async (c) => {
   const gate = runGate(c, ctx, { slug: body.app_slug, checkBody: false });
   if (!gate.ok) return runGateResponse(c, gate);
 
-  const row = db.prepare('SELECT * FROM apps WHERE slug = ?').get(body.app_slug) as AppRecord | undefined;
+  const row = await adapters.storage.getApp(body.app_slug);
   if (!row) return c.json({ error: `App not found: ${body.app_slug}` }, 404);
   if (row.status !== 'active') {
     return c.json({ error: `App is ${row.status}, cannot run` }, 409);
@@ -262,19 +262,16 @@ runRouter.post('/', async (c) => {
   // visibility check (private apps need the caller's user_id).
   const runId = newRunId();
   const threadId = typeof body.thread_id === 'string' ? body.thread_id : null;
-  db.prepare(
-    `INSERT INTO runs (id, app_id, thread_id, action, inputs, status, workspace_id, user_id, device_id)
-     VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
-  ).run(
-    runId,
-    row.id,
-    threadId,
-    actionName,
-    JSON.stringify(validated),
-    ctx.workspace_id,
-    ctx.user_id,
-    ctx.device_id,
-  );
+  await adapters.storage.createRun({
+    id: runId,
+    app_id: row.id,
+    thread_id: threadId,
+    action: actionName,
+    inputs: validated,
+    workspace_id: ctx.workspace_id,
+    user_id: ctx.user_id,
+    device_id: ctx.device_id,
+  });
 
   // W4-minimal gap close: pass the resolved session context so the runner
   // can look up per-user secrets (user_secrets table). Without this, the
@@ -471,8 +468,7 @@ runRouter.post('/:id/share', async (c) => {
     }
   }
 
-  // Idempotent flip. SQLite returns changes=0 on a no-op UPDATE which is fine.
-  db.prepare(`UPDATE runs SET is_public = 1 WHERE id = ?`).run(id);
+  await adapters.storage.updateRun(id, { is_public: 1 });
 
   const publicUrl = `/api/run/${encodeURIComponent(id)}`;
   const shareUrl = `/r/${encodeURIComponent(id)}`;
@@ -541,11 +537,12 @@ export const slugRunRouter = new Hono<{ Variables: { slug: string } }>();
 
 slugRunRouter.post('/', async (c) => {
   const slug = c.req.param('slug');
+  if (!slug) return c.json({ error: 'slug is required' }, 400);
   const ctx = await resolveUserContext(c);
   const bodyGate = runGate(c, ctx, { slug, checkRate: false });
   if (!bodyGate.ok) return runGateResponse(c, bodyGate);
 
-  const row = db.prepare('SELECT * FROM apps WHERE slug = ?').get(slug) as AppRecord | undefined;
+  const row = await adapters.storage.getApp(slug);
   if (!row) return c.json({ error: `App not found: ${slug}` }, 404);
   if (row.status !== 'active') {
     return c.json({ error: `App is ${row.status}, cannot run` }, 409);
@@ -611,18 +608,16 @@ slugRunRouter.post('/', async (c) => {
   // W4M.1: scope the run by the current session. `ctx` already resolved
   // for the visibility check above.
   const runId = newRunId();
-  db.prepare(
-    `INSERT INTO runs (id, app_id, thread_id, action, inputs, status, workspace_id, user_id, device_id)
-     VALUES (?, ?, NULL, ?, ?, 'pending', ?, ?, ?)`,
-  ).run(
-    runId,
-    row.id,
-    actionName,
-    JSON.stringify(validated),
-    ctx.workspace_id,
-    ctx.user_id,
-    ctx.device_id,
-  );
+  await adapters.storage.createRun({
+    id: runId,
+    app_id: row.id,
+    thread_id: null,
+    action: actionName,
+    inputs: validated,
+    workspace_id: ctx.workspace_id,
+    user_id: ctx.user_id,
+    device_id: ctx.device_id,
+  });
 
   // W4-minimal gap close: pass the resolved session context so the runner
   // can look up per-user secrets (user_secrets table). Without this, the
@@ -684,9 +679,7 @@ slugQuotaRouter.get('/', async (c) => {
   // helpers (isByokGated, decideByok) receive a guaranteed string.
   const slug = c.req.param('slug');
   if (!slug) return c.json({ error: 'slug is required' }, 400);
-  const row = db.prepare('SELECT slug FROM apps WHERE slug = ?').get(slug) as
-    | { slug: string }
-    | undefined;
+  const row = await adapters.storage.getApp(slug);
   if (!row) return c.json({ error: `App not found: ${slug}` }, 404);
 
   if (!isByokGated(slug)) {
@@ -797,63 +790,19 @@ function feedbackAppSlugFromUrl(raw: string | null): string | null {
   }
 }
 
-function loadStudioApps(
+async function loadStudioApps(
   ctx: SessionContext,
-): StudioAppSummaryRow[] {
+): Promise<StudioAppSummaryRow[]> {
   const isOssLocal = !ctx.is_authenticated && ctx.workspace_id === DEFAULT_WORKSPACE_ID;
-  if (isOssLocal) {
-    return db.prepare(
-      `SELECT apps.id, apps.slug, apps.name, apps.icon, apps.publish_status,
-              apps.visibility, apps.created_at, apps.updated_at,
-              (
-                SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
-              ) AS last_run_at,
-              (
-                SELECT COUNT(*) FROM runs
-                 WHERE runs.app_id = apps.id
-                   AND runs.started_at >= datetime('now', '-7 days')
-              ) AS runs_7d
-         FROM apps
-        WHERE apps.workspace_id = ?
-        ORDER BY
-          CASE WHEN (
-            SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
-          ) IS NULL THEN 1 ELSE 0 END,
-          (
-            SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
-          ) DESC,
-          apps.updated_at DESC`
-    ).all(ctx.workspace_id) as StudioAppSummaryRow[];
-  }
-
-  return db.prepare(
-    `SELECT apps.id, apps.slug, apps.name, apps.icon, apps.publish_status,
-            apps.visibility, apps.created_at, apps.updated_at,
-            (
-              SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
-            ) AS last_run_at,
-            (
-              SELECT COUNT(*) FROM runs
-               WHERE runs.app_id = apps.id
-                 AND runs.started_at >= datetime('now', '-7 days')
-            ) AS runs_7d
-       FROM apps
-      WHERE apps.workspace_id = ?
-        AND apps.author = ?
-      ORDER BY
-        CASE WHEN (
-          SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
-        ) IS NULL THEN 1 ELSE 0 END,
-        (
-          SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
-        ) DESC,
-        apps.updated_at DESC`
-  ).all(ctx.workspace_id, ctx.user_id) as StudioAppSummaryRow[];
+  return adapters.storage.listStudioAppSummaries({
+    workspace_id: ctx.workspace_id,
+    author: isOssLocal ? null : ctx.user_id,
+  });
 }
 
 meRouter.get('/studio/stats', async (c) => {
   const ctx = await resolveUserContext(c);
-  const apps = loadStudioApps(ctx);
+  const apps = await loadStudioApps(ctx);
   const appIds = apps.map((app) => app.id);
   const appSlugs = new Set(apps.map((app) => app.slug));
 
@@ -941,7 +890,7 @@ meRouter.get('/studio/stats', async (c) => {
 meRouter.get('/studio/activity', async (c) => {
   const ctx = await resolveUserContext(c);
   const limit = Math.max(1, Math.min(100, Number(c.req.query('limit') || 5)));
-  const apps = loadStudioApps(ctx);
+  const apps = await loadStudioApps(ctx);
   const appIds = apps.map((app) => app.id);
 
   if (appIds.length === 0) {
