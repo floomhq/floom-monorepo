@@ -11,7 +11,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { db } from '../db.js';
+import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newRunId, newJobId } from '../lib/ids.js';
 import { validateInputs, ManifestError } from '../services/manifest.js';
 import { dispatchRun, getRun } from '../services/runner.js';
@@ -30,6 +30,7 @@ import {
   DOCKER_PUBLISH_FLAG,
 } from '../services/docker-image-ingest.js';
 import { resolveUserContext } from '../services/session.js';
+import * as userSecrets from '../services/user_secrets.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import {
   AUTH_DOCS_URL,
@@ -287,6 +288,14 @@ function createPerAppMcpServer(
             )
             .all(fresh.id) as { name: string }[];
           for (const r of rows) available.add(r.name);
+          if (ctx) {
+            try {
+              const persisted = userSecrets.loadForRun(ctx, actionSecretsNeeded);
+              for (const key of Object.keys(persisted)) available.add(key);
+            } catch {
+              // The runner emits the decrypt warning and still honors per-call _auth.
+            }
+          }
           // Per-call secrets
           for (const k of Object.keys(perCallSecrets || {})) available.add(k);
 
@@ -342,9 +351,27 @@ function createPerAppMcpServer(
           };
         }
 
+        const runtimeCtx =
+          ctx ||
+          {
+            workspace_id: DEFAULT_WORKSPACE_ID,
+            user_id: DEFAULT_USER_ID,
+            device_id: DEFAULT_USER_ID,
+            is_authenticated: false,
+          };
         db.prepare(
-          `INSERT INTO runs (id, app_id, action, inputs, status) VALUES (?, ?, ?, ?, 'pending')`,
-        ).run(runId, fresh.id, actionName, JSON.stringify(validated));
+          `INSERT INTO runs
+             (id, app_id, thread_id, action, inputs, status, workspace_id, user_id, device_id)
+           VALUES (?, ?, NULL, ?, ?, 'pending', ?, ?, ?)`,
+        ).run(
+          runId,
+          fresh.id,
+          actionName,
+          JSON.stringify(validated),
+          runtimeCtx.workspace_id,
+          runtimeCtx.user_id,
+          runtimeCtx.device_id,
+        );
         // Parity with POST /api/run + POST /api/:slug/run: pass the
         // resolved SessionContext so dispatchRun can merge the caller's
         // user-vault secrets. Without this every authed MCP consumer
@@ -358,7 +385,7 @@ function createPerAppMcpServer(
           actionName,
           validated,
           perCallSecrets,
-          ctx,
+          runtimeCtx,
         );
         const done = await waitForRun(runId);
         return {

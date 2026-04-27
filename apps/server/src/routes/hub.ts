@@ -369,10 +369,7 @@ hubRouter.post('/ingest', async (c) => {
   }
 });
 
-// GET /api/hub/mine — apps authored by the caller. In OSS mode the
-// caller is the synthetic local user, and we return apps authored by
-// 'local' OR with workspace_id='local'. In Cloud mode we filter on
-// author = user_id.
+// GET /api/hub/mine — apps owned by the caller's active workspace.
 hubRouter.get('/mine', async (c) => {
   const ctx = await resolveUserContext(c);
   const rows = db
@@ -384,11 +381,10 @@ hubRouter.get('/mine', async (c) => {
          SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
        ) AS last_run_at
          FROM apps
-        WHERE (apps.workspace_id = ? AND apps.author = ?)
-           OR apps.author = ?
+        WHERE apps.workspace_id = ?
         ORDER BY apps.updated_at DESC`,
     )
-    .all(ctx.workspace_id, ctx.user_id, ctx.user_id) as Array<
+    .all(ctx.workspace_id) as Array<
     AppRecord & { run_count: number; last_run_at: string | null }
   >;
 
