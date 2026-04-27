@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import type { Context } from 'hono';
-import { db } from '../db.js';
 import { adapters } from '../adapters/index.js';
 import { newRunId } from '../lib/ids.js';
 import {
