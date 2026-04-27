@@ -132,14 +132,13 @@ const menuItemStyle: CSSProperties = {
 //     Right (preview):  GH stars · Publish (CTA) · Sign in · Sign up
 //     Right (waitlist): GH stars · Publish (CTA) · Join waitlist
 //
-//   Authenticated (slim — v26):
-//     Centre: NOTHING — left rail handles all mode/page navigation
+//   Authenticated (deploy mode):
+//     Centre: Studio · My runs
 //     Right:  GH stars · Copy for Claude · + New app · avatar dropdown
 //     Avatar dropdown: Account settings · Docs · Help · Sign out
 //     Logo: route-aware → /run/apps when authenticated
 //
-// v26 change from v25: removed authenticated centre nav (Studio · My runs).
-// Left rail [Run|Studio] toggle is now the mode switcher (§12.2).
+// V26-IA-SPEC consumer-mode label: /run and /me surfaces render as "My runs".
 // Docs moved to avatar dropdown (§12.5).
 //
 // Two clean states only — never a 3rd. Preview vs prod differ in the
@@ -235,7 +234,11 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
     location.pathname.startsWith('/protocol') ||
     location.pathname.startsWith('/docs');
   const isStudio = location.pathname.startsWith('/studio');
-  // isRun removed — v26 authenticated TopBar has no centre nav
+  const isRun =
+    location.pathname === '/run' ||
+    location.pathname.startsWith('/run/') ||
+    location.pathname === '/me' ||
+    location.pathname.startsWith('/me/');
   const isPublishNav =
     location.pathname === '/studio/build' || location.pathname === '/deploy';
 
@@ -328,9 +331,40 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
 
         {/* Centre nav — v26-IA-SPEC §10 + §12:
             Anonymous: Apps · Docs · Pricing (discovery surfaces).
-            Authenticated (slim): NOTHING — left rail handles mode/page navigation.
-            TopBar becomes logo + Copy for Claude + + New app + avatar only. */}
-        {!showAuthedChrome && (
+            Authenticated: Studio · My runs. */}
+        {showAuthedChrome ? (
+          <nav
+            className="topbar-links topbar-links-desktop topbar-centre-nav"
+            aria-label="Primary"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              pointerEvents: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <Link
+              to="/studio"
+              data-testid="topbar-studio"
+              aria-current={isStudio ? 'page' : undefined}
+              style={navLinkStyle(isStudio)}
+            >
+              Studio
+            </Link>
+            <Link
+              to="/run/runs"
+              data-testid="topbar-my-runs"
+              aria-current={isRun ? 'page' : undefined}
+              style={navLinkStyle(isRun)}
+            >
+              My runs
+            </Link>
+          </nav>
+        ) : (
           <nav
             className="topbar-links topbar-links-desktop topbar-centre-nav"
             aria-label="Primary"
