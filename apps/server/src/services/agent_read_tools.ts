@@ -224,28 +224,32 @@ function appSummary(app: AppRecord, baseUrl: string): Record<string, unknown> {
   };
 }
 
-export function discoverApps(
+export async function discoverApps(
   c: Context,
   ctx: SessionContext,
   args: DiscoverAppsArgs,
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   requireReadScope(ctx);
   const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
   const offset = args.cursor ? Number(args.cursor) : 0;
   if (!Number.isInteger(offset) || offset < 0) {
     throw new AgentToolError('invalid_input', 'cursor must be a non-negative offset.', 400);
   }
-  const rows = db
-    .prepare(
-      `SELECT * FROM apps
-        WHERE status = 'active'
-          AND (
-            ((visibility = 'public' OR visibility IS NULL) AND publish_status = 'published')
-            OR (workspace_id = ? AND author = ?)
-          )
-        ORDER BY featured DESC, name ASC, slug ASC`,
-    )
-    .all(ctx.workspace_id, ctx.user_id) as AppRecord[];
+  const rows = (await adapters.storage.listApps())
+    .filter((app) => {
+      if (app.status !== 'active') return false;
+      const publishedPublic =
+        (app.visibility === 'public' || app.visibility === null) &&
+        app.publish_status === 'published';
+      const owned = app.workspace_id === ctx.workspace_id && app.author === ctx.user_id;
+      return publishedPublic || owned;
+    })
+    .sort(
+      (a, b) =>
+        Number(b.featured) - Number(a.featured) ||
+        a.name.localeCompare(b.name) ||
+        a.slug.localeCompare(b.slug),
+    );
   const needle = typeof args.q === 'string' ? args.q.trim().toLowerCase() : '';
   const category = typeof args.category === 'string' ? args.category.trim() : '';
   const filtered = rows.filter((app) => {
@@ -265,10 +269,8 @@ export function discoverApps(
   };
 }
 
-function loadAccessibleApp(ctx: SessionContext, slug: string): AppRecord {
-  const app = db.prepare('SELECT * FROM apps WHERE slug = ?').get(slug) as
-    | AppRecord
-    | undefined;
+async function loadAccessibleApp(ctx: SessionContext, slug: string): Promise<AppRecord> {
+  const app = await adapters.storage.getApp(slug);
   if (!app || app.status !== 'active') {
     throw new AgentToolError('not_found', `App not found: ${slug}`, 404);
   }
@@ -282,13 +284,13 @@ function loadAccessibleApp(ctx: SessionContext, slug: string): AppRecord {
   return app;
 }
 
-export function getAppSkill(
+export async function getAppSkill(
   c: Context,
   ctx: SessionContext,
   slug: string,
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   requireReadScope(ctx);
-  const app = loadAccessibleApp(ctx, slug);
+  const app = await loadAccessibleApp(ctx, slug);
   const manifest = parseManifest(app);
   const actionNames = Object.keys(manifest.actions);
   const action =
@@ -327,7 +329,7 @@ export async function runApp(
   const gate = runGate(c, ctx, { slug: args.slug });
   if (!gate.ok) throwRunGateError(gate);
 
-  const app = loadAccessibleApp(ctx, args.slug);
+  const app = await loadAccessibleApp(ctx, args.slug);
   if (!canRunApp(app, ctx)) {
     throw new AgentToolError(
       'forbidden_scope',

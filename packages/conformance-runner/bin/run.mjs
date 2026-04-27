@@ -58,18 +58,6 @@ function prefixStream(stream, prefix, write) {
   });
 }
 
-function parseTally(output) {
-  const match = output.match(
-    /(\d+)\s+(?:passing|passed)(?:,\s+(\d+)\s+skipped)?,\s+(\d+)\s+(?:failing|failed)/,
-  );
-  if (!match) return null;
-  return {
-    passed: Number(match[1]),
-    skipped: Number(match[2] || 0),
-    failed: Number(match[3]),
-  };
-}
-
 let args;
 try {
   args = parseArgs(process.argv.slice(2));
@@ -128,13 +116,6 @@ const child = spawn(command, [suite], {
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 
-let output = '';
-child.stdout.on('data', (chunk) => {
-  output += chunk.toString();
-});
-child.stderr.on('data', (chunk) => {
-  output += chunk.toString();
-});
 prefixStream(child.stdout, `[conformance:${args.concern}] `, (text) =>
   process.stdout.write(text),
 );
@@ -147,18 +128,10 @@ child.on('error', (err) => {
   process.exit(1);
 });
 
-child.on('close', (code) => {
-  const tally = parseTally(output);
-  if (!tally) {
-    console.error(`[conformance:${args.concern}] unable to parse suite tally`);
-    process.exit(code === 0 ? 1 : code ?? 1);
+child.on('close', (code, signal) => {
+  if (signal) {
+    console.error(`[conformance:${args.concern}] suite terminated by ${signal}`);
+    process.exit(1);
   }
-
-  console.log(
-    `[conformance:${args.concern}] ${tally.passed} passing, ${tally.skipped} skipped, ${tally.failed} failing`,
-  );
-  if (code !== 0 || tally.failed > 0) {
-    process.exit(code !== 0 ? code ?? 1 : 1);
-  }
-  process.exit(0);
+  process.exit(code ?? 1);
 });

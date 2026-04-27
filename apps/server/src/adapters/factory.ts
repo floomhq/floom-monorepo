@@ -311,12 +311,12 @@ function assertAdapterSurface(
   }
 }
 
-function validateDynamicModule<T>(
+async function validateDynamicModule<T>(
   kind: AdapterKind,
   key: string,
   moduleExport: unknown,
   createOptions: AdapterCreateOptions = {},
-): T {
+): Promise<T> {
   if (typeof moduleExport !== 'object' || moduleExport === null) {
     throw new Error(
       `[adapters] ${kind} adapter module ${JSON.stringify(
@@ -352,7 +352,7 @@ function validateDynamicModule<T>(
     return typed.adapter as T;
   }
   if (typeof typed.create === 'function') {
-    const adapter = (typed.create as (opts: AdapterCreateOptions) => unknown)(
+    const adapter = await (typed.create as (opts: AdapterCreateOptions) => unknown)(
       createOptions,
     );
     assertAdapterSurface(kind, key, typed, adapter);
@@ -383,7 +383,7 @@ async function importDynamicAdapter<T>(
         )} is missing a default export`,
       );
     }
-    return validateDynamicModule<T>(kind, value, imported.default, createOptions);
+    return await validateDynamicModule<T>(kind, value, imported.default, createOptions);
   } catch (e) {
     if (
       e instanceof Error &&

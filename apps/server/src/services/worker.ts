@@ -19,7 +19,7 @@ import {
   nextQueuedJob,
   requeueJob,
 } from './jobs.js';
-import { dispatchRun, getRun } from './runner.js';
+import { dispatchRun } from './runner.js';
 import { deliverWebhook, type WebhookPayload } from './webhook.js';
 import { getJobTriggerContext } from './triggers-worker.js';
 import type {
@@ -173,7 +173,7 @@ async function waitForRunOrTimeout(
 ): Promise<RunRecord | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const row = await getRun(runId);
+    const row = await adapters.storage.getRun(runId);
     if (row && ['success', 'error', 'timeout'].includes(row.status)) return row;
     await new Promise((r) => setTimeout(r, RUN_POLL_INTERVAL_MS));
   }
