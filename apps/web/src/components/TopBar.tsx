@@ -126,30 +126,27 @@ const menuItemStyle: CSSProperties = {
   borderRadius: 6,
 };
 
-// v17 TopBar — auth-branched chrome 2026-04-25 (project_floom_nav_ia.md).
+// v26 TopBar — auth-branched chrome (V26-IA-SPEC §10 + §12.5, locked 2026-04-27).
 //   Anonymous (waitlist visitor / signed-out):
 //     Centre: Apps · Docs · Pricing                                  (3 items)
 //     Right (preview):  GH stars · Publish (CTA) · Sign in · Sign up
 //     Right (waitlist): GH stars · Publish (CTA) · Join waitlist
 //
-//   Authenticated (deploy mode):
-//     Centre: Studio · My runs                                       (2 items)
+//   Authenticated (slim — v26):
+//     Centre: NOTHING — left rail handles all mode/page navigation
 //     Right:  GH stars · Copy for Claude · + New app · avatar dropdown
 //     Avatar dropdown: Account settings · Docs · Help · Sign out
+//     Logo: route-aware → /run/apps when authenticated
 //
-// Why the split: Federico 2026-04-25 — "Pricing, Docs etc don't matter
-// so much when I am already logged in, so the nav and the priorities of
-// what to click next change." Discovery items demote to the dropdown for
-// authed users; the centre nav surfaces only their day-to-day work
-// surfaces. MECE labelling: /run = "My runs" (consumer), /studio =
-// "Studio" (creator). URL slugs stay; only the visible label changes.
+// v26 change from v25: removed authenticated centre nav (Studio · My runs).
+// Left rail [Run|Studio] toggle is now the mode switcher (§12.2).
+// Docs moved to avatar dropdown (§12.5).
 //
 // Two clean states only — never a 3rd. Preview vs prod differ in the
 // CTA wording (Publish vs Join waitlist), not the nav structure.
 //
 // Changelog stays in the footer (#572 nav declutter, original 04-23 pass).
-// Mobile: hamburger collapses everything to a vertical column menu, with
-// the same anon-vs-authed split.
+// Mobile: hamburger → MobileDrawer (v26 workspace identity + mode toggle + items).
 export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
@@ -238,11 +235,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
     location.pathname.startsWith('/protocol') ||
     location.pathname.startsWith('/docs');
   const isStudio = location.pathname.startsWith('/studio');
-  const isRun =
-    location.pathname === '/run' ||
-    location.pathname.startsWith('/run/') ||
-    location.pathname === '/me' ||
-    location.pathname.startsWith('/me/');
+  // isRun removed — v26 authenticated TopBar has no centre nav
   const isPublishNav =
     location.pathname === '/studio/build' || location.pathname === '/deploy';
 
@@ -333,42 +326,11 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           </button>
         )}
 
-        {/* Centre nav — branches on auth state (v26-IA-SPEC §10 + §12).
+        {/* Centre nav — v26-IA-SPEC §10 + §12:
             Anonymous: Apps · Docs · Pricing (discovery surfaces).
-            Authenticated: Studio · My runs (work surfaces). */}
-        {showAuthedChrome ? (
-          <nav
-            className="topbar-links topbar-links-desktop topbar-centre-nav"
-            aria-label="Primary"
-            style={{
-              position: 'absolute',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              pointerEvents: 'auto',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 2,
-            }}
-          >
-            <Link
-              to="/studio"
-              data-testid="topbar-studio"
-              aria-current={isStudio ? 'page' : undefined}
-              style={navLinkStyle(isStudio)}
-            >
-              Studio
-            </Link>
-            <Link
-              to="/run/runs"
-              data-testid="topbar-my-runs"
-              aria-current={isRun ? 'page' : undefined}
-              style={navLinkStyle(isRun)}
-            >
-              My runs
-            </Link>
-          </nav>
-        ) : (
+            Authenticated (slim): NOTHING — left rail handles mode/page navigation.
+            TopBar becomes logo + Copy for Claude + + New app + avatar only. */}
+        {!showAuthedChrome && (
           <nav
             className="topbar-links topbar-links-desktop topbar-centre-nav"
             aria-label="Primary"
