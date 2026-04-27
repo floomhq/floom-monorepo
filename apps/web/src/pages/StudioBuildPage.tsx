@@ -1,12 +1,7 @@
-// MVP stub: /studio/build — replaced with ComingSoon for launch.
+// MVP stub: /studio/build → redirect for launch.
 
-import { WorkspacePageShell } from '../components/WorkspacePageShell';
-import { ComingSoon } from '../components/ComingSoon';
+import { Navigate } from 'react-router-dom';
 
 export function StudioBuildPage() {
-  return (
-    <WorkspacePageShell mode="studio" title="Build · Studio · Floom">
-      <ComingSoon feature="App builder" />
-    </WorkspacePageShell>
-  );
+  return <Navigate to="/me/agent-keys" replace />;
 }
