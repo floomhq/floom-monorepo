@@ -13,7 +13,7 @@
 // We detect that via /api/session/me (cloud_mode: false) and render a
 // banner letting the user know they can use the local account.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
 import { useSession, refreshSession } from '../hooks/useSession';
@@ -24,7 +24,6 @@ import {
   type AuthErrorAction,
 } from '../lib/authErrors';
 import { track, identifyFromSession } from '../lib/posthog';
-import { readDeployEnabled } from '../lib/flags';
 
 type Mode = 'signin' | 'signup';
 
@@ -35,8 +34,7 @@ export function LoginPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { data, isAuthenticated } = useSession();
-  const deployEnabled = useMemo(() => readDeployEnabled(), []);
-  const routeMode = getModeFromLocation(location.pathname, searchParams);
+const routeMode = getModeFromLocation(location.pathname, searchParams);
   const [mode, setMode] = useState<Mode>(routeMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -205,21 +203,11 @@ export function LoginPage() {
   return (
     <PageShell title={mode === 'signin' ? 'Sign in · Floom' : 'Sign up · Floom'}>
       <div
-        className="login-grid"
+        className="login-single-col"
         style={{
-          display: 'grid',
-          gap: 48,
-          gridTemplateColumns: '440px 1fr',
-          maxWidth: 960,
-          margin: '40px auto',
-          alignItems: 'start',
-        }}
-      >
-      <div
-        className="login-left"
-        style={{
-          width: '100%',
           maxWidth: 440,
+          margin: '40px auto',
+          padding: '0 24px',
         }}
         data-testid={mode === 'signin' ? 'login-page' : 'signup-page'}
       >
@@ -590,55 +578,6 @@ export function LoginPage() {
           New to Floom? You are in the right place, the same page signs you up. ·{' '}
           <Link to="/" style={{ color: 'var(--ink)' }}>Back to home</Link>
         </p>
-      </div>
-
-      {/* Right column: value pitch. Hidden on mobile via CSS (<1024px).
-          Kept intentionally quiet: one headline + one supporting line.
-          The three-bullet + closing-line version read as filler on an
-          auth page, so we dropped it (2026-04-20).
-          2026-04-21: dropped the standalone brand mark from this panel.
-          The TopBar already renders the floom logo in the chrome, so
-          showing another one here read as double-branding. Stripe /
-          Linear / Notion put one mark in the chrome and zero in the
-          side panel. */}
-      <aside
-        className="login-right"
-        data-testid="login-value-pitch"
-        style={{
-          padding: '8px 0 0',
-        }}
-      >
-        <h2
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 22,
-            fontWeight: 700,
-            letterSpacing: '-0.02em',
-            lineHeight: 1.3,
-            margin: '0 0 12px',
-            color: 'var(--ink)',
-          }}
-        >
-          {deployEnabled ? 'Ship AI apps fast.' : 'Run AI apps from one account.'}
-        </h2>
-        <p
-          style={{
-            fontSize: 14,
-            color: 'var(--muted)',
-            lineHeight: 1.6,
-            margin: 0,
-          }}
-        >
-          {deployEnabled ? (
-            <>Paste a GitHub link. Get a runnable app in 30 seconds.</>
-          ) : (
-            <>
-              Try catalog apps, MCP, and your dashboard on floom.dev. Publishing to
-              our cloud is waitlist-only; self-host stays unrestricted.
-            </>
-          )}
-        </p>
-      </aside>
       </div>
     </PageShell>
   );
