@@ -47,6 +47,7 @@ interface UpdateRunArgs {
   logs?: string;
   duration_ms?: number | null;
   finished?: boolean;
+  is_public?: 0 | 1 | boolean;
 }
 
 export function updateRun(runId: string, patch: UpdateRunArgs): void {
@@ -79,6 +80,10 @@ export function updateRun(runId: string, patch: UpdateRunArgs): void {
   if (patch.duration_ms !== undefined) {
     cols.push('duration_ms = ?');
     values.push(patch.duration_ms);
+  }
+  if (patch.is_public !== undefined) {
+    cols.push('is_public = ?');
+    values.push(patch.is_public ? 1 : 0);
   }
   if (patch.finished) {
     cols.push("finished_at = datetime('now')");

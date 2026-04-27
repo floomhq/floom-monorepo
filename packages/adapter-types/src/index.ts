@@ -218,6 +218,44 @@ export interface RunRecord {
   is_public?: 0 | 1;
 }
 
+export interface AppReviewRecord {
+  id: string;
+  workspace_id: string;
+  app_slug: string;
+  user_id: string;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AppReviewListFilter {
+  app_slug?: string;
+  workspace_id?: string;
+  user_id?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface StudioAppSummaryRecord {
+  id: string;
+  slug: string;
+  name: string;
+  icon: string | null;
+  publish_status: string | null;
+  visibility: string | null;
+  created_at: string;
+  updated_at: string;
+  last_run_at: string | null;
+  runs_7d: number;
+}
+
+export interface StudioAppSummaryFilter {
+  workspace_id: string;
+  author?: string | null;
+}
+
 export interface SecretRecord {
   id: string;
   name: string;
@@ -364,6 +402,9 @@ export interface StorageAdapter {
     thread_id?: string | null;
     action: string;
     inputs: Record<string, unknown> | null;
+    workspace_id?: string;
+    user_id?: string | null;
+    device_id?: string | null;
   }): Promise<RunRecord>;
   getRun(id: string): Promise<RunRecord | undefined>;
   listRuns(filter?: RunListFilter): Promise<RunRecord[]>;
@@ -378,8 +419,20 @@ export interface StorageAdapter {
       logs?: string;
       duration_ms?: number | null;
       finished?: boolean;
+      is_public?: 0 | 1 | boolean;
     },
   ): Promise<void>;
+
+  listStudioAppSummaries(filter: StudioAppSummaryFilter): Promise<StudioAppSummaryRecord[]>;
+
+  createAppReview(input: AppReviewRecord): Promise<AppReviewRecord>;
+  getAppReview(id: string): Promise<AppReviewRecord | undefined>;
+  listAppReviews(filter?: AppReviewListFilter): Promise<AppReviewRecord[]>;
+  updateAppReview(
+    id: string,
+    patch: Pick<AppReviewRecord, 'rating'> & Partial<Pick<AppReviewRecord, 'title' | 'body' | 'updated_at'>>,
+  ): Promise<AppReviewRecord | undefined>;
+  deleteAppReview(id: string): Promise<boolean>;
 
   createRunThread(input: {
     id: string;

@@ -186,12 +186,73 @@ try {
       logs: 'done',
       duration_ms: 12,
       finished: true,
+      is_public: 1,
     });
     const updated = await storage.getRun(run.id);
     assert(updated?.status === 'success', `updated status=${updated?.status}`);
     assert(updated?.outputs === json({ ok: true }), `outputs=${updated?.outputs}`);
+    assert(updated?.is_public === 1, `is_public=${updated?.is_public}`);
     await storage.deleteApp(app.slug);
     assert((await storage.getRun(run.id)) === undefined, 'run did not cascade with app delete');
+  });
+
+  await check('studio app summaries include run rollups with tenant author filters', async () => {
+    const app = await storage.createApp({
+      ...appInput('app-studio-summary-1', 'app-studio-summary-1'),
+      author: 'studio-user-1',
+    });
+    await storage.createRun({
+      id: 'run-studio-summary-1',
+      app_id: app.id,
+      action: 'run',
+      inputs: {},
+      workspace_id: DEFAULT_WORKSPACE_ID,
+      user_id: 'studio-user-1',
+      device_id: 'device-studio-summary-1',
+    });
+    const visible = await storage.listStudioAppSummaries({
+      workspace_id: DEFAULT_WORKSPACE_ID,
+      author: 'studio-user-1',
+    });
+    assert(visible.some((row) => row.id === app.id && Number(row.runs_7d) >= 1), `visible=${json(visible)}`);
+    const hidden = await storage.listStudioAppSummaries({
+      workspace_id: DEFAULT_WORKSPACE_ID,
+      author: 'different-user',
+    });
+    assert(!hidden.some((row) => row.id === app.id), `hidden=${json(hidden)}`);
+  });
+
+  await check('app reviews CRUD round-trip with scoped listing', async () => {
+    const now = new Date().toISOString();
+    const review = await storage.createAppReview({
+      id: 'review-contract-1',
+      workspace_id: DEFAULT_WORKSPACE_ID,
+      app_slug: 'app-studio-summary-1',
+      user_id: 'studio-user-1',
+      rating: 4,
+      title: 'Useful',
+      body: 'Works well',
+      created_at: now,
+      updated_at: now,
+    });
+    assert(review.rating === 4, `rating=${review.rating}`);
+    assert((await storage.getAppReview(review.id))?.id === review.id, 'getAppReview mismatch');
+    const listed = await storage.listAppReviews({
+      app_slug: review.app_slug,
+      workspace_id: DEFAULT_WORKSPACE_ID,
+      user_id: review.user_id,
+      limit: 1,
+    });
+    assert(listed.length === 1 && listed[0].id === review.id, `listed=${json(listed)}`);
+    const updated = await storage.updateAppReview(review.id, {
+      rating: 5,
+      title: 'Great',
+      body: null,
+      updated_at: new Date().toISOString(),
+    });
+    assert(updated?.rating === 5 && updated.title === 'Great' && updated.body === null, `updated=${json(updated)}`);
+    assert((await storage.deleteAppReview(review.id)) === true, 'deleteAppReview existing returned false');
+    assert((await storage.deleteAppReview(review.id)) === false, 'deleteAppReview missing was not false');
   });
 
   await check('run threads and turns round-trip with ordered append', async () => {

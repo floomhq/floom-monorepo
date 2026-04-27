@@ -1,5 +1,7 @@
 import type {
   AppListFilter,
+  AppReviewListFilter,
+  AppReviewRecord,
   AppRecord,
   AgentTokenRecord,
   ErrorType,
@@ -11,6 +13,8 @@ import type {
   RunThreadRecord,
   RunTurnRecord,
   SecretRecord,
+  StudioAppSummaryFilter,
+  StudioAppSummaryRecord,
   StorageAdapter,
   UserRecord,
   UserWriteColumn,
@@ -214,18 +218,23 @@ class PostgresStorageAdapter implements StorageAdapter {
     thread_id?: string | null;
     action: string;
     inputs: Record<string, unknown> | null;
+    workspace_id?: string;
+    user_id?: string | null;
+    device_id?: string | null;
   }): Promise<RunRecord> {
     const app = await this.getAppById(input.app_id);
     await this.execute(
-      `INSERT INTO runs (id, app_id, thread_id, action, inputs, status, workspace_id)
-       VALUES ($1, $2, $3, $4, $5::jsonb, 'pending', $6)`,
+      `INSERT INTO runs (id, app_id, thread_id, action, inputs, status, workspace_id, user_id, device_id)
+       VALUES ($1, $2, $3, $4, $5::jsonb, 'pending', $6, $7, $8)`,
       [
         input.id,
         input.app_id,
         input.thread_id ?? null,
         input.action,
         input.inputs === null ? null : JSON.stringify(input.inputs),
-        app?.workspace_id ?? 'local',
+        input.workspace_id ?? app?.workspace_id ?? 'local',
+        input.user_id ?? null,
+        input.device_id ?? null,
       ],
     );
     const row = await this.getRun(input.id);
@@ -279,6 +288,7 @@ class PostgresStorageAdapter implements StorageAdapter {
       logs?: string;
       duration_ms?: number | null;
       finished?: boolean;
+      is_public?: 0 | 1 | boolean;
     },
   ): Promise<void> {
     const cols: string[] = [];
@@ -311,6 +321,10 @@ class PostgresStorageAdapter implements StorageAdapter {
       cols.push(`duration_ms = $${values.length + 1}`);
       values.push(patch.duration_ms);
     }
+    if (patch.is_public !== undefined) {
+      cols.push(`is_public = $${values.length + 1}`);
+      values.push(Boolean(patch.is_public));
+    }
     if (patch.finished) {
       cols.push('finished_at = now()');
     }
@@ -324,6 +338,114 @@ class PostgresStorageAdapter implements StorageAdapter {
     ) {
       await this.refreshAppAvgRunMs(id);
     }
+  }
+
+  async listStudioAppSummaries(
+    filter: StudioAppSummaryFilter,
+  ): Promise<StudioAppSummaryRecord[]> {
+    const params: unknown[] = [filter.workspace_id];
+    const authorClause =
+      filter.author === undefined || filter.author === null ? '' : ` AND apps.author = $2`;
+    if (authorClause) params.push(filter.author);
+    return (await this.query(
+      `SELECT apps.id, apps.slug, apps.name, apps.icon, apps.publish_status,
+              apps.visibility, apps.created_at, apps.updated_at,
+              (
+                SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
+              ) AS last_run_at,
+              (
+                SELECT COUNT(*) FROM runs
+                 WHERE runs.app_id = apps.id
+                   AND runs.started_at >= now() - interval '7 days'
+              ) AS runs_7d
+         FROM apps
+        WHERE apps.workspace_id = $1${authorClause}
+        ORDER BY
+          CASE WHEN (
+            SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
+          ) IS NULL THEN 1 ELSE 0 END,
+          (
+            SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
+          ) DESC,
+          apps.updated_at DESC`,
+      params,
+    )).map(normalizeStudioAppSummary);
+  }
+
+  async createAppReview(input: AppReviewRecord): Promise<AppReviewRecord> {
+    await this.execute(
+      `INSERT INTO app_reviews
+        (id, workspace_id, app_slug, user_id, rating, title, body, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        input.id,
+        input.workspace_id,
+        input.app_slug,
+        input.user_id,
+        input.rating,
+        input.title,
+        input.body,
+        input.created_at,
+        input.updated_at,
+      ],
+    );
+    const row = await this.getAppReview(input.id);
+    if (!row) throw new Error(`createAppReview: failed to re-read row ${input.id}`);
+    return row;
+  }
+
+  async getAppReview(id: string): Promise<AppReviewRecord | undefined> {
+    return one((await this.query('SELECT * FROM app_reviews WHERE id = $1', [id])).map(normalizeAppReview));
+  }
+
+  async listAppReviews(filter: AppReviewListFilter = {}): Promise<AppReviewRecord[]> {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filter.app_slug) {
+      params.push(filter.app_slug);
+      clauses.push(`app_slug = $${params.length}`);
+    }
+    if (filter.workspace_id) {
+      params.push(filter.workspace_id);
+      clauses.push(`workspace_id = $${params.length}`);
+    }
+    if (filter.user_id) {
+      params.push(filter.user_id);
+      clauses.push(`user_id = $${params.length}`);
+    }
+    let sql = `SELECT * FROM app_reviews${clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : ''} ORDER BY created_at DESC`;
+    if (typeof filter.limit === 'number') {
+      params.push(nonNegativeInt(filter.limit));
+      sql += ` LIMIT $${params.length}`;
+      if (typeof filter.offset === 'number') {
+        params.push(nonNegativeInt(filter.offset));
+        sql += ` OFFSET $${params.length}`;
+      }
+    }
+    return (await this.query(sql, params)).map(normalizeAppReview);
+  }
+
+  async updateAppReview(
+    id: string,
+    patch: Pick<AppReviewRecord, 'rating'> &
+      Partial<Pick<AppReviewRecord, 'title' | 'body' | 'updated_at'>>,
+  ): Promise<AppReviewRecord | undefined> {
+    const rows = await this.query(
+      `UPDATE app_reviews
+          SET rating = $1,
+              title = $2,
+              body = $3,
+              updated_at = $4
+        WHERE id = $5
+        RETURNING *`,
+      [patch.rating, patch.title ?? null, patch.body ?? null, patch.updated_at ?? new Date().toISOString(), id],
+    );
+    return one(rows.map(normalizeAppReview));
+  }
+
+  async deleteAppReview(id: string): Promise<boolean> {
+    const result = await this.execute('DELETE FROM app_reviews WHERE id = $1', [id]);
+    return result.rowCount > 0;
   }
 
   async createRunThread(input: {
@@ -833,6 +955,26 @@ function normalizeRun(row: Record<string, unknown>): RunRecord {
       ? null
       : timestampColumnToString(out.finished_at);
   return out as unknown as RunRecord;
+}
+
+function normalizeStudioAppSummary(row: Record<string, unknown>): StudioAppSummaryRecord {
+  return {
+    ...row,
+    created_at: timestampColumnToString(row.created_at),
+    updated_at: timestampColumnToString(row.updated_at),
+    last_run_at:
+      row.last_run_at === null || row.last_run_at === undefined
+        ? null
+        : timestampColumnToString(row.last_run_at),
+  } as StudioAppSummaryRecord;
+}
+
+function normalizeAppReview(row: Record<string, unknown>): AppReviewRecord {
+  return {
+    ...row,
+    created_at: timestampColumnToString(row.created_at),
+    updated_at: timestampColumnToString(row.updated_at),
+  } as AppReviewRecord;
 }
 
 function normalizeRunThread(row: Record<string, unknown>): RunThreadRecord {
