@@ -304,6 +304,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/run" element={<Navigate to="/run/apps" replace />} />
         <Route path="/run/overview" element={<WaitlistGuard source="me"><MePage /></WaitlistGuard>} />
         <Route path="/run/apps" element={<WaitlistGuard source="me"><MeAppsPage /></WaitlistGuard>} />
+        {/* V12: /run/apps/:slug → /run/apps/:slug/run */}
+        <Route path="/run/apps/:slug" element={<SlugToRunRedirect />} />
         <Route path="/run/runs" element={<WaitlistGuard source="me"><MeRunsPage /></WaitlistGuard>} />
         <Route path="/run/runs/:runId" element={<WaitlistGuard source="me"><MeRunDetailPage /></WaitlistGuard>} />
         <Route path="/run/install" element={<WaitlistGuard source="me"><MeInstallPage /></WaitlistGuard>} />

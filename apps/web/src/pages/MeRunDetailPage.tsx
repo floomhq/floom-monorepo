@@ -1,15 +1,7 @@
-/**
- * /run/runs/:id — MVP stub. Replaced with ComingSoon for launch.
- * Full run detail UI is in development on the v26 branch.
- */
+// MVP stub: /run/runs/:id → redirect to agent-keys for launch.
 
-import { WorkspacePageShell } from '../components/WorkspacePageShell';
-import { ComingSoon } from '../components/ComingSoon';
+import { Navigate } from 'react-router-dom';
 
 export function MeRunDetailPage() {
-  return (
-    <WorkspacePageShell mode="run" title="Run detail · Floom">
-      <ComingSoon feature="Run detail" />
-    </WorkspacePageShell>
-  );
+  return <Navigate to="/me/agent-keys" replace />;
 }
