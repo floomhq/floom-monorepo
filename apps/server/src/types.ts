@@ -389,6 +389,7 @@ export interface WorkspaceRecord {
   plan: string;
   wrapped_dek: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface UserRecord {
@@ -444,6 +445,8 @@ export interface AgentTokenRecord {
   label: string;
   scope: AgentTokenScope;
   workspace_id: string;
+  /** Launch compatibility: backed by agent_tokens.user_id until v1.1 column rename. */
+  issued_by_user_id?: string;
   user_id: string;
   created_at: string;
   last_used_at: string | null;

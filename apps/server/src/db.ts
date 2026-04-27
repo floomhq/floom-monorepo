@@ -728,7 +728,21 @@ db.exec(`
   );
 `);
 
-export const runWorkspaceSecretsBackfill = db.transaction(() => {
+export type WorkspaceSecretsBackfillResult = {
+  dry_run: boolean;
+  groups_scanned: number;
+  secrets_inserted: number;
+  conflicts_recorded: number;
+  conflicts_cleared: number;
+  runtime_ms: number;
+};
+
+type WorkspaceSecretsBackfillOptions = {
+  dryRun?: boolean;
+  log?: boolean;
+};
+
+const runWorkspaceSecretsBackfillTransaction = db.transaction((dryRun: boolean) => {
   const groups = db
     .prepare(
       `SELECT workspace_id, key,
@@ -743,6 +757,25 @@ export const runWorkspaceSecretsBackfill = db.transaction(() => {
     row_count: number;
     value_count: number;
   }>;
+  const result = {
+    dry_run: dryRun,
+    groups_scanned: groups.length,
+    secrets_inserted: 0,
+    conflicts_recorded: 0,
+    conflicts_cleared: 0,
+  };
+  const selectSecret = db.prepare(
+    `SELECT 1 FROM workspace_secrets
+      WHERE workspace_id = ?
+        AND key = ?
+      LIMIT 1`,
+  );
+  const selectConflict = db.prepare(
+    `SELECT 1 FROM workspace_secret_backfill_conflicts
+      WHERE workspace_id = ?
+        AND key = ?
+      LIMIT 1`,
+  );
   const insertSecret = db.prepare(
     `INSERT INTO workspace_secrets
        (workspace_id, key, ciphertext, nonce, auth_tag, created_at, updated_at)
@@ -772,17 +805,49 @@ export const runWorkspaceSecretsBackfill = db.transaction(() => {
 
   for (const group of groups) {
     if (group.value_count === 1) {
-      insertSecret.run(group.workspace_id, group.key);
-      clearConflict.run(group.workspace_id, group.key);
+      if (!selectSecret.get(group.workspace_id, group.key)) {
+        result.secrets_inserted += 1;
+        if (!dryRun) {
+          insertSecret.run(group.workspace_id, group.key);
+        }
+      }
+      if (selectConflict.get(group.workspace_id, group.key)) {
+        result.conflicts_cleared += 1;
+        if (!dryRun) {
+          clearConflict.run(group.workspace_id, group.key);
+        }
+      }
       continue;
     }
     const users = (selectUsers.all(group.workspace_id, group.key) as Array<{ user_id: string }>).map(
       (row) => row.user_id,
     );
-    insertConflict.run(group.workspace_id, group.key, JSON.stringify(users));
+    result.conflicts_recorded += 1;
+    if (!dryRun) {
+      insertConflict.run(group.workspace_id, group.key, JSON.stringify(users));
+    }
   }
+  return result;
 });
-runWorkspaceSecretsBackfill();
+
+export function runWorkspaceSecretsBackfill(
+  options: WorkspaceSecretsBackfillOptions = {},
+): WorkspaceSecretsBackfillResult {
+  const startedAt = Date.now();
+  const result = runWorkspaceSecretsBackfillTransaction(options.dryRun === true);
+  const withRuntime = { ...result, runtime_ms: Date.now() - startedAt };
+  if (options.log) {
+    const mode = withRuntime.dry_run ? 'dry-run ' : '';
+    console.info(
+      `[db] workspace_secrets backfill ${mode}completed in ${withRuntime.runtime_ms}ms ` +
+        `(groups=${withRuntime.groups_scanned}, inserted=${withRuntime.secrets_inserted}, ` +
+        `conflicts=${withRuntime.conflicts_recorded}, cleared=${withRuntime.conflicts_cleared})`,
+    );
+  }
+  return withRuntime;
+}
+
+runWorkspaceSecretsBackfill({ log: true });
 
 // ---------- agent_tokens: scoped machine credentials for agents ----------
 // Token plaintext is shown exactly once by the mint endpoint. The database
