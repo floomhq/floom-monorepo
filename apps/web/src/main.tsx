@@ -24,6 +24,7 @@ const DocsPage = lazy(() => import('./pages/DocsPage').then(m => ({ default: m.D
 // content moved from wireframe to live markdown.
 const DocsLandingPage = lazy(() => import('./pages/DocsLandingPage').then(m => ({ default: m.DocsLandingPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const SignupPage = lazy(() => import('./pages/SignupPage').then(m => ({ default: m.SignupPage })));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then(m => ({ default: m.ForgotPasswordPage })));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })));
 const MePage = lazy(() => import('./pages/MePage').then(m => ({ default: m.MePage })));
@@ -40,6 +41,9 @@ const MeSettingsTokensPage = lazy(() => import('./pages/MeSettingsTokensPage').t
 // exports (AppHeader, TabBar) used by the Studio pages; the routes that
 // mounted them directly now redirect into /studio/*.
 const MeAppRunPage = lazy(() => import('./pages/MeAppRunPage').then(m => ({ default: m.MeAppRunPage })));
+const MeAppTriggersPage = lazy(() => import('./pages/MeAppTriggersPage').then(m => ({ default: m.MeAppTriggersPage })));
+const MeAppTriggerSchedulePage = lazy(() => import('./pages/MeAppTriggerSchedulePage').then(m => ({ default: m.MeAppTriggerSchedulePage })));
+const MeAppTriggerWebhookPage = lazy(() => import('./pages/MeAppTriggerWebhookPage').then(m => ({ default: m.MeAppTriggerWebhookPage })));
 const MeInstallPage = lazy(() => import('./pages/MeInstallPage').then(m => ({ default: m.MeInstallPage })));
 // 2026-04-20 (PRR tail cleanup): public /install stub — separate from
 // /me/install which is the authenticated "Install to Claude" flow.
@@ -56,6 +60,8 @@ const AboutPage = lazy(() => import('./pages/AboutPage').then(m => ({ default: m
 // Free during beta, self-host free forever, paid plans TBD. Fixes the
 // commercial-visitor dead-end called out in the product audit (pd-12).
 const PricingPage = lazy(() => import('./pages/PricingPage').then(m => ({ default: m.PricingPage })));
+const IaPage = lazy(() => import('./pages/IaPage').then(m => ({ default: m.IaPage })));
+const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage').then(m => ({ default: m.ArchitecturePage })));
 const BuildPage = lazy(() => import('./pages/BuildPage').then(m => ({ default: m.BuildPage })));
 const CreatorPage = lazy(() => import('./pages/CreatorPage').then(m => ({ default: m.CreatorPage })));
 const CreatorAppPage = lazy(() => import('./pages/CreatorAppPage').then(m => ({ default: m.CreatorAppPage })));
@@ -73,12 +79,14 @@ const StudioAppSecretsPage = lazy(() => import('./pages/StudioAppSecretsPage').t
 const StudioAppAccessPage = lazy(() => import('./pages/StudioAppAccessPage').then(m => ({ default: m.StudioAppAccessPage })));
 const StudioAppRendererPage = lazy(() => import('./pages/StudioAppRendererPage').then(m => ({ default: m.StudioAppRendererPage })));
 const StudioAppAnalyticsPage = lazy(() => import('./pages/StudioAppAnalyticsPage').then(m => ({ default: m.StudioAppAnalyticsPage })));
+const StudioAppFeedbackPage = lazy(() => import('./pages/StudioAppFeedbackPage').then(m => ({ default: m.StudioAppFeedbackPage })));
 const StudioTriggersTab = lazy(() => import('./pages/StudioTriggersTab').then(m => ({ default: m.StudioTriggersTab })));
 const StudioSettingsPage = lazy(() => import('./pages/StudioSettingsPage').then(m => ({ default: m.StudioSettingsPage })));
 const ImprintPage = lazy(() => import('./pages/ImprintPage').then(m => ({ default: m.ImprintPage })));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
 const TermsPage = lazy(() => import('./pages/TermsPage').then(m => ({ default: m.TermsPage })));
 const CookiesPage = lazy(() => import('./pages/CookiesPage').then(m => ({ default: m.CookiesPage })));
+const StatusPage = lazy(() => import('./pages/StatusPage').then(m => ({ default: m.StatusPage })));
 // /changelog (PR #405 ripple, 2026-04-22): TopBar advertises a Changelog
 // link in the centre nav; previously it was a dead `#` anchor. This
 // page is a minimal landing that points at GitHub Releases + Discord.
@@ -140,15 +148,15 @@ function PSlugDashboardRedirect() {
 // redirects keep old bookmarks + shared links alive.
 function MeAppRedirect() {
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/me/apps/${slug ?? ''}`} replace />;
+  return <Navigate to={`/run/apps/${slug ?? ''}`} replace />;
 }
 function MeAppSecretsRedirect() {
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/me/apps/${slug ?? ''}/secrets`} replace />;
+  return <Navigate to={`/run/apps/${slug ?? ''}/secrets`} replace />;
 }
 function MeAppRunRedirect() {
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/me/apps/${slug ?? ''}/run`} replace />;
+  return <Navigate to={`/run/apps/${slug ?? ''}/run`} replace />;
 }
 
 // Studio restructure 2026-04-18: Store/Studio split. These redirects
@@ -160,11 +168,40 @@ function StudioSlugRedirect({ subpath }: { subpath?: string }) {
   return <Navigate to={`/studio/${slug ?? ''}${tail}`} replace />;
 }
 
+function LegacyWorkspaceUiRedirect() {
+  const location = useLocation();
+  const pathname = location.pathname.replace(/\/$/, '') || '/';
+  let target = '/run';
+  if (pathname === '/me/install') target = '/run/install';
+  else if (pathname === '/me/secrets') target = '/settings/byok-keys';
+  else if (pathname === '/me/agent-keys' || pathname === '/me/api-keys') {
+    target = '/settings/agent-tokens';
+  } else if (pathname === '/me/settings' || pathname === '/me/settings/tokens') {
+    target = '/account/settings';
+  } else if (pathname === '/studio/settings') {
+    target = '/settings/studio';
+  } else if (pathname === '/me/apps') {
+    target = '/run/apps';
+  } else if (pathname.startsWith('/me/apps/')) {
+    target = pathname.replace(/^\/me\/apps/, '/run/apps');
+  } else if (pathname === '/me/runs') {
+    target = '/run/runs';
+  } else if (pathname.startsWith('/me/runs/')) {
+    target = pathname.replace(/^\/me\/runs/, '/run/runs');
+  }
+  return <Navigate to={`${target}${location.search}${location.hash}`} replace />;
+}
+
 // Design-audit fix 2026-04-22: /apps/:slug and /store/:slug funnel into the
 // canonical app permalink at /p/:slug. The top-nav "Store" label and the
 // "Try on Floom" CTAs on app cards point at these URLs, so the redirect
 // keeps deep links from external pages (wireframes, shared links) alive.
 function AppSlugToPermalinkRedirect() {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/p/${slug ?? ''}`} replace />;
+}
+
+function EmbedSlugToPermalinkRedirect() {
   const { slug } = useParams<{ slug: string }>();
   return <Navigate to={`/p/${slug ?? ''}`} replace />;
 }
@@ -227,6 +264,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/store/:slug" element={<AppSlugToPermalinkRedirect />} />
         {/* Standalone app permalink */}
         <Route path="/p/:slug" element={<AppPermalinkPage />} />
+        <Route path="/embed/:slug" element={<EmbedSlugToPermalinkRedirect />} />
         <Route path="/r/:runId" element={<PublicRunPermalinkPage />} />
         {/* Protocol spec page */}
         <Route path="/protocol" element={<ProtocolPage />} />
@@ -247,60 +285,44 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             unreachable — visitors land on /waitlist instead. On preview
             (DEPLOY_ENABLED=true) this renders normally. */}
         <Route path="/login" element={<WaitlistGuard source="login"><LoginPage /></WaitlistGuard>} />
-        <Route path="/signup" element={<WaitlistGuard source="signup"><LoginPage /></WaitlistGuard>} />
+        <Route path="/signup" element={<WaitlistGuard source="signup"><SignupPage /></WaitlistGuard>} />
         {/* Pre-launch P0: real password-reset flow. Replaces the old
             mailto link that dropped into Federico's inbox. Better Auth's
             `sendResetPassword` hook emails the reset link; this page
             handles the form side. */}
         <Route path="/forgot-password" element={<WaitlistGuard source="forgot-password"><ForgotPasswordPage /></WaitlistGuard>} />
         <Route path="/reset-password" element={<WaitlistGuard source="reset-password"><ResetPasswordPage /></WaitlistGuard>} />
-        {/* W4-minimal: user dashboard. WaitlistGuard keeps /me* + /studio*
-            and /build unreachable on floom.dev (waitlist-only) while
-            leaving the public landing, /apps, /p/:slug, and /docs open. */}
-        <Route path="/me" element={<WaitlistGuard source="me"><MePage /></WaitlistGuard>} />
-        <Route path="/me/install" element={<WaitlistGuard source="me"><MeInstallPage /></WaitlistGuard>} />
-        {/* Studio-tabbed dashboard tab pages (issue #547). Each tab is
-            its own URL so deep links + browser back/forward behave
-            naturally. Default tab = Overview at /me. */}
-        <Route path="/me/apps" element={<WaitlistGuard source="me"><MeAppsPage /></WaitlistGuard>} />
-        <Route path="/me/runs" element={<WaitlistGuard source="me"><MeRunsPage /></WaitlistGuard>} />
-        <Route path="/me/secrets" element={<WaitlistGuard source="me"><MeSecretsPage /></WaitlistGuard>} />
-        <Route path="/me/runs/:runId" element={<WaitlistGuard source="me"><MeRunDetailPage /></WaitlistGuard>} />
-        <Route path="/me/settings" element={<WaitlistGuard source="me"><MeSettingsPage /></WaitlistGuard>} />
-        {/* /me/agent-keys — canonical location for "Agent tokens"
-            (vocabulary lock per `keys-decision.md`: "API keys" is banned
-            from user-visible copy on this surface, including the URL).
-            The underlying page component file rename
-            MeSettingsTokensPage.tsx → MeAgentKeysPage.tsx happens in PR-G
-            (keys impl); this PR-A only flips the route URL + adds the
-            back-compat redirect. Both routes serve the same page for 30
-            days; old URL is then deprecated.
-            /me/api-keys redirects → /me/agent-keys.
-            /me/settings/tokens redirects directly → /me/agent-keys (no
-            double-hop) so existing docs/links land in one redirect. */}
-        <Route path="/me/agent-keys" element={<WaitlistGuard source="me"><MeSettingsTokensPage /></WaitlistGuard>} />
-        <Route
-          path="/me/api-keys"
-          element={<Navigate to="/me/agent-keys" replace />}
-        />
-        <Route
-          path="/me/settings/tokens"
-          element={<Navigate to="/me/agent-keys" replace />}
-        />
-        {/* v16 studio restructure 2026-04-18: creator-context pages moved
-            to /studio/*. Legacy /me/apps/:slug (owner context) redirects
-            to the new Studio tree. MeAppRunPage stays under /me/apps/:slug/run
-            because "run an owned app" is a /me (consumer) action, not a
-            creator management action — the RunSurface lives there, and
-            Studio links into it when needed.
-            /me/apps is now the Apps tab (rendered above); the sub-paths
-            below redirect deeper links into the Studio tree. */}
-        <Route path="/me/apps/:slug" element={<StudioSlugRedirect />} />
-        <Route path="/me/apps/:slug/secrets" element={<StudioSlugRedirect subpath="secrets" />} />
-        <Route path="/me/apps/:slug/run" element={<WaitlistGuard source="me"><MeAppRunPage /></WaitlistGuard>} />
-        {/* Legacy /me/a/:slug redirects (preserve old bookmarks). The
-            /secrets and /run variants keep the existing hop to the
-            /me/apps/:slug* chain, which then funnels to /studio/*. */}
+        {/* Layer 5 Round 2 canonical workspace UI routes. Page bodies stay on
+            the existing Me* modules until Round 3 renames content and shells. */}
+        <Route path="/run" element={<WaitlistGuard source="me"><MePage /></WaitlistGuard>} />
+        <Route path="/run/apps" element={<WaitlistGuard source="me"><MeAppsPage /></WaitlistGuard>} />
+        <Route path="/run/runs" element={<WaitlistGuard source="me"><MeRunsPage /></WaitlistGuard>} />
+        <Route path="/run/runs/:runId" element={<WaitlistGuard source="me"><MeRunDetailPage /></WaitlistGuard>} />
+        <Route path="/run/install" element={<WaitlistGuard source="me"><MeInstallPage /></WaitlistGuard>} />
+        <Route path="/run/apps/:slug/run" element={<WaitlistGuard source="me"><MeAppRunPage /></WaitlistGuard>} />
+        <Route path="/run/apps/:slug/triggers" element={<WaitlistGuard source="me"><MeAppTriggersPage /></WaitlistGuard>} />
+        <Route path="/run/apps/:slug/triggers/schedule" element={<WaitlistGuard source="me"><MeAppTriggerSchedulePage /></WaitlistGuard>} />
+        <Route path="/run/apps/:slug/triggers/webhook" element={<WaitlistGuard source="me"><MeAppTriggerWebhookPage /></WaitlistGuard>} />
+        <Route path="/settings/byok-keys" element={<WaitlistGuard source="me"><MeSecretsPage /></WaitlistGuard>} />
+        <Route path="/settings/agent-tokens" element={<WaitlistGuard source="me"><MeSettingsTokensPage /></WaitlistGuard>} />
+        <Route path="/settings/studio" element={<WaitlistGuard source="studio"><StudioSettingsPage /></WaitlistGuard>} />
+        <Route path="/account/settings" element={<WaitlistGuard source="me"><MeSettingsPage /></WaitlistGuard>} />
+
+        {/* Legacy workspace UI URLs. Server returns 301 on direct loads; these
+            redirects cover in-app navigation that never reaches the server. */}
+        <Route path="/me" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/install" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/apps" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/runs" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/secrets" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/runs/:runId" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/settings" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/agent-keys" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/api-keys" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/settings/tokens" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/apps/:slug" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/apps/:slug/secrets" element={<LegacyWorkspaceUiRedirect />} />
+        <Route path="/me/apps/:slug/run" element={<LegacyWorkspaceUiRedirect />} />
         <Route path="/me/a/:slug" element={<MeAppRedirect />} />
         <Route path="/me/a/:slug/secrets" element={<MeAppSecretsRedirect />} />
         <Route path="/me/a/:slug/run" element={<MeAppRunRedirect />} />
@@ -324,13 +346,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             sidebar copy, and no external URL references
             /studio/my-apps. Revisit if we ever start emitting that URL
             from docs / marketing. */}
-        <Route path="/studio/settings" element={<WaitlistGuard source="studio"><StudioSettingsPage /></WaitlistGuard>} />
+        <Route path="/studio/settings" element={<LegacyWorkspaceUiRedirect />} />
         <Route path="/studio/:slug" element={<WaitlistGuard source="studio"><StudioAppPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/runs" element={<WaitlistGuard source="studio"><StudioAppRunsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/secrets" element={<WaitlistGuard source="studio"><StudioAppSecretsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/access" element={<WaitlistGuard source="studio"><StudioAppAccessPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/renderer" element={<WaitlistGuard source="studio"><StudioAppRendererPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/analytics" element={<WaitlistGuard source="studio"><StudioAppAnalyticsPage /></WaitlistGuard>} />
+        <Route path="/studio/:slug/feedback" element={<WaitlistGuard source="studio"><StudioAppFeedbackPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/triggers" element={<WaitlistGuard source="studio"><StudioTriggersTab /></WaitlistGuard>} />
         {/* Legacy creator-context redirects into Studio (preserve old links). */}
         <Route path="/build" element={<Navigate to="/studio/build" replace />} />
@@ -372,6 +395,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             banner ("Welcome to Floom — try an app ↓"). */}
         <Route path="/onboarding" element={<Navigate to="/me?welcome=1" replace />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/ia" element={<IaPage />} />
+        <Route path="/architecture" element={<ArchitecturePage />} />
         {/* /changelog — added alongside v17 TopBar (PR #405 ripple fix). */}
         <Route path="/changelog" element={<ChangelogPage />} />
         <Route path="/waitlist" element={<WaitlistPage />} />
@@ -383,6 +408,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/imprint" element={<ImprintPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/status" element={<StatusPage />} />
         <Route path="/cookies" element={<CookiesPage />} />
         {/* /legal/* subpath aliases so both URL conventions work. */}
         <Route path="/legal/imprint" element={<Navigate to="/legal" replace />} />

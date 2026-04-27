@@ -991,6 +991,8 @@ if (webDist) {
     '/store',
     '/about',
     '/pricing',
+    '/ia',
+    '/architecture',
     '/protocol',
     '/install',
     '/install-in-claude',
@@ -999,6 +1001,14 @@ if (webDist) {
     '/signup',
     '/forgot-password',
     '/reset-password',
+    '/run',
+    '/run/apps',
+    '/run/runs',
+    '/run/install',
+    '/settings/byok-keys',
+    '/settings/agent-tokens',
+    '/settings/studio',
+    '/account/settings',
     '/me',
     '/me/install',
     '/me/runs',
@@ -1028,6 +1038,7 @@ if (webDist) {
     '/impressum',
     '/privacy',
     '/terms',
+    '/status',
     '/cookies',
     '/spec',
     '/_creator-legacy',
@@ -1045,11 +1056,16 @@ if (webDist) {
   const knownDynamicPatterns: RegExp[] = [
     new RegExp(`^/p/${SLUG}/?$`),
     new RegExp(`^/p/${SLUG}/dashboard/?$`),
+    new RegExp(`^/embed/${SLUG}/?$`),
     new RegExp(`^/r/${RUN_ID}/?$`),
     new RegExp(`^/apps/${SLUG}/?$`),
     new RegExp(`^/store/${SLUG}/?$`),
     new RegExp(`^/install/${SLUG}/?$`),
     new RegExp(`^/docs/${SLUG}/?$`),
+    new RegExp(`^/run/runs/${RUN_ID}/?$`),
+    new RegExp(`^/run/apps/${SLUG}/?$`),
+    new RegExp(`^/run/apps/${SLUG}/(run|triggers)/?$`),
+    new RegExp(`^/run/apps/${SLUG}/triggers/(schedule|webhook)/?$`),
     new RegExp(`^/me/runs/${RUN_ID}/?$`),
     new RegExp(`^/me/apps/${SLUG}/?$`),
     new RegExp(`^/me/apps/${SLUG}/(secrets|run)/?$`),
@@ -1073,6 +1089,32 @@ if (webDist) {
       : pathname;
     if (knownExactPaths.has(stripped)) return true;
     return knownDynamicPatterns.some((rx) => rx.test(pathname));
+  }
+
+  function legacyWorkspaceUiTarget(pathname: string): string | null {
+    const normalized =
+      pathname.length > 1 && pathname.endsWith('/')
+        ? pathname.slice(0, -1)
+        : pathname;
+    if (normalized === '/me') return '/run';
+    if (normalized === '/me/install') return '/run/install';
+    if (normalized === '/me/secrets') return '/settings/byok-keys';
+    if (normalized === '/me/agent-keys' || normalized === '/me/api-keys') {
+      return '/settings/agent-tokens';
+    }
+    if (normalized === '/me/settings' || normalized === '/me/settings/tokens') {
+      return '/account/settings';
+    }
+    if (normalized === '/studio/settings') return '/settings/studio';
+    if (normalized === '/me/apps') return '/run/apps';
+    if (normalized.startsWith('/me/apps/')) {
+      return normalized.replace(/^\/me\/apps/, '/run/apps');
+    }
+    if (normalized === '/me/runs') return '/run/runs';
+    if (normalized.startsWith('/me/runs/')) {
+      return normalized.replace(/^\/me\/runs/, '/run/runs');
+    }
+    return null;
   }
 
   // Crawlers don't run JS, so client-side meta updates in AppPermalinkPage
@@ -1160,9 +1202,16 @@ if (webDist) {
     // free forever, paid plans TBD). SSR title so outbound-comparison
     // crawlers see "Pricing", not the landing title.
     if (pathname === '/pricing' || pathname === '/pricing/') return 'Pricing · Floom';
+    if (pathname === '/ia' || pathname === '/ia/') return 'Information architecture · Floom';
+    if (pathname === '/architecture' || pathname === '/architecture/') return 'Architecture · Floom';
     // /onboarding is a redirect to /me?welcome=1 but the title the server
     // returns before the 302 hops still matters for preview bots.
     if (pathname === '/onboarding' || pathname === '/onboarding/') return 'Welcome to Floom · Floom';
+    if (pathname === '/run' || pathname.startsWith('/run/')) return 'Run · Floom';
+    if (pathname.startsWith('/settings/')) return 'Workspace settings · Floom';
+    if (pathname === '/account/settings' || pathname === '/account/settings/') {
+      return 'Account settings · Floom';
+    }
     if (pathname === '/me' || pathname.startsWith('/me/')) return 'Me · Floom';
     if (pathname.startsWith('/studio')) return 'Studio · Floom';
     if (pathname.startsWith('/docs')) return 'Docs · Floom';
@@ -1174,6 +1223,7 @@ if (webDist) {
     if (pathname === '/imprint') return 'Imprint · Floom';
     if (pathname === '/privacy') return 'Privacy · Floom';
     if (pathname === '/terms') return 'Terms · Floom';
+    if (pathname === '/status' || pathname === '/status/') return 'Status · Floom';
     if (pathname === '/cookies') return 'Cookies · Floom';
     return null;
   }
@@ -1204,6 +1254,20 @@ if (webDist) {
         ogTitle: 'Pricing · Floom',
         description:
           'Free during beta. Self-host free forever. Paid cloud plans coming soon.',
+      };
+    }
+    if (pathname === '/ia' || pathname === '/ia/') {
+      return {
+        ogTitle: 'Information architecture · Floom',
+        description:
+          'The v24 sitemap for public, Workspace Run, and Studio surfaces.',
+      };
+    }
+    if (pathname === '/architecture' || pathname === '/architecture/') {
+      return {
+        ogTitle: 'Architecture · Floom',
+        description:
+          'How Floom maps web, MCP, REST, and CLI onto one protocol and runtime.',
       };
     }
     if (pathname === '/install' || pathname === '/install/') {
@@ -1249,6 +1313,12 @@ if (webDist) {
       return {
         ogTitle: 'Create account · Floom',
         description: 'Create a free Floom account to publish and run AI apps.',
+      };
+    }
+    if (pathname === '/status' || pathname === '/status/') {
+      return {
+        ogTitle: 'Status · Floom',
+        description: 'Current launch-week status for Floom public pages, runtime API, workspace data, and transactional email.',
       };
     }
     return null;
@@ -1458,6 +1528,19 @@ if (webDist) {
       });
     }
 
+    function permanentRedirect(targetPath: string) {
+      const target = `${targetPath}${url.search}`;
+      return new Response(null, {
+        status: 301,
+        headers: { location: target, 'cache-control': 'public, max-age=3600' },
+      });
+    }
+
+    const meRedirectTarget = legacyWorkspaceUiTarget(pathname);
+    if (meRedirectTarget) {
+      return permanentRedirect(meRedirectTarget);
+    }
+
     // 2026-04-24 (SEO #348): /apps/<slug> and /store/<slug> are legacy
     // patterns that funnel into /p/<slug> client-side. On the server we
     // return a real 301 so crawlers don't index both URLs and users who
@@ -1471,6 +1554,20 @@ if (webDist) {
       return new Response(null, {
         status: 301,
         headers: { location: target, 'cache-control': 'public, max-age=3600' },
+      });
+    }
+
+    // Launch-blocker audit 2026-04-27: embed surfaces are deferred to v1.1.
+    // Keep old/bookmarked `/embed/:slug` URLs useful by routing them to the
+    // public run surface instead of a bare 404.
+    const embedMatch = pathname.match(/^\/embed\/([a-z0-9][a-z0-9-]*)\/?$/);
+    if (embedMatch && embedMatch[1]) {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: `/p/${embedMatch[1]}`,
+          'cache-control': 'no-cache',
+        },
       });
     }
 

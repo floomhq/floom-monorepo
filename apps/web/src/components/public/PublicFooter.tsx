@@ -97,6 +97,7 @@ export function PublicFooter() {
         <div style={COL_STYLE}>
           <div style={COL_LABEL_STYLE}>Company</div>
           <FootLink to="/about">About</FootLink>
+          <FootLink to="/status">Status</FootLink>
           <FootLink href="https://github.com/floomhq/floom">GitHub</FootLink>
           <FootLink to="/docs/limits">Runtime limits</FootLink>
           <FootLink to="/docs/security">Security</FootLink>
@@ -144,16 +145,6 @@ export function PublicFooter() {
           </div>
         )}
       </div>
-
-      <style>{`
-        @media (max-width: 640px) {
-          .public-footer-columns {
-            grid-template-columns: 1fr !important;
-            gap: 20px !important;
-            max-width: 320px !important;
-          }
-        }
-      `}</style>
     </footer>
   );
 }

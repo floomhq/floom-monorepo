@@ -580,10 +580,18 @@ db.exec(`
     name TEXT NOT NULL,
     plan TEXT NOT NULL DEFAULT 'oss',
     wrapped_dek TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_workspaces_slug ON workspaces(slug);
 `);
+const workspaceCols = (db.prepare(`PRAGMA table_info(workspaces)`).all() as {
+  name: string;
+}[]).map((r) => r.name);
+if (!workspaceCols.includes('updated_at')) {
+  db.exec(`ALTER TABLE workspaces ADD COLUMN updated_at TEXT`);
+  db.exec(`UPDATE workspaces SET updated_at = COALESCE(updated_at, created_at, datetime('now'))`);
+}
 
 // ---------- users (global identity, shared across workspaces) ----------
 db.exec(`
@@ -699,6 +707,82 @@ db.exec(`
     PRIMARY KEY (workspace_id, user_id, key)
   );
 `);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS workspace_secrets (
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    ciphertext TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+    auth_tag TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (workspace_id, key)
+  );
+  CREATE TABLE IF NOT EXISTS workspace_secret_backfill_conflicts (
+    workspace_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    user_ids_json TEXT NOT NULL,
+    detected_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (workspace_id, key)
+  );
+`);
+
+export const runWorkspaceSecretsBackfill = db.transaction(() => {
+  const groups = db
+    .prepare(
+      `SELECT workspace_id, key,
+              COUNT(*) AS row_count,
+              COUNT(DISTINCT ciphertext || ':' || nonce || ':' || auth_tag) AS value_count
+         FROM user_secrets
+        GROUP BY workspace_id, key`,
+    )
+    .all() as Array<{
+    workspace_id: string;
+    key: string;
+    row_count: number;
+    value_count: number;
+  }>;
+  const insertSecret = db.prepare(
+    `INSERT INTO workspace_secrets
+       (workspace_id, key, ciphertext, nonce, auth_tag, created_at, updated_at)
+     SELECT workspace_id, key, ciphertext, nonce, auth_tag, MIN(created_at), MAX(updated_at)
+       FROM user_secrets
+      WHERE workspace_id = ?
+        AND key = ?
+      GROUP BY workspace_id, key, ciphertext, nonce, auth_tag
+     ON CONFLICT (workspace_id, key) DO NOTHING`,
+  );
+  const selectUsers = db.prepare(
+    `SELECT user_id FROM user_secrets WHERE workspace_id = ? AND key = ? ORDER BY user_id`,
+  );
+  const insertConflict = db.prepare(
+    `INSERT INTO workspace_secret_backfill_conflicts
+       (workspace_id, key, user_ids_json, detected_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT (workspace_id, key) DO UPDATE SET
+       user_ids_json = excluded.user_ids_json,
+       detected_at = excluded.detected_at`,
+  );
+  const clearConflict = db.prepare(
+    `DELETE FROM workspace_secret_backfill_conflicts
+      WHERE workspace_id = ?
+        AND key = ?`,
+  );
+
+  for (const group of groups) {
+    if (group.value_count === 1) {
+      insertSecret.run(group.workspace_id, group.key);
+      clearConflict.run(group.workspace_id, group.key);
+      continue;
+    }
+    const users = (selectUsers.all(group.workspace_id, group.key) as Array<{ user_id: string }>).map(
+      (row) => row.user_id,
+    );
+    insertConflict.run(group.workspace_id, group.key, JSON.stringify(users));
+  }
+});
+runWorkspaceSecretsBackfill();
 
 // ---------- agent_tokens: scoped machine credentials for agents ----------
 // Token plaintext is shown exactly once by the mint endpoint. The database
