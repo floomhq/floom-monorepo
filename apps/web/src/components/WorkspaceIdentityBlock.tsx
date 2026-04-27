@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useSession } from '../hooks/useSession';
 
 const wrapStyle: CSSProperties = {
@@ -11,6 +12,8 @@ const wrapStyle: CSSProperties = {
   flexDirection: 'column',
   justifyContent: 'center',
   gap: 2,
+  textDecoration: 'none',
+  cursor: 'pointer',
 };
 
 const eyebrowStyle: CSSProperties = {
@@ -23,6 +26,13 @@ const eyebrowStyle: CSSProperties = {
   lineHeight: 1,
 };
 
+const nameRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 6,
+};
+
 const nameStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 700,
@@ -31,16 +41,46 @@ const nameStyle: CSSProperties = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   lineHeight: 1.2,
+  flex: 1,
+  minWidth: 0,
 };
+
+/** Subtle downward chevron indicates click → opens settings */
+function ChevronDown() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ flexShrink: 0, color: 'var(--muted)' }}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
 
 export function WorkspaceIdentityBlock() {
   const { data } = useSession();
   const workspaceName = data?.active_workspace?.name?.trim() || 'Workspace';
 
   return (
-    <div data-testid="workspace-identity-block" style={wrapStyle}>
+    <Link
+      to="/settings"
+      data-testid="workspace-identity-block"
+      title="Workspace settings"
+      style={wrapStyle}
+    >
       <span style={eyebrowStyle}>Workspace</span>
-      <span style={nameStyle}>{workspaceName}</span>
-    </div>
+      <div style={nameRowStyle}>
+        <span style={nameStyle}>{workspaceName}</span>
+        <ChevronDown />
+      </div>
+    </Link>
   );
 }

@@ -1,14 +1,27 @@
+/**
+ * StudioRail — v26 workspace rail for Studio mode.
+ *
+ * v26 changes (V26-IA-SPEC §12):
+ *   §12.1 — brand logo REMOVED from rail (TopBar carries it)
+ *   §12.2 — same shell shape as RunRail ([Run|Studio] toggle below workspace name)
+ *   §12.3/12.4 — "+ New app" is the ONLY app-entry CTA in Studio mode;
+ *                no standalone "App store" item
+ *   §12.5 — Docs removed from rail (moved to avatar dropdown)
+ *   §12.6 — workspace settings only via identity-block click (no gear in rail)
+ *   Rail: {workspace name ▾} → [Run|Studio] toggle → Apps · Runs →
+ *         + New app → footer
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, Home, KeyRound, LockKeyhole, Plus, Settings, UserRound } from 'lucide-react';
+import { Box, Play, Plus } from 'lucide-react';
 import { AppIcon } from './AppIcon';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
+import { ModeToggle } from './ModeToggle';
 import {
-  Brand,
   RailFoot,
   RailItem,
-  RailSection,
   bodyStyle,
   headStyle,
   railStyle,
@@ -20,7 +33,10 @@ export function StudioRail() {
   const location = useLocation();
   const [apps, setApps] = useState<StudioAppSummary[] | null>(null);
   const firstSegment = location.pathname.match(/^\/studio\/([^/]+)/)?.[1];
-  const activeSlug = firstSegment && !['apps', 'runs', 'build', 'new'].includes(firstSegment) ? firstSegment : undefined;
+  const activeSlug =
+    firstSegment && !['apps', 'runs', 'build', 'new', 'overview'].includes(firstSegment)
+      ? firstSegment
+      : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -48,31 +64,39 @@ export function StudioRail() {
 
   return (
     <aside data-testid="studio-rail" aria-label="Studio navigation" style={railStyle}>
+      {/* v26 §12.1: no brand here — TopBar carries the floom logo */}
       <div style={headStyle}>
-        <Brand to="/studio" label="floom" tag="Studio" />
         <WorkspaceIdentityBlock />
-        <Link to="/studio/build" data-testid="studio-rail-new-app" style={primaryCtaStyle}>
-          <Plus size={15} aria-hidden="true" />
-          <span>New app</span>
-        </Link>
+        <ModeToggle activeMode="studio" />
       </div>
       <div style={bodyStyle}>
-        <RailSection label="Studio">
-          <RailItem to="/studio" active={location.pathname === '/studio'} icon={<Home size={15} />}>
-            Home
-          </RailItem>
-          <RailItem to="/studio/apps" active={location.pathname === '/studio/apps'} icon={<Box size={15} />}>
-            Apps
-          </RailItem>
-          <RailItem to="/studio/runs" active={location.pathname === '/studio/runs'} icon={<Home size={15} />}>
-            All runs
-          </RailItem>
-        </RailSection>
-        <RailSection label={`Apps · ${apps?.length ?? 0}`}>
-          {visibleApps.length === 0 ? (
-            <div style={hintStyle}>{apps === null ? 'Loading workspace apps...' : 'No apps yet.'}</div>
-          ) : (
-            visibleApps.map((app) => (
+        {/* Primary nav items */}
+        <RailItem
+          to="/studio/apps"
+          active={
+            location.pathname === '/studio/apps' ||
+            (!!activeSlug && location.pathname.startsWith('/studio/'))
+          }
+          icon={<Box size={15} />}
+          count={apps?.length}
+        >
+          Apps
+        </RailItem>
+        <RailItem
+          to="/studio/runs"
+          active={
+            location.pathname === '/studio/runs' ||
+            location.pathname.startsWith('/studio/runs/')
+          }
+          icon={<Play size={15} />}
+        >
+          Runs
+        </RailItem>
+
+        {/* Per-app quick links (active app shortcuts) */}
+        {visibleApps.length > 0 && (
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {visibleApps.map((app) => (
               <Link
                 key={app.slug}
                 to={`/studio/${app.slug}`}
@@ -84,41 +108,21 @@ export function StudioRail() {
                 </span>
                 <span style={appNameStyle}>{app.name}</span>
               </Link>
-            ))
-          )}
-        </RailSection>
-        <RailSection label="Workspace settings">
-          <RailItem
-            to="/settings/byok-keys"
-            active={location.pathname === '/settings/byok-keys'}
-            icon={<LockKeyhole size={15} />}
+            ))}
+          </div>
+        )}
+
+        {/* v26 §12.3/12.4: "+ New app" is the single entry point in Studio */}
+        <div style={{ marginTop: 'auto', paddingTop: 12 }}>
+          <Link
+            to="/studio/build"
+            data-testid="studio-rail-new-app"
+            style={primaryCtaStyle}
           >
-            BYOK keys
-          </RailItem>
-          <RailItem
-            to="/settings/agent-tokens"
-            active={location.pathname === '/settings/agent-tokens'}
-            icon={<KeyRound size={15} />}
-          >
-            Agent tokens
-          </RailItem>
-          <RailItem
-            to="/settings/studio"
-            active={location.pathname === '/settings/studio'}
-            icon={<Settings size={15} />}
-          >
-            Studio settings
-          </RailItem>
-        </RailSection>
-        <RailSection label="Account">
-          <RailItem
-            to="/account/settings"
-            active={location.pathname === '/account/settings'}
-            icon={<UserRound size={15} />}
-          >
-            Account settings
-          </RailItem>
-        </RailSection>
+            <Plus size={14} aria-hidden="true" />
+            <span>New app</span>
+          </Link>
+        </div>
       </div>
       <RailFoot />
     </aside>
@@ -138,13 +142,8 @@ const primaryCtaStyle: CSSProperties = {
   textDecoration: 'none',
   fontSize: 13,
   fontWeight: 700,
-};
-
-const hintStyle: CSSProperties = {
-  color: 'var(--muted)',
-  fontSize: 12,
-  lineHeight: 1.45,
-  padding: '6px 10px',
+  width: '100%',
+  boxSizing: 'border-box',
 };
 
 function appItemStyle(active: boolean): CSSProperties {

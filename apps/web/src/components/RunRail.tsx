@@ -1,12 +1,25 @@
+/**
+ * RunRail — v26 workspace rail for Run mode.
+ *
+ * v26 changes (V26-IA-SPEC §12):
+ *   §12.1 — brand logo REMOVED from rail (TopBar carries it)
+ *   §12.2 — [Run|Studio] mode toggle pill below workspace name
+ *   §12.3/12.4 — no standalone "App store" item; "+ New app" is the single
+ *                entry point; in Run mode it opens an overlay
+ *   §12.5 — Docs removed from rail (moved to avatar dropdown)
+ *   §12.6 — workspace settings only via identity-block click
+ *   Rail: {workspace name ▾} → [Run|Studio] toggle → Apps · Runs → footer
+ */
+
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, Home, KeyRound, LockKeyhole, UserRound } from 'lucide-react';
-import { Logo } from './Logo';
+import { Box, Play } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
+import { ModeToggle } from './ModeToggle';
 import { useMyApps } from '../hooks/useMyApps';
 import { useSession } from '../hooks/useSession';
 
-const RAIL_WIDTH = 280;
+const RAIL_WIDTH = 240;
 
 export function RunRail() {
   const location = useLocation();
@@ -14,56 +27,33 @@ export function RunRail() {
 
   return (
     <aside data-testid="run-rail" aria-label="Run navigation" style={railStyle}>
+      {/* v26 §12.1: no brand here — TopBar carries the floom logo */}
       <div style={headStyle}>
-        <Brand to="/run" label="floom" />
         <WorkspaceIdentityBlock />
+        <ModeToggle activeMode="run" />
       </div>
       <div style={bodyStyle}>
-        <RailSection label="Run">
-          <RailItem to="/run" active={location.pathname === '/run'} icon={<Home size={15} />}>
-            Overview
-          </RailItem>
-          <RailItem
-            to="/run/apps"
-            active={location.pathname === '/run/apps' || location.pathname.startsWith('/run/apps/')}
-            icon={<Box size={15} />}
-            count={apps?.length}
-          >
-            Apps
-          </RailItem>
-          <RailItem
-            to="/run/runs"
-            active={location.pathname === '/run/runs' || location.pathname.startsWith('/run/runs/')}
-            icon={<Home size={15} />}
-          >
-            Runs
-          </RailItem>
-        </RailSection>
-        <RailSection label="Workspace settings">
-          <RailItem
-            to="/settings/byok-keys"
-            active={location.pathname === '/settings/byok-keys'}
-            icon={<LockKeyhole size={15} />}
-          >
-            BYOK keys
-          </RailItem>
-          <RailItem
-            to="/settings/agent-tokens"
-            active={location.pathname === '/settings/agent-tokens'}
-            icon={<KeyRound size={15} />}
-          >
-            Agent tokens
-          </RailItem>
-        </RailSection>
-        <RailSection label="Account">
-          <RailItem
-            to="/account/settings"
-            active={location.pathname === '/account/settings'}
-            icon={<UserRound size={15} />}
-          >
-            Account settings
-          </RailItem>
-        </RailSection>
+        <RailItem
+          to="/run/apps"
+          active={
+            location.pathname === '/run/apps' ||
+            location.pathname.startsWith('/run/apps/')
+          }
+          icon={<Box size={15} />}
+          count={apps?.length}
+        >
+          Apps
+        </RailItem>
+        <RailItem
+          to="/run/runs"
+          active={
+            location.pathname === '/run/runs' ||
+            location.pathname.startsWith('/run/runs/')
+          }
+          icon={<Play size={15} />}
+        >
+          Runs
+        </RailItem>
       </div>
       <RailFoot />
     </aside>
@@ -78,21 +68,27 @@ export function RailFoot() {
 
   return (
     <div style={footStyle}>
-      <div style={avatarStyle}>{user?.image ? <img src={user.image} alt="" style={avatarImgStyle} /> : initial}</div>
+      <div style={avatarStyle}>
+        {user?.image ? (
+          <img src={user.image} alt="" style={avatarImgStyle} />
+        ) : (
+          initial
+        )}
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={footNameStyle}>{label}</div>
-        <Link to="/account/settings" style={footLinkStyle}>
-          Account settings
+        <Link to="/settings/general" style={footLinkStyle}>
+          Settings
         </Link>
       </div>
     </div>
   );
 }
 
+/** Kept for backward-compat imports only (StudioRail used to import Brand). */
 export function Brand({ to, label, tag }: { to: string; label: string; tag?: string }) {
   return (
     <Link to={to} style={brandStyle}>
-      <Logo size={20} withWordmark={false} variant="glow" />
       <span style={brandNameStyle}>{label}</span>
       {tag ? <span style={brandTagStyle}>{tag}</span> : null}
     </Link>
@@ -125,7 +121,9 @@ export function RailItem({
     <Link to={to} aria-current={active ? 'page' : undefined} style={itemStyle(active)}>
       <span style={iconStyle}>{icon}</span>
       <span style={itemTextStyle}>{children}</span>
-      {typeof count === 'number' ? <span style={countStyle}>{count}</span> : null}
+      {typeof count === 'number' ? (
+        <span style={countStyle}>{count}</span>
+      ) : null}
     </Link>
   );
 }
@@ -144,10 +142,10 @@ export const railStyle: CSSProperties = {
 };
 
 export const headStyle: CSSProperties = {
-  padding: '18px 16px 14px',
+  padding: '16px 14px 12px',
   display: 'flex',
   flexDirection: 'column',
-  gap: 14,
+  gap: 10,
 };
 
 export const bodyStyle: CSSProperties = {
@@ -156,7 +154,7 @@ export const bodyStyle: CSSProperties = {
   padding: '6px 10px 14px',
   display: 'flex',
   flexDirection: 'column',
-  gap: 18,
+  gap: 4,
 };
 
 const brandStyle: CSSProperties = {

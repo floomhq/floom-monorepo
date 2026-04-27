@@ -171,13 +171,14 @@ function StudioSlugRedirect({ subpath }: { subpath?: string }) {
 function LegacyWorkspaceUiRedirect() {
   const location = useLocation();
   const pathname = location.pathname.replace(/\/$/, '') || '/';
-  let target = '/run';
+  // v26: /run now redirects to /run/apps, so legacy /me → /run/apps directly.
+  let target = '/run/apps';
   if (pathname === '/me/install') target = '/run/install';
   else if (pathname === '/me/secrets') target = '/settings/byok-keys';
   else if (pathname === '/me/agent-keys' || pathname === '/me/api-keys') {
     target = '/settings/agent-tokens';
   } else if (pathname === '/me/settings' || pathname === '/me/settings/tokens') {
-    target = '/account/settings';
+    target = '/settings/general';
   } else if (pathname === '/studio/settings') {
     target = '/settings/studio';
   } else if (pathname === '/me/apps') {
@@ -292,9 +293,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             handles the form side. */}
         <Route path="/forgot-password" element={<WaitlistGuard source="forgot-password"><ForgotPasswordPage /></WaitlistGuard>} />
         <Route path="/reset-password" element={<WaitlistGuard source="reset-password"><ResetPasswordPage /></WaitlistGuard>} />
-        {/* Layer 5 Round 2 canonical workspace UI routes. Page bodies stay on
-            the existing Me* modules until Round 3 renames content and shells. */}
-        <Route path="/run" element={<WaitlistGuard source="me"><MePage /></WaitlistGuard>} />
+        {/* v26 §9: /run → /run/apps (drop overview page, apps IS the default landing).
+            v25 MePage moves to /run/overview for back-compat during transition. */}
+        <Route path="/run" element={<Navigate to="/run/apps" replace />} />
+        <Route path="/run/overview" element={<WaitlistGuard source="me"><MePage /></WaitlistGuard>} />
         <Route path="/run/apps" element={<WaitlistGuard source="me"><MeAppsPage /></WaitlistGuard>} />
         <Route path="/run/runs" element={<WaitlistGuard source="me"><MeRunsPage /></WaitlistGuard>} />
         <Route path="/run/runs/:runId" element={<WaitlistGuard source="me"><MeRunDetailPage /></WaitlistGuard>} />
@@ -303,10 +305,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/run/apps/:slug/triggers" element={<WaitlistGuard source="me"><MeAppTriggersPage /></WaitlistGuard>} />
         <Route path="/run/apps/:slug/triggers/schedule" element={<WaitlistGuard source="me"><MeAppTriggerSchedulePage /></WaitlistGuard>} />
         <Route path="/run/apps/:slug/triggers/webhook" element={<WaitlistGuard source="me"><MeAppTriggerWebhookPage /></WaitlistGuard>} />
+        {/* v26: /settings is the tabbed workspace settings page (§4).
+            /settings alone redirects to /settings/general (account settings).
+            Deep-link tabs all exist as sub-routes. */}
+        <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
+        <Route path="/settings/general" element={<WaitlistGuard source="me"><MeSettingsPage /></WaitlistGuard>} />
         <Route path="/settings/byok-keys" element={<WaitlistGuard source="me"><MeSecretsPage /></WaitlistGuard>} />
         <Route path="/settings/agent-tokens" element={<WaitlistGuard source="me"><MeSettingsTokensPage /></WaitlistGuard>} />
         <Route path="/settings/studio" element={<WaitlistGuard source="studio"><StudioSettingsPage /></WaitlistGuard>} />
-        <Route path="/account/settings" element={<WaitlistGuard source="me"><MeSettingsPage /></WaitlistGuard>} />
+        {/* Legacy: /account/settings → /settings/general */}
+        <Route path="/account/settings" element={<Navigate to="/settings/general" replace />} />
 
         {/* Legacy workspace UI URLs. Server returns 301 on direct loads; these
             redirects cover in-app navigation that never reaches the server. */}
@@ -326,9 +334,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/me/a/:slug" element={<MeAppRedirect />} />
         <Route path="/me/a/:slug/secrets" element={<MeAppSecretsRedirect />} />
         <Route path="/me/a/:slug/run" element={<MeAppRunRedirect />} />
-        {/* Studio context: /studio is the creator home; /studio/apps is
-            the heavier app index. Still auth-gated and waitlist-gated. */}
-        <Route path="/studio" element={<WaitlistGuard source="studio"><StudioHomePage /></WaitlistGuard>} />
+        {/* v26 §9: /studio → /studio/apps (drop overview page, apps IS default).
+            v25 StudioHomePage moves to /studio/overview for back-compat. */}
+        <Route path="/studio" element={<Navigate to="/studio/apps" replace />} />
+        <Route path="/studio/overview" element={<WaitlistGuard source="studio"><StudioHomePage /></WaitlistGuard>} />
         <Route path="/studio/apps" element={<WaitlistGuard source="studio"><StudioAppsPage /></WaitlistGuard>} />
         <Route path="/studio/runs" element={<WaitlistGuard source="studio"><StudioRunsPage /></WaitlistGuard>} />
         <Route path="/studio/build" element={<WaitlistGuard source="studio"><StudioBuildPage /></WaitlistGuard>} />
@@ -393,7 +402,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             linked from post-signup flows. No standalone page yet — redirect
             to /me?welcome=1 so the dashboard shows a one-shot welcome
             banner ("Welcome to Floom — try an app ↓"). */}
-        <Route path="/onboarding" element={<Navigate to="/me?welcome=1" replace />} />
+        <Route path="/onboarding" element={<Navigate to="/run/apps?welcome=1" replace />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/ia" element={<IaPage />} />
         <Route path="/architecture" element={<ArchitecturePage />} />

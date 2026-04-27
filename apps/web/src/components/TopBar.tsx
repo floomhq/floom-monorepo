@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from './Logo';
 import { useSession, clearSession } from '../hooks/useSession';
 import { useMyApps } from '../hooks/useMyApps';
-import { useSecrets } from '../hooks/useSecrets';
 import * as api from '../api/client';
 import { useDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
@@ -158,7 +157,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const { data, isAuthenticated, refresh } = useSession();
-  const { apps: myApps } = useMyApps();
+  useMyApps(); // prefetch apps cache for downstream components (mobile drawer)
   // 2026-04-24 prod/preview split: read the flag from the live session
   // payload so prod (DEPLOY_ENABLED=false) hides Sign in / Sign up even
   // when the Vite build had VITE_DEPLOY_ENABLED=true baked in. Same
@@ -171,10 +170,6 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
   // we're on preview (deploy_enabled=true).
   const deployEnabled = deployEnabledFlag === true;
   const waitlistMode = deployEnabledFlag === false;
-  const studioNavLabel =
-    isAuthenticated && myApps && myApps.length > 0
-      ? `Studio (${myApps.length})`
-      : 'Studio';
   // Auth-branched chrome: only flip to the work-focused layout when the
   // session is authenticated AND we know we're on a deploy-enabled
   // environment. Both must be true. While the deploy flag is loading
@@ -246,13 +241,6 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
     location.pathname.startsWith('/protocol') ||
     location.pathname.startsWith('/docs');
   const isStudio = location.pathname.startsWith('/studio');
-  const isMe = location.pathname.startsWith('/me');
-  const isRun =
-    location.pathname === '/run' ||
-    location.pathname.startsWith('/run/') ||
-    location.pathname.startsWith('/settings/') ||
-    location.pathname === '/account/settings' ||
-    isMe;
   const isPublishNav =
     location.pathname === '/studio/build' || location.pathname === '/deploy';
 
@@ -342,72 +330,52 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           </button>
         )}
 
-        {/* Centre nav — branches on auth state (project_floom_nav_ia.md).
+        {/* Centre nav — branches on auth state (v26-IA-SPEC §10 + §12).
             Anonymous: Apps · Docs · Pricing (discovery surfaces).
-            Authenticated: Run · Studio (work surfaces). Pricing/Docs
-            move to the avatar dropdown — 1 click away when needed. */}
-        <nav
-          className="topbar-links topbar-links-desktop topbar-centre-nav"
-          aria-label="Primary"
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'auto',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 2,
-          }}
-        >
-          {showAuthedChrome ? (
-            <>
-              <Link
-                to="/run"
-                data-testid="topbar-run"
-                aria-current={isRun ? 'page' : undefined}
-                style={navLinkStyle(isRun)}
-              >
-                Run
-              </Link>
-              <Link
-                to="/studio"
-                data-testid="topbar-studio"
-                aria-current={isStudio ? 'page' : undefined}
-                style={navLinkStyle(isStudio)}
-              >
-                {studioNavLabel}
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/apps"
-                data-testid="topbar-apps"
-                aria-current={isApps ? 'page' : undefined}
-                style={navLinkStyle(isApps)}
-              >
-                Apps
-              </Link>
-              <Link
-                to="/docs"
-                data-testid="topbar-docs"
-                aria-current={isDocs ? 'page' : undefined}
-                style={navLinkStyle(isDocs)}
-              >
-                Docs
-              </Link>
-              <Link
-                to="/pricing"
-                data-testid="topbar-pricing"
-                aria-current={isPricing ? 'page' : undefined}
-                style={navLinkStyle(isPricing)}
-              >
-                Pricing
-              </Link>
-            </>
-          )}
-        </nav>
+            Authenticated (slim): nothing in centre — left rail handles
+            mode/page navigation. TopBar becomes logo + actions only.
+            v26 spec: "Drop Apps/Docs/Pricing from authenticated TopBar." */}
+        {!showAuthedChrome && (
+          <nav
+            className="topbar-links topbar-links-desktop topbar-centre-nav"
+            aria-label="Primary"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              pointerEvents: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <Link
+              to="/apps"
+              data-testid="topbar-apps"
+              aria-current={isApps ? 'page' : undefined}
+              style={navLinkStyle(isApps)}
+            >
+              Apps
+            </Link>
+            <Link
+              to="/docs"
+              data-testid="topbar-docs"
+              aria-current={isDocs ? 'page' : undefined}
+              style={navLinkStyle(isDocs)}
+            >
+              Docs
+            </Link>
+            <Link
+              to="/pricing"
+              data-testid="topbar-pricing"
+              aria-current={isPricing ? 'page' : undefined}
+              style={navLinkStyle(isPricing)}
+            >
+              Pricing
+            </Link>
+          </nav>
+        )}
 
         {/* Right side: Sign in + Sign up (anon) or avatar dropdown (authed) */}
         <div
@@ -613,13 +581,11 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                     zIndex: 50,
                   }}
                 >
-                  {/* v23 dropdown shape (Federico-locked 2026-04-26):
-                      header (name + email) · Apps store · BYOK keys ·
-                      Agent tokens · Settings · — · Pricing · Docs · — ·
-                      Sign out. Counts after labels (Apps · 5 etc) when
-                      session caches are populated; omit gracefully
-                      otherwise. Vocabulary lock: use "Agent tokens"
-                      in user-visible copy on this surface. */}
+                  {/* v26 avatar dropdown (V26-IA-SPEC §12.5):
+                      header (name + email) · Account settings · — ·
+                      Docs · Help · — · Sign out.
+                      Pricing demoted to anon TopBar only (§10c).
+                      Docs moves from rail to here (§12.5). */}
                   <div
                     style={{
                       padding: '8px 12px 6px',
@@ -665,35 +631,11 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                     aria-hidden="true"
                   />
                   <DropdownItem
-                    to="/run"
-                    label="Workspace Run"
-                    testId="topbar-user-workspace-run"
-                    onSelect={() => setDropOpen(false)}
-                    active={isRun}
-                  />
-                  <DropdownItem
-                    to="/apps"
-                    label="Apps store"
-                    count={myApps?.length}
-                    testId="topbar-user-apps-store"
-                    onSelect={() => setDropOpen(false)}
-                    active={isApps}
-                  />
-                  <ByokKeysDropdownItem
-                    onSelect={() => setDropOpen(false)}
-                  />
-                  <DropdownItem
-                    to="/settings/agent-tokens"
-                    label="Agent tokens"
-                    testId="topbar-user-agent-tokens"
-                    onSelect={() => setDropOpen(false)}
-                  />
-                  <DropdownItem
-                    to="/account/settings"
+                    to="/settings/general"
                     label="Account settings"
                     testId="topbar-user-settings"
                     onSelect={() => setDropOpen(false)}
-                    active={location.pathname === '/account/settings'}
+                    active={location.pathname.startsWith('/settings')}
                   />
                   <div
                     style={{
@@ -704,18 +646,17 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                     aria-hidden="true"
                   />
                   <DropdownItem
-                    to="/pricing"
-                    label="Pricing"
-                    testId="topbar-user-pricing"
-                    onSelect={() => setDropOpen(false)}
-                    active={isPricing}
-                  />
-                  <DropdownItem
                     to="/docs"
                     label="Docs"
                     testId="topbar-user-docs"
                     onSelect={() => setDropOpen(false)}
                     active={isDocs}
+                  />
+                  <DropdownItem
+                    to="/docs/help"
+                    label="Help"
+                    testId="topbar-user-help"
+                    onSelect={() => setDropOpen(false)}
                   />
                   <div
                     style={{
@@ -790,22 +731,6 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
   );
 }
 
-// BYOK keys dropdown row. Wrapped in its own component so `useSecrets()`
-// only fires `/api/secrets` when the dropdown actually mounts (i.e. the
-// authed avatar is rendered AND open) — anon users never trigger the
-// fetch. Count omitted gracefully while loading or when entries is null.
-function ByokKeysDropdownItem({ onSelect }: { onSelect: () => void }) {
-  const { entries } = useSecrets();
-  return (
-    <DropdownItem
-      to="/settings/byok-keys"
-      label="BYOK keys"
-      count={entries?.length}
-      testId="topbar-user-byok-keys"
-      onSelect={onSelect}
-    />
-  );
-}
 
 // Avatar dropdown row with optional `count` tag rendered as a monospace
 // suffix per v23 spec ("Apps · 5", "BYOK keys · 3"). Counts are sourced
