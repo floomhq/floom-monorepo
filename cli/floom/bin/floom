@@ -5,7 +5,7 @@
 #   init      scaffold floom.yaml in the current directory
 #   deploy    validate + publish the current app
 #   status    list your apps and recent runs
-#   auth      save an API key to ~/.floom/config.json
+#   auth      save an Agent token to ~/.floom/config.json
 #   --help    show this help
 #   --version print version
 
@@ -26,7 +26,7 @@ commands:
   init              scaffold a floom.yaml in the current directory
   deploy            validate + publish the current app (use --dry-run to preview)
   status            list your apps and recent runs
-  auth <api-key>    save an API key to ~/.floom/config.json
+  auth <agent-token> save an Agent token to ~/.floom/config.json
 
 options:
   --help, -h        show this help
@@ -34,7 +34,7 @@ options:
 
 docs:     https://floom.dev/docs
 examples: https://github.com/floomhq/floom/tree/main/examples
-api key:  https://floom.dev/me/api-keys
+agent tokens: https://floom.dev/settings/agent-tokens
 EOF
 }
 
