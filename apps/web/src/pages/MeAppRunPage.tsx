@@ -1,7 +1,7 @@
 // MVP stub: /me/apps/:slug/run — replaced with ComingSoon for launch.
 // RunAppTabs export preserved as MeAppTriggersPage etc. depend on it.
 
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { ComingSoon } from '../components/ComingSoon';
 
