@@ -19,8 +19,8 @@ Federico's running feedback as he reviews `mvp.floom.dev` and `v26.floom.dev`. T
 | V1 | (verbal) | `/run/apps` + `/studio/apps` need UX work (empty states, stat rows, mode-specific CTAs) | IN-FLIGHT | a50aa3eea1abdc340 |
 | V2 | SS 10.59.51 | Rail-bottom avatar+sign-out should not exist (avatar lives in TopBar only per §12.5) | IN-FLIGHT | a5c369123e7f99eb2 |
 | V3 | SS 10.59.51 | No black terminal backgrounds — use `#1b1a17` warm dark | IN-FLIGHT | a5c369123e7f99eb2 |
-| V4 | SS 11.00.53 | Studio Build "Run sample" fails with "App not found: example-api" | IN-FLIGHT | a5c369123e7f99eb2 |
-| V5 | SS 11.01.36 | Sidebar + content containers shift between pages — should be static | IN-FLIGHT | ad00414ed0b97c8ed |
+| V4 | SS 11.00.53 | Studio Build detect returns "Authentication required" for public OpenAPI URLs (e.g. petstore.swagger.io) | FIXED 829559f5 — removed Cloud-mode auth gate from /api/hub/detect and /detect/inline; SSRF hardening #2 (SSRF_BLOCK_LIST_V4/V6 in fetchSpec) remains; auth still required on /ingest and /from-github | this session |
+| V5 | SS 11.01.36 | Sidebar + content containers shift between pages — should be static | FIXED 23f92de9 — all /studio/* pages migrated from StudioLayout (sidebar-based BaseLayout path, maxWidth 1100) to WorkspacePageShell (shellStyle flex, maxWidth 1040); rail width stays 240px via shared railStyle | this session |
 | V6 | SS 11.02.31 | "Copy for Claude" stacks 3 install methods, overwhelming — refactor to tabs (Claude/Cursor/Codex/CLI) | IN-FLIGHT | aff6d47e69f9fcc05 |
 | V7 | (verbal) | `/p/:slug` not updated to v26 chrome | IN-FLIGHT (may already be v26 — check SS 11.04.35) | aff6d47e69f9fcc05 |
 | V8 | (verbal) | No "+ Install in workspace" CTA on `/p/:slug` for authed users | IN-FLIGHT | aff6d47e69f9fcc05 |
@@ -39,6 +39,7 @@ Federico's running feedback as he reviews `mvp.floom.dev` and `v26.floom.dev`. T
 | R1 | GH #882 | Analytics tab shows "Coming v1.1" — backend data exists | FIXED fac199e6+f8253d1c — GET /api/hub/:slug/analytics endpoint + 5 stat cards + 7-day sparkline UI | this session |
 | R2 | GH #881 | /studio/:slug/feedback returns 404 | FIXED fac199e6+2e144411 — GET /api/hub/:slug/feedback endpoint (owner-only, returns app_reviews with summary) + feedback list UI | this session |
 | R3 | GH #883 | App version not displayed on /p/:slug | ALREADY DONE — hub.ts:977 returns `version: manifestVersion \|\| '0.1.0'`; AppPermalinkPage.tsx:902 renders `v{app.version}` chip in hero-version-meta row. No code change needed. | this session |
+| R4 | (curl test) | GET /api/run/:id returns 404 for anon callers even when run succeeds — checkRunAccess rejected cookie-less curl clients | FIXED 3e725803 — extended DEFAULT_WORKSPACE_ID early-return to cover cloud mode; all unclaimed anon runs in local workspace are world-readable; authenticated runs unaffected (carry real workspace_id after rekey) | this session |
 | X5 | (verbal) | MCP testing scope = unauth (public store directory + run public apps) + authed (user-specific apps, create app, workspace switching) | IN-FLIGHT | a800539bb5a2eab58 (claude) + codex (codex bg) |
 | X7 | (verbal) | Run MCP/CLI tests with BOTH claude AND codex independently, diff findings | IN-FLIGHT | claude=a800539bb5a2eab58, codex=bg |
 | X6 | (verbal Q→confirmed) | Any public-visibility app is runnable at `/p/:slug` for anyone — by design. Private apps (only_me) return 404 to outsiders. | CONFIRMED | n/a |
