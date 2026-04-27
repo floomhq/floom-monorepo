@@ -8,7 +8,8 @@
 
 set -euo pipefail
 
-LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || readlink "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+LIB_DIR="$(cd "$(dirname "$_SCRIPT_PATH")" && pwd)"
 
 DRY_RUN=0
 while [[ $# -gt 0 ]]; do

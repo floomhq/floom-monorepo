@@ -2,10 +2,12 @@
 # floom-auth.sh — save an Agent token to ~/.floom/config.json.
 #
 # Usage:
-#   floom auth <agent-token>            save token (api_url defaults to https://floom.dev)
-#   floom auth <agent-token> <api-url>  save token + custom URL (for self-host)
-#   floom auth --show               print redacted current config
-#   floom auth --clear              delete config file
+#   floom auth <agent-token>                save token (api_url defaults to https://floom.dev)
+#   floom auth <agent-token> <api-url>      save token + custom URL (for self-host)
+#   floom auth login --token=<agent-token>  alternate form used by CLI snippets
+#   floom auth whoami                       print identity for current token
+#   floom auth --show                       print redacted current config
+#   floom auth --clear                      delete config file
 
 set -euo pipefail
 
@@ -32,15 +34,73 @@ PY
     rm -f "$CONFIG"
     echo "cleared $CONFIG"
     exit 0 ;;
+  whoami)
+    if [[ ! -f "$CONFIG" && -z "${FLOOM_API_KEY:-}" ]]; then
+      echo "not logged in. Run: floom auth <agent-token>"
+      exit 1
+    fi
+    CONFIG_PATH="$CONFIG" python3 - <<'PY'
+import json
+import os
+
+env_key = os.environ.get("FLOOM_API_KEY", "")
+cfg_path = os.environ.get("CONFIG_PATH", "")
+if env_key:
+    key = env_key
+    url = os.environ.get("FLOOM_API_URL", "https://floom.dev")
+elif cfg_path and os.path.exists(cfg_path):
+    c = json.load(open(cfg_path))
+    key = c.get("api_key", "")
+    url = c.get("api_url", "https://floom.dev")
+else:
+    print("not logged in. Run: floom auth <agent-token>")
+    raise SystemExit(1)
+
+if not key:
+    print("not logged in. Run: floom auth <agent-token>")
+    raise SystemExit(1)
+
+red = key[:14] + "..." + key[-4:] if len(key) > 18 else key[:4] + "..."
+print(f"logged in  api_url: {url}")
+print(f"token:     {red}")
+PY
+    exit $? ;;
+  login)
+    # Support: floom auth login --token=<agent-token> [--url=<api-url>]
+    AGENT_TOKEN=""
+    API_URL="https://floom.dev"
+    shift
+    for arg in "$@"; do
+      case "$arg" in
+        --token=*) AGENT_TOKEN="${arg#--token=}" ;;
+        --url=*)   API_URL="${arg#--url=}" ;;
+        *)         echo "floom auth login: unknown option: $arg" >&2; exit 1 ;;
+      esac
+    done
+    if [[ -z "$AGENT_TOKEN" ]]; then
+      echo "floom auth login: --token is required" >&2
+      exit 1
+    fi
+    mkdir -p "$(dirname "$CONFIG")"
+    CONFIG_PATH="$CONFIG" AGENT_TOKEN="$AGENT_TOKEN" API_URL="$API_URL" python3 - <<'PY'
+import json, os
+with open(os.environ["CONFIG_PATH"], "w") as f:
+    json.dump({"api_key": os.environ["AGENT_TOKEN"], "api_url": os.environ["API_URL"]}, f)
+PY
+    chmod 600 "$CONFIG"
+    echo "saved $CONFIG (api_url: $API_URL)"
+    exit 0 ;;
   -h|--help|"")
     cat <<EOF
 floom auth — save Agent token.
 
 usage:
-  floom auth <agent-token>            save token (defaults to https://floom.dev)
-  floom auth <agent-token> <api-url>  save token + custom URL (self-host)
-  floom auth --show               print redacted config
-  floom auth --clear              delete config
+  floom auth <agent-token>                     save token (defaults to https://floom.dev)
+  floom auth <agent-token> <api-url>           save token + custom URL (self-host)
+  floom auth login --token=<agent-token>       alternate login form
+  floom auth whoami                            show identity for current token
+  floom auth --show                            print redacted config
+  floom auth --clear                           delete config
 
 Create an Agent token in Workspace settings:
   https://floom.dev/settings/agent-tokens

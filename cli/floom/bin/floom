@@ -11,18 +11,9 @@
 
 set -euo pipefail
 
-SOURCE="${BASH_SOURCE[0]}"
-while [[ -h "$SOURCE" ]]; do
-  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
-  TARGET="$(readlink "$SOURCE")"
-  if [[ "$TARGET" == /* ]]; then
-    SOURCE="$TARGET"
-  else
-    SOURCE="$DIR/$TARGET"
-  fi
-done
-
-BIN_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || readlink "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+BIN_DIR="$SCRIPT_DIR"
 ROOT_DIR="$(cd "$BIN_DIR/.." && pwd)"
 LIB_DIR="$ROOT_DIR/lib"
 
