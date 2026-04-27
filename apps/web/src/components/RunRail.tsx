@@ -13,11 +13,12 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, Play } from 'lucide-react';
+import { Box, Play, Plus } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
 import { useMyApps } from '../hooks/useMyApps';
-import { useSession } from '../hooks/useSession';
+import { useSession, clearSession } from '../hooks/useSession';
+import * as api from '../api/client';
 
 const RAIL_WIDTH = 240;
 
@@ -54,6 +55,18 @@ export function RunRail() {
         >
           Runs
         </RailItem>
+
+        {/* v26 §12.3/12.4: "+ New app" in Run mode → browse store (overlay in v1.1) */}
+        <div style={{ marginTop: 'auto', paddingTop: 12 }}>
+          <Link
+            to="/apps"
+            data-testid="run-rail-new-app"
+            style={runPrimaryCtaStyle}
+          >
+            <Plus size={14} aria-hidden="true" />
+            <span>New app</span>
+          </Link>
+        </div>
       </div>
       <RailFoot />
     </aside>
@@ -61,10 +74,17 @@ export function RunRail() {
 }
 
 export function RailFoot() {
-  const { data } = useSession();
+  const { data, refresh } = useSession();
   const user = data?.user;
   const label = user?.name || user?.email || 'Local user';
   const initial = label.charAt(0).toUpperCase();
+
+  async function handleSignOut() {
+    try { await api.signOut(); } catch { /* ignore */ }
+    clearSession();
+    await refresh();
+    window.location.href = '/';
+  }
 
   return (
     <div style={footStyle}>
@@ -77,9 +97,15 @@ export function RailFoot() {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={footNameStyle}>{label}</div>
-        <Link to="/settings/general" style={footLinkStyle}>
-          Settings
-        </Link>
+        {/* v26 §12.6: settings only via workspace name click; footer shows sign-out */}
+        <button
+          type="button"
+          data-testid="rail-foot-signout"
+          onClick={() => { void handleSignOut(); }}
+          style={footSignOutStyle}
+        >
+          Sign out
+        </button>
       </div>
     </div>
   );
@@ -127,6 +153,23 @@ export function RailItem({
     </Link>
   );
 }
+
+const runPrimaryCtaStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
+  padding: '9px 12px',
+  borderRadius: 8,
+  background: 'var(--ink)',
+  border: '1px solid var(--ink)',
+  color: '#fff',
+  textDecoration: 'none',
+  fontSize: 13,
+  fontWeight: 700,
+  width: '100%',
+  boxSizing: 'border-box' as const,
+};
 
 export const railStyle: CSSProperties = {
   width: RAIL_WIDTH,
@@ -274,8 +317,14 @@ const footNameStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-const footLinkStyle: CSSProperties = {
+const footSignOutStyle: CSSProperties = {
   fontSize: 11.5,
   color: 'var(--muted)',
   textDecoration: 'none',
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  display: 'inline',
 };

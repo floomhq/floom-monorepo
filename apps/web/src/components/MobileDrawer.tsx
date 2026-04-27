@@ -2,18 +2,18 @@
  * MobileDrawer — v26 mobile navigation drawer.
  *
  * v26 changes (V26-IA-SPEC §12):
- *   - No "Workspace settings" group (access via /settings from workspace name)
- *   - No "Account" group (access via /settings/general)
- *   - Run section: Apps · Runs
- *   - Studio section: Apps · Runs · + New app
- *   - Settings link (workspace name)
- *   - Docs + Sign out at bottom
+ *   - Workspace identity block (name → /settings)
+ *   - Mode toggle [Run | Studio] pill
+ *   - Mode-specific items (Run: Apps, Runs, + New app; Studio: Apps, Runs, + New app)
+ *   - Sign out at bottom
+ *   - No group labels, no standalone "Settings" group, no Docs in drawer
+ *   Wire order: Workspace name → mode toggle → Apps/Runs/+ New app → Sign out
+ *   Unauthenticated: Apps · Docs · Pricing · Sign in
  */
 
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, Play, Plus, Settings, X } from 'lucide-react';
-import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
+import { Box, Play, Plus, X } from 'lucide-react';
 import { useMyApps } from '../hooks/useMyApps';
 import { useSession } from '../hooks/useSession';
 
@@ -29,6 +29,12 @@ export function MobileDrawer({ open, onClose, onSignOut }: Props) {
   const { apps } = useMyApps();
   if (!open) return null;
 
+  // Determine active mode from current route; default to 'run' when on non-mode routes
+  const isStudioRoute = location.pathname.startsWith('/studio');
+  const activeMode: 'run' | 'studio' = isStudioRoute ? 'studio' : 'run';
+
+  const workspaceName = data?.active_workspace?.name?.trim() || 'Workspace';
+
   return (
     <>
       <div style={scrimStyle} role="presentation" aria-hidden="true" onClick={onClose} />
@@ -39,75 +45,136 @@ export function MobileDrawer({ open, onClose, onSignOut }: Props) {
         data-testid="mobile-drawer"
         style={panelStyle}
       >
+        {/* Header: workspace identity + close button */}
         <div style={headStyle}>
-          <WorkspaceIdentityBlock />
+          <div style={wsIdStyle}>
+            <Link
+              to="/settings"
+              onClick={onClose}
+              title="Workspace settings"
+              data-testid="mobile-drawer-ws-identity"
+              style={wsLinkStyle}
+            >
+              <span style={wsEyebrowStyle}>Workspace</span>
+              <span style={wsNameStyle}>{workspaceName} <span style={wsChevStyle}>▾</span></span>
+            </Link>
+          </div>
           <button type="button" aria-label="Close menu" onClick={onClose} style={closeStyle}>
             <X size={19} aria-hidden="true" />
           </button>
         </div>
-        <div style={groupsStyle}>
+
+        <div style={bodyStyle}>
           {isAuthenticated ? (
             <>
-              <DrawerGroup label="Run">
-                <DrawerLink
+              {/* Mode toggle pill */}
+              <div style={modeToggleStyle} role="tablist" aria-label="Workspace mode" data-testid="mobile-mode-toggle">
+                <Link
                   to="/run/apps"
-                  active={location.pathname === '/run/apps' || location.pathname.startsWith('/run/apps/')}
-                  onClose={onClose}
-                  icon={<Box size={15} />}
+                  onClick={onClose}
+                  role="tab"
+                  aria-selected={activeMode === 'run'}
+                  data-testid="mobile-mode-run"
+                  style={modePillStyle(activeMode === 'run')}
                 >
-                  Apps {apps ? `· ${apps.length}` : ''}
-                </DrawerLink>
-                <DrawerLink
-                  to="/run/runs"
-                  active={location.pathname === '/run/runs' || location.pathname.startsWith('/run/runs/')}
-                  onClose={onClose}
-                  icon={<Play size={15} />}
-                >
-                  Runs
-                </DrawerLink>
-              </DrawerGroup>
-              <DrawerGroup label="Studio">
-                <DrawerLink
+                  Run
+                </Link>
+                <Link
                   to="/studio/apps"
-                  active={location.pathname === '/studio/apps' || (
-                    location.pathname.startsWith('/studio/') &&
-                    !location.pathname.startsWith('/studio/runs')
-                  )}
-                  onClose={onClose}
-                  icon={<Box size={15} />}
+                  onClick={onClose}
+                  role="tab"
+                  aria-selected={activeMode === 'studio'}
+                  data-testid="mobile-mode-studio"
+                  style={modePillStyle(activeMode === 'studio')}
                 >
-                  Apps
-                </DrawerLink>
-                <DrawerLink
-                  to="/studio/runs"
-                  active={location.pathname === '/studio/runs' || location.pathname.startsWith('/studio/runs/')}
-                  onClose={onClose}
-                  icon={<Play size={15} />}
+                  Studio
+                </Link>
+              </div>
+
+              {/* Mode-specific items */}
+              {activeMode === 'run' ? (
+                <div style={itemGroupStyle}>
+                  <DrawerLink
+                    to="/run/apps"
+                    active={location.pathname === '/run/apps' || location.pathname.startsWith('/run/apps/')}
+                    onClose={onClose}
+                    icon={<Box size={15} />}
+                  >
+                    Apps {apps ? `· ${apps.length}` : ''}
+                  </DrawerLink>
+                  <DrawerLink
+                    to="/run/runs"
+                    active={location.pathname === '/run/runs' || location.pathname.startsWith('/run/runs/')}
+                    onClose={onClose}
+                    icon={<Play size={15} />}
+                  >
+                    Runs
+                  </DrawerLink>
+                  {/* §12.3/12.4: Run "+ New app" → browse store (overlay v1.1) */}
+                  <DrawerLink
+                    to="/apps"
+                    active={location.pathname === '/apps'}
+                    onClose={onClose}
+                    icon={<Plus size={15} />}
+                  >
+                    New app
+                  </DrawerLink>
+                </div>
+              ) : (
+                <div style={itemGroupStyle}>
+                  <DrawerLink
+                    to="/studio/apps"
+                    active={
+                      location.pathname === '/studio/apps' ||
+                      (location.pathname.startsWith('/studio/') &&
+                        !location.pathname.startsWith('/studio/runs') &&
+                        !location.pathname.startsWith('/studio/build'))
+                    }
+                    onClose={onClose}
+                    icon={<Box size={15} />}
+                  >
+                    Apps
+                  </DrawerLink>
+                  <DrawerLink
+                    to="/studio/runs"
+                    active={location.pathname === '/studio/runs' || location.pathname.startsWith('/studio/runs/')}
+                    onClose={onClose}
+                    icon={<Play size={15} />}
+                  >
+                    Runs
+                  </DrawerLink>
+                  {/* §12.3/12.4: Studio "+ New app" → build flow */}
+                  <DrawerLink
+                    to="/studio/build"
+                    active={location.pathname === '/studio/build'}
+                    onClose={onClose}
+                    icon={<Plus size={15} />}
+                  >
+                    New app
+                  </DrawerLink>
+                </div>
+              )}
+
+              <div style={dividerStyle} />
+
+              {/* Sign out */}
+              {onSignOut && (
+                <button
+                  type="button"
+                  data-testid="mobile-drawer-signout"
+                  onClick={() => {
+                    onClose();
+                    onSignOut();
+                  }}
+                  style={signOutStyle}
                 >
-                  Runs
-                </DrawerLink>
-                <DrawerLink
-                  to="/studio/build"
-                  active={location.pathname === '/studio/build'}
-                  onClose={onClose}
-                  icon={<Plus size={15} />}
-                >
-                  New app
-                </DrawerLink>
-              </DrawerGroup>
-              <DrawerGroup label="Settings">
-                <DrawerLink
-                  to="/settings/general"
-                  active={location.pathname.startsWith('/settings')}
-                  onClose={onClose}
-                  icon={<Settings size={15} />}
-                >
-                  Workspace settings
-                </DrawerLink>
-              </DrawerGroup>
+                  Sign out
+                </button>
+              )}
             </>
           ) : (
-            <DrawerGroup label="Discover">
+            /* Unauthenticated: discovery links */
+            <div style={itemGroupStyle}>
               <DrawerLink to="/apps" active={location.pathname === '/apps'} onClose={onClose} icon={<Box size={15} />}>
                 Apps
               </DrawerLink>
@@ -117,54 +184,15 @@ export function MobileDrawer({ open, onClose, onSignOut }: Props) {
               <DrawerLink to="/pricing" active={location.pathname === '/pricing'} onClose={onClose} icon={<Box size={15} />}>
                 Pricing
               </DrawerLink>
-            </DrawerGroup>
-          )}
-
-          <DrawerGroup label="">
-            {isAuthenticated && (
-              <DrawerLink
-                to="/docs"
-                active={location.pathname.startsWith('/docs')}
-                onClose={onClose}
-                icon={<Box size={15} />}
-              >
-                Docs
-              </DrawerLink>
-            )}
-            {!isAuthenticated ? (
+              <div style={dividerStyle} />
               <DrawerLink to="/login" active={location.pathname === '/login'} onClose={onClose} icon={<Box size={15} />}>
                 Sign in
               </DrawerLink>
-            ) : null}
-            {isAuthenticated && onSignOut ? (
-              <button
-                type="button"
-                data-testid="mobile-drawer-signout"
-                onClick={() => {
-                  onClose();
-                  onSignOut();
-                }}
-                style={buttonLinkStyle}
-              >
-                Sign out
-              </button>
-            ) : null}
-          </DrawerGroup>
+            </div>
+          )}
         </div>
-        {data?.user ? (
-          <div style={footStyle}>{data.user.name || data.user.email || 'Local user'}</div>
-        ) : null}
       </aside>
     </>
-  );
-}
-
-function DrawerGroup({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <section style={groupStyle}>
-      {label && <div style={labelStyle}>{label}</div>}
-      {children}
-    </section>
   );
 }
 
@@ -209,12 +237,49 @@ const panelStyle: CSSProperties = {
 };
 
 const headStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr auto',
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
   gap: 10,
-  alignItems: 'start',
-  padding: 14,
+  padding: '14px 14px 12px',
   borderBottom: '1px solid var(--line)',
+};
+
+const wsIdStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+};
+
+const wsLinkStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+  textDecoration: 'none',
+};
+
+const wsEyebrowStyle: CSSProperties = {
+  fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'var(--muted)',
+  lineHeight: 1,
+};
+
+const wsNameStyle: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 700,
+  color: 'var(--ink)',
+  lineHeight: 1.2,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const wsChevStyle: CSSProperties = {
+  color: 'var(--muted)',
+  fontSize: 11,
 };
 
 const closeStyle: CSSProperties = {
@@ -228,31 +293,58 @@ const closeStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   cursor: 'pointer',
+  flexShrink: 0,
 };
 
-const groupsStyle: CSSProperties = {
+const bodyStyle: CSSProperties = {
   flex: 1,
   overflowY: 'auto',
   padding: '14px 10px',
   display: 'flex',
   flexDirection: 'column',
-  gap: 18,
+  gap: 10,
 };
 
-const groupStyle: CSSProperties = {
+const modeToggleStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  background: 'var(--card)',
+  border: '1px solid var(--line)',
+  borderRadius: 8,
+  padding: 3,
+  gap: 2,
+  marginBottom: 4,
+};
+
+function modePillStyle(active: boolean): CSSProperties {
+  return {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '8px 12px',
+    borderRadius: 6,
+    fontSize: 13,
+    fontWeight: active ? 700 : 500,
+    color: active ? 'var(--ink)' : 'var(--muted)',
+    background: active ? 'var(--bg)' : 'transparent',
+    boxShadow: active ? '0 1px 2px rgba(14,14,12,0.06)' : 'none',
+    border: active ? '1px solid var(--line)' : '1px solid transparent',
+    textDecoration: 'none',
+    lineHeight: 1,
+  };
+}
+
+const itemGroupStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 4,
 };
 
-const labelStyle: CSSProperties = {
-  fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
-  fontSize: 10,
-  fontWeight: 800,
-  color: 'var(--muted)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-  padding: '0 10px 3px',
+const dividerStyle: CSSProperties = {
+  height: 1,
+  background: 'var(--line)',
+  margin: '4px 0',
 };
 
 function drawerLinkStyle(active: boolean): CSSProperties {
@@ -267,7 +359,7 @@ function drawerLinkStyle(active: boolean): CSSProperties {
     border: active ? '1px solid var(--line)' : '1px solid transparent',
     textDecoration: 'none',
     fontSize: 13,
-    fontWeight: active ? 800 : 650,
+    fontWeight: active ? 700 : 600,
   };
 }
 
@@ -279,23 +371,19 @@ const iconStyle: CSSProperties = {
   justifyContent: 'center',
 };
 
-const buttonLinkStyle: CSSProperties = {
-  ...drawerLinkStyle(false),
-  width: '100%',
+const signOutStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 9,
+  padding: '10px',
+  borderRadius: 8,
+  color: 'var(--muted)',
+  background: 'transparent',
   border: '1px solid transparent',
+  fontSize: 13,
+  fontWeight: 600,
+  width: '100%',
+  textAlign: 'left',
   fontFamily: 'inherit',
   cursor: 'pointer',
-  background: 'none',
-  textAlign: 'left',
-};
-
-const footStyle: CSSProperties = {
-  padding: '13px 16px',
-  borderTop: '1px solid var(--line)',
-  fontSize: 12,
-  color: 'var(--muted)',
-  fontWeight: 600,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
 };
