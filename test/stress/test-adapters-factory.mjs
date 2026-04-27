@@ -40,7 +40,11 @@ const [{ createAdapters, __testing }, { FLOOM_PROTOCOL_VERSION }] = await Promis
   import('../../apps/server/src/adapters/version.ts'),
 ]);
 
-function storageModuleSource({ kind = 'storage', protocolVersion = '^0.2' } = {}) {
+function storageModuleSource({
+  kind = 'storage',
+  protocolVersion = '^0.2',
+  missingMethods = [],
+} = {}) {
   return `
 const adapter = {
   async getApp() { return undefined; },
@@ -59,6 +63,15 @@ const adapter = {
   async listAppReviews() { return []; },
   async updateAppReview() { return undefined; },
   async deleteAppReview() { return false; },
+  async createRunThread(input) { return { id: input.id, title: input.title || null, created_at: 'now', updated_at: 'now' }; },
+  async getRunThread() { return undefined; },
+  async listRunTurns() { return []; },
+  async appendRunTurn(input) { return { ...input, turn_index: 0, created_at: 'now' }; },
+  async updateRunThread() { return undefined; },
+  async createAgentToken(input) { return input; },
+  async listAgentTokensForUser() { return []; },
+  async getAgentTokenForUser() { return undefined; },
+  async revokeAgentTokenForUser() { return undefined; },
   async createJob(input) { return { ...input, attempts: 0, status: input.status || 'queued', created_at: 'now', started_at: null, finished_at: null }; },
   async getJob() { return undefined; },
   async claimNextJob() { return undefined; },
@@ -73,6 +86,10 @@ const adapter = {
   async upsertAdminSecret() {},
   async deleteAdminSecret() { return false; },
 };
+
+for (const method of ${JSON.stringify(missingMethods)}) {
+  delete adapter[method];
+}
 
 export default {
   kind: ${JSON.stringify(kind)},
@@ -91,6 +108,10 @@ writeFileSync(
 writeFileSync(
   join(tmp, 'tmp-mock-bad-version.mjs'),
   storageModuleSource({ protocolVersion: '^0.3' }),
+);
+writeFileSync(
+  join(tmp, 'tmp-mock-missing-append-turn.mjs'),
+  storageModuleSource({ missingMethods: ['appendRunTurn'] }),
 );
 
 let passed = 0;
@@ -136,9 +157,49 @@ log('bundle.runtime.execute is fn', typeof bundle.runtime.execute === 'function'
 const storageGetAppResult = bundle.storage.getApp('__factory_missing__');
 log('bundle.storage.getApp returns Promise', storageGetAppResult instanceof Promise);
 await storageGetAppResult;
+log('default sqlite storage passes completeness validation', typeof bundle.storage.createAgentToken === 'function');
 log('bundle.auth.getSession is fn', typeof bundle.auth.getSession === 'function');
 log('bundle.secrets.get is fn', typeof bundle.secrets.get === 'function');
 log('bundle.observability.increment is fn', typeof bundle.observability.increment === 'function');
+
+__testing.STORAGE_IMPLS['static-missing-one'] = { ...__testing.STORAGE_IMPLS.sqlite };
+delete __testing.STORAGE_IMPLS['static-missing-one'].appendRunTurn;
+process.env.FLOOM_STORAGE = 'static-missing-one';
+let staticMissingOneError;
+try {
+  await createAdapters();
+} catch (e) {
+  staticMissingOneError = e;
+}
+delete process.env.FLOOM_STORAGE;
+delete __testing.STORAGE_IMPLS['static-missing-one'];
+log(
+  'static storage adapter missing one method throws with method name',
+  staticMissingOneError instanceof Error &&
+    /missing required methods: appendRunTurn/.test(staticMissingOneError.message) &&
+    /Required:/.test(staticMissingOneError.message),
+  staticMissingOneError instanceof Error ? staticMissingOneError.message : String(staticMissingOneError),
+);
+
+__testing.STORAGE_IMPLS['static-missing-many'] = { ...__testing.STORAGE_IMPLS.sqlite };
+delete __testing.STORAGE_IMPLS['static-missing-many'].appendRunTurn;
+delete __testing.STORAGE_IMPLS['static-missing-many'].createAgentToken;
+process.env.FLOOM_STORAGE = 'static-missing-many';
+let staticMissingManyError;
+try {
+  await createAdapters();
+} catch (e) {
+  staticMissingManyError = e;
+}
+delete process.env.FLOOM_STORAGE;
+delete __testing.STORAGE_IMPLS['static-missing-many'];
+log(
+  'static storage adapter missing multiple methods names all',
+  staticMissingManyError instanceof Error &&
+    /appendRunTurn/.test(staticMissingManyError.message) &&
+    /createAgentToken/.test(staticMissingManyError.message),
+  staticMissingManyError instanceof Error ? staticMissingManyError.message : String(staticMissingManyError),
+);
 
 // ---- 4. protocol version compatibility ----
 __testing.RUNTIME_MODULE_EXPORTS.docker = {
@@ -217,6 +278,21 @@ log(
     dynamicBundle &&
     typeof dynamicBundle.storage.getApp === 'function',
   dynamicLoadError instanceof Error ? dynamicLoadError.message : String(dynamicLoadError),
+);
+
+process.env.FLOOM_STORAGE = './tmp-mock-missing-append-turn.mjs';
+let dynamicMissingMethodError;
+try {
+  await createAdapters();
+} catch (e) {
+  dynamicMissingMethodError = e;
+}
+log(
+  'dynamic storage adapter missing method is caught',
+  dynamicMissingMethodError instanceof Error &&
+    /tmp-storage/.test(dynamicMissingMethodError.message) &&
+    /missing required methods: appendRunTurn/.test(dynamicMissingMethodError.message),
+  dynamicMissingMethodError instanceof Error ? dynamicMissingMethodError.message : String(dynamicMissingMethodError),
 );
 
 process.env.FLOOM_STORAGE = './tmp-mock-bad-kind.mjs';
