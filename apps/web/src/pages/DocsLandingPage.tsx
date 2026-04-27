@@ -9,6 +9,9 @@
 // The welcome content is intentionally not markdown — it's the one docs
 // page with its own layout blocks (surface-card grid, spec table,
 // footer CTA) that don't map cleanly to react-markdown.
+//
+// v26 V17: shell migrated to DocsPageShell (flex row, fixed sidebar width)
+// so the sidebar never shifts on navigation — mirrors WorkspacePageShell.
 
 import { Link, useLocation } from 'react-router-dom';
 import type { CSSProperties } from 'react';
@@ -20,18 +23,10 @@ import { PageHead } from '../components/PageHead';
 import { DocsSidebar, DOCS_SIDEBAR_GROUPS } from '../components/docs/DocsSidebar';
 import { DocsPublishWaitlistBanner } from '../components/docs/DocsPublishWaitlistBanner';
 import { DocsHeroCards } from '../components/docs/DocsHeroCards';
+import { DocsPageShell } from '../components/docs/DocsPageShell';
 import { readDeployEnabled } from '../lib/flags';
 
 // ── Styles ────────────────────────────────────────────────────────────────
-
-const shellStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '260px minmax(0, 1fr)',
-  gap: 0,
-  maxWidth: 1260,
-  margin: '0 auto',
-  minHeight: 720,
-};
 
 const mainStyle: CSSProperties = {
   // Audit 2026-04-24 (S2): /docs was dense above the fold. Dropped top padding
@@ -327,17 +322,11 @@ export function DocsLandingPage() {
         description="Everything you need to ship an AI app on Floom: quickstart, protocol, operations, billing, and self-hosting."
       />
       <TopBar />
-      <DocsPublishWaitlistBanner />
 
-      <main className="docs-shell" style={shellStyle}>
-        <style>{`
-          @media (max-width: 900px) {
-            .docs-shell { grid-template-columns: 1fr !important; }
-            .docs-shell > article { padding: 20px 18px 48px !important; }
-          }
-        `}</style>
-        <DocsSidebar groups={DOCS_SIDEBAR_GROUPS} currentPath={pathname} />
-
+      <DocsPageShell
+        banner={<DocsPublishWaitlistBanner />}
+        sidebar={<DocsSidebar groups={DOCS_SIDEBAR_GROUPS} currentPath={pathname} />}
+      >
         <article style={mainStyle}>
           <nav style={crumbsStyle} aria-label="Breadcrumb">
             <Link to="/docs" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
@@ -654,7 +643,7 @@ docker run -d -p 3000:3000 \\
             </a>
           </div>
         </article>
-      </main>
+      </DocsPageShell>
 
       <Footer />
       <FeedbackButton />
