@@ -206,8 +206,13 @@ function buildAuthOptions(_overrideBaseURL?: string): any {
     database: db,
     emailAndPassword: {
       enabled: true,
-      requireEmailVerification: true,
-      autoSignIn: false,
+      // GH #849 — v1: disable email verification gate so users can sign up
+      // and log in immediately without verifying their email address. This
+      // unblocks the common path where signup returns token:null + any
+      // subsequent sign-in returns 403 EMAIL_NOT_VERIFIED. Email verification
+      // will be re-enabled in v1.1 once the verification UX is complete.
+      requireEmailVerification: false,
+      autoSignIn: true,
       // SMTP via Resend (2026-04-20). Outside the Resend-required production
       // signal, when RESEND_API_KEY is unset the handler in ./email.ts falls
       // back to stdout: Better Auth won't crash, the reset URL just appears
