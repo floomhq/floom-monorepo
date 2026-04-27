@@ -9,6 +9,7 @@
 
 import type { SessionContext } from '../types.js';
 import type { AuthAdapter, UserWriteColumn, UserWriteInput } from './types.js';
+import type { Hono } from 'hono';
 import {
   DEFAULT_WORKSPACE_ID,
   DEFAULT_USER_ID,
@@ -17,9 +18,17 @@ import {
 } from '../db.js';
 import {
   getAuth,
+  getAuthForRequest,
   isCloudMode,
   registerAuthUserDeleteListener,
 } from '../lib/better-auth.js';
+import { sanitizeAuthResponse } from '../lib/auth-response.js';
+import { padToFloor, shouldPadAuthTiming } from '../lib/auth-response-guard.js';
+import {
+  applyProgressiveSigninDelayFromContext,
+  parseEmailForSigninProgressiveDelay,
+  recordSigninEmailProgressiveDelayOutcome,
+} from '../lib/signin-progressive-delay.js';
 import {
   agentContextToSessionContext,
   extractAgentTokenPrefix,
@@ -29,14 +38,20 @@ import {
 } from '../lib/agent-tokens.js';
 import {
   getActiveWorkspaceId,
+  isDeployEnabled,
   provisionPersonalWorkspace,
 } from '../services/workspaces.js';
 import { linkPendingEmailInvites } from '../services/sharing.js';
 import {
+  AccountDeleteError,
+  getUserDeletionStateByEmail,
   getUserDeletionState,
+  initiateAccountSoftDelete,
   isDeleteExpired,
   permanentDeleteAccount,
+  permanentlyDeleteExpiredAccountForEmail,
   revokeAccountSessions,
+  softDeletedSignInBody,
 } from '../services/account-deletion.js';
 import { rekeyDevice } from '../services/device-rekey.js';
 
@@ -128,6 +143,27 @@ function bearerToken(headers: Headers): string | null {
   const raw = headers.get('authorization') || headers.get('Authorization');
   const match = raw?.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim() || null;
+}
+
+function normalizeBasePath(basePath: string): string {
+  const trimmed = basePath.trim();
+  if (!trimmed || trimmed === '/') return '';
+  return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
+}
+
+function authPath(basePath: string, suffix: string): string {
+  return `${normalizeBasePath(basePath)}${suffix}`;
+}
+
+function isSignupPath(pathname: string, basePath: string): boolean {
+  const signUpBase = authPath(basePath, '/sign-up');
+  const signupBase = authPath(basePath, '/signup');
+  return (
+    pathname === signUpBase ||
+    pathname.startsWith(`${signUpBase}/`) ||
+    pathname === signupBase ||
+    pathname.startsWith(`${signupBase}/`)
+  );
 }
 
 function rememberSessionCookie(
@@ -388,6 +424,148 @@ export const betterAuthAdapter: AuthAdapter = {
     const auth = getAuth();
     if (!auth) return null;
     return resolveBetterAuthSession(auth, request.headers, device_id);
+  },
+
+  async mountHttp(app: unknown, basePath: string): Promise<void> {
+    if (!isCloudMode()) return;
+    const auth = getAuth();
+    if (!auth) return;
+
+    const hono = app as Hono;
+    const wildcardPath = authPath(basePath, '/*');
+
+    hono.get(authPath(basePath, '/error'), (c) => {
+      const error = c.req.query('error') || 'unknown';
+      const isDev = process.env.NODE_ENV !== 'production';
+      const frontendOrigin =
+        process.env.FLOOM_APP_URL ||
+        (isDev ? 'http://localhost:5173' : '');
+      if (frontendOrigin) {
+        return c.redirect(
+          `${frontendOrigin}/login?error=${encodeURIComponent(error)}`,
+        );
+      }
+      return c.json({ error: 'auth_failed', code: error }, 400);
+    });
+
+    hono.get(authPath(basePath, '/session'), async (c) => {
+      const session = await betterAuthAdapter.getSession(c.req.raw);
+      return c.json(session);
+    });
+
+    hono.use(wildcardPath, async (c, next) => {
+      const method = c.req.method;
+      const pathname = new URL(c.req.url).pathname;
+      if (method === 'POST' && isSignupPath(pathname, basePath) && !isDeployEnabled()) {
+        return c.json({ error: 'sign-up disabled — join the waitlist' }, 403);
+      }
+      return next();
+    });
+
+    hono.post(authPath(basePath, '/delete-user'), async (c) => {
+      const authForRequest = getAuthForRequest(c.req.raw);
+      if (!authForRequest) {
+        return new Response('Auth not configured', { status: 503 });
+      }
+      const session = (await authForRequest.api.getSession({
+        headers: c.req.raw.headers,
+      })) as { user?: { id: string; email: string } } | null;
+      if (!session?.user?.id || !session.user.email) {
+        return c.json(
+          { error: 'Authentication required. Sign in and retry.', code: 'auth_required' },
+          401,
+        );
+      }
+      let confirmEmail = session.user.email;
+      try {
+        const body = (await c.req.json()) as { confirm_email?: unknown };
+        if (typeof body.confirm_email === 'string') confirmEmail = body.confirm_email;
+      } catch {
+        confirmEmail = session.user.email;
+      }
+      try {
+        const result = initiateAccountSoftDelete(session.user.id, confirmEmail);
+        return c.json({
+          success: true,
+          message: 'User deleted',
+          delete_at: result.delete_at,
+        });
+      } catch (err) {
+        if (err instanceof AccountDeleteError) {
+          return c.json(
+            { error: err.message, code: err.code },
+            err.status as 400 | 401 | 404 | 409 | 410 | 422,
+          );
+        }
+        throw err;
+      }
+    });
+
+    hono.on(
+      ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
+      wildcardPath,
+      async (c) => {
+        const authForRequest = getAuthForRequest(c.req.raw);
+        if (!authForRequest) {
+          return new Response('Auth not configured', { status: 503 });
+        }
+        const pathname = new URL(c.req.url).pathname;
+        const method = c.req.method;
+        let reqForAuth = c.req.raw;
+        let signinEmailForDelay: string | null = null;
+        let pendingDeleteSignin = null as ReturnType<typeof getUserDeletionStateByEmail> | null;
+        if (method === 'POST' && pathname === authPath(basePath, '/sign-in/email')) {
+          const bodyText = await c.req.raw.clone().text();
+          const parsedEmail = parseEmailForSigninProgressiveDelay(bodyText);
+          if (parsedEmail) {
+            signinEmailForDelay = parsedEmail;
+            await applyProgressiveSigninDelayFromContext(c, parsedEmail);
+            const deletionState = getUserDeletionStateByEmail(parsedEmail);
+            if (deletionState?.deleted_at) {
+              if (isDeleteExpired(deletionState)) {
+                const earlyStartedAtMs = Date.now();
+                permanentlyDeleteExpiredAccountForEmail(parsedEmail);
+                const expired = new Response(
+                  JSON.stringify({
+                    error: 'Invalid email or password.',
+                    code: 'invalid_credentials',
+                  }),
+                  { status: 401, headers: { 'content-type': 'application/json' } },
+                );
+                await recordSigninEmailProgressiveDelayOutcome(c, parsedEmail, expired);
+                const padTiming = shouldPadAuthTiming(pathname);
+                if (padTiming) await padToFloor(earlyStartedAtMs);
+                return expired;
+              }
+              pendingDeleteSignin = deletionState;
+            }
+            reqForAuth = new Request(c.req.raw.url, {
+              method: c.req.raw.method,
+              headers: c.req.raw.headers,
+              body: bodyText,
+            });
+          }
+        }
+        const padTiming = shouldPadAuthTiming(pathname);
+        const startedAtMs = padTiming ? Date.now() : 0;
+        const raw = await authForRequest.handler(reqForAuth);
+        let res = await sanitizeAuthResponse(reqForAuth, raw);
+        if (pendingDeleteSignin && res.status >= 200 && res.status < 300) {
+          revokeAccountSessions(pendingDeleteSignin.id);
+          res = new Response(JSON.stringify(softDeletedSignInBody(pendingDeleteSignin)), {
+            status: 403,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        if (signinEmailForDelay) {
+          await recordSigninEmailProgressiveDelayOutcome(c, signinEmailForDelay, res);
+        }
+        if (padTiming) {
+          await padToFloor(startedAtMs);
+        }
+        return res;
+      },
+    );
   },
 
   async signIn(input): Promise<{

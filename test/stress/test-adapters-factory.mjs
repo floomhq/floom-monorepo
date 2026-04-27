@@ -223,6 +223,7 @@ log('bundle.storage.setEncryptedSecret is fn', typeof bundle.storage.setEncrypte
 log('bundle.storage.listEncryptedSecrets is fn', typeof bundle.storage.listEncryptedSecrets === 'function');
 log('bundle.storage.deleteEncryptedSecret is fn', typeof bundle.storage.deleteEncryptedSecret === 'function');
 log('bundle.auth.getSession is fn', typeof bundle.auth.getSession === 'function');
+log('bundle.auth.mountHttp is fn', typeof bundle.auth.mountHttp === 'function');
 log('bundle.secrets.get is fn', typeof bundle.secrets.get === 'function');
 log('bundle.observability.increment is fn', typeof bundle.observability.increment === 'function');
 
