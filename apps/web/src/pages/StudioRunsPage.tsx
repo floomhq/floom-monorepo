@@ -1,10 +1,11 @@
 /**
  * /studio/runs — thin wrapper over RunsList.
  * Data fetching lives here; all rendering in RunsList.
+ * v26-IA-SPEC §12.2: uses WorkspacePageShell mode="studio" for shell alignment.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { StudioLayout } from '../components/studio/StudioLayout';
+import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { StudioSignedOutState } from '../components/studio/StudioSignedOutState';
 import { RunsList, runListRowsFromStudioActivity } from '../components/workspace/RunsList';
 import { useSession } from '../hooks/useSession';
@@ -45,13 +46,10 @@ export function StudioRunsPage() {
   const hasMore = allRows ? allRows.length > visibleCount : false;
 
   return (
-    <StudioLayout
-      title="All runs · Studio · Floom"
+    <WorkspacePageShell
+      mode="studio"
+      title="Runs · Studio · Floom"
       allowSignedOutShell={signedOutPreview}
-      contentStyle={{
-        maxWidth: 1180,
-        padding: 0,
-      }}
     >
       {signedOutPreview ? (
         <StudioSignedOutState />
@@ -96,7 +94,7 @@ export function StudioRunsPage() {
           error={error}
         />
       )}
-    </StudioLayout>
+    </WorkspacePageShell>
   );
 }
 

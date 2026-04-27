@@ -1,10 +1,9 @@
-// /studio + /studio/apps.
-// Canonical split: creator home lives at /studio; app index lives at /studio/apps.
+// /studio/apps (v26: /studio → /studio/apps via redirect)
+// v26-IA-SPEC §12.2: same shell shape as /run/apps (WorkspacePageShell mode="studio")
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { StudioLayout } from '../components/studio/StudioLayout';
-import { StudioDashboardHome } from '../components/studio/StudioDashboardHome';
+import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { StudioSignedOutState } from '../components/studio/StudioSignedOutState';
 import * as api from '../api/client';
 import { refreshMyApps, useMyApps } from '../hooks/useMyApps';
@@ -22,21 +21,24 @@ import {
   type AppsListActivityRow,
 } from '../components/workspace/AppsList';
 
+/** Legacy v25 home — kept at /studio/overview for back-compat. */
 export function StudioHomePage() {
   const { data: session } = useSession();
   const signedOutPreview = !!session && session.cloud_mode && session.user.is_local;
-
   return (
-    <StudioLayout
+    <WorkspacePageShell
+      mode="studio"
       title="Studio · Floom"
       allowSignedOutShell={signedOutPreview}
-      contentStyle={{
-        maxWidth: 1240,
-        padding: '24px 28px 96px',
-      }}
     >
-      <StudioDashboardHome />
-    </StudioLayout>
+      {/* Redirect handled at route level (/studio → /studio/apps).
+          This page is only reachable via /studio/overview for back-compat. */}
+      <div style={{ padding: '24px 0' }}>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+          Redirecting to Studio apps…
+        </p>
+      </div>
+    </WorkspacePageShell>
   );
 }
 
@@ -186,7 +188,8 @@ export function StudioAppsPage() {
   );
 
   return (
-    <StudioLayout
+    <WorkspacePageShell
+      mode="studio"
       title="Studio apps · Floom"
       allowSignedOutShell={signedOutPreview}
     >
@@ -340,7 +343,7 @@ export function StudioAppsPage() {
         onClose={() => setWaitlistOpen(false)}
         source="studio-deploy"
       />
-    </StudioLayout>
+    </WorkspacePageShell>
   );
 }
 
