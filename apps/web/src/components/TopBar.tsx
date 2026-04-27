@@ -7,7 +7,6 @@ import { useMyApps } from '../hooks/useMyApps';
 import * as api from '../api/client';
 import { useDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
-import { GitHubStarsBadge } from './GitHubStarsBadge';
 import { CopyForClaudeButton } from './CopyForClaudeButton';
 import { MobileDrawer } from './MobileDrawer';
 
@@ -229,7 +228,6 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
     location.pathname.startsWith('/apps/') ||
     location.pathname.startsWith('/store/') ||
     location.pathname.startsWith('/p/');
-  const isPricing = location.pathname === '/pricing';
   const isDocs =
     location.pathname.startsWith('/protocol') ||
     location.pathname.startsWith('/docs');
@@ -325,10 +323,8 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
         )}
 
         {/* Centre nav — v26-IA-SPEC §10 + §12.5:
-            Anonymous: Apps · Docs · Pricing (discovery surfaces).
-            Authenticated: no centre nav — Studio/My runs live in the rail,
-            not the TopBar. Slim authenticated TopBar = logo + Copy for
-            Claude + + New app + avatar only (§12.5). V11 fix 2026-04-27. */}
+            Anonymous: Apps · Docs · Help (3 items max, no Pricing for launch-mvp).
+            Authenticated: no centre nav — slim TopBar = logo + avatar only. */}
         {showAuthedChrome ? null : (
           <nav
             className="topbar-links topbar-links-desktop topbar-centre-nav"
@@ -361,12 +357,11 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               Docs
             </Link>
             <Link
-              to="/pricing"
-              data-testid="topbar-pricing"
-              aria-current={isPricing ? 'page' : undefined}
-              style={navLinkStyle(isPricing)}
+              to="/help"
+              data-testid="topbar-help"
+              style={navLinkStyle(false)}
             >
-              Pricing
+              Help
             </Link>
           </nav>
         )}
@@ -385,31 +380,22 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               TopBar = floom + Copy for Claude + + New app + avatar.
               No badge clutter for signed-in users who know the product.
               V11 fix 2026-04-27. */}
-          {!isLoginPage && !showAuthedChrome && <GitHubStarsBadge compact dataTestId="topbar-gh-stars" />}
+          {/* GitHub badge: moved to footer per launch-mvp slim header spec.
+              Removed from primary nav to reduce noise. */}
 
-          {/* Copy-for-Claude — globally present (anon + authed). Sits
-              between centre nav and CTA/avatar cluster (Federico-locked
-              2026-04-26). Hidden only on auth pages so they stay focused.
-              The popover handles its own state, click-outside, and Esc.
-              Anon centre nav: Apps · Docs · Pricing → Copy-for-Claude →
-              Sign in / Sign up. Authed: Studio · My runs →
-              Copy-for-Claude → + New app → avatar. */}
-          {!isLoginPage && <CopyForClaudeButton />}
+          {/* Get install snippet — anon only (authed users have the /home page).
+              Hidden on auth pages. */}
+          {!isLoginPage && !showAuthedChrome && <CopyForClaudeButton />}
 
-          {/* Primary CTA — brand-green pill. Authed users get "+ New app"
-              (work-focused: take me to the build flow). Anonymous users
-              get "Publish" (discovery-focused: learn what publishing
-              means). Both route to /studio/build in deploy mode; on
-              waitlist-prod the anon variant opens the waitlist instead.
-              Hidden on /login + /signup so auth pages stay focused.
-              While the deploy flag is loading we render nothing to avoid
-              the flash. */}
+          {/* Primary CTA — brand-green pill for anon only on launch-mvp.
+              Authed users use /home (token + install). Drop "+ New app" from
+              authed TopBar for launch-mvp simplicity. */}
           {!isLoginPage && showAuthedChrome && (
             <Link
               to="/studio/build"
               data-testid="topbar-new-app-cta"
               aria-current={isPublishNav ? 'page' : undefined}
-              style={publishCtaStyle}
+              style={{ ...publishCtaStyle, display: 'none' }}
             >
               + New app
             </Link>
@@ -591,7 +577,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                     active={isDocs}
                   />
                   <DropdownItem
-                    to="/docs/help"
+                    to="/help"
                     label="Help"
                     testId="topbar-user-help"
                     onSelect={() => setDropOpen(false)}
@@ -644,7 +630,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           /login + /signup so auth surfaces stay focused. Reuses the
           shared CopyForClaudeButton in mobile variant — same popover,
           same context-aware row 3 logic. */}
-      {!isLoginPage && (
+      {!isLoginPage && !showAuthedChrome && (
         <div className="topbar-mcp-mobile" data-testid="topbar-mcp-mobile">
           <CopyForClaudeButton variant="mobile" />
         </div>

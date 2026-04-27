@@ -14,6 +14,8 @@ import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from '
 import { LandingV17Page } from './pages/LandingV17Page';
 // M5: launch-mvp slim landing
 import { LandingMVPPage } from './pages/LandingMVPPage';
+// launch-mvp: slim one-box authed home (token + install)
+const MvpHomePage = lazy(() => import('./pages/MvpHomePage').then(m => ({ default: m.MvpHomePage })));
 import { NotFoundPage } from './pages/NotFoundPage';
 const AppsDirectoryPage = lazy(() => import('./pages/AppsDirectoryPage').then(m => ({ default: m.AppsDirectoryPage })));
 const AppPermalinkPage = lazy(() => import('./pages/AppPermalinkPage').then(m => ({ default: m.AppPermalinkPage })));
@@ -99,6 +101,8 @@ const ChangelogPage = lazy(() => import('./pages/ChangelogPage').then(m => ({ de
 // confirmation email for users who lost the modal, and the destination
 // for the /deploy shortcut when the flow is gated.
 const WaitlistPage = lazy(() => import('./pages/WaitlistPage').then(m => ({ default: m.WaitlistPage })));
+// launch-mvp: /help — separate from /docs reference content
+const HelpPage = lazy(() => import('./pages/HelpPage').then(m => ({ default: m.HelpPage })));
 import { IconSprite } from './components/IconSprite';
 import { CookieBanner } from './components/CookieBanner';
 import { RouteLoading } from './components/RouteLoading';
@@ -260,6 +264,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Routes>
         {/* M5: slim MVP landing */}
         <Route path="/" element={<LandingMVPPage />} />
+        {/* launch-mvp: one-box authed home — token + install */}
+        <Route path="/home" element={<MvpHomePage />} />
         <Route path="/marketing" element={<LandingV17Page />} />
         {/* Apps directory. Mounted at both /apps (legacy canonical) and
             /store (matches the "Store" pill label Federico sees on screen).
@@ -422,6 +428,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         {/* /changelog — added alongside v17 TopBar (PR #405 ripple fix). */}
         <Route path="/changelog" element={<ChangelogPage />} />
         <Route path="/waitlist" element={<WaitlistPage />} />
+        {/* launch-mvp: /help — support contact, separate from /docs reference content */}
+        <Route path="/help" element={<HelpPage />} />
         <Route path="/p/:slug/dashboard" element={<PSlugDashboardRedirect />} />
         {/* Legal pages. Floom, Inc. is a Delaware C-Corp. /legal is the
             canonical company-info route; /imprint is kept as a back-compat

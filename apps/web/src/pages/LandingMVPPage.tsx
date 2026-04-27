@@ -1,16 +1,29 @@
 /**
  * LandingMVPPage — slim landing for the launch-mvp branch.
  *
- * One job: land → sign up → mint MCP token.
- * Structure: Hero + 3-step explainer + mini footer.
+ * Fix 2 (restore context) + Fix 3 (one subtitle).
  *
- * The full marketing landing (LandingV17Page) is preserved at /marketing.
- * This page is only wired on launch-mvp via main.tsx.
+ * Structure:
+ *   Header (anon: logo · Apps · Docs · Help · Sign in · Sign up)
+ *   Hero (H1 + ONE subline + CTA)
+ *   What Floom does (2-3 short paragraphs)
+ *   3-step explainer
+ *   Mini apps section
+ *   Footer (floom · Apps · Docs · Help · Privacy · Terms)
+ *
+ * NO GitHub badge in primary nav, NO Pricing in anon nav, NO "Built in SF".
  */
 
 import { Link } from 'react-router-dom';
 
-const GITHUB_URL = 'https://github.com/floomhq/floom';
+// ---------- styles ----------
+
+const INK = '#0e0e0c';
+const MUTED = '#585550';
+const ACCENT = '#047857';
+const BG = '#fafaf8';
+const CARD = '#fff';
+const LINE = 'rgba(14,14,12,0.1)';
 
 export function LandingMVPPage() {
   return (
@@ -18,18 +31,19 @@ export function LandingMVPPage() {
       data-testid="landing-mvp"
       style={{
         minHeight: '100vh',
-        background: 'var(--bg)',
+        background: BG,
         display: 'flex',
         flexDirection: 'column',
         fontFamily: "'Inter', system-ui, sans-serif",
+        color: INK,
       }}
     >
-      {/* Slim TopBar: floom · Sign in · Get started */}
+      {/* ─── Slim anon header ─── */}
       <header
         style={{
           height: 52,
-          borderBottom: '1px solid var(--line)',
-          background: 'var(--bg)',
+          borderBottom: `1px solid ${LINE}`,
+          background: CARD,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -39,27 +53,53 @@ export function LandingMVPPage() {
           zIndex: 100,
         }}
       >
+        {/* Logo */}
         <Link
           to="/"
           style={{
             fontFamily: 'var(--font-display)',
-            fontWeight: 800,
+            fontWeight: 600,
             fontSize: 17,
-            color: 'var(--ink)',
+            color: INK,
             textDecoration: 'none',
             letterSpacing: '-0.02em',
           }}
         >
           floom
         </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+
+        {/* Centre nav: Apps · Docs · Help */}
+        <nav
+          aria-label="Primary"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 2,
+          }}
+          className="landing-centre-nav"
+        >
+          <Link to="/apps" style={{ fontSize: 13, fontWeight: 500, color: MUTED, textDecoration: 'none', padding: '7px 10px', borderRadius: 6 }}>Apps</Link>
+          <Link to="/docs" style={{ fontSize: 13, fontWeight: 500, color: MUTED, textDecoration: 'none', padding: '7px 10px', borderRadius: 6 }}>Docs</Link>
+          <Link to="/help" style={{ fontSize: 13, fontWeight: 500, color: MUTED, textDecoration: 'none', padding: '7px 10px', borderRadius: 6 }}>Help</Link>
+        </nav>
+
+        {/* Right: Sign in + Sign up */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Link
             to="/login"
             style={{
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: 'var(--muted)',
+              fontSize: 13,
+              fontWeight: 500,
+              color: INK,
               textDecoration: 'none',
+              padding: '7px 14px',
+              borderRadius: 6,
+              border: `1px solid ${LINE}`,
+              background: BG,
             }}
           >
             Sign in
@@ -71,22 +111,24 @@ export function LandingMVPPage() {
               alignItems: 'center',
               justifyContent: 'center',
               padding: '7px 14px',
-              borderRadius: 999,
-              background: 'var(--ink)',
+              borderRadius: 6,
+              background: INK,
               color: '#fff',
-              fontSize: 13.5,
-              fontWeight: 700,
+              fontSize: 13,
+              fontWeight: 600,
               textDecoration: 'none',
               whiteSpace: 'nowrap',
             }}
           >
-            Get started
+            Sign up
           </Link>
         </div>
       </header>
 
-      {/* Hero */}
+      {/* ─── Main content ─── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+
+        {/* Hero */}
         <section
           data-testid="mvp-hero"
           style={{
@@ -95,36 +137,37 @@ export function LandingMVPPage() {
             alignItems: 'center',
             justifyContent: 'center',
             textAlign: 'center',
-            padding: '80px 24px 60px',
-            borderBottom: '1px solid var(--line)',
-            background: 'linear-gradient(180deg, var(--card) 0%, var(--bg) 100%)',
+            padding: '80px 24px 64px',
+            borderBottom: `1px solid ${LINE}`,
+            background: `linear-gradient(180deg, ${CARD} 0%, ${BG} 100%)`,
           }}
         >
           <h1
             style={{
               fontFamily: 'var(--font-display)',
               fontWeight: 800,
-              fontSize: 56,
+              fontSize: 'clamp(36px, 6vw, 58px)',
               lineHeight: 1.03,
               letterSpacing: '-0.025em',
-              color: 'var(--ink)',
-              margin: '0 0 20px',
+              color: INK,
+              margin: '0 0 16px',
               maxWidth: 720,
             }}
           >
             Ship AI apps fast.
           </h1>
+          {/* ONE subtitle only — Fix 3 */}
           <p
             style={{
               fontSize: 18,
               lineHeight: 1.5,
-              color: 'var(--muted)',
-              maxWidth: 560,
-              margin: '0 auto 32px',
+              color: MUTED,
+              maxWidth: 480,
+              margin: '0 auto 36px',
               fontWeight: 400,
             }}
           >
-            Mint your MCP token in 30 seconds and use Floom from Claude, Cursor, or Codex.
+            The protocol and runtime for agentic work.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             <Link
@@ -136,7 +179,7 @@ export function LandingMVPPage() {
                 justifyContent: 'center',
                 padding: '14px 28px',
                 borderRadius: 999,
-                background: 'var(--ink)',
+                background: INK,
                 color: '#fff',
                 fontSize: 16,
                 fontWeight: 700,
@@ -144,14 +187,64 @@ export function LandingMVPPage() {
                 whiteSpace: 'nowrap',
               }}
             >
-              Get your MCP token \u2192
+              Get your MCP token →
             </Link>
             <Link
               to="/login"
-              style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}
+              style={{ fontSize: 13, color: MUTED, textDecoration: 'none' }}
             >
               Already have an account? Sign in
             </Link>
+          </div>
+        </section>
+
+        {/* What Floom does */}
+        <section
+          data-testid="mvp-what"
+          style={{
+            maxWidth: 760,
+            margin: '0 auto',
+            padding: '56px 24px 0',
+            width: '100%',
+          }}
+        >
+          <h2
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
+              fontSize: 22,
+              letterSpacing: '-0.02em',
+              color: INK,
+              margin: '0 0 20px',
+            }}
+          >
+            What is Floom?
+          </h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 24,
+            }}
+          >
+            <div>
+              <p style={{ fontSize: 14, color: INK, fontWeight: 600, margin: '0 0 6px' }}>A workspace + runtime</p>
+              <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.65, margin: 0 }}>
+                Floom gives every AI app a canonical HTTP endpoint, an MCP server, and a CLI — so it runs anywhere your agent does.
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: 14, color: INK, fontWeight: 600, margin: '0 0 6px' }}>For non-dev AI engineers</p>
+              <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.65, margin: 0 }}>
+                You don't need a DevOps background. Paste a GitHub link and you get a runnable, shareable, rate-limited app in under 30 seconds.
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: 14, color: INK, fontWeight: 600, margin: '0 0 6px' }}>Vibe-code speed, production safety</p>
+              <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.65, margin: 0 }}>
+                Secrets stay encrypted. Runs are logged and auditable. Apps are shareable or private. Ship fast without sacrificing guardrails.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -168,7 +261,7 @@ export function LandingMVPPage() {
               letterSpacing: '-0.02em',
               textAlign: 'center',
               margin: '0 0 36px',
-              color: 'var(--ink)',
+              color: INK,
             }}
           >
             Up and running in 3 steps
@@ -178,8 +271,8 @@ export function LandingMVPPage() {
               <div
                 key={step.num}
                 style={{
-                  background: 'var(--card)',
-                  border: '1px solid var(--line)',
+                  background: CARD,
+                  border: `1px solid ${LINE}`,
                   borderRadius: 12,
                   padding: '20px 18px',
                 }}
@@ -190,7 +283,7 @@ export function LandingMVPPage() {
                     fontSize: 10,
                     fontWeight: 700,
                     letterSpacing: '0.08em',
-                    color: 'var(--accent)',
+                    color: ACCENT,
                     textTransform: 'uppercase' as const,
                     marginBottom: 10,
                   }}
@@ -202,41 +295,89 @@ export function LandingMVPPage() {
                     fontSize: 15,
                     fontWeight: 700,
                     margin: '0 0 8px',
-                    color: 'var(--ink)',
+                    color: INK,
                     lineHeight: 1.3,
                   }}
                 >
                   {step.title}
                 </h3>
-                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, margin: 0 }}>
+                <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.55, margin: 0 }}>
                   {step.body}
                 </p>
               </div>
             ))}
           </div>
         </section>
+
+        {/* Featured apps mini-section */}
+        <section
+          data-testid="mvp-apps"
+          style={{
+            borderTop: `1px solid ${LINE}`,
+            padding: '56px 24px 64px',
+            background: CARD,
+          }}
+        >
+          <div style={{ maxWidth: 800, margin: '0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
+              <h2
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 800,
+                  fontSize: 22,
+                  letterSpacing: '-0.02em',
+                  color: INK,
+                  margin: 0,
+                }}
+              >
+                Browse apps
+              </h2>
+              <Link
+                to="/apps"
+                style={{ fontSize: 13, color: ACCENT, textDecoration: 'none', fontWeight: 600 }}
+              >
+                View all →
+              </Link>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              {FEATURED_APPS.map(app => (
+                <Link
+                  key={app.slug}
+                  to={`/p/${app.slug}`}
+                  style={{ display: 'block', padding: '16px 18px', background: BG, border: `1px solid ${LINE}`, borderRadius: 10, textDecoration: 'none' }}
+                >
+                  <div style={{ fontSize: 24, marginBottom: 8 }}>{app.emoji}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>{app.name}</div>
+                  <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>{app.tagline}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
       </main>
 
-      {/* Mini footer */}
+      {/* ─── Mini footer ─── */}
       <footer
         data-testid="mvp-footer"
         style={{
-          borderTop: '1px solid var(--line)',
+          borderTop: `1px solid ${LINE}`,
           padding: '16px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: 12,
+          background: CARD,
         }}
       >
         <Link
           to="/"
           style={{
             fontFamily: 'var(--font-display)',
-            fontWeight: 800,
+            fontWeight: 700,
             fontSize: 14,
-            color: 'var(--ink)',
+            color: INK,
             textDecoration: 'none',
             letterSpacing: '-0.02em',
           }}
@@ -244,9 +385,11 @@ export function LandingMVPPage() {
           floom
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <Link to="/docs/privacy" style={{ fontSize: 12.5, color: 'var(--muted)', textDecoration: 'none' }}>Privacy</Link>
-          <Link to="/docs/terms" style={{ fontSize: 12.5, color: 'var(--muted)', textDecoration: 'none' }}>Terms</Link>
-          <a href={GITHUB_URL} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: 'var(--muted)', textDecoration: 'none' }}>GitHub</a>
+          <Link to="/apps" style={{ fontSize: 12.5, color: MUTED, textDecoration: 'none' }}>Apps</Link>
+          <Link to="/docs" style={{ fontSize: 12.5, color: MUTED, textDecoration: 'none' }}>Docs</Link>
+          <Link to="/help" style={{ fontSize: 12.5, color: MUTED, textDecoration: 'none' }}>Help</Link>
+          <Link to="/privacy" style={{ fontSize: 12.5, color: MUTED, textDecoration: 'none' }}>Privacy</Link>
+          <Link to="/terms" style={{ fontSize: 12.5, color: MUTED, textDecoration: 'none' }}>Terms</Link>
         </div>
       </footer>
     </div>
@@ -257,16 +400,23 @@ const STEPS = [
   {
     num: '1',
     title: 'Sign up',
-    body: 'Create a free account. No credit card needed. Free during the beta.',
+    body: 'Create a free account. No credit card. Free during the beta.',
   },
   {
     num: '2',
     title: 'Mint your token',
-    body: 'Go to Agent Keys and mint your floom_agent_* token. One click.',
+    body: 'One click to generate your floom_agent_* workspace credential.',
   },
   {
     num: '3',
-    title: 'Paste the snippet',
-    body: 'Copy the MCP config and paste it into Claude Desktop, Cursor, or Codex.',
+    title: 'Paste the config',
+    body: 'Drop the MCP config into Claude Desktop, Cursor, Codex, or any MCP client.',
   },
+];
+
+const FEATURED_APPS = [
+  { slug: 'blog-writer', name: 'Blog writer', tagline: 'Draft long-form posts from a brief.', emoji: '✍️' },
+  { slug: 'lead-scorer', name: 'Lead scorer', tagline: 'Score a list of leads against an ICP.', emoji: '🎯' },
+  { slug: 'summariser', name: 'Summariser', tagline: 'Summarise any text or URL in seconds.', emoji: '📄' },
+  { slug: 'competitor-analysis', name: 'Competitor analysis', tagline: 'Compare two products side-by-side.', emoji: '🔍' },
 ];
