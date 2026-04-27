@@ -195,7 +195,11 @@ export function LoginPage() {
   const hasOAuthProvider = Boolean(
     cloudMode && (data?.auth_providers?.google || data?.auth_providers?.github),
   );
-  const showPasswordForm = !hasOAuthProvider;
+  // P0-C fix 2026-04-27: always show email/password form — it should be
+  // available alongside OAuth, not replaced by it. In OSS mode (cloudMode
+  // false) this is the only sign-in method anyway; in cloud mode it's the
+  // email-verification path for users who prefer not to use Google/GitHub.
+  const showPasswordForm = cloudMode;
 
   return (
     <PageShell title={mode === 'signin' ? 'Sign in · Floom' : 'Sign up · Floom'}>
@@ -252,17 +256,6 @@ export function LoginPage() {
         <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 24px', textAlign: 'center' }}>
           {mode === 'signup' ? '30 seconds. Free for launch.' : 'One account. Run apps, ship apps, all in one place.'}
         </p>
-
-        {mode === 'signup' && (
-          <div role="tablist" aria-label="What do you want to do?" style={signupModeStyle}>
-            <button type="button" role="tab" aria-selected="true" style={signupModeActiveStyle}>
-              I want to run apps
-            </button>
-            <button type="button" role="tab" aria-selected="false" style={signupModeButtonStyle}>
-              I want to publish apps
-            </button>
-          </div>
-        )}
 
         {hasSavedDraft && (
           <div
@@ -417,53 +410,31 @@ export function LoginPage() {
           </>
         )}
 
-        {hasOAuthProvider && (
-          <>
-            <p
-              style={{
-                fontSize: 13,
-                color: 'var(--muted)',
-                lineHeight: 1.55,
-                margin: '0 0 12px',
-              }}
-            >
-              On signup, you can save workspace BYOK keys once. Apps on Floom can use them at run time. Values stay encrypted and are never logged.
-            </p>
-            <p
-              style={{
-                fontSize: 12,
-                color: 'var(--muted)',
-                lineHeight: 1.5,
-                margin: 0,
-              }}
-            >
-              By continuing, you agree to our <Link to="/terms" style={{ color: 'var(--ink)' }}>Terms</Link> and <Link to="/privacy" style={{ color: 'var(--ink)' }}>Privacy Policy</Link>.
-            </p>
-            <p
-              style={{
-                fontSize: 12,
-                color: 'var(--muted)',
-                lineHeight: 1.5,
-                margin: '4px 0 16px',
-              }}
-            >
-              No password. No tracking pixels.
-            </p>
-          </>
-        )}
-
-        {!hasOAuthProvider && (
-          <p
+        {hasOAuthProvider && showPasswordForm && (
+          <div
             style={{
-              fontSize: 12,
-              color: 'var(--muted)',
-              lineHeight: 1.5,
-              margin: '0 0 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              margin: '8px 0 4px',
             }}
           >
-            By continuing, you agree to our <Link to="/terms" style={{ color: 'var(--ink)' }}>Terms</Link> and <Link to="/privacy" style={{ color: 'var(--ink)' }}>Privacy Policy</Link>.
-          </p>
+            <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+            <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>or continue with email</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+          </div>
         )}
+
+        <p
+          style={{
+            fontSize: 12,
+            color: 'var(--muted)',
+            lineHeight: 1.5,
+            margin: '0 0 16px',
+          }}
+        >
+          By continuing, you agree to our <Link to="/terms" style={{ color: 'var(--ink)' }}>Terms</Link> and <Link to="/privacy" style={{ color: 'var(--ink)' }}>Privacy Policy</Link>.
+        </p>
 
         {state === 'error' && errorCopy && (
           <div
@@ -699,37 +670,6 @@ const labelStyle: React.CSSProperties = {
   color: 'var(--muted)',
   marginBottom: 6,
   marginTop: 12,
-};
-
-const signupModeStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 0,
-  padding: 4,
-  background: 'var(--bg)',
-  border: '1px solid var(--line)',
-  borderRadius: 10,
-  marginBottom: 24,
-};
-
-const signupModeButtonStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '8px 12px',
-  border: 0,
-  background: 'transparent',
-  fontFamily: 'inherit',
-  fontSize: 13,
-  fontWeight: 500,
-  color: 'var(--muted)',
-  borderRadius: 7,
-  cursor: 'pointer',
-};
-
-const signupModeActiveStyle: React.CSSProperties = {
-  ...signupModeButtonStyle,
-  background: 'var(--card)',
-  color: 'var(--ink)',
-  fontWeight: 600,
-  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
 // #563 2026-04-23: font-size is 16px, not 14px. iOS Safari auto-zooms
