@@ -1,33 +1,12 @@
-// /studio/build — thin wrapper around BuildPage rendered inside
-// StudioLayout. Keeps the paste-first / detect / publish flow intact
-// (PR #5) while reusing the same code path. Post-publish links send
-// the creator to /studio/:slug. The in-page back breadcrumb was killed
-// in the 2026-04-20 nav unification; the TopBar pill is now the only
-// mode-switch affordance.
+// MVP stub: /studio/build — replaced with ComingSoon for launch.
 
-import type { ReactNode } from 'react';
-import { BuildPage } from './BuildPage';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
-import { useSession } from '../hooks/useSession';
-
-function StudioLayoutAdapter({ children, title }: { children: ReactNode; title?: string }) {
-  const { data } = useSession();
-  const workspaceName = data?.active_workspace?.name || 'Workspace';
-  return (
-    <WorkspacePageShell mode="studio" title={title} allowSignedOutShell>
-      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
-        Target workspace: {workspaceName}
-      </div>
-      {children}
-    </WorkspacePageShell>
-  );
-}
+import { ComingSoon } from '../components/ComingSoon';
 
 export function StudioBuildPage() {
   return (
-    <BuildPage
-      layout={StudioLayoutAdapter}
-      postPublishHref={(slug) => `/studio/${slug}`}
-    />
+    <WorkspacePageShell mode="studio" title="Build · Studio · Floom">
+      <ComingSoon feature="App builder" />
+    </WorkspacePageShell>
   );
 }
