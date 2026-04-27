@@ -24,9 +24,9 @@ Federico's running feedback as he reviews `mvp.floom.dev` and `v26.floom.dev`. T
 | V6 | SS 11.02.31 | "Copy for Claude" stacks 3 install methods, overwhelming — refactor to tabs (Claude/Cursor/Codex/CLI) | IN-FLIGHT | aff6d47e69f9fcc05 |
 | V7 | (verbal) | `/p/:slug` not updated to v26 chrome | IN-FLIGHT (may already be v26 — check SS 11.04.35) | aff6d47e69f9fcc05 |
 | V8 | (verbal) | No "+ Install in workspace" CTA on `/p/:slug` for authed users | IN-FLIGHT | aff6d47e69f9fcc05 |
-| V9 | SS 11.04.16 | Footer cluttered: 13 links across 3 columns, redundancy (Cookies/Legal, Status/Changelog), wrong tag "Built in SF" | OPEN | (new agent) |
-| V10 | SS 11.04.35 | Run on `/p/ai-readiness-audit` fails with `run_8wda96xryr1d` — `floom_internal_error` | OPEN | (new agent) |
-| V11 | SS 11.05.45 | Header nav not clean — `Studio` + `My runs` + GitHub `6` badge shouldn't be in TopBar (per §12.5: slim TopBar = floom + Copy-for-Claude + + New app + avatar) | IN-FLIGHT | ab8376b7f1a4fa521 |
+| V9 | SS 11.04.16 | Footer cluttered: 13 links across 3 columns, redundancy (Cookies/Legal, Status/Changelog), wrong tag "Built in SF" | FIXED 074f467a — slim 3-col (Product: Apps/Docs/Pricing/Changelog, Company: About/GitHub/Status, Legal: Terms/Privacy); dropped Cookies, Legal, Runtime limits, Security | this session |
+| V10 | SS 11.04.35 | Run on `/p/ai-readiness-audit` fails with `run_8wda96xryr1d` — `floom_internal_error` | FIXED cfc2d085 — root cause: `listen EADDRNOTAVAIL 172.25.0.1` (gateway IP not available inside server container); fix: connect server container to run network, listen 0.0.0.0, expose container IP; verified run_jry5mxd5cgg8 success | this session |
+| V11 | SS 11.05.45 | Header nav not clean — `Studio` + `My runs` + GitHub `6` badge shouldn't be in TopBar (per §12.5: slim TopBar = floom + Copy-for-Claude + + New app + avatar) | FIXED 074f467a — removed authed centre nav (Studio/My runs) and GitHub badge from authed state; anon TopBar unchanged | this session |
 | V12 | SS 11.06.40 | Click on app card on `/run/apps` goes to `/p/:slug` (public) — should go to private workspace view `/run/apps/:slug` | OPEN | (new agent) |
 | V13 | SS 11.06.40 | Counter mismatch: rail says "Apps 0", content stat says "Apps 1 installed" — different sources of truth | OPEN | (new agent) |
 | V14 | SS 11.06.40 | Auto-install on first run: ran public app once → it now appears in workspace as "installed" without explicit claim. Either: (a) language wrong (call it "recently used" not "installed"), or (b) require explicit Install action | OPEN | (new agent) |
@@ -41,7 +41,7 @@ Federico's running feedback as he reviews `mvp.floom.dev` and `v26.floom.dev`. T
 
 | # | Source | Issue | Status | Owner |
 |---|---|---|---|---|
-| X1 | SS 10.59.51 | "Built in SF" tag misleading — Federico in Hamburg moving to SF | OPEN | (new agent) |
+| X1 | SS 10.59.51 | "Built in SF" tag misleading — Federico in Hamburg moving to SF | FIXED 074f467a — removed location tag, footer now just "Ship AI apps fast." | this session |
 | X2 | (verbal) | ICP scenarios A/B/C/D/E full headless testing on v26 + mvp | IN-FLIGHT | a33659defe804b805 |
 | X3 | (verbal) | Schema additions ADR-34 (`unlisted` tier) + ADR-35 (`password_hash`) | OPEN | awaiting Federico's approval |
 | X4 | (verbal) | Triage 16 P1/P2 ICP-test issues (#829-#844) | OPEN | Federico AM triage |
