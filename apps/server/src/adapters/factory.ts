@@ -68,7 +68,7 @@ type AdapterCreateOptions = Record<string, unknown> & {
   storage?: StorageAdapter;
 };
 
-const EXPECTED_METHODS: Record<AdapterKind, readonly string[]> = {
+const REQUIRED_METHODS: Record<AdapterKind, readonly string[]> = {
   runtime: ['execute'],
   storage: [
     'getApp',
@@ -87,6 +87,15 @@ const EXPECTED_METHODS: Record<AdapterKind, readonly string[]> = {
     'listAppReviews',
     'updateAppReview',
     'deleteAppReview',
+    'createRunThread',
+    'getRunThread',
+    'listRunTurns',
+    'appendRunTurn',
+    'updateRunThread',
+    'createAgentToken',
+    'listAgentTokensForUser',
+    'getAgentTokenForUser',
+    'revokeAgentTokenForUser',
     'createJob',
     'getJob',
     'claimNextJob',
@@ -194,8 +203,11 @@ function importTargetFor(value: string): string {
   return value;
 }
 
-function adapterName(moduleExport: AdapterModuleExport, fallback: string): string {
-  return typeof moduleExport.name === 'string' && moduleExport.name.length > 0
+function adapterName(
+  moduleExport: AdapterModuleExport | undefined,
+  fallback: string,
+): string {
+  return typeof moduleExport?.name === 'string' && moduleExport.name.length > 0
     ? moduleExport.name
     : fallback;
 }
@@ -203,7 +215,7 @@ function adapterName(moduleExport: AdapterModuleExport, fallback: string): strin
 function assertAdapterSurface(
   kind: AdapterKind,
   key: string,
-  moduleExport: AdapterModuleExport,
+  moduleExport: AdapterModuleExport | undefined,
   adapter: unknown,
 ): void {
   if (typeof adapter !== 'object' || adapter === null) {
@@ -215,7 +227,8 @@ function assertAdapterSurface(
     );
   }
 
-  const missing = EXPECTED_METHODS[kind].filter(
+  const required = REQUIRED_METHODS[kind];
+  const missing = required.filter(
     (method) =>
       typeof (adapter as Record<string, unknown>)[method] !== 'function',
   );
@@ -224,7 +237,8 @@ function assertAdapterSurface(
       `[adapters] adapter '${adapterName(
         moduleExport,
         key,
-      )}' (kind=${kind}) is missing required methods: ${missing.join(', ')}`,
+      )}' (kind=${kind}) is missing required methods: ${missing.join(', ')}. ` +
+        `Required: ${required.join(', ')}`,
     );
   }
 }
@@ -347,6 +361,7 @@ async function pick<T>(
     );
   }
   assertProtocolVersionCompatibility(kind, effective, moduleExports[effective]);
+  assertAdapterSurface(kind, effective, moduleExports[effective], impl);
   return impl;
 }
 
@@ -448,4 +463,5 @@ export const __testing = {
   AUTH_MODULE_EXPORTS,
   SECRETS_MODULE_EXPORTS,
   OBSERVABILITY_MODULE_EXPORTS,
+  REQUIRED_METHODS,
 };
