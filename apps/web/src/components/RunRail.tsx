@@ -16,17 +16,18 @@ import { Link, useLocation } from 'react-router-dom';
 import { Box, Play, Plus } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
-// V13: run-history hook so rail count matches MeAppsPage
+// V13: run-history hook so rail count matches MeAppsPage (same data source)
 import { useMyRuns } from '../hooks/useMyRuns';
+import { useSession, clearSession } from '../hooks/useSession';
+import * as api from '../api/client';
 
 const RAIL_WIDTH = 240;
 
 export function RunRail() {
   const location = useLocation();
   const { runs } = useMyRuns();
-  const appsCount = runs
-    ? new Set(runs.map((r: { app_slug: string | null }) => r.app_slug).filter(Boolean)).size
-    : null;
+  // Unique-app count from run history
+  const appsCount = runs ? new Set(runs.map((r) => r.app_slug).filter(Boolean)).size : null;
 
   return (
     <aside data-testid="run-rail" aria-label="Run navigation" style={railStyle}>
@@ -70,19 +71,47 @@ export function RunRail() {
           </Link>
         </div>
       </div>
-      {/* v26 §12.5 + §12.6: no rail-bottom avatar or sign-out.
-          Avatar dropdown lives in TopBar only (Account settings · Docs · Help · Sign out). */}
+      <RailFoot />
     </aside>
   );
 }
 
-/**
- * v26 §12.5 + §12.6: Avatar and Sign out live in the TopBar avatar dropdown ONLY.
- * The rail has no footer account section. RailFoot is exported for backward-compat
- * but renders nothing.
- */
 export function RailFoot() {
-  return null;
+  const { data, refresh } = useSession();
+  const user = data?.user;
+  const label = user?.name || user?.email || 'Local user';
+  const initial = label.charAt(0).toUpperCase();
+
+  async function handleSignOut() {
+    try { await api.signOut(); } catch { /* ignore */ }
+    clearSession();
+    await refresh();
+    window.location.href = '/';
+  }
+
+  return (
+    <div style={footStyle}>
+      <div style={avatarStyle}>
+        {user?.image ? (
+          <img src={user.image} alt="" style={avatarImgStyle} />
+        ) : (
+          initial
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={footNameStyle}>{label}</div>
+        {/* v26 §12.6: settings only via workspace name click; footer shows sign-out */}
+        <button
+          type="button"
+          data-testid="rail-foot-signout"
+          onClick={() => { void handleSignOut(); }}
+          style={footSignOutStyle}
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** Kept for backward-compat imports only (StudioRail used to import Brand). */
@@ -251,3 +280,54 @@ function itemStyle(active: boolean): CSSProperties {
     fontWeight: active ? 700 : 600,
   };
 }
+
+const footStyle: CSSProperties = {
+  padding: '13px 14px 15px',
+  borderTop: '1px solid var(--line)',
+  background: 'var(--bg)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+};
+
+const avatarStyle: CSSProperties = {
+  width: 30,
+  height: 30,
+  borderRadius: 999,
+  background: 'var(--accent)',
+  color: '#fff',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 12,
+  fontWeight: 800,
+  flexShrink: 0,
+  overflow: 'hidden',
+};
+
+const avatarImgStyle: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+};
+
+const footNameStyle: CSSProperties = {
+  fontSize: 12.5,
+  fontWeight: 700,
+  color: 'var(--ink)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const footSignOutStyle: CSSProperties = {
+  fontSize: 11.5,
+  color: 'var(--muted)',
+  textDecoration: 'none',
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  display: 'inline',
+};

@@ -1,12 +1,7 @@
-// MVP stub: /run/apps — replaced with ComingSoon for launch.
+// MVP stub: /run/apps → redirect to agent-keys for launch.
 
-import { WorkspacePageShell } from '../components/WorkspacePageShell';
-import { ComingSoon } from '../components/ComingSoon';
+import { Navigate } from 'react-router-dom';
 
 export function MeAppsPage() {
-  return (
-    <WorkspacePageShell mode="run" title="Apps · Floom">
-      <ComingSoon feature="Apps dashboard" />
-    </WorkspacePageShell>
-  );
+  return <Navigate to="/me/agent-keys" replace />;
 }
