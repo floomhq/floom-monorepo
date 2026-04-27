@@ -341,7 +341,7 @@ export const DOCS_SIDEBAR_GROUPS: DocsSidebarGroup[] = [
     heading: 'API reference',
     links: [
       { to: '/docs/api-reference', label: 'Endpoints' },
-      { to: '/docs/security', label: 'Auth and API keys' },
+      { to: '/docs/security', label: 'Auth and BYOK keys' },
     ],
   },
   {

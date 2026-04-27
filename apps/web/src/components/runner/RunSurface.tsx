@@ -2218,7 +2218,7 @@ function EmptyOutputSkeleton({ outputType }: { outputType: OutputType | undefine
 //   - Single neutral palette (var(--card) bg, var(--line) border).
 //     NO category tints, NO warm-dark `--code` background despite the
 //     v23 wireframe — Federico's prompt overrides: "single neutral palette".
-//   - Vocabulary: "BYOK key" + "Gemini key" — never "API key".
+//   - Vocabulary: "BYOK key" + "Gemini key".
 //   - NO "Upgrade to Pro" CTA — Pro doesn't exist pre-launch.
 //   - The static "Resets at midnight UTC" reset line is a fallback because
 //     /api/:slug/quota does not currently expose `resets_at`. If the API
@@ -2606,7 +2606,7 @@ export function humanizeStartupError(raw: string): {
   }
   if (/byok|api key|gemini|auth/.test(r)) {
     return {
-      headline: 'The run needs a Gemini API key.',
+      headline: 'The run needs a Gemini BYOK key.',
       sub: 'Add your key in settings, or try a different app.',
     };
   }

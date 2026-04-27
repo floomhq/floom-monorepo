@@ -38,6 +38,62 @@ function buildContextSnippet(pathname: string): ContextSnippet | null {
       snippet: `floom run ${slug}`,
     };
   }
+  if (pathname === '/run') {
+    return {
+      label: 'WORKSPACE RUN',
+      snippet: `floom auth login --token=floom_agent_••••••\nfloom apps list`,
+    };
+  }
+  if (pathname === '/run/apps') {
+    return {
+      label: 'RUN APPS',
+      snippet: `floom auth login --token=floom_agent_••••••\nfloom apps list`,
+    };
+  }
+  if (pathname === '/run/runs' || pathname.startsWith('/run/runs/')) {
+    return {
+      label: 'RUN HISTORY',
+      snippet: `floom auth login --token=floom_agent_••••••\nfloom status`,
+    };
+  }
+  if (pathname === '/run/install') {
+    return {
+      label: 'INSTALL IN CLAUDE',
+      snippet: `floom auth login --token=floom_agent_••••••\nfloom apps list`,
+    };
+  }
+  const runAppMatch = pathname.match(/^\/run\/apps\/([^/]+)/);
+  if (runAppMatch) {
+    const slug = runAppMatch[1];
+    return {
+      label: `RUN THIS APP (${slug})`,
+      snippet: `floom auth login --token=floom_agent_••••••\nfloom run ${slug}`,
+    };
+  }
+  if (pathname === '/settings/byok-keys') {
+    return {
+      label: 'MANAGE BYOK KEYS',
+      snippet: `floom auth login --token=floom_agent_••••••\nfloom apps list`,
+    };
+  }
+  if (pathname === '/settings/agent-tokens') {
+    return {
+      label: 'MANAGE AGENT TOKENS',
+      snippet: `floom auth login --token=floom_agent_••••••`,
+    };
+  }
+  if (pathname === '/settings/studio') {
+    return {
+      label: 'STUDIO SETTINGS',
+      snippet: `floom auth login --token=floom_agent_••••••\nfloom deploy`,
+    };
+  }
+  if (pathname === '/account/settings') {
+    return {
+      label: 'ACCOUNT SETTINGS',
+      snippet: `floom auth login --token=floom_agent_••••••`,
+    };
+  }
   // /studio/:slug — creator-side deploy snippet for THIS app. Skip the
   // bare /studio root and /studio/build flow (no slug to bind).
   const studioMatch = pathname.match(/^\/studio\/([^/]+)/);
@@ -51,8 +107,8 @@ function buildContextSnippet(pathname: string): ContextSnippet | null {
   // /me + sub-pages — generic agent snippet
   if (pathname === '/me' || pathname.startsWith('/me/')) {
     return {
-      label: 'For this page (your account)',
-      snippet: `floom auth login\nfloom apps list`,
+      label: 'WORKSPACE RUN',
+      snippet: `floom auth login --token=floom_agent_••••••\nfloom apps list`,
     };
   }
   // Elsewhere: hide row 3
