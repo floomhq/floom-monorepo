@@ -9,7 +9,7 @@
 //
 // Coverage:
 //   1. Hosted default (no opts / selfHost: false): allowlist applies,
-//      only the launch-demo slugs pass.
+//      only the three launch-demo slugs pass.
 //   2. Self-host (selfHost: true): allowlist bypassed, every non-
 //      fixture app passes.
 //   3. Test fixtures stay filtered regardless of mode (we never want
@@ -52,7 +52,6 @@ const mkApp = (slug, extras = {}) => ({
 const demo = mkApp('competitor-lens');
 const demo2 = mkApp('ai-readiness-audit');
 const demo3 = mkApp('pitch-coach');
-const demo4 = mkApp('linkedin-roaster');
 const fastApp = mkApp('uuid');
 const ingested = mkApp('stripe-api');
 const fixture = mkApp('swagger-petstore', {
@@ -66,8 +65,7 @@ console.log('hub-filter: hosted mode (default opts)');
   log('launch demo → visible', isPubliclyListed(demo) === true);
   log('launch demo 2 → visible', isPubliclyListed(demo2) === true);
   log('launch demo 3 → visible', isPubliclyListed(demo3) === true);
-  log('launch demo 4 → visible', isPubliclyListed(demo4) === true);
-  log('fast-app hidden on hosted', isPubliclyListed(fastApp) === false);
+  log('fast-app visible on hosted (per BROWSE_SLUGS)', isPubliclyListed(fastApp) === true);
   log('ingested app hidden on hosted', isPubliclyListed(ingested) === false);
   log('test fixture hidden on hosted', isPubliclyListed(fixture) === false);
   log('test fixture 2 hidden on hosted', isPubliclyListed(fixture2) === false);
@@ -75,13 +73,13 @@ console.log('hub-filter: hosted mode (default opts)');
 
 {
   const visible = publicHubApps(
-    [demo, demo2, demo3, demo4, fastApp, ingested, fixture, fixture2],
+    [demo, demo2, demo3, fastApp, ingested, fixture, fixture2],
   );
   log(
-    'hosted publicHubApps: keeps exactly 4 demos',
+    'hosted publicHubApps: keeps 3 showcase + browse fast-apps (uuid is in BROWSE_SLUGS)',
     visible.length === 4 &&
       visible.every((a) =>
-        ['competitor-lens', 'ai-readiness-audit', 'pitch-coach', 'linkedin-roaster'].includes(a.slug),
+        ['competitor-lens', 'ai-readiness-audit', 'pitch-coach', 'uuid'].includes(a.slug),
       ),
     `got ${visible.map((a) => a.slug).join(',')}`,
   );
@@ -92,7 +90,7 @@ console.log('hub-filter: self-host mode (selfHost: true)');
 {
   // Every non-fixture app is surfaced on self-host. This is the main
   // regression — before the bypass, a fresh local-Docker instance showed
-  // "0 apps" because only the demo slugs were on the allowlist and
+  // "0 apps" because only the 3 demo slugs were on the allowlist and
   // those need docker.sock mounted to seed.
   log('launch demo → visible (self-host)',
     isPubliclyListed(demo, { selfHost: true }) === true);
@@ -108,12 +106,12 @@ console.log('hub-filter: self-host mode (selfHost: true)');
 
 {
   const visible = publicHubApps(
-    [demo, demo2, demo3, demo4, fastApp, ingested, fixture, fixture2],
+    [demo, demo2, demo3, fastApp, ingested, fixture, fixture2],
     { selfHost: true },
   );
   log(
     'self-host publicHubApps: keeps every non-fixture',
-    visible.length === 6 &&
+    visible.length === 5 &&
       !visible.some((a) => a.slug === 'swagger-petstore' || a.slug === 'my-renderer-test'),
     `got ${visible.map((a) => a.slug).join(',')}`,
   );

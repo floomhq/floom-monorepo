@@ -3,6 +3,7 @@ import { lookup } from 'node:dns/promises';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
+import { hostname } from 'node:os';
 import { domainToASCII } from 'node:url';
 import type { NormalizedManifest } from '../types.js';
 import { ManifestError } from './manifest.js';
@@ -223,7 +224,8 @@ async function authorizeTarget(
 
 async function startAllowlistProxy(
   runId: string,
-  listenHost: string,
+  bindHost: string,
+  advertisedHost: string,
   allowedDomains: string[],
 ): Promise<{ url: string; close: () => Promise<void> }> {
   const sockets = new Set<net.Socket>();
@@ -317,7 +319,7 @@ async function startAllowlistProxy(
 
   const address = await new Promise<net.AddressInfo>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, listenHost, () => {
+    server.listen(0, bindHost, () => {
       server.off('error', reject);
       const addr = server.address();
       if (!addr || typeof addr === 'string') {
@@ -330,7 +332,7 @@ async function startAllowlistProxy(
   server.unref();
 
   return {
-    url: `http://${listenHost}:${address.port}`,
+    url: `http://${advertisedHost}:${address.port}`,
     close: () =>
       new Promise((resolve, reject) => {
         for (const socket of sockets) socket.destroy();
@@ -344,6 +346,46 @@ async function startAllowlistProxy(
           else resolve();
         });
       }),
+  };
+}
+
+function getNetworkContainerIp(
+  networkInfo: { Containers?: Record<string, { Name?: string; IPv4Address?: string }> },
+  containerId: string,
+): string | null {
+  const containers = networkInfo.Containers || {};
+  for (const [id, details] of Object.entries(containers)) {
+    const name = (details.Name || '').replace(/^\//, '');
+    if (id === containerId || id.startsWith(containerId) || name === containerId) {
+      const ip = details.IPv4Address?.split('/')[0];
+      if (ip && net.isIP(ip) === 4) return ip;
+    }
+  }
+  return null;
+}
+
+async function connectCurrentContainerToNetwork(
+  network: Docker.Network,
+): Promise<{ containerId: string; ip: string; cleanup: () => Promise<void> }> {
+  const containerId = hostname();
+  if (!containerId) {
+    throw new Error('current container hostname is empty');
+  }
+
+  await network.connect({ Container: containerId });
+  const info = await network.inspect();
+  const ip = getNetworkContainerIp(info, containerId);
+  if (!ip) {
+    await network.disconnect({ Container: containerId, Force: true }).catch(() => {});
+    throw new Error(`Docker network did not expose an IP for current container ${containerId}`);
+  }
+
+  return {
+    containerId,
+    ip,
+    cleanup: async () => {
+      await network.disconnect({ Container: containerId, Force: true });
+    },
   };
 }
 
@@ -364,25 +406,7 @@ export async function prepareDockerNetworkPolicy(
   const networkName = `floom-run-net-${runId.replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 48)}`;
   let network: Docker.Network | null = null;
   let proxy: { url: string; close: () => Promise<void> } | null = null;
-  // When the Floom server itself runs inside a Docker container, the gateway
-  // of a newly-created bridge network (e.g. 172.25.0.1) lives on the HOST's
-  // network stack, not on any interface visible inside the server container.
-  // Calling server.listen(0, gateway) from inside the container fails with
-  // EADDRNOTAVAIL (V10 bug, run_8wda96xryr1d, 2026-04-27).
-  //
-  // Fix: detect when we're running as a container (HOSTNAME is a 12-char hex
-  // container ID), then connect the server container to the newly-created run
-  // network so it receives an IP on that subnet. Listen on 0.0.0.0 and pass
-  // the container's IP on the run network (not the gateway) as the proxy URL.
-  // In cleanup, disconnect the server from the run network.
-  //
-  // Bare-host path (dev, CI): gateway IS locally bound — keep old behaviour.
-  const serverContainerId = process.env.HOSTNAME?.match(/^[0-9a-f]{12}$/)
-    ? process.env.HOSTNAME
-    : null;
-
-  let serverConnectedToNetwork = false;
-
+  let currentContainerNetwork: { ip: string; cleanup: () => Promise<void> } | null = null;
   try {
     network = await docker.createNetwork({
       Name: networkName,
@@ -396,39 +420,23 @@ export async function prepareDockerNetworkPolicy(
       throw new Error(`Docker network ${networkName} did not expose a gateway`);
     }
 
-    let listenHost: string;
-    let proxyIp: string;
-
-    if (serverContainerId) {
-      // Server is a container — connect it to the run network so it can bind
-      // an address on that subnet and the app container can reach the proxy.
-      await network.connect({ Container: serverContainerId });
-      serverConnectedToNetwork = true;
-
-      // Re-inspect to get the IP Docker assigned to this container on the new
-      // network, then use 0.0.0.0 for bind (so any interface works) but pass
-      // the container-side IP in the proxy URL so app containers can reach it.
-      const serverInspect = await docker.getContainer(serverContainerId).inspect();
-      const serverIpOnNet =
-        serverInspect.NetworkSettings?.Networks?.[networkName]?.IPAddress;
-      if (!serverIpOnNet) {
-        throw new Error(
-          `[network-policy] server container ${serverContainerId} has no IP on ${networkName}`,
-        );
+    try {
+      proxy = await startAllowlistProxy(runId, gateway, gateway, allowedDomains);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== 'EADDRNOTAVAIL') {
+        throw err;
       }
-      listenHost = '0.0.0.0';
-      proxyIp = serverIpOnNet;
-    } else {
-      // Bare-host path: gateway is a locally-bound bridge interface.
-      listenHost = gateway;
-      proxyIp = gateway;
+      currentContainerNetwork = await connectCurrentContainerToNetwork(network);
+      proxy = await startAllowlistProxy(
+        runId,
+        '0.0.0.0',
+        currentContainerNetwork.ip,
+        allowedDomains,
+      );
     }
 
-    proxy = await startAllowlistProxy(runId, listenHost, allowedDomains);
-    // When listening on 0.0.0.0, replace it in the URL with the real routable
-    // IP that app containers will use to reach this proxy.
-    const proxyUrl = proxy.url.replace('0.0.0.0', proxyIp).replace('127.0.0.1', proxyIp);
-
+    const proxyUrl = proxy.url;
     return {
       networkMode: networkName,
       env: [
@@ -450,11 +458,11 @@ export async function prepareDockerNetworkPolicy(
             errors.push((err as Error).message);
           }
         }
-        if (serverContainerId && serverConnectedToNetwork && network) {
+        if (currentContainerNetwork) {
           try {
-            await network.disconnect({ Container: serverContainerId, Force: true });
+            await currentContainerNetwork.cleanup();
           } catch (err) {
-            errors.push(`disconnect: ${(err as Error).message}`);
+            errors.push((err as Error).message);
           }
         }
         if (network) {
@@ -471,9 +479,7 @@ export async function prepareDockerNetworkPolicy(
     };
   } catch (err) {
     if (proxy) await proxy.close().catch(() => {});
-    if (serverContainerId && serverConnectedToNetwork && network) {
-      await network.disconnect({ Container: serverContainerId, Force: true }).catch(() => {});
-    }
+    if (currentContainerNetwork) await currentContainerNetwork.cleanup().catch(() => {});
     if (network) await network.remove().catch(() => {});
     throw err;
   }
