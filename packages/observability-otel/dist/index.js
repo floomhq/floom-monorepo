@@ -16,6 +16,8 @@ class OtelObservabilityAdapter {
     counters = new Map();
     histograms = new Map();
     gauges = new Map();
+    sdk = null;
+    sdkStart = null;
     constructor(opts) {
         this.serviceName = opts.serviceName || DEFAULT_SERVICE_NAME;
         this.endpoint = normalizeEndpoint(opts.otlpEndpoint || process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
@@ -85,6 +87,12 @@ class OtelObservabilityAdapter {
             });
         });
     }
+    async close() {
+        if (!this.sdk)
+            return;
+        await this.sdkStart;
+        await this.sdk.shutdown();
+    }
     startSdk(batchTimeoutMs) {
         safe(() => {
             const traceExporter = new OTLPTraceExporter({
@@ -103,7 +111,8 @@ class OtelObservabilityAdapter {
                 traceExporter,
                 metricReader,
             });
-            void Promise.resolve(sdk.start()).catch(() => undefined);
+            this.sdk = sdk;
+            this.sdkStart = Promise.resolve(sdk.start()).catch(() => undefined);
         });
     }
     counter(metric) {

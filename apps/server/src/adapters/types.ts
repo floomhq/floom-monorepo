@@ -1,5 +1,7 @@
 export type {
   ActionSpec,
+  AdapterHealth,
+  AdapterLifecycle,
   AgentTokenRecord,
   AppInviteRecord,
   AppListFilter,

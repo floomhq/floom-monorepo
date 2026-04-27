@@ -14,6 +14,26 @@ TypeScript declarations: [`@floom/adapter-types`](../packages/adapter-types/src/
 
 ---
 
+## Optional lifecycle hooks
+
+Every adapter interface includes optional lifecycle methods. These methods are
+not part of the required method list used by the server factory, so existing
+adapters remain valid when they omit them.
+
+```ts
+interface AdapterLifecycle {
+  ready?(): Promise<void>;
+  health?(): Promise<{ ok: boolean; details?: Record<string, unknown> }>;
+  close?(): Promise<void>;
+}
+```
+
+- `ready()` runs once during adapter bundle creation after selection and surface validation. A thrown error aborts boot.
+- `health()` returns adapter-local status for callers that want direct adapter probes. The core server does not expose it over HTTP in protocol 0.2.
+- `close()` runs during SIGINT/SIGTERM shutdown. Adapters with open pools, SDKs, sockets, or workers use it to drain resources.
+
+---
+
 ## RuntimeAdapter
 
 **Purpose.** Executes one action of a Floom app and returns a normalized result.
@@ -502,7 +522,9 @@ At boot, the factory:
 2. If the value is a module specifier, calls `await import(value)` and reads `.default`.
 3. Validates `kind` matches the expected concern, rejects with a descriptive error otherwise.
 4. Validates `protocolVersion` is compatible with the server's `FLOOM_PROTOCOL_VERSION` constant (see below); rejects with a version-mismatch error otherwise.
-5. Registers `adapter` in the bundle.
+5. Validates the required method surface for that concern.
+6. Awaits `adapter.ready?.()`.
+7. Registers `adapter` in the bundle.
 
 Validation failures MUST halt server boot. A Floom server MUST NOT start with a partially-loaded adapter bundle.
 

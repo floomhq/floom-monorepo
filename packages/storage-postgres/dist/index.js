@@ -85,6 +85,10 @@ const JOB_COLUMNS = new Set([
     'started_at',
     'finished_at',
 ]);
+function positiveIntEnv(name) {
+    const value = Number(process.env[name]);
+    return Number.isInteger(value) && value > 0 ? value : undefined;
+}
 class PostgresStorageAdapter {
     pool;
     connectionString;
@@ -95,8 +99,33 @@ class PostgresStorageAdapter {
         this.setupSchema = opts.setupSchema ?? true;
         this.pool = new Pool({
             connectionString: opts.connectionString || 'postgres://invalid',
-            max: 10,
+            max: opts.maxConnections ?? positiveIntEnv('DATABASE_POOL_SIZE') ?? 10,
+            idleTimeoutMillis: opts.idleTimeoutMs ?? positiveIntEnv('DATABASE_IDLE_TIMEOUT_MS') ?? 30_000,
+            connectionTimeoutMillis: opts.connectionTimeoutMs ?? positiveIntEnv('DATABASE_CONNECTION_TIMEOUT_MS') ?? 10_000,
+            query_timeout: opts.queryTimeoutMs ?? positiveIntEnv('DATABASE_QUERY_TIMEOUT_MS') ?? 30_000,
+            statement_timeout: opts.statementTimeoutMs ?? positiveIntEnv('DATABASE_STATEMENT_TIMEOUT_MS') ?? 30_000,
+            application_name: 'floom-server',
         });
+    }
+    async ready() {
+        await this.ensureReady();
+    }
+    async health() {
+        try {
+            await this.query('SELECT 1 AS ok', []);
+            return { ok: true };
+        }
+        catch (err) {
+            return {
+                ok: false,
+                details: {
+                    error: err instanceof Error ? err.message : String(err),
+                },
+            };
+        }
+    }
+    async close() {
+        await this.pool.end();
     }
     async getApp(slug) {
         return one((await this.query('SELECT * FROM apps WHERE slug = $1', [slug])).map(normalizeApp));
@@ -372,14 +401,31 @@ class PostgresStorageAdapter {
         return (await this.query('SELECT * FROM run_turns WHERE thread_id = $1 ORDER BY turn_index ASC', [thread_id])).map(normalizeRunTurn);
     }
     async appendRunTurn(input) {
-        const row = one((await this.query(`INSERT INTO run_turns (id, thread_id, turn_index, kind, payload)
+        await this.ensureReady();
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('SELECT pg_advisory_xact_lock(hashtext($1)::bigint)', [
+                input.thread_id,
+            ]);
+            const result = await client.query(`INSERT INTO run_turns (id, thread_id, turn_index, kind, payload)
          SELECT $1, $2, COALESCE(MAX(turn_index), -1) + 1, $3, $4
            FROM run_turns
           WHERE thread_id = $2
-         RETURNING *`, [input.id, input.thread_id, input.kind, input.payload])).map(normalizeRunTurn));
-        if (!row)
-            throw new Error(`appendRunTurn: failed to re-read row ${input.id}`);
-        return row;
+         RETURNING *`, [input.id, input.thread_id, input.kind, input.payload]);
+            const row = one(result.rows.map(normalizeRunTurn));
+            if (!row)
+                throw new Error(`appendRunTurn: failed to re-read row ${input.id}`);
+            await client.query('COMMIT');
+            return row;
+        }
+        catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        }
+        finally {
+            client.release();
+        }
     }
     async updateRunThread(id, patch) {
         const rows = patch.title !== undefined

@@ -455,6 +455,17 @@ export interface SessionContext {
 // Shared adapter shapes
 // =====================================================================
 
+export interface AdapterHealth {
+  ok: boolean;
+  details?: Record<string, unknown>;
+}
+
+export interface AdapterLifecycle {
+  ready?(): Promise<void>;
+  health?(): Promise<AdapterHealth>;
+  close?(): Promise<void>;
+}
+
 export interface RuntimeResult {
   status: RunStatus;
   outputs: unknown;
@@ -494,7 +505,7 @@ export interface RunListFilter {
 // 1. RuntimeAdapter
 // =====================================================================
 
-export interface RuntimeAdapter {
+export interface RuntimeAdapter extends AdapterLifecycle {
   execute(
     app: AppRecord,
     manifest: NormalizedManifest,
@@ -511,7 +522,7 @@ export interface RuntimeAdapter {
 // 2. StorageAdapter
 // =====================================================================
 
-export interface StorageAdapter {
+export interface StorageAdapter extends AdapterLifecycle {
   getApp(slug: string): Promise<AppRecord | undefined>;
   getAppById(id: string): Promise<AppRecord | undefined>;
   listApps(filter?: AppListFilter): Promise<AppRecord[]>;
@@ -797,7 +808,7 @@ export type UserWriteColumn = Exclude<keyof UserWriteInput, 'id'>;
 // 3. AuthAdapter
 // =====================================================================
 
-export interface AuthAdapter {
+export interface AuthAdapter extends AdapterLifecycle {
   getSession(request: Request): Promise<SessionContext | null>;
 
   signIn(input: { email: string; password?: string }): Promise<AuthSessionResult | AuthMagicLinkSentResult>;
@@ -832,7 +843,7 @@ export interface AuthMagicLinkSentResult {
 // 4. SecretsAdapter
 // =====================================================================
 
-export interface SecretsAdapter {
+export interface SecretsAdapter extends AdapterLifecycle {
   get(ctx: SessionContext, key: string): Promise<string | null>;
   set(ctx: SessionContext, key: string, plaintext: string): Promise<void>;
   delete(ctx: SessionContext, key: string): Promise<boolean>;
@@ -852,7 +863,7 @@ export interface SecretsAdapter {
 // 5. ObservabilityAdapter
 // =====================================================================
 
-export interface ObservabilityAdapter {
+export interface ObservabilityAdapter extends AdapterLifecycle {
   captureError(err: unknown, context?: Record<string, unknown>): void;
   increment(metric: string, amount?: number, tags?: Record<string, string>): void;
   timing(metric: string, ms: number, tags?: Record<string, string>): void;

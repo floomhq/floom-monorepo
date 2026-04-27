@@ -76,6 +76,12 @@ import type {
 } from './types.js';
 
 type UserDeleteListener = (user_id: string) => void | Promise<void>;
+type AppendRunTurnInput = {
+  id: string;
+  thread_id: string;
+  kind: RunTurnRecord['kind'];
+  payload: string;
+};
 type SqliteStorageAdapter = StorageAdapter & {
   deleteUser(id: string): Promise<boolean>;
   onUserDelete(cb: UserDeleteListener): void;
@@ -115,6 +121,31 @@ function userInsertValues(
   keys: Array<keyof UserWriteInput>,
 ): unknown[] {
   return keys.map((key) => input[key]);
+}
+
+const appendRunTurnTxn = db.transaction((input: AppendRunTurnInput) => {
+  const lastTurn = db
+    .prepare('SELECT MAX(turn_index) as max_idx FROM run_turns WHERE thread_id = ?')
+    .get(input.thread_id) as { max_idx: number | null };
+  const nextIdx = (lastTurn.max_idx ?? -1) + 1;
+  db.prepare(
+    `INSERT INTO run_turns (id, thread_id, turn_index, kind, payload)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(input.id, input.thread_id, nextIdx, input.kind, input.payload);
+  return db
+    .prepare('SELECT * FROM run_turns WHERE id = ?')
+    .get(input.id) as RunTurnRecord;
+});
+
+function isRunTurnIndexConstraint(err: unknown): boolean {
+  const error = err as { code?: unknown; message?: unknown };
+  return (
+    error?.code === 'SQLITE_CONSTRAINT_UNIQUE' &&
+    typeof error.message === 'string' &&
+    /run_turns\.thread_id, run_turns\.turn_index|uniq_run_turns_thread_turn_index/.test(
+      error.message,
+    )
+  );
 }
 
 export const sqliteStorageAdapter: SqliteStorageAdapter = {
@@ -418,17 +449,14 @@ export const sqliteStorageAdapter: SqliteStorageAdapter = {
     kind: RunTurnRecord['kind'];
     payload: string;
   }): Promise<RunTurnRecord> {
-    const lastTurn = db
-      .prepare('SELECT MAX(turn_index) as max_idx FROM run_turns WHERE thread_id = ?')
-      .get(input.thread_id) as { max_idx: number | null };
-    const nextIdx = (lastTurn.max_idx ?? -1) + 1;
-    db.prepare(
-      `INSERT INTO run_turns (id, thread_id, turn_index, kind, payload)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(input.id, input.thread_id, nextIdx, input.kind, input.payload);
-    return db
-      .prepare('SELECT * FROM run_turns WHERE id = ?')
-      .get(input.id) as RunTurnRecord;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return appendRunTurnTxn(input);
+      } catch (err) {
+        if (!isRunTurnIndexConstraint(err) || attempt === 4) throw err;
+      }
+    }
+    throw new Error(`appendRunTurn: failed to append turn ${input.id}`);
   },
 
   async updateRunThread(

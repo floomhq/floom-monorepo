@@ -31,6 +31,8 @@ class OtelObservabilityAdapter implements ObservabilityAdapter {
   private readonly counters = new Map<string, ReturnType<typeof this.meter.createCounter>>();
   private readonly histograms = new Map<string, ReturnType<typeof this.meter.createHistogram>>();
   private readonly gauges = new Map<string, { points: Map<string, GaugePoint> }>();
+  private sdk: NodeSDK | null = null;
+  private sdkStart: Promise<void> | null = null;
 
   constructor(opts: OtelObservabilityOptions) {
     this.serviceName = opts.serviceName || DEFAULT_SERVICE_NAME;
@@ -111,6 +113,12 @@ class OtelObservabilityAdapter implements ObservabilityAdapter {
     });
   }
 
+  async close(): Promise<void> {
+    if (!this.sdk) return;
+    await this.sdkStart;
+    await this.sdk.shutdown();
+  }
+
   private startSdk(batchTimeoutMs?: number): void {
     safe(() => {
       const traceExporter = new OTLPTraceExporter({
@@ -129,7 +137,8 @@ class OtelObservabilityAdapter implements ObservabilityAdapter {
         traceExporter,
         metricReader,
       });
-      void Promise.resolve(sdk.start()).catch(() => undefined);
+      this.sdk = sdk;
+      this.sdkStart = Promise.resolve(sdk.start()).catch(() => undefined);
     });
   }
 

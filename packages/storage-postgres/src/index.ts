@@ -42,6 +42,11 @@ export interface PostgresAdapterOptions {
   connectionString: string;
   setupSchema?: boolean;
   callTimeoutMs?: number;
+  maxConnections?: number;
+  idleTimeoutMs?: number;
+  connectionTimeoutMs?: number;
+  queryTimeoutMs?: number;
+  statementTimeoutMs?: number;
 }
 
 interface QueryResult {
@@ -137,6 +142,11 @@ const JOB_COLUMNS = new Set([
   'finished_at',
 ]);
 
+function positiveIntEnv(name: string): number | undefined {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
 class PostgresStorageAdapter implements StorageAdapter {
   private readonly pool: PgPool;
   private readonly connectionString: string;
@@ -148,8 +158,37 @@ class PostgresStorageAdapter implements StorageAdapter {
     this.setupSchema = opts.setupSchema ?? true;
     this.pool = new Pool({
       connectionString: opts.connectionString || 'postgres://invalid',
-      max: 10,
+      max: opts.maxConnections ?? positiveIntEnv('DATABASE_POOL_SIZE') ?? 10,
+      idleTimeoutMillis: opts.idleTimeoutMs ?? positiveIntEnv('DATABASE_IDLE_TIMEOUT_MS') ?? 30_000,
+      connectionTimeoutMillis:
+        opts.connectionTimeoutMs ?? positiveIntEnv('DATABASE_CONNECTION_TIMEOUT_MS') ?? 10_000,
+      query_timeout: opts.queryTimeoutMs ?? positiveIntEnv('DATABASE_QUERY_TIMEOUT_MS') ?? 30_000,
+      statement_timeout:
+        opts.statementTimeoutMs ?? positiveIntEnv('DATABASE_STATEMENT_TIMEOUT_MS') ?? 30_000,
+      application_name: 'floom-server',
     });
+  }
+
+  async ready(): Promise<void> {
+    await this.ensureReady();
+  }
+
+  async health(): Promise<{ ok: boolean; details?: Record<string, unknown> }> {
+    try {
+      await this.query('SELECT 1 AS ok', []);
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        details: {
+          error: err instanceof Error ? err.message : String(err),
+        },
+      };
+    }
+  }
+
+  async close(): Promise<void> {
+    await this.pool.end();
   }
 
   async getApp(slug: string): Promise<AppRecord | undefined> {
@@ -515,18 +554,33 @@ class PostgresStorageAdapter implements StorageAdapter {
     kind: RunTurnRecord['kind'];
     payload: string;
   }): Promise<RunTurnRecord> {
-    const row = one(
-      (await this.query(
+    await this.ensureReady();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1)::bigint)', [
+        input.thread_id,
+      ]);
+      const result = await client.query(
         `INSERT INTO run_turns (id, thread_id, turn_index, kind, payload)
          SELECT $1, $2, COALESCE(MAX(turn_index), -1) + 1, $3, $4
            FROM run_turns
           WHERE thread_id = $2
          RETURNING *`,
         [input.id, input.thread_id, input.kind, input.payload],
-      )).map(normalizeRunTurn),
-    );
-    if (!row) throw new Error(`appendRunTurn: failed to re-read row ${input.id}`);
-    return row;
+      );
+      const row = one(
+        (result.rows as Array<Record<string, unknown>>).map(normalizeRunTurn),
+      );
+      if (!row) throw new Error(`appendRunTurn: failed to re-read row ${input.id}`);
+      await client.query('COMMIT');
+      return row;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async updateRunThread(
