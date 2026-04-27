@@ -21,15 +21,15 @@ Zero behavior change under the default configuration. Every env var defaults to 
 
 ## Supported values per env var
 
-| Env var                  | Default        | Supported values | Lives in                                   |
-|--------------------------|----------------|------------------|--------------------------------------------|
-| `FLOOM_RUNTIME`          | `docker`       | `docker`, `proxy` | `adapters/runtime-docker.ts`, `adapters/runtime-proxy.ts` |
-| `FLOOM_STORAGE`          | `sqlite`       | `sqlite`          | `adapters/storage-sqlite.ts`               |
-| `FLOOM_AUTH`             | `better-auth`  | `better-auth`     | `adapters/auth-better-auth.ts`             |
-| `FLOOM_SECRETS`          | `local`        | `local`           | `adapters/secrets-local.ts`; package option `@floomhq/secrets-gcp-kms` |
-| `FLOOM_OBSERVABILITY`    | `console`      | `console`         | `adapters/observability-console.ts`        |
+| Env var                  | Default        | Built-in keys | First-party package adapters |
+|--------------------------|----------------|---------------|------------------------------|
+| `FLOOM_RUNTIME`          | `docker`       | `docker`, `proxy` | none shipped in v0.2 |
+| `FLOOM_STORAGE`          | `sqlite`       | `sqlite` | `@floomhq/storage-postgres` |
+| `FLOOM_AUTH`             | `better-auth`  | `better-auth` | `@floomhq/auth-magic-link` |
+| `FLOOM_SECRETS`          | `local`        | `local` | `@floomhq/secrets-gcp-kms` |
+| `FLOOM_OBSERVABILITY`    | `console`      | `console` | `@floomhq/observability-otel` |
 
-Known first-party optional adapters include `@floomhq/storage-postgres` for Postgres-backed storage and `@floomhq/observability-otel` for OpenTelemetry metrics and error events. The OpenTelemetry adapter stays out of `@floom/server` dependencies; install it only on deployments that export to an OTLP collector.
+The first-party package adapters live under [`packages`](../packages). They are workspace packages in this repo; npm publication ships with the v0.5 release, and the structure is ready today. The OpenTelemetry adapter stays out of `@floom/server` dependencies; install or build it only on deployments that export to an OTLP collector.
 
 Values starting with `@` or containing `/` are treated as third-party module specifiers and loaded with dynamic `import()` at boot:
 
@@ -38,36 +38,41 @@ FLOOM_STORAGE=@floom-community/storage-postgres
 FLOOM_STORAGE=./local-adapters/storage-postgres.js
 ```
 
-## Adding a new in-tree adapter (3 steps)
+## Status today
 
-Say you want to add a Postgres `StorageAdapter`:
+Protocol v0.2 wires all five concerns through the factory and the exported `adapters` singleton. The shipped state is:
 
-1. **Write the wrapper.** Create `apps/server/src/adapters/storage-postgres.ts` that exports a `postgresStorageAdapter: StorageAdapter` conforming to the interface in `adapters/types.ts`. Use `better-sqlite3`'s schema as a reference but translate to `pg` (or your preferred driver).
-2. **Register it in the factory.** In `apps/server/src/adapters/factory.ts`, add one line to `STORAGE_IMPLS`:
-   ```ts
-   const STORAGE_IMPLS: Record<string, StorageAdapter> = {
-     sqlite: sqliteStorageAdapter,
-     postgres: postgresStorageAdapter,
-   };
-   ```
-3. **Document the env var value.** Append to the supported-values table in this doc and to the `FLOOM_STORAGE` block in `docker/.env.example`. Set `FLOOM_STORAGE=postgres` on the deployment that should use it.
+- `FLOOM_PROTOCOL_VERSION` is `0.2.0` in [`apps/server/src/adapters/version.ts`](../apps/server/src/adapters/version.ts), and the shared type surface is the `@floom/adapter-types` workspace package at [`packages/adapter-types`](../packages/adapter-types).
+- Runtime dispatch uses `adapters.runtime.execute`; auth session resolution uses `adapters.auth.getSession`; run secret resolution uses async `adapters.secrets` methods.
+- `StorageAdapter` covers workspaces, users, OAuth connections, app sharing, triggers, app memory, run threads, run turns, jobs, admin secret pointers, and encrypted secret rows.
+- `ctx?: SessionContext` tenant scoping, lifecycle hooks (`ready`, `health`, `close`), boot-time adapter surface validation, and SIGINT/SIGTERM close wiring are implemented.
+- The conformance runner lives at [`packages/conformance-runner`](../packages/conformance-runner), and all five per-concern suites live at `test/stress/test-adapters-<concern>-contract.mjs`.
+- First-party optional adapter packages are present for Postgres storage, magic-link auth, GCP KMS secrets, and OpenTelemetry observability.
 
-That's the whole pattern. The factory picks the impl, the adapter conforms to the typed contract, the rest of the server reads from the bundle.
+Deferred items are limited to npm publication of the first-party packages, community adapter releases under `@floom-community/*`, and Docker-only conformance assertions that skip when Docker is not available on the host.
 
-## What is NOT in this PR
+## Adding a new adapter package (3 steps)
 
-- **Call-site migration.** Routes and services in `routes/*` and `services/*` still import `db`, `runner`, `userSecrets` directly. The adapter bundle exists and is callable, but the 50+ existing call sites are not refactored yet. That is deliberately scoped to a follow-on PR so this one can land fast.
-- **New concrete adapters.** The reference impls (`docker`, `proxy`, `sqlite`, `better-auth`, `local`, `console`) remain the only in-tree registry values. First-party package adapters such as Postgres storage and magic-link auth are loaded through the same dynamic import path used by third-party adapters.
+Say you want to add a new `StorageAdapter`:
 
-## Proof-of-pattern call site
+1. **Write the package.** Create an ESM package that imports the concern interface from `@floom/adapter-types` and implements every required method.
+2. **Export the registration object.** Default-export `{ kind, name, protocolVersion, adapter }`, or `{ kind, name, protocolVersion, create }` when the adapter needs factory-provided dependencies such as `storage`.
+3. **Run conformance and wire the env var.** Run `pnpm test:conformance --concern storage --adapter <package-or-path>`, then set `FLOOM_STORAGE=<package-or-path>` for the server process.
 
-[`apps/server/src/routes/health.ts`](../apps/server/src/routes/health.ts) emits a `health.check` counter through `adapters.observability.increment(...)` on every request. It's the minimal demonstration that the bundle is reachable from a route. Swap `FLOOM_OBSERVABILITY` once we add a second impl and the same line starts writing to OpenTelemetry / Datadog / StatsD instead of stdout, without any change in `health.ts`.
+Adding a new built-in short key such as `FLOOM_STORAGE=my-store` is a separate server change: add the implementation to the matching registry in [`apps/server/src/adapters/factory.ts`](../apps/server/src/adapters/factory.ts) and document the key here.
+
+## Live call sites
+
+- [`apps/server/src/routes/health.ts`](../apps/server/src/routes/health.ts) emits `health.check` through `adapters.observability.increment(...)`.
+- [`apps/server/src/services/runner.ts`](../apps/server/src/services/runner.ts) invokes `adapters.runtime.execute` and resolves run secrets through `adapters.secrets`.
+- [`apps/server/src/services/session.ts`](../apps/server/src/services/session.ts) resolves request sessions through `adapters.auth.getSession`.
+- Route and service migrations for storage-backed areas use `adapters.storage` for the protocol surfaces covered by the v0.2 contract.
 
 ## Writing a third-party adapter
 
 The protocol-level contract for out-of-tree adapters lives in [`spec/adapters.md` "Third-party adapters"](../spec/adapters.md#third-party-adapters). This section is the practical cookbook: what a developer actually does to build and ship one today.
 
-**Status today.** Dynamic-import registration is shipped for package and path specifiers, and the adapter contracts are available from `@floom/adapter-types`. Publish your adapter as an ESM package or point the relevant `FLOOM_<CONCERN>` env var at a local `.js` file; the stock server imports it during boot and validates its default export.
+**Third-party status.** Dynamic-import registration is shipped for package and path specifiers, and the adapter contracts are available from `@floom/adapter-types`. Publish your adapter as an ESM package or point the relevant `FLOOM_<CONCERN>` env var at a local `.js` file; the stock server imports it during boot and validates its default export. Out-of-tree registration via the `@floom-community/*` naming convention works through this path; no community adapter is shipped by this repo.
 
 ### 1. Package skeleton
 
@@ -167,6 +172,8 @@ The runner prints the suite output and exits non-zero when any assertion fails.
 
 - `@floomhq/storage-postgres`: first-party Postgres `StorageAdapter` package for protocol 0.2.
 - `@floomhq/auth-magic-link`: first-party Resend-backed magic-link `AuthAdapter` package for protocol 0.2. It stores users, one-time magic-link tokens, and JWT revocations through the configured `StorageAdapter`, so auth and storage remain separate concerns.
+- `@floomhq/secrets-gcp-kms`: first-party GCP Cloud KMS `SecretsAdapter` package for protocol 0.2. It uses per-secret AES-256-GCM envelope encryption and KMS-wrapped DEKs stored through `StorageAdapter` encrypted-secret rows.
+- `@floomhq/observability-otel`: first-party OpenTelemetry `ObservabilityAdapter` package for protocol 0.2.
 
 ### 4. Wire it into a local Floom server
 
@@ -194,11 +201,6 @@ When your adapter is ready:
 3. **Announce in Discord**: the Floom server at https://discord.gg/8fXGXjxcRz has a channel for community adapter releases.
 4. **Keep a CHANGELOG**: downstream operators pin exact versions for supply-chain reasons (see the security note in `spec/adapters.md`). A clear changelog is what lets them upgrade.
 
-### Known adapters
-
-- `@floomhq/storage-postgres`: first-party Postgres `StorageAdapter`.
-- `@floomhq/secrets-gcp-kms`: first-party GCP Cloud KMS `SecretsAdapter` using per-secret AES-256-GCM envelope encryption and KMS-wrapped DEKs.
-
 ## Current migration targets
 
-Migration target for adapter work: every concern has an executable contract suite under `test/stress/test-adapters-<concern>-contract.mjs`, and the runner command above is the green-bar gate for third-party implementations.
+Protocol v0.2 migration target is closed: every concern has an executable contract suite under `test/stress/test-adapters-<concern>-contract.mjs`, and the runner command above is the green-bar gate for third-party implementations.

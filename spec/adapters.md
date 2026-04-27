@@ -1,16 +1,49 @@
 # Floom adapter interfaces
 
-Version: 0.1-draft · Last updated: 2026-04-20
+Version: 0.2.0 · Last updated: 2026-04-27
 
 This doc formalizes [§10 of protocol.md](./protocol.md) — the five pluggable concerns any Floom server is built out of.
 
-The reference server in this repo pins one concrete implementation for each of runtime, storage, auth, secrets, and observability. This doc publishes the interface contracts for those five concerns so an alternate server (Kubernetes runtime, Postgres storage, Auth0 identity, Vault secrets, OpenTelemetry observability, etc.) can see exactly what to implement.
+The reference server in this repo wires runtime, storage, auth, secrets, and observability through an `AdapterBundle`. This doc publishes the interface contracts for those five concerns so an alternate server (Kubernetes runtime, Postgres storage, Auth0 identity, Vault secrets, OpenTelemetry observability, etc.) can see exactly what to implement.
 
 TypeScript declarations: [`@floom/adapter-types`](../packages/adapter-types/src/index.ts). The server keeps [`apps/server/src/adapters/types.ts`](../apps/server/src/adapters/types.ts) as a compatibility re-export for in-repo imports.
 
-> **Status.** The five interfaces are *declarations only* today. The reference services (`runner.ts`, `db.ts`, `better-auth.ts`, `user_secrets.ts`, `sentry.ts`) don't implement them explicitly yet — that refactor is deferred for launch-risk reasons. The shapes are stable; a future PR will make the existing services formally conform to these interfaces and expose a single adapter-registration point.
+---
 
-> Of the five, only the **renderer** is currently swappable *at runtime* via the per-app bundle upload (see [§3.3](./protocol.md#33-renderconfig) and `POST /api/hub/:slug/renderer`). The other five are *compile-time swappable* — change the adapter import in the server bootstrap and rebuild.
+## v0.2 status
+
+Protocol v0.2 is the first complete adapter protocol release. It ships the following P0 closures:
+
+- Runtime dispatch invokes `adapters.runtime.execute` from [`apps/server/src/services/runner.ts`](../apps/server/src/services/runner.ts).
+- Request session resolution invokes `adapters.auth.getSession` from [`apps/server/src/services/session.ts`](../apps/server/src/services/session.ts).
+- Run secret resolution is async and goes through `adapters.secrets` in [`apps/server/src/services/runner.ts`](../apps/server/src/services/runner.ts).
+- `StorageAdapter` covers workspaces, users, OAuth connections, app sharing, triggers, app memory, run threads, run turns, jobs, admin secret pointers, and encrypted secret rows in [`packages/adapter-types/src/index.ts`](../packages/adapter-types/src/index.ts).
+- The factory validates adapter `kind`, `protocolVersion`, required method surface, and module shape at boot in [`apps/server/src/adapters/factory.ts`](../apps/server/src/adapters/factory.ts).
+- Encrypted-secret storage methods (`getEncryptedSecret`, `setEncryptedSecret`, `listEncryptedSecrets`, `deleteEncryptedSecret`) are part of the storage contract and are implemented by the SQLite and Postgres storage adapters.
+
+It also ships the P1 hardening set:
+
+- `FLOOM_PROTOCOL_VERSION` is `0.2.0` in [`apps/server/src/adapters/version.ts`](../apps/server/src/adapters/version.ts), and `@floom/adapter-types` is a workspace package at [`packages/adapter-types`](../packages/adapter-types).
+- Dynamic factory imports support `FLOOM_<CONCERN>=@scope/pkg`, `FLOOM_<CONCERN>=./relative/path`, `file:` URLs, and absolute paths.
+- The conformance runner lives at [`packages/conformance-runner`](../packages/conformance-runner) and runs with `pnpm test:conformance --concern <kind> --adapter <name-or-module>`.
+- All five per-adapter contract suites exist under `test/stress/test-adapters-<concern>-contract.mjs` for runtime, storage, auth, secrets, and observability.
+- First-party alternative adapter packages exist under [`packages`](../packages): `@floomhq/storage-postgres`, `@floomhq/auth-magic-link`, `@floomhq/secrets-gcp-kms`, and `@floomhq/observability-otel`.
+- Storage list methods accept `ctx?: SessionContext`, and the storage contract covers default tenant isolation from `ctx.workspace_id`.
+- Optional lifecycle hooks `ready()`, `health()`, and `close()` are in the shared type surface; factory boot invokes `ready()`, and [`apps/server/src/index.ts`](../apps/server/src/index.ts) drains `close()` on SIGINT/SIGTERM shutdown.
+- The Postgres storage adapter accepts pool settings through `createPostgresAdapter(...)` options and reads connection configuration from env-backed defaults.
+- `appendRunTurn` is atomic: SQLite uses a transaction with the `(thread_id, turn_index)` uniqueness guard and retry path, Postgres uses a transaction plus advisory lock, and the storage contract runs 50 parallel appends.
+
+Deferred items:
+
+- npm publication ships with the v0.5 release; the package structure and `package.json` exports are present today, but the monorepo still uses `workspace:*` dependencies.
+- Out-of-tree `@floom-community/*` adapters work through dynamic import registration, but no community adapter is shipped by this repo.
+- Docker-dependent runtime conformance assertions keep environmental skips when the selected adapter is not Docker or the host has no reachable Docker daemon.
+
+## Changelog
+
+### v0.2.0 - 2026-04-27
+
+- First complete adapter protocol release: the five concern interfaces, factory registration, protocol-version validation, lifecycle hooks, conformance runner, five contract suites, storage expansion, async secrets path, live runtime/auth wiring, and first-party optional adapter packages are all present in the repo.
 
 ---
 
@@ -429,7 +462,7 @@ A conformant `AuthAdapter` MUST pass:
 
 A conformant impl SHOULD support concurrent `getSession` calls without cross-request state leakage. It MAY expose richer features (MFA, passkeys, API key management) as adapter-internal details not visible to Floom.
 
-Reference test skeleton: `test/stress/test-adapters-auth-contract.mjs` (ships on `protocol-v0.2`; today it is executable-as-spec — 4 assertions fail-expected until the Better Auth migration lands, 1 passes). Related coverage: `test/stress/test-auth-401-hints.mjs`, `test-auth-dynamic-baseurl.mjs`.
+Reference suite: `test/stress/test-adapters-auth-contract.mjs`. It covers password-backed auth and magic-link auth; related coverage lives in `test/stress/test-auth-401-hints.mjs` and `test-auth-dynamic-baseurl.mjs`.
 
 ### SecretsAdapter
 
