@@ -33,6 +33,7 @@
 // locally-seeded app, so the ownership check passes naturally.
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { adapters } from '../adapters/index.js';
 import { db } from '../db.js';
 import { deleteAppRecordById } from '../services/app_delete.js';
 import { auditLog, getAuditActor } from '../services/audit-log.js';
@@ -70,10 +71,8 @@ function safeManifest(raw: string): NormalizedManifest | null {
   }
 }
 
-function loadApp(slug: string): AppRecord | undefined {
-  return db
-    .prepare('SELECT * FROM apps WHERE slug = ?')
-    .get(slug) as AppRecord | undefined;
+async function loadApp(slug: string): Promise<AppRecord | undefined> {
+  return adapters.storage.getApp(slug);
 }
 
 function isOwner(
@@ -120,7 +119,7 @@ meAppsRouter.get('/:slug/sharing', async (c) => {
   const ctx = await resolveUserContext(c);
   const gate = requireAuthenticatedInCloud(c, ctx);
   if (gate) return gate;
-  const app = loadApp(c.req.param('slug') || '');
+  const app = await loadApp(c.req.param('slug') || '');
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isAppOwner(app, ctx)) return c.json({ error: 'App not found', code: 'not_found' }, 404);
 
@@ -142,7 +141,7 @@ meAppsRouter.patch('/:slug/sharing', async (c) => {
   const ctx = await resolveUserContext(c);
   const gate = requireAuthenticatedInCloud(c, ctx);
   if (gate) return gate;
-  const app = loadApp(c.req.param('slug') || '');
+  const app = await loadApp(c.req.param('slug') || '');
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isAppOwner(app, ctx)) return c.json({ error: 'App not found', code: 'not_found' }, 404);
 
@@ -205,7 +204,7 @@ meAppsRouter.get('/:slug/sharing/user-search', async (c) => {
   const ctx = await resolveUserContext(c);
   const gate = requireAuthenticatedInCloud(c, ctx);
   if (gate) return gate;
-  const app = loadApp(c.req.param('slug') || '');
+  const app = await loadApp(c.req.param('slug') || '');
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isAppOwner(app, ctx)) return c.json({ error: 'App not found', code: 'not_found' }, 404);
 
@@ -228,7 +227,7 @@ meAppsRouter.post('/:slug/sharing/invite', async (c) => {
   const ctx = await resolveUserContext(c);
   const gate = requireAuthenticatedInCloud(c, ctx);
   if (gate) return gate;
-  const app = loadApp(c.req.param('slug') || '');
+  const app = await loadApp(c.req.param('slug') || '');
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isAppOwner(app, ctx)) return c.json({ error: 'App not found', code: 'not_found' }, 404);
 
@@ -265,9 +264,7 @@ meAppsRouter.post('/:slug/sharing/invite', async (c) => {
       state: user ? 'pending_accept' : 'pending_email',
     });
     if (!user) {
-      const inviter = db.prepare(`SELECT name, email FROM users WHERE id = ?`).get(ctx.user_id) as
-        | { name: string | null; email: string | null }
-        | undefined;
+      const inviter = await adapters.storage.getUser(ctx.user_id);
       const rendered = renderAppInviteEmail({
         appName: app.name,
         inviterName: inviter?.name || inviter?.email || null,
@@ -300,7 +297,7 @@ meAppsRouter.post('/:slug/sharing/invite/:invite_id/revoke', async (c) => {
   const ctx = await resolveUserContext(c);
   const gate = requireAuthenticatedInCloud(c, ctx);
   if (gate) return gate;
-  const app = loadApp(c.req.param('slug') || '');
+  const app = await loadApp(c.req.param('slug') || '');
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isAppOwner(app, ctx)) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   const invite = revokeInvite(c.req.param('invite_id') || '', app.id);
@@ -312,7 +309,7 @@ meAppsRouter.post('/:slug/sharing/submit-review', async (c) => {
   const ctx = await resolveUserContext(c);
   const gate = requireAuthenticatedInCloud(c, ctx);
   if (gate) return gate;
-  const app = loadApp(c.req.param('slug') || '');
+  const app = await loadApp(c.req.param('slug') || '');
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isAppOwner(app, ctx)) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   try {
@@ -333,7 +330,7 @@ meAppsRouter.post('/:slug/sharing/withdraw-review', async (c) => {
   const ctx = await resolveUserContext(c);
   const gate = requireAuthenticatedInCloud(c, ctx);
   if (gate) return gate;
-  const app = loadApp(c.req.param('slug') || '');
+  const app = await loadApp(c.req.param('slug') || '');
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isAppOwner(app, ctx)) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   try {
@@ -366,7 +363,7 @@ meAppsRouter.get('/:slug/secret-policies', async (c) => {
   if (gate) return gate;
 
   const slug = c.req.param('slug') || '';
-  const app = loadApp(slug);
+  const app = await loadApp(slug);
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   const blocked = checkAppVisibility(c, app.visibility || 'public', {
     app_id: app.id,
@@ -424,7 +421,7 @@ meAppsRouter.put('/:slug/secret-policies/:key', async (c) => {
 
   const slug = c.req.param('slug') || '';
   const key = c.req.param('key') || '';
-  const app = loadApp(slug);
+  const app = await loadApp(slug);
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isOwner(app, ctx)) {
     return c.json(
@@ -509,7 +506,7 @@ meAppsRouter.put('/:slug/creator-secrets/:key', async (c) => {
 
   const slug = c.req.param('slug') || '';
   const key = c.req.param('key') || '';
-  const app = loadApp(slug);
+  const app = await loadApp(slug);
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isOwner(app, ctx)) {
     return c.json(
@@ -607,7 +604,7 @@ meAppsRouter.delete('/:slug/creator-secrets/:key', async (c) => {
 
   const slug = c.req.param('slug') || '';
   const key = c.req.param('key') || '';
-  const app = loadApp(slug);
+  const app = await loadApp(slug);
   if (!app) return c.json({ error: 'App not found', code: 'not_found' }, 404);
   if (!isOwner(app, ctx)) {
     return c.json(
@@ -656,7 +653,7 @@ meAppsRouter.delete('/:slug', async (c) => {
   if (gate) return gate;
 
   const slug = c.req.param('slug') || '';
-  const app = loadApp(slug);
+  const app = await loadApp(slug);
   if (!app || !isOwner(app, ctx)) {
     return c.json({ error: 'App not found', code: 'not_found' }, 404);
   }

@@ -5,6 +5,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
+import { adapters } from '../adapters/index.js';
 import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newRunId } from '../lib/ids.js';
 import { dispatchRun, getRun } from '../services/runner.js';
@@ -54,25 +55,11 @@ function runGateResponse(c: Context, gate: Exclude<RunGateResult, { ok: true }>)
   return c.json(gate.body, gate.status, gate.headers);
 }
 
-type RunAppAccessRow = {
-  id: string;
-  slug: string;
-  visibility: string | null;
-  author: string | null;
-  workspace_id: string;
-  link_share_token: string | null;
-  link_share_requires_auth: number;
-};
-
 async function loadAuthorizedRunApp(
   c: Context,
   appId: string,
-): Promise<{ app: RunAppAccessRow | undefined; blocked: Response | null }> {
-  const app = db
-    .prepare(
-      'SELECT id, slug, visibility, author, workspace_id, link_share_token, link_share_requires_auth FROM apps WHERE id = ?',
-    )
-    .get(appId) as RunAppAccessRow | undefined;
+): Promise<{ app: AppRecord | undefined; blocked: Response | null }> {
+  const app = await adapters.storage.getAppById(appId);
   if (!app) return { app: undefined, blocked: null };
   const ctx = await resolveUserContext(c);
   const blocked = checkAppVisibility(c, app.visibility || 'public', {

@@ -13,6 +13,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
+import { adapters } from '../adapters/index.js';
 import { db } from '../db.js';
 import { resolveUserContext } from '../services/session.js';
 import type { AppReviewRecord } from '../types.js';
@@ -91,9 +92,7 @@ reviewsRouter.post('/:slug/reviews', async (c) => {
   const slug = c.req.param('slug') || '';
 
   // Confirm the app exists so we don't accumulate orphan reviews.
-  const app = db
-    .prepare('SELECT id FROM apps WHERE slug = ?')
-    .get(slug) as { id: string } | undefined;
+  const app = await adapters.storage.getApp(slug);
   if (!app) {
     return c.json({ error: 'App not found', code: 'app_not_found' }, 404);
   }
@@ -171,9 +170,7 @@ const InviteBody = z.object({
 
 reviewsRouter.post('/:slug/invite', async (c) => {
   const slug = c.req.param('slug') || '';
-  const app = db
-    .prepare('SELECT id FROM apps WHERE slug = ?')
-    .get(slug) as { id: string } | undefined;
+  const app = await adapters.storage.getApp(slug);
   if (!app) {
     return c.json({ error: 'App not found', code: 'app_not_found' }, 404);
   }
@@ -192,4 +189,3 @@ reviewsRouter.post('/:slug/invite', async (c) => {
   }
   return c.json({ ok: true, invite_id: `stub-${Date.now()}` }, 201);
 });
-
