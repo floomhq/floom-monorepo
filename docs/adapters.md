@@ -45,10 +45,10 @@ Protocol v0.2 wires the adapter bundle through the factory and the exported `ada
 - `FLOOM_PROTOCOL_VERSION` is `0.2.0` in [`apps/server/src/adapters/version.ts`](../apps/server/src/adapters/version.ts), and the shared type surface is the `@floom/adapter-types` workspace package at [`packages/adapter-types`](../packages/adapter-types).
 - Runtime is closed for P0 #1: run dispatch uses `adapters.runtime.execute`.
 - Auth is closed for P0 #2: request session resolution uses `adapters.auth.getSession`.
-- Storage is substantively closed: `StorageAdapter` covers workspaces, users, OAuth connections, app sharing, triggers, app memory, run threads, run turns, jobs, admin secret pointers, and encrypted secret rows. The jobs queue service still has direct SQLite calls in [`apps/server/src/services/jobs.ts`](../apps/server/src/services/jobs.ts); that migration closes in `protocol-jobs-storage`.
-- Secrets are substantively closed: run secret resolution uses async `adapters.secrets` methods. User-facing secret route migration remains in `protocol-secrets-routes`.
+- Storage is closed for P0 #4: `StorageAdapter` covers workspaces, users, OAuth connections, app sharing, triggers, app memory, run threads, run turns, jobs, admin secret pointers, and encrypted secret rows, and the jobs queue service uses the storage adapter rather than direct SQLite helpers.
+- Secrets are closed for P0 #3: run secret resolution, user-facing secret routes, BYOK quota checks, and docker-image ingest use async `adapters.secrets` methods.
 - Observability is closed: server health and metrics paths emit through `adapters.observability`.
-- `ctx?: SessionContext` tenant scoping, lifecycle hooks (`ready`, `health`, `close`), boot-time adapter surface validation, and SIGINT/SIGTERM close wiring are implemented.
+- The P1 hardening set is nearly closed: `ctx?: SessionContext` tenant scoping, lifecycle hooks (`ready`, `health`, `close`), boot-time adapter surface validation, and SIGINT/SIGTERM close wiring are implemented.
 - The conformance runner lives at [`packages/conformance-runner`](../packages/conformance-runner), and all five per-concern suites live at `test/stress/test-adapters-<concern>-contract.mjs`.
 - First-party optional adapter packages are present for Postgres storage, magic-link auth, GCP KMS secrets, and OpenTelemetry observability.
 

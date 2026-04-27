@@ -25,8 +25,8 @@ Live server wiring status:
 
 - Runtime is closed for P0 #1.
 - Auth is closed for P0 #2.
-- Storage is substantively closed; the jobs queue service still uses direct SQLite helpers in [`apps/server/src/services/jobs.ts`](../apps/server/src/services/jobs.ts), and that migration lands in `protocol-jobs-storage`.
-- Secrets are substantively closed; user-facing route migration lands in `protocol-secrets-routes`.
+- Storage is closed for P0 #4; the jobs queue service uses `StorageAdapter` job methods instead of direct SQLite helpers.
+- Secrets are closed for P0 #3; run secret resolution, user-facing secret routes, BYOK quota checks, and docker-image ingest use async `adapters.secrets` methods.
 - Observability is closed.
 
 It also ships the P1 hardening set:
