@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { PageShell } from './PageShell';
 import { RunRail } from './RunRail';
 import { SettingsRail } from './SettingsRail';
+import { SettingsTabBar } from './SettingsTabBar';
 import { StudioRail } from './StudioRail';
 
 type Mode = 'run' | 'settings' | 'studio';
@@ -24,6 +25,8 @@ export function WorkspacePageShell({
   mainMaxWidth = 1040,
 }: Props) {
   const rail = mode === 'studio' ? <StudioRail /> : mode === 'settings' ? <SettingsRail /> : <RunRail />;
+  // v26: settings pages render a tab bar at top of main area (V26-IA-SPEC §/settings)
+  const showSettingsTabs = mode === 'settings';
 
   return (
     <PageShell
@@ -43,6 +46,7 @@ export function WorkspacePageShell({
             ...contentStyle,
           }}
         >
+          {showSettingsTabs && <SettingsTabBar />}
           {children}
         </div>
       </div>
