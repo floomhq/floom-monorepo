@@ -2,7 +2,8 @@
 // Contract tests for the AuthAdapter.
 //
 // These tests DEFINE what the AuthAdapter contract looks like from a
-// caller's perspective. A conforming adapter reports 5 passing and exits 0.
+// caller's perspective. A conforming adapter reports 5 passing and exits 0;
+// any failed assertion is counted in the tally and exits non-zero.
 //
 // Run: tsx test/stress/test-adapters-auth-contract.mjs
 

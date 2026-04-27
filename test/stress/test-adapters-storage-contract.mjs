@@ -2,10 +2,8 @@
 // Contract tests for the StorageAdapter.
 //
 // These tests define executable conformance checks for apps, runs, jobs,
-// users/workspaces, and admin secret pointers. They always exit 0 so direct
-// documentation runs and CI smoke jobs can print the complete tally; the
-// conformance runner parses the tally and returns a failing status when any
-// assertion fails.
+// users/workspaces, and admin secret pointers. They print the complete tally
+// and exit non-zero when any assertion fails.
 //
 // Run: tsx test/stress/test-adapters-storage-contract.mjs
 
@@ -794,4 +792,4 @@ try {
 }
 
 console.log(`\n${passed} passing, ${skipped} skipped, ${failed} failing`);
-process.exit(0);
+process.exit(failed > 0 ? 1 : 0);

@@ -2,10 +2,8 @@
 // Contract tests for the SecretsAdapter.
 //
 // These tests define executable conformance checks for the local encrypted
-// vault and creator-override loader. They always exit 0 so direct
-// documentation runs and CI smoke jobs can print the complete tally; the
-// conformance runner parses the tally and returns a failing status when any
-// assertion fails.
+// vault and creator-override loader. They print the complete tally and exit
+// non-zero when any assertion fails.
 //
 // Run: tsx test/stress/test-adapters-secrets-contract.mjs
 
@@ -230,4 +228,4 @@ try {
 }
 
 console.log(`\n${passed} passing, ${failed} failing`);
-process.exit(0);
+process.exit(failed > 0 ? 1 : 0);

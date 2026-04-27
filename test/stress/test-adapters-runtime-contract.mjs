@@ -2,9 +2,7 @@
 // Contract tests for the RuntimeAdapter.
 //
 // These tests define executable conformance checks for the runtime concern.
-// They always exit 0 so direct documentation runs and CI smoke jobs can print
-// the complete tally; the conformance runner parses the tally and returns a
-// failing status when any assertion fails.
+// They print the complete tally and exit non-zero when any assertion fails.
 //
 // Run: tsx test/stress/test-adapters-runtime-contract.mjs
 
@@ -403,4 +401,4 @@ try {
 }
 
 console.log(`\n${passed} passing, ${skipped} skipped, ${failed} failing`);
-process.exit(0);
+process.exit(failed > 0 ? 1 : 0);
