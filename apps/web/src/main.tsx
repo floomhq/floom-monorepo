@@ -159,6 +159,12 @@ function MeAppRunRedirect() {
   return <Navigate to={`/run/apps/${slug ?? ''}/run`} replace />;
 }
 
+// V12: /run/apps/:slug (workspace view) → /run/apps/:slug/run
+function SlugToRunRedirect() {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/run/apps/${slug ?? ''}/run`} replace />;
+}
+
 // Studio restructure 2026-04-18: Store/Studio split. These redirects
 // funnel every legacy creator-context URL into the new /studio/* tree.
 // Each uses <Navigate replace> so query strings and bookmarks stay alive.
@@ -301,6 +307,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/run/runs" element={<WaitlistGuard source="me"><MeRunsPage /></WaitlistGuard>} />
         <Route path="/run/runs/:runId" element={<WaitlistGuard source="me"><MeRunDetailPage /></WaitlistGuard>} />
         <Route path="/run/install" element={<WaitlistGuard source="me"><MeInstallPage /></WaitlistGuard>} />
+        {/* V12 */}
+        <Route path="/run/apps/:slug" element={<SlugToRunRedirect />} />
         <Route path="/run/apps/:slug/run" element={<WaitlistGuard source="me"><MeAppRunPage /></WaitlistGuard>} />
         <Route path="/run/apps/:slug/triggers" element={<WaitlistGuard source="me"><MeAppTriggersPage /></WaitlistGuard>} />
         <Route path="/run/apps/:slug/triggers/schedule" element={<WaitlistGuard source="me"><MeAppTriggerSchedulePage /></WaitlistGuard>} />

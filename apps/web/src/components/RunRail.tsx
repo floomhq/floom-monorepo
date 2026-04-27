@@ -16,13 +16,17 @@ import { Link, useLocation } from 'react-router-dom';
 import { Box, Play, Plus } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
-import { useMyApps } from '../hooks/useMyApps';
+// V13: run-history hook so rail count matches MeAppsPage
+import { useMyRuns } from '../hooks/useMyRuns';
 
 const RAIL_WIDTH = 240;
 
 export function RunRail() {
   const location = useLocation();
-  const { apps } = useMyApps();
+  const { runs } = useMyRuns();
+  const appsCount = runs
+    ? new Set(runs.map((r: { app_slug: string | null }) => r.app_slug).filter(Boolean)).size
+    : null;
 
   return (
     <aside data-testid="run-rail" aria-label="Run navigation" style={railStyle}>
@@ -39,7 +43,7 @@ export function RunRail() {
             location.pathname.startsWith('/run/apps/')
           }
           icon={<Box size={15} />}
-          count={apps?.length}
+          count={appsCount ?? undefined}
         >
           Apps
         </RailItem>
