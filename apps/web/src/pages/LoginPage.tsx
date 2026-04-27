@@ -67,7 +67,7 @@ export function LoginPage() {
     rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
       ? rawNext
       : null;
-  const nextPath = safeNext || (mode === 'signup' ? '/studio/build' : '/me');
+  const nextPath = safeNext || (mode === 'signup' ? '/studio/build' : '/run');
 
   // If the user is already logged in (cloud mode) redirect away.
   useEffect(() => {
@@ -247,11 +247,22 @@ export function LoginPage() {
             textAlign: 'center',
           }}
         >
-          Sign in to Floom
+          {mode === 'signup' ? 'Create the active workspace.' : 'Sign in to Floom'}
         </h1>
         <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 24px', textAlign: 'center' }}>
-          One account. Run apps, ship apps, all in one place.
+          {mode === 'signup' ? '30 seconds. Free for launch.' : 'One account. Run apps, ship apps, all in one place.'}
         </p>
+
+        {mode === 'signup' && (
+          <div role="tablist" aria-label="What do you want to do?" style={signupModeStyle}>
+            <button type="button" role="tab" aria-selected="true" style={signupModeActiveStyle}>
+              I want to run apps
+            </button>
+            <button type="button" role="tab" aria-selected="false" style={signupModeButtonStyle}>
+              I want to publish apps
+            </button>
+          </div>
+        )}
 
         {hasSavedDraft && (
           <div
@@ -416,7 +427,7 @@ export function LoginPage() {
                 margin: '0 0 12px',
               }}
             >
-              On signup, you can save your own GEMINI_API_KEY or OPENAI_API_KEY once, every app on Floom can use it. Your keys stay encrypted, never logged.
+              On signup, you can save workspace BYOK keys once. Apps on Floom can use them at run time. Values stay encrypted and are never logged.
             </p>
             <p
               style={{
@@ -566,7 +577,7 @@ export function LoginPage() {
                 ? 'Working...'
                 : mode === 'signin'
                 ? 'Sign in'
-                : 'Sign up'}
+                : 'Create account'}
             </button>
           </form>
         )}
@@ -688,6 +699,37 @@ const labelStyle: React.CSSProperties = {
   color: 'var(--muted)',
   marginBottom: 6,
   marginTop: 12,
+};
+
+const signupModeStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: 0,
+  padding: 4,
+  background: 'var(--bg)',
+  border: '1px solid var(--line)',
+  borderRadius: 10,
+  marginBottom: 24,
+};
+
+const signupModeButtonStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '8px 12px',
+  border: 0,
+  background: 'transparent',
+  fontFamily: 'inherit',
+  fontSize: 13,
+  fontWeight: 500,
+  color: 'var(--muted)',
+  borderRadius: 7,
+  cursor: 'pointer',
+};
+
+const signupModeActiveStyle: React.CSSProperties = {
+  ...signupModeButtonStyle,
+  background: 'var(--card)',
+  color: 'var(--ink)',
+  fontWeight: 600,
+  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
 // #563 2026-04-23: font-size is 16px, not 14px. iOS Safari auto-zooms

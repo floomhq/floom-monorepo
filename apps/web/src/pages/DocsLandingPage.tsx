@@ -368,7 +368,7 @@ export function DocsLandingPage() {
               <>
                 The protocol, the runtime, and the patterns that make Floom work.
                 Run apps today via MCP, CLI, or web. Ship to the floom.dev cloud
-                when publishing opens for your account — or self-host, no waitlist.
+                when publishing opens for the workspace — or self-host, no waitlist.
               </>
             )}
           </p>
@@ -491,10 +491,10 @@ curl -X POST https://api.floom.dev/api/lead-scorer/run \\
               <div style={surfaceTitleStyle}>Your apps</div>
               <p style={{ ...pStyle, fontSize: 12.5, margin: 0 }}>
                 {deployEnabled ? (
-                  <>Create, update, rotate secrets. Web UI, not an MCP endpoint.</>
+                  <>Create, update, rotate app creator secrets. Web UI, not an MCP endpoint.</>
                 ) : (
                   <>
-                    Create, update, rotate secrets when your account can publish on
+                    Create, update, rotate app creator secrets when the workspace can publish on
                     floom.dev (waitlist during launch). Self-host has no such gate.
                     Web UI, not an MCP endpoint.
                   </>
@@ -610,7 +610,7 @@ docker run -d -p 3000:3000 \\
           </table>
 
           <p style={pStyle}>
-            Full lifecycle of a run (validation → container boot → secrets →
+            Full lifecycle of a run (validation → container boot → app creator secrets →
             `__FLOOM_RESULT__` marker) lives at{' '}
             <Link to="/docs/runtime-specs" style={{ color: 'var(--accent)' }}>
               Runtime specs

@@ -179,7 +179,7 @@ export function LandingV17Page() {
                 textWrap: 'balance' as unknown as 'balance',
               }}
             >
-              Ship AI apps <span style={{ color: 'var(--accent)' }}>fast.</span>
+              Ship AI apps fast.
             </h1>
 
             {/* Sub-positioning — locked copy. NO KICKER (dropped 2026-04-22). */}
@@ -196,7 +196,10 @@ export function LandingV17Page() {
                 margin: '0 auto 28px',
               }}
             >
-              The protocol and runtime for agentic work.
+              The protocol + runtime for agentic work.
+            </p>
+            <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)', margin: '-14px 0 28px' }}>
+              Vibe-coding speed. Production-grade safety.
             </p>
 
             {/* CTA — runtime-gated by DEPLOY_ENABLED. Preview keeps the
@@ -572,7 +575,7 @@ const STEPS = [
     num: '03',
     kicker: 'SHARE',
     title: 'Share a link. Install anywhere.',
-    body: 'Runs in Claude, Cursor, ChatGPT, a browser, or behind an API key.',
+    body: 'Runs in Claude, Cursor, ChatGPT, a browser, or with an Agent token.',
     mono: 'floom.dev/a/your-app',
   },
 ];

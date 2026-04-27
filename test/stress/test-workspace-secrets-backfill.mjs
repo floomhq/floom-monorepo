@@ -70,6 +70,12 @@ function conflict(workspaceId, key) {
     .get(workspaceId, key);
 }
 
+function tableSnapshot(table) {
+  return JSON.stringify(
+    db.prepare(`SELECT * FROM ${table} ORDER BY workspace_id, key`).all(),
+  );
+}
+
 console.log('workspace_secrets backfill launch-blocker tests');
 
 insertWorkspace('ws_alpha', 'alpha');
@@ -115,10 +121,20 @@ log(
   countWorkspaceSecretRows('ws_alpha', 'OPENAI_API_KEY') === 1 &&
     countWorkspaceSecretRows('ws_beta', 'GEMINI_API_KEY') === 1,
 );
+const beforeThirdPassSnapshot = tableSnapshot('workspace_secrets');
+runWorkspaceSecretsBackfill();
+const afterThirdPassSnapshot = tableSnapshot('workspace_secrets');
+log('re-running backfill produces the same workspace_secrets rows', afterThirdPassSnapshot === beforeThirdPassSnapshot);
 
 // Simulated concurrent write: a legacy user-level secret is written after
 // the first migration pass. A follow-up pass picks it up exactly once.
 userSecrets.set(ctx('ws_beta', 'user_beta_a'), 'ANTHROPIC_API_KEY', 'beta-anthropic');
+const dryRun = runWorkspaceSecretsBackfill({ dryRun: true });
+log('dry-run reports pending backfill without writing', dryRun.secrets_inserted === 1);
+log(
+  'dry-run leaves workspace_secrets unchanged',
+  countWorkspaceSecretRows('ws_beta', 'ANTHROPIC_API_KEY') === 0,
+);
 runWorkspaceSecretsBackfill();
 runWorkspaceSecretsBackfill();
 log(
