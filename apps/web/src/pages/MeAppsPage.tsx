@@ -3,7 +3,7 @@
  * Data fetching lives here; all rendering in AppsList.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import {
@@ -12,47 +12,38 @@ import {
   type AppsListActivityRow,
 } from '../components/workspace/AppsList';
 import { useSession } from '../hooks/useSession';
-import * as api from '../api/client';
+import { useMyRuns } from '../hooks/useMyRuns';
 import { formatTime } from '../lib/time';
-import type { MeRunSummary } from '../lib/types';
-
-const FETCH_LIMIT = 200;
 
 export function MeAppsPage() {
   const { data: session, loading: sessionLoading, error: sessionError } = useSession();
-  const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
+  const { runs } = useMyRuns();
 
   const signedOutPreview = !!session && session.cloud_mode && session.user.is_local;
   const sessionPending = sessionLoading || (session === null && !sessionError);
 
-  useEffect(() => {
-    if (sessionPending) return;
-    if (signedOutPreview) {
-      setRuns([]);
-      return;
-    }
-
-    let cancelled = false;
-    api
-      .getMyRuns(FETCH_LIMIT)
-      .then((res) => {
-        if (!cancelled) setRuns(res.runs);
-      })
-      .catch(() => {
-        if (!cancelled) setRuns([]);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionPending, signedOutPreview]);
-
   const apps = useMemo(() => (runs ? runAppsFromRuns(runs) : null), [runs]);
 
-  // Build recent-activity rows from the most recent 3 runs
+  // Runs 7d: count runs from the last 7 days using same data already fetched
+  const runs7d = useMemo(() => {
+    if (!runs) return null;
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return runs.filter((r) => {
+      const ts = r.started_at ? new Date(r.started_at).getTime() : 0;
+      return ts >= cutoff;
+    }).length;
+  }, [runs]);
+
+  // Active runs right now (status === 'running')
+  const activeNow = useMemo(() => {
+    if (!runs) return null;
+    return runs.filter((r) => (r as { status?: string }).status === 'running').length;
+  }, [runs]);
+
+  // Build recent-activity rows from the most recent 5 runs
   const activityRows = useMemo((): AppsListActivityRow[] => {
     if (!runs || runs.length === 0) return [];
-    return runs.slice(0, 3).map((run) => ({
+    return runs.slice(0, 5).map((run) => ({
       id: run.id,
       title: run.app_name || run.app_slug || 'App',
       snippet: run.action || '',
@@ -67,7 +58,7 @@ export function MeAppsPage() {
     }));
   }, [runs]);
 
-  const loading = runs === null;
+  const loading = runs === null && !signedOutPreview && !sessionPending;
 
   return (
     <WorkspacePageShell
@@ -78,20 +69,21 @@ export function MeAppsPage() {
       <AppsList
         mode="run"
         heading="Apps"
-        subtitle={`Runnable apps in this workspace, sorted by the last time they ran.`}
+        subtitle={
+          apps && apps.length > 0
+            ? `${apps.length} app${apps.length === 1 ? '' : 's'} in this workspace — last run ${runs && runs.length > 0 ? formatTime(runs[0].started_at) : 'never'}.`
+            : 'Install apps from the store. Runs appear here as you trigger them.'
+        }
         primaryCta={
-          <Link
-            to="/apps"
-            style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--accent)', textDecoration: 'none' }}
-          >
+          <Link to="/apps" className="btn-ghost sm" style={{ textDecoration: 'none' }}>
             Browse store →
           </Link>
         }
         stats={[
-          { label: 'Apps', value: apps ? String(apps.length) : '—', sub: 'installed' },
-          { label: 'Runs 7d', value: '—', sub: 'this week' },
-          { label: 'Running now', value: '—', sub: 'active' },
-          { label: 'P95', value: '—', sub: 'workspace' },
+          { label: 'Apps', value: apps ? String(apps.length) : '…', sub: !apps || apps.length === 0 ? 'none yet' : 'in workspace' },
+          { label: 'Runs 7d', value: runs7d !== null ? String(runs7d) : '…', sub: runs7d === 0 ? 'none yet' : 'this week' },
+          { label: 'Running now', value: activeNow !== null ? String(activeNow) : '…', sub: activeNow === 0 ? 'idle' : 'active' },
+          { label: 'Avg speed', value: '—', sub: 'not tracked yet' },
         ]}
         filters={[
           { label: 'All', active: true },
@@ -99,12 +91,8 @@ export function MeAppsPage() {
           { label: 'Scheduled' },
         ]}
         toolbarAction={
-          <Link
-            to="/apps"
-            className="btn btn-secondary btn-sm"
-            style={{ textDecoration: 'none', fontSize: 12.5, padding: '6px 12px' }}
-          >
-            Browse the store →
+          <Link to="/apps" className="btn-ghost sm" style={{ textDecoration: 'none' }}>
+            Browse store →
           </Link>
         }
         apps={apps}
@@ -112,21 +100,7 @@ export function MeAppsPage() {
         activityAllHref="/run/runs"
         activityRows={activityRows}
         stripCta={
-          <Link
-            to="/apps"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '9px 16px',
-              background: 'var(--card)',
-              border: '1px solid var(--line)',
-              borderRadius: 999,
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'var(--accent)',
-              textDecoration: 'none',
-            }}
-          >
+          <Link to="/apps" className="btn-ghost sm" style={{ textDecoration: 'none' }}>
             Browse the app store →
           </Link>
         }

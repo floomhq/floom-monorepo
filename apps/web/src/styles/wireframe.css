@@ -1706,3 +1706,18 @@ input { font-family: inherit; }
     transition: none !important;
   }
 }
+
+/* ── Workspace apps pages: responsive stat + grid breakpoints ── */
+@media (max-width: 900px) {
+  [data-testid^="workspace-apps-"] [data-testid="workspace-apps-stats"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+@media (max-width: 600px) {
+  [data-testid^="workspace-apps-"] [data-testid="workspace-apps-stats"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  [data-testid^="workspace-apps-"] [data-testid="workspace-apps-grid"] {
+    grid-template-columns: 1fr !important;
+  }
+}

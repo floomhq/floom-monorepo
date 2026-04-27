@@ -484,7 +484,7 @@ function EmptyApps({ mode }: { mode: 'run' | 'studio' }) {
           No apps installed yet.
         </h2>
         <p style={{ margin: '0 auto 22px', maxWidth: 420, fontSize: 15, lineHeight: 1.65, color: 'var(--muted)' }}>
-          Browse the store to find and install apps for your workspace.
+          Browse the public store to install your first app.
         </p>
         <Link
           to="/apps"
@@ -503,6 +503,10 @@ function EmptyApps({ mode }: { mode: 'run' | 'studio' }) {
         >
           Browse the store →
         </Link>
+        <p style={{ margin: '16px auto 0', maxWidth: 380, fontSize: 12.5, lineHeight: 1.6, color: 'var(--muted)' }}>
+          Or use Floom from Claude, Cursor, or Codex via MCP &mdash;
+          install the floom server in your tool&rsquo;s config.
+        </p>
       </div>
     );
   }
@@ -530,10 +534,10 @@ function EmptyApps({ mode }: { mode: 'run' | 'studio' }) {
           margin: '0 0 10px',
         }}
       >
-        No apps yet.
+        No apps published yet.
       </h2>
       <p style={{ margin: '0 auto 22px', maxWidth: 420, fontSize: 15, lineHeight: 1.65, color: 'var(--muted)' }}>
-        Deploy your first app from a GitHub repo or OpenAPI spec.
+        Create your first app from a GitHub repo, OpenAPI spec, or blank canvas.
       </p>
       <Link
         to="/studio/build"
@@ -552,6 +556,9 @@ function EmptyApps({ mode }: { mode: 'run' | 'studio' }) {
       >
         + New app
       </Link>
+      <p style={{ margin: '16px auto 0', maxWidth: 380, fontSize: 12.5, lineHeight: 1.6, color: 'var(--muted)' }}>
+        After you publish, apps appear in the public store at /apps once approved.
+      </p>
     </div>
   );
 }
@@ -571,7 +578,7 @@ export function runAppsFromRuns(runs: MeRunSummary[]): AppsListAppItem[] {
     meta: run.started_at ? `last run ${formatTime(run.started_at)}` : '',
     description: run.action || '',
     ctaLabel: 'Run again →',
-    href: `/p/${run.app_slug}`,
+    href: `/run/apps/${run.app_slug}`,
   }));
 }
 
