@@ -24,3 +24,8 @@ a2d50504e01e7a10abb3fb57b5f9019e9af766c0:test/stress/test-hub-runs-auth.mjs:gene
 ade72f9a99b684afd1e93bf8ba144c43aa731a90:test/stress/test-hub-runs-auth.mjs:generic-api-key:209
 82e7a6d3fd0292860600c36b2018a753bf678302:test/stress/test-w31-auth-boundary.mjs:generic-api-key:219
 82e7a6d3fd0292860600c36b2018a753bf678302:test/stress/test-w31-auth-boundary.mjs:generic-api-key:223
+
+# sample-inputs.ts — public-test-fixture JWT (jwt.io classic, name="Floom", no secret) used as demo input
+# for the jwt-decoder app. R15ui's HEAD splits it into 3 placeholder strings with `gitleaks:allow`,
+# but the historical commit 5d7b51a5 contains the joined form. Non-sensitive by design.
+5d7b51a54cf54658401292344e642dc841f34786:apps/web/src/lib/sample-inputs.ts:jwt:57
