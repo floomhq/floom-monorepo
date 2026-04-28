@@ -405,3 +405,96 @@ Open items still reproducible:
 ### 12.4 Current launch-readiness interpretation
 
 The updated build is more stable on lifecycle transitions than the prior pass. Remaining friction is concentrated in install semantics for pending-review apps and auth-mode constraints for CLI token management.
+
+
+
+
+---
+
+## 13) Third Rerun (Post-Update Validation)
+
+Date (UTC): 2026-04-28
+Run timestamp: `20260428234103`
+
+### 13.1 MCP rerun summary
+
+- Temp app: `mcp-rerun-28234103`
+- Total: `12`
+- Passed: `9`
+- Failed: `3`
+- Cleanup: ✅ (`studio_delete_app` succeeded)
+
+Passed:
+
+- `tools/list` (`count=39`)
+- `account_get`
+- `discover_apps`
+- `studio_publish_app`
+- `studio_set_app_sharing(link)`
+- `studio_set_app_sharing(private)`
+- `studio_submit_app_review`
+- `studio_withdraw_app_review`
+- `studio_delete_app`
+
+Failures:
+
+1. `run_app base64` returned runtime error
+- `status: error`
+- `error: fetch failed`
+- `error_type: network_unreachable`
+- Interpretation: intermittent runtime/network dependency issue (not schema/validation).
+
+2. `studio_set_app_sharing(invited)` now consistently returns structured policy error:
+- `409`
+- `code: illegal_transition`
+- `message: Illegal visibility transition.`
+- Interpretation: behavior now explicit and deterministic; no server 500.
+
+3. `studio_install_app` now returns explicit policy error:
+- `409`
+- `code: app_not_installable`
+- message indicates only public Store apps are installable; pending-review app already available in Studio.
+- Interpretation: clear improvement over earlier ambiguous not-found behavior.
+
+### 13.2 CLI rerun summary
+
+- Temp app: `cli-rerun-28234103`
+- Total: `7`
+- Passed: `5`
+- Failed: `2`
+- Cleanup: ✅ (`floom apps delete` succeeded)
+
+Passed:
+
+- `floom init`
+- `floom deploy`
+- `floom apps sharing set --state link`
+- `floom apps sharing set --state private`
+- `floom apps delete`
+
+Failed:
+
+1. `floom apps sharing set --state invited`
+- `HTTP 409`
+- `code: illegal_transition`
+
+2. `floom apps install`
+- `HTTP 409`
+- message: only public Store apps can be installed
+
+### 13.3 Delta from prior re-audit
+
+Improvements observed:
+
+- Install semantics are now explicit (`409 app_not_installable`) rather than opaque `404 not_found`.
+- Sharing invited transition returns clean policy error (`409 illegal_transition`) across MCP and CLI.
+
+New instability signal:
+
+- `run_app` on known-good app (`base64`) produced intermittent `network_unreachable` in this rerun, indicating runtime/network reliability regression or transient outage.
+
+### 13.4 Current status after third rerun
+
+- API error contracts for sharing/install are substantially clearer than initial audit.
+- Main remaining reliability concern: intermittent app runtime network failure (`fetch failed`) seen in MCP run path.
+
