@@ -315,9 +315,9 @@ function AppCard({ app }: { app: RunApp }) {
       {app.description && (
         <p
           style={{
-            fontSize: 14,
-            color: 'var(--ink-2, var(--muted))',
-            margin: '6px 0 0',
+            fontSize: 12.5,
+            color: 'var(--muted)',
+            margin: 0,
             lineHeight: 1.5,
             display: '-webkit-box',
             WebkitLineClamp: 2,
