@@ -22,7 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
-import { RunSurface, PastRunsDisclosure, type RunSurfaceResult } from '../components/runner/RunSurface';
+import { RunSurface, type RunSurfaceResult } from '../components/runner/RunSurface';
 import { AppIcon } from '../components/AppIcon';
 import { AppReviews } from '../components/AppReviews';
 import { FeedbackButton } from '../components/FeedbackButton';
@@ -123,12 +123,10 @@ export function AppPermalinkPage() {
   // Run is the default — the previous product-page layout made users scroll
   // past marketing copy to find the actual run surface. Shared-run URLs
   // (/p/:slug?run=<id>) auto-land on Run.
-  // R10 (2026-04-28): added 5th tab "Earlier runs" (wireframe v17 parity).
-  // Replaces the below-fold <details> disclosure that was easy to miss.
-  type PTab = 'run' | 'about' | 'install' | 'source' | 'runs';
+  type PTab = 'run' | 'about' | 'install' | 'source';
   const initialTab: PTab = searchParams.get('tab') as PTab | null ?? 'run';
   const [activeTab, setActiveTab] = useState<PTab>(
-    ['run', 'about', 'install', 'source', 'runs'].includes(initialTab) ? initialTab : 'run',
+    ['run', 'about', 'install', 'source'].includes(initialTab) ? initialTab : 'run',
   );
   // Run prefetched from /api/run/:id when the URL contains ?run=<id>. Lets
   // RunSurface hydrate directly into the `done` phase for shared links.
@@ -824,17 +822,22 @@ export function AppPermalinkPage() {
           )}
         </div>
 
-        {/* R10 (2026-04-28): wireframe v17 — outer wrapper card REMOVED.
-            Federico R10 brief: "drop outer wrapper white card. Hero+tabs
-            flatter on cream bg, run-card focal element keeps its card
-            chrome. Don't put EVERYTHING in one giant white box."
-            Hero + tabs now sit directly on the cream page bg; the
-            run-unified-card inside the Run tab is the only focal
-            container. Tab body keeps its width via `<main maxWidth=1040>`. */}
+        {/* G4 + G6 (2026-04-28): rounded white card wrapping hero+tabs+body
+            with proper padding, border-radius, soft shadow, and a LOCKED
+            width (1040px on <main> above) so EVERY tab body inherits the
+            same width. Federico: "the white background has no proper
+            padding; the background of the page should at least have a
+            radius on the white container" + "the white container should
+            stick to a certain width, and it does not matter whether I'm
+            on a certain tab; this is a bit confusing". */}
         <div
           data-testid="permalink-card"
           style={{
-            background: 'transparent',
+            background: 'var(--card)',
+            border: '1px solid var(--line)',
+            borderRadius: 18,
+            overflow: 'hidden',
+            boxShadow: '0 1px 2px rgba(22,21,18,0.04), 0 4px 24px rgba(22,21,18,0.05)',
           }}
         >
 
@@ -846,14 +849,14 @@ export function AppPermalinkPage() {
               display: 'flex',
               alignItems: 'flex-start',
               gap: 14,
-              padding: '8px 0 18px',
+              padding: '24px 28px 20px',
               flexWrap: 'wrap',
             }}
           >
             <div
               style={{
-                width: 64,
-                height: 64,
+                width: 52,
+                height: 52,
                 borderRadius: 14,
                 background: 'var(--bg)',
                 border: '1px solid var(--line)',
@@ -869,7 +872,7 @@ export function AppPermalinkPage() {
             <div className="permalink-hero-title" style={{ flex: 1, minWidth: 0 }}>
               <h1
                 style={{
-                  fontSize: 28,
+                  fontSize: 24,
                   fontWeight: 700,
                   color: 'var(--ink)',
                   margin: 0,
@@ -988,17 +991,13 @@ export function AppPermalinkPage() {
                   aria-expanded={installPopoverOpen}
                   onClick={() => setInstallPopoverOpen((o) => !o)}
                   style={{
-                    /* R10 (2026-04-28): demoted from primary ink-filled
-                       to secondary outlined. Run is the primary green
-                       CTA inside the run-card status header now;
-                       Install is a secondary affordance per wireframe v17. */
                     padding: '8px 14px',
-                    border: '1px solid var(--line)',
+                    border: '1px solid var(--ink)',
                     borderRadius: 10,
                     fontSize: 12.5,
                     fontWeight: 600,
-                    color: 'var(--ink)',
-                    background: 'var(--card)',
+                    color: '#fff',
+                    background: 'var(--ink)',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     display: 'inline-flex',
@@ -1104,7 +1103,7 @@ export function AppPermalinkPage() {
               alignItems: 'stretch',
               flexWrap: 'wrap',
               gap: 0,
-              padding: '0',
+              padding: '0 28px',
               borderBottom: '1px solid var(--line)',
               background: 'transparent',
             }}
@@ -1114,7 +1113,6 @@ export function AppPermalinkPage() {
               { id: 'about' as PTab, label: 'About' },
               { id: 'install' as PTab, label: 'Install' },
               { id: 'source' as PTab, label: 'Source' },
-              { id: 'runs' as PTab, label: 'Earlier runs' },
             ]).map((t) => {
               const isOn = activeTab === t.id;
               return (
@@ -1163,7 +1161,7 @@ export function AppPermalinkPage() {
           <div
             className="app-page-body"
             style={{
-              padding: '24px 0 36px',
+              padding: '28px 32px 36px',
               background: 'transparent',
             }}
           >
@@ -1253,77 +1251,57 @@ export function AppPermalinkPage() {
                   onResetInitialRun={handleResetInitialRun}
                   onResult={handleRunResult}
                 />
-                {/* v26 3-card footer */}
+                {/* R7.8 (2026-04-28): inline privacy/data-handling note.
+                    Gemini audit P0: trust signals were missing on /p/:slug.
+                    A single mono-monospace line below the run surface tells
+                    the visitor what happens to their inputs without taking
+                    visual real estate from the run flow itself. Links to
+                    /privacy for the full policy. */}
                 <div
-                  data-testid="ap-foot-grid"
+                  data-testid="ap-privacy-note"
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: 14,
-                    marginTop: 32,
-                    paddingTop: 24,
-                    borderTop: '1px solid var(--line)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginTop: 20,
+                    padding: '10px 14px',
+                    border: '1px solid var(--line)',
+                    borderRadius: 10,
+                    background: 'var(--bg)',
+                    fontSize: 12,
+                    color: 'var(--muted)',
+                    lineHeight: 1.5,
                   }}
-                  className="ap-foot-grid-responsive"
                 >
-                  {([
-                    {
-                      id: 'about' as const,
-                      title: 'About this app',
-                      desc: 'How it works, who built it, license, changelog. Read the full README.',
-                      cta: 'Read about',
-                    },
-                    {
-                      id: 'install' as const,
-                      title: 'Install in Claude / Cursor / API',
-                      desc: 'One command for Claude Desktop. A single endpoint for Cursor. Plain HTTP for everything else.',
-                      cta: 'Install',
-                    },
-                    {
-                      id: 'source' as const,
-                      title: 'Source on GitHub',
-                      desc: githubRepo
-                        ? `${githubRepo.replace('https://github.com/', '')} · ${app.manifest?.license?.trim() ?? 'MIT'}`
-                        : 'OpenAPI spec, floom manifest, and self-host instructions.',
-                      cta: 'View source',
-                    },
-                  ]).map((card) => (
-                    <button
-                      key={card.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveTab(card.id);
-                        setSearchParams((prev) => {
-                          const next = new URLSearchParams(prev);
-                          next.set('tab', card.id);
-                          return next;
-                        }, { replace: true });
-                      }}
-                      style={{
-                        background: 'var(--card)',
-                        border: '1px solid var(--line)',
-                        borderRadius: 12,
-                        padding: '18px 20px',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                      }}
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    style={{ flexShrink: 0, color: 'var(--accent)' }}
+                  >
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                  <span>
+                    Your inputs are sent to {app.manifest?.name ?? app.name} to produce a result. Floom doesn't sell or share run data.{' '}
+                    <a
+                      href="/privacy"
+                      style={{ color: 'var(--accent)', textDecoration: 'underline' }}
                     >
-                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>
-                        {card.title}
-                      </div>
-                      <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5, flex: 1 }}>
-                        {card.desc}
-                      </div>
-                      <div style={{ fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, marginTop: 4 }}>
-                        {card.cta} &rarr;
-                      </div>
-                    </button>
-                  ))}
+                      Privacy →
+                    </a>
+                  </span>
                 </div>
+                {/* 3-card footer (About / Install / Source) removed
+                    2026-04-28: pure redundancy with the Run/About/Install/Source
+                    TABS at the top of the page card. Clicking these just
+                    switched the active tab — same affordance the tabs already
+                    provide. Federico flagged. */}
                 {celebrate && (
                   <CelebrationCard
                     slug={app.slug}
@@ -1698,29 +1676,6 @@ export function AppPermalinkPage() {
                 value={`docker run -e GEMINI_BYOK=$KEY -p 3000:3000 ghcr.io/floomhq/${app.slug}:latest`}
               />
             </div>
-          </section>
-        )}
-
-        {/* R10 (2026-04-28): Earlier runs tab. Replaces the
-            below-fold disclosure that lived inside RunSurface; tabs
-            are the discoverable spot. PastRunsDisclosure renders its
-            own load-on-expand list of recent runs scoped to this slug. */}
-        {activeTab === 'runs' && (
-          <section data-testid="tab-content-runs">
-            <div
-              style={{
-                fontFamily: 'JetBrains Mono, monospace',
-                fontSize: 10.5,
-                color: 'var(--muted)',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                fontWeight: 600,
-                marginBottom: 14,
-              }}
-            >
-              Earlier runs
-            </div>
-            <PastRunsDisclosure appSlug={app.slug} />
           </section>
         )}
           </div>
