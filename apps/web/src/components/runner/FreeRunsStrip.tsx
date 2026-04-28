@@ -36,6 +36,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getAppQuota,
   readUserGeminiKey,
@@ -235,14 +236,24 @@ export function FreeRunsStrip({ slug, refreshKey = 0, onOpenBYOK }: FreeRunsStri
             Free runs used up today · <span style={{ color: 'var(--muted)' }}>add your Gemini key to keep going</span>
           </span>
         </span>
-        <button
-          type="button"
-          data-testid="free-runs-strip-add-key"
-          onClick={onOpenBYOK}
-          style={ctaButtonStyle(true)}
-        >
-          Add Gemini key &rarr;
-        </button>
+        <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+          <button
+            type="button"
+            data-testid="free-runs-strip-add-key"
+            onClick={onOpenBYOK}
+            style={ctaButtonStyle(true)}
+          >
+            Add Gemini key &rarr;
+          </button>
+          {/* Wireframe ref: rate-hint link → /settings/byok-keys (not the old /me/secrets path) */}
+          <Link
+            to="/settings/byok-keys"
+            data-testid="free-runs-strip-byok-settings-link"
+            style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'underline' }}
+          >
+            Manage keys
+          </Link>
+        </span>
       </div>
     );
   }
