@@ -50,9 +50,10 @@ function buildCliSnippet(token: string) {
   return `curl -fsSL ${HOST_ORIGIN}/install.sh | bash\nfloom auth login --token=${token}`;
 }
 
-// ---------- MvpAuthShell ----------
-
-function MvpAuthShell({ children }: { children: React.ReactNode }) {
+// ---------- MvpAuthShell (DEAD CODE — replaced by standard TopBar 2026-04-28) ----------
+// Kept for diff readability; sweep in a future cleanup.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _MvpAuthShell_unused({ children }: { children: React.ReactNode }) {
   const { data, isAuthenticated } = useSession();
   const [dropOpen, setDropOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
