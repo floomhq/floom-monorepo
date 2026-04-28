@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, Play, Plus } from 'lucide-react';
+import { LayoutGrid, Play, Plus } from 'lucide-react';
 import { AppIcon } from './AppIcon';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
@@ -77,7 +77,7 @@ export function StudioRail() {
             location.pathname === '/studio/apps' ||
             (!!activeSlug && location.pathname.startsWith('/studio/'))
           }
-          icon={<Box size={15} />}
+          icon={<LayoutGrid size={15} />}
           count={apps?.length}
         >
           Apps
