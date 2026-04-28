@@ -240,10 +240,15 @@ const routeMode = getModeFromLocation(location.pathname, searchParams);
             textAlign: 'center',
           }}
         >
-          {mode === 'signup' ? 'Create the active workspace.' : 'Sign in to Floom'}
+          {/* R21A: signup H1 was "Create the active workspace." — internal
+              jargon ("active workspace") that doesn't match the rest of the
+              site's plain language. Switched to "Create your account." which
+              matches the user's actual intent and pairs with the existing
+              "30 seconds. Free during launch." sub. */}
+          {mode === 'signup' ? 'Create your account.' : 'Sign in to Floom'}
         </h1>
         <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 24px', textAlign: 'center' }}>
-          {mode === 'signup' ? '30 seconds. Free for launch.' : 'One account. Run apps, ship apps, all in one place.'}
+          {mode === 'signup' ? '30 seconds. Free during launch.' : 'One account. Run apps, ship apps, all in one place.'}
         </p>
 
         {hasSavedDraft && (
@@ -575,6 +580,11 @@ const routeMode = getModeFromLocation(location.pathname, searchParams);
             {mode === 'signin' ? 'Sign up' : 'Sign in'}
           </button>
         </p>
+        {/* R21A: dropped the "New to Floom? You are in the right place, the same
+            page signs you up." line. The Sign in / Sign up tabs already make
+            the routing obvious; the helper text was meta-explanation that
+            competed with the toggle link directly above. The stray "·" middot
+            also rendered with no left content on mobile (sentence wrap). */}
         <p
           style={{
             textAlign: 'center',
@@ -583,7 +593,6 @@ const routeMode = getModeFromLocation(location.pathname, searchParams);
             color: 'var(--muted)',
           }}
         >
-          New to Floom? You are in the right place, the same page signs you up. ·{' '}
           <Link to="/" style={{ color: 'var(--ink)' }}>Back to home</Link>
         </p>
       </div>

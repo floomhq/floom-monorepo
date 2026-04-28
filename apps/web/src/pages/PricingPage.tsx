@@ -10,6 +10,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageShell } from '../components/PageShell';
+import { CopyButton } from '../components/output/CopyButton';
 import { readDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
 
@@ -615,24 +616,43 @@ export function PricingPage() {
           </div>
           {/* R18B (2026-04-28): horizontal scroll on the code element so
               the long docker command never pushes the layout wider than the
-              viewport. maxWidth: 100% pins it to the parent flex line. */}
-          <code
+              viewport. maxWidth: 100% pins it to the parent flex line.
+              R21A (2026-04-29): added inline Copy button — prior revision
+              showed the command as a static <code> with no copy affordance,
+              and Gemini audit flagged this as a missing convention for a
+              developer-facing snippet. */}
+          <div
             style={{
-              ...MONO,
-              fontSize: 12,
-              color: INK,
-              background: STUDIO_BG,
-              border: `1px solid ${LINE}`,
-              borderRadius: 6,
-              padding: '6px 12px',
-              whiteSpace: 'nowrap',
-              overflowX: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
               maxWidth: '100%',
-              boxSizing: 'border-box',
+              minWidth: 0,
             }}
           >
-            docker run -p 3000:3000 ghcr.io/floomhq/floom-monorepo:latest
-          </code>
+            <code
+              style={{
+                ...MONO,
+                fontSize: 12,
+                color: INK,
+                background: STUDIO_BG,
+                border: `1px solid ${LINE}`,
+                borderRadius: 6,
+                padding: '6px 12px',
+                whiteSpace: 'nowrap',
+                overflowX: 'auto',
+                flex: '1 1 auto',
+                minWidth: 0,
+                boxSizing: 'border-box',
+              }}
+            >
+              docker run -p 3000:3000 ghcr.io/floomhq/floom-monorepo:latest
+            </code>
+            <CopyButton
+              value="docker run -p 3000:3000 ghcr.io/floomhq/floom-monorepo:latest"
+              label="Copy"
+            />
+          </div>
         </div>
       </section>
 

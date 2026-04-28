@@ -55,7 +55,7 @@ const STAGES: Stage[] = [
   {
     num: '04',
     title: 'Any agent',
-    body: 'Claude, Cursor, Codex — or curl. Same endpoint, same auth, same logs.',
+    body: 'Claude, Cursor, Codex, or curl. Same endpoint, same auth, same logs.',
     Icon: Bot,
   },
 ];

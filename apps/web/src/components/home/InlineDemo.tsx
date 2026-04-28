@@ -241,7 +241,7 @@ export function InlineDemo() {
             >
               the lead-scorer app
             </Link>
-            {' '}— same runtime every Floom app uses.
+            . Same runtime every Floom app uses.
           </p>
         </header>
 
