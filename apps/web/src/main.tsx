@@ -89,6 +89,12 @@ const ChangelogPage = lazy(() => import('./pages/ChangelogPage').then(m => ({ de
 // confirmation email for users who lost the modal, and the destination
 // for the /deploy shortcut when the flow is gated.
 const WaitlistPage = lazy(() => import('./pages/WaitlistPage').then(m => ({ default: m.WaitlistPage })));
+// Workspace settings hub: /settings, /settings/general, /settings/byok-keys,
+// /settings/agent-tokens, /settings/studio. Closes issues #919 and #922.
+const WorkspaceSettingsPage = lazy(() => import('./pages/WorkspaceSettingsPage').then(m => ({ default: m.WorkspaceSettingsPage })));
+const SettingsByokKeysPage = lazy(() => import('./pages/SettingsByokKeysPage').then(m => ({ default: m.SettingsByokKeysPage })));
+const SettingsAgentTokensPage = lazy(() => import('./pages/MeSettingsTokensPage').then(m => ({ default: m.SettingsAgentTokensPage })));
+const SettingsStudioPage = lazy(() => import('./pages/StudioSettingsPage').then(m => ({ default: m.SettingsStudioPage })));
 import { IconSprite } from './components/IconSprite';
 import { CookieBanner } from './components/CookieBanner';
 import { RouteLoading } from './components/RouteLoading';
@@ -302,6 +308,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/me/a/:slug" element={<MeAppRedirect />} />
         <Route path="/me/a/:slug/secrets" element={<MeAppSecretsRedirect />} />
         <Route path="/me/a/:slug/run" element={<MeAppRunRedirect />} />
+        {/* Workspace settings hub (#919, #922). Each tab is a separate page
+            component all backed by WorkspacePageShell mode="settings" (which
+            renders SettingsRail + SettingsTabBar automatically). Auth-gated.
+            v23 /me/settings stays live (COEXIST); v26 /settings/* are canonical. */}
+        <Route path="/settings" element={<WaitlistGuard source="me"><WorkspaceSettingsPage /></WaitlistGuard>} />
+        <Route path="/settings/general" element={<WaitlistGuard source="me"><WorkspaceSettingsPage /></WaitlistGuard>} />
+        <Route path="/settings/byok-keys" element={<WaitlistGuard source="me"><SettingsByokKeysPage /></WaitlistGuard>} />
+        <Route path="/settings/agent-tokens" element={<WaitlistGuard source="me"><SettingsAgentTokensPage /></WaitlistGuard>} />
+        <Route path="/settings/studio" element={<WaitlistGuard source="me"><SettingsStudioPage /></WaitlistGuard>} />
+        <Route path="/account/settings" element={<Navigate to="/settings" replace />} />
         {/* Studio context: /studio is the creator home; /studio/apps is
             the heavier app index. Still auth-gated and waitlist-gated. */}
         <Route path="/studio" element={<WaitlistGuard source="studio"><StudioHomePage /></WaitlistGuard>} />
