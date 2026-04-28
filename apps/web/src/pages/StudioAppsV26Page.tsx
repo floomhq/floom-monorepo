@@ -759,9 +759,24 @@ export function StudioAppsV26Page() {
             {appsLoading && !apps && (
               <div
                 data-testid="studio-apps-loading"
-                style={{ color: 'var(--muted)', padding: '32px 0', fontSize: 14 }}
+                style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}
               >
-                Loading your apps…
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      background: 'var(--card)',
+                      border: '1px solid var(--line)',
+                      borderRadius: 14,
+                      padding: 18,
+                      height: 140,
+                      boxShadow: 'var(--shadow-2)',
+                    }}
+                  >
+                    <div style={{ width: '60%', height: 14, background: 'var(--line)', borderRadius: 4, marginBottom: 8 }} />
+                    <div style={{ width: '90%', height: 10, background: 'var(--line)', borderRadius: 4 }} />
+                  </div>
+                ))}
               </div>
             )}
 
