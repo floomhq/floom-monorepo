@@ -330,6 +330,19 @@ export function MeAppSecretsPage({
                 </div>
               )}
 
+              {/* ---- Workspace BYOK requirements section (spec §8) ---- */}
+              {/* TODO: backend wire required_workspace_byok manifest field.
+                  Once the server emits `manifest.required_workspace_byok: string[]`,
+                  replace the stub below with app.manifest.required_workspace_byok ?? [].
+                  This section appears on both /studio/:slug/secrets (creator view)
+                  and /run/apps/:slug/secrets + /me/apps/:slug/secrets (runner view). */}
+              <WorkspaceBYOKSection
+                requiredByok={
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (app?.manifest as any).required_workspace_byok ?? []
+                }
+              />
+
               <p
                 style={{
                   fontSize: 11,
@@ -913,6 +926,173 @@ function SecretRow({ secretKey, entry, onSave, onRemove }: SecretRowProps) {
           style={{ fontSize: 12, color: '#c2321f', marginTop: 6 }}
         >
           {err}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Workspace BYOK requirements section (spec §8).
+//
+// Shows which workspace-level BYOK keys this app expects, with
+// present/missing status based on the active workspace's key list.
+// Renders on /studio/:slug/secrets (creator view), /me/apps/:slug/secrets
+// (v23 alias), and /run/apps/:slug/secrets (v26 runner view).
+//
+// TODO: backend wire required_workspace_byok manifest field.
+// Once the server emits `manifest.required_workspace_byok: string[]`,
+// the parent passes that list in. Empty list renders graceful empty state.
+// ---------------------------------------------------------------------
+
+function WorkspaceBYOKSection({ requiredByok }: { requiredByok: string[] }) {
+  const session = useSession();
+  const wsId = session.data?.active_workspace?.id;
+  const [wsKeys, setWsKeys] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (!wsId) {
+      setWsKeys(new Set());
+      return;
+    }
+    let cancelled = false;
+    api
+      .listWorkspaceSecrets(wsId)
+      .then((res) => {
+        if (!cancelled)
+          setWsKeys(new Set((res.entries ?? []).map((e) => e.key)));
+      })
+      .catch(() => {
+        if (!cancelled) setWsKeys(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wsId]);
+
+  return (
+    <div data-testid="me-app-secrets-byok-section" style={{ marginTop: 32 }}>
+      <h2
+        style={{
+          fontSize: 15,
+          fontWeight: 700,
+          color: 'var(--ink)',
+          margin: '0 0 4px',
+        }}
+      >
+        Workspace BYOK requirements
+      </h2>
+      <p
+        style={{
+          fontSize: 13,
+          color: 'var(--muted)',
+          margin: '0 0 16px',
+          lineHeight: 1.55,
+        }}
+      >
+        BYOK keys this app expects from your workspace.{' '}
+        <Link to="/settings/byok-keys" style={{ color: 'var(--accent)' }}>
+          Manage BYOK keys →
+        </Link>
+      </p>
+
+      {/* TODO: backend wire required_workspace_byok manifest field.
+          Remove this note once the server emits the field. */}
+      {requiredByok.length === 0 && (
+        <div
+          data-testid="me-app-secrets-byok-empty"
+          style={{
+            border: '1px dashed var(--line)',
+            borderRadius: 10,
+            padding: '20px 16px',
+            background: 'var(--card)',
+            fontSize: 13,
+            color: 'var(--muted)',
+          }}
+        >
+          No workspace BYOK keys declared by this app.
+        </div>
+      )}
+
+      {requiredByok.length > 0 && (
+        <div
+          data-testid="me-app-secrets-byok-list"
+          style={{
+            border: '1px solid var(--line)',
+            borderRadius: 10,
+            background: 'var(--card)',
+            overflow: 'hidden',
+          }}
+        >
+          {requiredByok.map((keyName) => {
+            const present = wsKeys?.has(keyName) ?? false;
+            return (
+              <div
+                key={keyName}
+                data-testid={`me-byok-row-${keyName}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 16px',
+                  borderBottom: '1px solid var(--line)',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <code
+                  style={{
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--ink)',
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  {keyName}
+                </code>
+                {present ? (
+                  <span
+                    data-testid={`me-byok-present-${keyName}`}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: 'var(--accent)',
+                      background: 'var(--accent-soft)',
+                      border: '1px solid var(--accent-border)',
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                    }}
+                  >
+                    Present
+                  </span>
+                ) : (
+                  <>
+                    <span
+                      data-testid={`me-byok-missing-${keyName}`}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: '#b45309',
+                        background: '#fef3c7',
+                        border: '1px solid #fcd9a8',
+                        padding: '2px 8px',
+                        borderRadius: 999,
+                      }}
+                    >
+                      Missing
+                    </span>
+                    <Link
+                      to="/settings/byok-keys"
+                      style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}
+                    >
+                      Add to workspace →
+                    </Link>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
