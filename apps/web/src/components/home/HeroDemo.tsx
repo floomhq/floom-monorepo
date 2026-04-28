@@ -208,6 +208,32 @@ function usePrefersReducedMotion(): boolean {
 }
 
 /**
+ * Mobile detection — narrow viewports get a different physical layout (3
+ * stacked cards) instead of the desktop synchronized morphing canvas.
+ * Federico R20 (2026-04-29): the desktop demo crammed editor + sidebar +
+ * deploy timeline + run grid into a 580px fixed canvas at 360px wide.
+ * Tracker text rendered at 10.5px (sub-12 readable threshold), code panel
+ * gutter ate horizontal real estate, deploy timeline + code preview were
+ * stacked but still pinched. The fix is structural, not stylistic — render
+ * a separate mobile path that shows each beat as its own auto-height card,
+ * vertically stacked, end-state only, no synchronized animation. SSR-safe:
+ * defaults to false so the desktop layout renders on the server, then the
+ * client effect flips to mobile after hydration.
+ */
+function useIsMobile(breakpoint = 768): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    setIsMobile(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [breakpoint]);
+  return isMobile;
+}
+
+/**
  * Type a string one char at a time. Returns a progress integer (0..text.length).
  * Starts advancing as soon as `active` becomes true; resets when `cycleKey`
  * changes. `charMs` controls per-char speed.
@@ -283,6 +309,19 @@ function useCountUp(
 // -----------------------------------------------------------------------------
 export function HeroDemo() {
   const reducedMotion = usePrefersReducedMotion();
+  const isMobile = useIsMobile(768);
+
+  // Mobile gets a structurally different layout — see MobileStackedDemo.
+  // Both branches mount different component subtrees, so the desktop hooks
+  // below stay unconditionally ordered inside the desktop branch.
+  return isMobile ? (
+    <MobileStackedDemo reducedMotion={reducedMotion} />
+  ) : (
+    <DesktopMorphDemo reducedMotion={reducedMotion} />
+  );
+}
+
+function DesktopMorphDemo({ reducedMotion }: { reducedMotion: boolean }) {
   const [state, setState] = useState<DemoState>(() => (reducedMotion ? 'run' : 'build'));
   const [cycle, setCycle] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -361,6 +400,139 @@ export function HeroDemo() {
           reducedMotion={reducedMotion}
         />
       </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// MobileStackedDemo — 3 vertically stacked cards (Build / Deploy / Use),
+// each showing the end-state of its beat. No synchronized animation, no
+// fixed-height canvas, no horizontal tracker. R20 2026-04-29.
+//
+// Why:
+//   The desktop morph canvas is 580px tall and assumes ~600+px of width to
+//   hold an editor sidebar (or the deploy split-pane, or the run
+//   2-column grid). Below 768px it visibly cramps every state — code
+//   panel scrolls horizontally, deploy timeline + code preview share a
+//   single column, run grid collapses but still inherits the canvas
+//   chrome. The structural fix is to stop forcing a single canvas at
+//   narrow widths. Each beat owns its own card; the visual story still
+//   reads top-to-bottom as Build -> Deploy -> Use.
+//
+// Anatomy:
+//   01  Build card  — handler.py preview, syntax-highlighted, full code
+//                     visible (font-size 11px, monospace).
+//   02  Deploy card — `$ /floomit` line, 4 step checks (all ✓), final
+//                     "Deployed" URL chip.
+//   03  Use card    — score (8/10), "Ready to ship" tag, 3 reason
+//                     bullets, "Also available as API · MCP · Analytics".
+// -----------------------------------------------------------------------------
+function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: boolean }) {
+  const tokens = useMemo(() => tokenizePython(HANDLER_CODE), []);
+  const lineCount = useMemo(() => countLines(HANDLER_CODE, HANDLER_CODE.length), []);
+
+  return (
+    <div
+      data-testid="hero-demo"
+      data-mode="mobile-stacked"
+      role="region"
+      aria-label="Build, deploy and use a Floom app in three steps"
+      style={MOBILE_WRAP_STYLE}
+    >
+      {/* 01 — BUILD */}
+      <section style={MOBILE_CARD} aria-labelledby="hd-mob-build-title">
+        <header style={MOBILE_CARD_HEADER}>
+          <span style={MOBILE_STEP_NUM}>01</span>
+          <span style={MOBILE_STEP_LABEL} id="hd-mob-build-title">Build</span>
+          <span style={MOBILE_STEP_HINT}>handler.py</span>
+        </header>
+        <div style={MOBILE_BUILD_BODY}>
+          <div style={MOBILE_GUTTER_WRAP}>
+            <div style={MOBILE_GUTTER}>
+              {Array.from({ length: Math.max(lineCount, 1) }).map((_, i) => (
+                <span key={i}>{i + 1}</span>
+              ))}
+            </div>
+            <pre style={MOBILE_CODE_PRE}>
+              {renderTokens(tokens, HANDLER_CODE.length)}
+            </pre>
+          </div>
+        </div>
+      </section>
+
+      {/* 02 — DEPLOY */}
+      <section style={MOBILE_CARD} aria-labelledby="hd-mob-deploy-title">
+        <header style={MOBILE_CARD_HEADER}>
+          <span style={MOBILE_STEP_NUM}>02</span>
+          <span style={MOBILE_STEP_LABEL} id="hd-mob-deploy-title">Deploy</span>
+          <span style={MOBILE_STEP_HINT}>via /floomit</span>
+        </header>
+        <div style={MOBILE_DEPLOY_BODY}>
+          <div style={MOBILE_DEPLOY_SLASH}>
+            <span style={MOBILE_DEPLOY_PROMPT}>$</span>
+            <span style={MOBILE_DEPLOY_SLASH_TEXT}>/floomit</span>
+          </div>
+          <ul style={MOBILE_STEPS_LIST}>
+            {DEPLOY_STEPS.map((label) => (
+              <li key={label} style={MOBILE_STEP_ITEM}>
+                <span style={MOBILE_STEP_CHECK} aria-hidden="true">{'✓'}</span>
+                <span style={MOBILE_STEP_TEXT}>{label}</span>
+              </li>
+            ))}
+          </ul>
+          <div style={MOBILE_DEPLOY_URL_CARD}>
+            <span style={MOBILE_LIVE_DOT_WRAP} aria-hidden="true">
+              <span style={MOBILE_LIVE_DOT_CORE} />
+            </span>
+            <div style={MOBILE_DEPLOY_URL_TEXT}>
+              <div style={MOBILE_DEPLOY_URL_MAIN}>floom.dev/p/ai-readiness-audit</div>
+              <div style={MOBILE_DEPLOY_URL_META}>Deployed in 1.2s · HTTPS · edge</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 03 — USE */}
+      <section style={MOBILE_CARD} aria-labelledby="hd-mob-run-title">
+        <header style={MOBILE_CARD_HEADER}>
+          <span style={MOBILE_STEP_NUM}>03</span>
+          <span style={MOBILE_STEP_LABEL} id="hd-mob-run-title">Use</span>
+          <span style={MOBILE_STEP_HINT}>AI Readiness Audit</span>
+        </header>
+        <div style={MOBILE_RUN_BODY}>
+          <div style={MOBILE_RUN_INPUT_ROW}>
+            <span style={MOBILE_RUN_INPUT_LABEL}>Company URL</span>
+            <div style={MOBILE_RUN_INPUT_BOX}>stripe.com</div>
+          </div>
+          <div style={MOBILE_SCORE_ROW}>
+            <span style={MOBILE_SCORE_BIG}>8</span>
+            <span style={MOBILE_SCORE_OF}>/ 10</span>
+            <span style={MOBILE_TIER_PILL}>Ready to ship</span>
+          </div>
+          <ul style={MOBILE_REASONS_LIST}>
+            <li style={MOBILE_REASON_ITEM}>
+              <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
+              Clear AI story across docs, ship-ready positioning.
+            </li>
+            <li style={MOBILE_REASON_ITEM}>
+              <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
+              Surfaces real evals + customer case studies publicly.
+            </li>
+            <li style={MOBILE_REASON_ITEM}>
+              <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
+              Risk: no published latency / error guardrails yet.
+            </li>
+          </ul>
+          <div style={MOBILE_RUN_SECONDARY}>
+            <span>Also available as</span>
+            <span style={MOBILE_RUN_SEC_TAG}>API</span>
+            <span style={MOBILE_RUN_SEC_SEP}>·</span>
+            <span style={MOBILE_RUN_SEC_TAG}>MCP</span>
+            <span style={MOBILE_RUN_SEC_SEP}>·</span>
+            <span style={MOBILE_RUN_SEC_TAG}>Analytics</span>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -1752,5 +1924,330 @@ const RUN_SEC_TAG: CSSProperties = {
 };
 
 const RUN_SEC_SEP: CSSProperties = {
+  color: '#c4c1b8',
+};
+
+// -----------------------------------------------------------------------------
+// Mobile (R20 2026-04-29) — stacked-card variant.
+// All mobile styles are namespaced MOBILE_* and only consumed by
+// <MobileStackedDemo />. Visual lineage: same cream paper palette as the
+// desktop morph canvas, but each card is a self-contained module.
+// -----------------------------------------------------------------------------
+
+const MOBILE_WRAP_STYLE: CSSProperties = {
+  margin: '24px auto 0',
+  // No artificial maxWidth — the wrapper inherits the page content
+  // column width. Each card stretches edge-to-edge of the gutter.
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 14,
+};
+
+const MOBILE_CARD: CSSProperties = {
+  background: 'var(--card, #ffffff)',
+  border: '1px solid var(--line, #e8e6e0)',
+  borderRadius: 16,
+  overflow: 'hidden',
+  boxShadow: '0 12px 32px -28px rgba(14,14,12,0.18), 0 1px 4px -2px rgba(14,14,12,0.04)',
+};
+
+const MOBILE_CARD_HEADER: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '12px 14px',
+  borderBottom: '1px solid #ece8de',
+  background: '#f5f4f0',
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+};
+
+const MOBILE_STEP_NUM: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  color: '#a8a49b',
+  letterSpacing: '0.06em',
+};
+
+const MOBILE_STEP_LABEL: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: '#1b1a17',
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+};
+
+const MOBILE_STEP_HINT: CSSProperties = {
+  marginLeft: 'auto',
+  fontSize: 11,
+  color: '#8b8680',
+};
+
+// 01 — Build card body
+const MOBILE_BUILD_BODY: CSSProperties = {
+  background: '#faf8f3',
+  fontFamily: "'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace",
+  color: '#2a2825',
+};
+
+const MOBILE_GUTTER_WRAP: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '28px 1fr',
+};
+
+const MOBILE_GUTTER: CSSProperties = {
+  color: '#c4c1b8',
+  textAlign: 'right',
+  padding: '12px 6px 12px 0',
+  fontSize: 11,
+  userSelect: 'none',
+  borderRight: '1px solid #ece8de',
+  display: 'flex',
+  flexDirection: 'column',
+  lineHeight: 1.7,
+};
+
+const MOBILE_CODE_PRE: CSSProperties = {
+  padding: '12px 12px',
+  margin: 0,
+  whiteSpace: 'pre',
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  fontFamily: 'inherit',
+  fontSize: 11,
+  lineHeight: 1.7,
+  color: '#2a2825',
+  // Mask trailing edge so a long line that scrolls feels finite, not chopped.
+  WebkitMaskImage:
+    'linear-gradient(to right, #000 0, #000 calc(100% - 14px), transparent 100%)',
+  maskImage:
+    'linear-gradient(to right, #000 0, #000 calc(100% - 14px), transparent 100%)',
+};
+
+// 02 — Deploy card body
+const MOBILE_DEPLOY_BODY: CSSProperties = {
+  background: '#faf8f3',
+  padding: '14px 14px 16px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+  fontFamily: "'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace",
+};
+
+const MOBILE_DEPLOY_SLASH: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  fontSize: 12,
+  color: '#1b1a17',
+};
+
+const MOBILE_DEPLOY_PROMPT: CSSProperties = {
+  color: '#047857',
+  fontWeight: 700,
+};
+
+const MOBILE_DEPLOY_SLASH_TEXT: CSSProperties = {
+  color: '#b45309',
+  fontWeight: 600,
+  letterSpacing: '0.02em',
+};
+
+const MOBILE_STEPS_LIST: CSSProperties = {
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+};
+
+const MOBILE_STEP_ITEM: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  fontSize: 12,
+  color: '#2a2825',
+};
+
+const MOBILE_STEP_CHECK: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 18,
+  height: 18,
+  borderRadius: 5,
+  background: '#d1fae5',
+  color: '#047857',
+  fontSize: 11,
+  fontWeight: 700,
+  border: '1px solid #a7f3d0',
+  flexShrink: 0,
+};
+
+const MOBILE_STEP_TEXT: CSSProperties = {
+  color: '#2a2825',
+};
+
+const MOBILE_DEPLOY_URL_CARD: CSSProperties = {
+  marginTop: 4,
+  padding: '10px 12px',
+  borderRadius: 10,
+  background: '#ffffff',
+  border: '1px solid #e8e6e0',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+};
+
+const MOBILE_LIVE_DOT_WRAP: CSSProperties = {
+  position: 'relative',
+  display: 'inline-flex',
+  width: 10,
+  height: 10,
+  flexShrink: 0,
+};
+
+const MOBILE_LIVE_DOT_CORE: CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: '50%',
+  background: '#10b981',
+  margin: 'auto',
+};
+
+const MOBILE_DEPLOY_URL_TEXT: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1,
+  minWidth: 0,
+  flex: 1,
+};
+
+const MOBILE_DEPLOY_URL_MAIN: CSSProperties = {
+  fontSize: 12,
+  color: '#1b1a17',
+  fontWeight: 600,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+};
+
+const MOBILE_DEPLOY_URL_META: CSSProperties = {
+  fontSize: 11,
+  color: '#8b8680',
+};
+
+// 03 — Use card body
+const MOBILE_RUN_BODY: CSSProperties = {
+  padding: '14px 14px 16px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+  background: '#ffffff',
+};
+
+const MOBILE_RUN_INPUT_ROW: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 5,
+};
+
+const MOBILE_RUN_INPUT_LABEL: CSSProperties = {
+  fontSize: 11,
+  color: '#8b8680',
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+  fontWeight: 600,
+};
+
+const MOBILE_RUN_INPUT_BOX: CSSProperties = {
+  border: '1px solid #e8e6e0',
+  borderRadius: 8,
+  padding: '8px 10px',
+  fontSize: 13,
+  color: '#1b1a17',
+  background: '#faf8f3',
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+};
+
+const MOBILE_SCORE_ROW: CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 6,
+  flexWrap: 'wrap',
+};
+
+const MOBILE_SCORE_BIG: CSSProperties = {
+  fontSize: 40,
+  fontWeight: 700,
+  color: '#047857',
+  lineHeight: 1,
+};
+
+const MOBILE_SCORE_OF: CSSProperties = {
+  fontSize: 14,
+  color: '#8b8680',
+  fontWeight: 500,
+};
+
+const MOBILE_TIER_PILL: CSSProperties = {
+  marginLeft: 6,
+  padding: '3px 9px',
+  background: '#d1fae5',
+  color: '#047857',
+  fontSize: 11,
+  fontWeight: 700,
+  borderRadius: 999,
+  letterSpacing: '0.02em',
+  border: '1px solid #a7f3d0',
+};
+
+const MOBILE_REASONS_LIST: CSSProperties = {
+  listStyle: 'none',
+  margin: 0,
+  padding: '10px 0 0',
+  borderTop: '1px solid #f0ece3',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+};
+
+const MOBILE_REASON_ITEM: CSSProperties = {
+  fontSize: 12.5,
+  color: '#2a2825',
+  lineHeight: 1.45,
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+};
+
+const MOBILE_REASON_BULLET: CSSProperties = {
+  width: 5,
+  height: 5,
+  borderRadius: '50%',
+  background: '#047857',
+  marginTop: 7,
+  flexShrink: 0,
+};
+
+const MOBILE_RUN_SECONDARY: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 6,
+  fontSize: 11,
+  color: '#a8a49b',
+  paddingTop: 6,
+};
+
+const MOBILE_RUN_SEC_TAG: CSSProperties = {
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontSize: 10.5,
+  color: '#8b8680',
+  letterSpacing: '0.04em',
+};
+
+const MOBILE_RUN_SEC_SEP: CSSProperties = {
   color: '#c4c1b8',
 };
