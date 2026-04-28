@@ -12,6 +12,8 @@ apps/server/data/
 # Phase 2 workplans + stress test report (local-only)
 WORKPLAN-*.md
 
+tmp_data/
+
 # macOS AppleDouble metadata files (rsync from macOS)
 ._*
 .DS_Store

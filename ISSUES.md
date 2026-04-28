@@ -409,3 +409,15 @@ Do NOT ship the superseded synthesis copy ("Your agent built it. You run it. Shi
 - Manifest: `file/pdf` input + `job_description: string` input.
 - Backend: Gemini 3 PDF read + JD match scoring.
 - Custom renderer: ranked candidate card with fit reasons.
+
+## L6 — #836 Curl example on agent token creation page uses production URL
+**Status:** BACKEND FIXED, WAITING ON UI TRACK
+**Severity:** P1 (test users copy this and hit prod, and the path 404s)
+**Where:** `apps/web/src/pages/MeAgentKeysPage.tsx:437`
+**Root cause:** The frontend hardcoded `https://floom.dev/api/p/${demoSlug}/run`. This breaks in preview/dev and uses the wrong path format (`/api/p/:slug` instead of `/api/:slug`).
+**Backend fix (already done):** The `POST /api/me/agent-keys` (handled in `apps/server/src/routes/agent_keys.ts`) now computes `example_curl` dynamically using `getPublicBaseUrl(c)` and the correct `/api/:slug/run` format. It returns this string in the 201 response.
+**Fix for UI Track:**
+- Update `apps/web/src/api/client.ts` to expect `example_curl?: string` in the `CreatedApiKey` type.
+- In `apps/web/src/pages/MeAgentKeysPage.tsx`, update the UI to display `justCreated.example_curl` directly in the snippet block instead of using the local `curlExample` function.
+- Delete the local `curlExample` helper in `MeAgentKeysPage.tsx` as the backend now provides the entire snippet dynamically.
+

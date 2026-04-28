@@ -14,6 +14,7 @@ import { auditLog, getAuditActor } from '../services/audit-log.js';
 import { resolveUserContext } from '../services/session.js';
 import * as workspaces from '../services/workspaces.js';
 import type { AgentTokenRecord, AgentTokenScope, SessionContext } from '../types.js';
+import { getPublicBaseUrl } from './mcp.js';
 
 export const agentKeysRouter = new Hono();
 
@@ -161,6 +162,14 @@ agentKeysRouter.post('/', async (c) => {
     metadata: { prefix: row.prefix },
   });
 
+  const userApps = db.prepare('SELECT slug FROM apps WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 1').get(ctx.workspace_id) as { slug: string } | undefined;
+  const demoSlug = userApps ? userApps.slug : 'lead-scorer';
+  const baseUrl = getPublicBaseUrl(c);
+  const example_curl = `curl -X POST ${baseUrl}/api/${demoSlug}/run \\
+  -H "Authorization: Bearer ${rawToken}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"inputs": {}}'`;
+
   return c.json(
     {
       id: row.id,
@@ -169,6 +178,7 @@ agentKeysRouter.post('/', async (c) => {
       scope: row.scope,
       workspace_id: row.workspace_id,
       raw_token: rawToken,
+      example_curl,
     },
     201,
   );
