@@ -257,7 +257,7 @@ function AppCard({ app }: { app: RunApp }) {
         transition: 'border-color 0.15s ease',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--muted)';
+        e.currentTarget.style.borderColor = 'var(--line-hover)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--line)';
