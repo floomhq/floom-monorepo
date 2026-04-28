@@ -58,6 +58,7 @@ import {
   AgentToolError,
   discoverApps,
   getAgentRun,
+  getAppLogs,
   getAppSkill,
   listMyRuns,
   runApp,
@@ -1628,6 +1629,35 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         }
       },
     );
+
+    server.registerTool(
+      'get_app_logs',
+      {
+        title: 'Get app logs',
+        description:
+          'Recent run logs for an owned app slug. Returns up to `limit` runs with status, duration, truncated input/output previews, and a deeplink URL. Workspace-scoped — slugs not owned by this workspace return an empty logs array.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          limit: z.number().int().min(1).max(100).optional(),
+          since: z.string().optional(),
+        },
+      },
+      async ({ slug, limit, since }) => {
+        recordMcpToolCall('get_app_logs');
+        try {
+          return mcpJson(
+            getAppLogs(ctx, {
+              slug,
+              limit,
+              since,
+              baseUrl: getPublicBaseUrl(c),
+            }),
+          );
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
   }
 
   if (canUseAccountTools(ctx)) {
@@ -1864,6 +1894,8 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             });
           }
           invalidateHubCache();
+          const publishOrigin = getPublicBaseUrl(c);
+          const permalink = `${publishOrigin}/p/${result.slug}`;
           return mcpJson({
             ok: true,
             slug: result.slug,
@@ -1872,9 +1904,16 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             publish_status: 'pending_review',
             review_note:
               'New user-published apps are visible to the owner immediately and enter manual review before public Store listing.',
-            permalink: `${baseUrl}/p/${result.slug}`,
-            mcp_url: `${baseUrl}/mcp/app/${result.slug}`,
-            owner_url: `${baseUrl}/studio/${result.slug}`,
+            permalink,
+            mcp_url: `${publishOrigin}/mcp/app/${result.slug}`,
+            owner_url: `${publishOrigin}/studio/${result.slug}`,
+            next_steps: [
+              `Your app is live at ${permalink}`,
+              `View install snippet at ${permalink}?tab=install`,
+              `Run it via CLI: floom apps run ${result.slug}`,
+              `Add the MCP endpoint to any agent: ${publishOrigin}/mcp/app/${result.slug}`,
+              `Source view: ${permalink}?tab=source`,
+            ],
           });
         } catch (err) {
           return mcpError(err);
@@ -1898,7 +1937,20 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('studio_detect_app');
         try {
           requireStudioScope(ctx);
-          return mcpJson(await detectAppFromInlineSpec(openapi_spec as never, slug, name));
+          const detected = await detectAppFromInlineSpec(openapi_spec as never, slug, name);
+          // Detection is a preview only — nothing is published yet. Surface
+          // the next two MECE actions: publish via this tool, or via CLI.
+          const detectedRecord =
+            detected && typeof detected === 'object'
+              ? (detected as unknown as Record<string, unknown>)
+              : {};
+          return mcpJson({
+            ...detectedRecord,
+            next_steps: [
+              'Run studio_publish_app with this spec',
+              'Or use floom CLI: floom publish <repo>',
+            ],
+          });
         } catch (err) {
           return mcpError(err);
         }
@@ -1962,6 +2014,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             .all(ctx.workspace_id, Math.max(1, Math.min(200, Number(limit || 50)))) as Array<
             AppRecord & { run_count: number; last_run_at: string | null }
           >;
+          const listOrigin = getPublicBaseUrl(c);
           return mcpJson({
             apps: rows.map((row) => ({
               slug: row.slug,
@@ -1972,9 +2025,13 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
               publish_status: row.publish_status,
               run_count: row.run_count || 0,
               last_run_at: row.last_run_at,
-              permalink: `${baseUrl}/p/${row.slug}`,
-              mcp_url: `${baseUrl}/mcp/app/${row.slug}`,
-              owner_url: `${baseUrl}/studio/${row.slug}`,
+              permalink: `${listOrigin}/p/${row.slug}`,
+              mcp_url: `${listOrigin}/mcp/app/${row.slug}`,
+              owner_url: `${listOrigin}/studio/${row.slug}`,
+              // Esteban feedback: hard to find run history after deploy.
+              // Surface the run-list landing per-app so agents can hand it
+              // back to users (or fetch via get_app_logs below).
+              runs_url: `${listOrigin}/r/?slug=${encodeURIComponent(row.slug)}`,
             })),
           });
         } catch (err) {

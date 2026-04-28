@@ -467,6 +467,101 @@ export function getAgentRun(
   return formatAgentRun(row, row.app_slug, runtime);
 }
 
+export interface GetAppLogsArgs {
+  slug: string;
+  limit?: number;
+  since?: string;
+  baseUrl: string;
+}
+
+/**
+ * R15be — surface recent run logs for an owned app slug. Esteban flagged
+ * "no visibility after deploy"; this gives agents a single tool to fetch
+ * the last N runs as a compact log feed (status + duration + truncated
+ * input/output previews + a deeplink to the full run page).
+ *
+ * Auth: same as run_app + studio_list_my_apps — workspace-scoped, agent
+ * token required. Returns an empty `logs` array (no error) when the slug
+ * is not owned by this workspace, mirroring how list_my_runs hides other
+ * users' runs without leaking existence.
+ */
+export function getAppLogs(
+  ctx: SessionContext,
+  args: GetAppLogsArgs,
+): Record<string, unknown> {
+  requireAnyAgentScope(ctx);
+  const limit = Math.max(1, Math.min(100, Number(args.limit ?? 20)));
+  // Resolve the app within the caller's workspace. We do NOT throw on
+  // "unowned slug" — instead we return empty logs + total: 0 so the
+  // agent gets an unambiguous "you have no logs for this app" without
+  // a 404 round-trip. This keeps the visibility-after-deploy flow smooth
+  // when the slug is misspelled or freshly transferred.
+  const ownedApp = db
+    .prepare(
+      `SELECT id, slug FROM apps
+        WHERE slug = ? AND workspace_id = ?
+        LIMIT 1`,
+    )
+    .get(args.slug, ctx.workspace_id) as { id: string; slug: string } | undefined;
+  if (!ownedApp) {
+    return {
+      slug: args.slug,
+      logs: [],
+      total: 0,
+      reason: 'not_owned_or_not_found',
+    };
+  }
+  const params: unknown[] = [ownedApp.id, ctx.workspace_id];
+  let where = 'runs.app_id = ? AND runs.workspace_id = ?';
+  if (args.since) {
+    where += ' AND runs.started_at >= ?';
+    params.push(args.since);
+  }
+  const rows = db
+    .prepare(
+      `SELECT runs.id, runs.status, runs.duration_ms, runs.started_at,
+              runs.finished_at, runs.inputs, runs.outputs
+         FROM runs
+        WHERE ${where}
+        ORDER BY runs.started_at DESC, runs.id DESC
+        LIMIT ?`,
+    )
+    .all(...params, limit) as Array<{
+    id: string;
+    status: string;
+    duration_ms: number | null;
+    started_at: string;
+    finished_at: string | null;
+    inputs: string | null;
+    outputs: string | null;
+  }>;
+  const totalRow = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM runs WHERE app_id = ? AND workspace_id = ?`,
+    )
+    .get(ownedApp.id, ctx.workspace_id) as { n: number } | undefined;
+  const baseUrl = args.baseUrl.replace(/\/+$/, '');
+  return {
+    slug: ownedApp.slug,
+    logs: rows.map((row) => ({
+      run_id: row.id,
+      ts: row.started_at,
+      duration_ms: row.duration_ms,
+      status: row.status,
+      input_summary: truncatePreview(row.inputs),
+      output_preview: truncatePreview(row.outputs),
+      url: `${baseUrl}/r/${row.id}`,
+    })),
+    total: totalRow?.n ?? rows.length,
+  };
+}
+
+function truncatePreview(raw: string | null): string {
+  if (!raw) return '';
+  const s = raw.length > 80 ? `${raw.slice(0, 80)}…` : raw;
+  return s;
+}
+
 export function listMyRuns(
   ctx: SessionContext,
   args: ListRunsArgs,
