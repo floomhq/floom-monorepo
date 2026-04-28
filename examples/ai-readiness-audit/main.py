@@ -65,7 +65,10 @@ DEFAULT_MODEL_ID = "gemini-2.5-flash-lite"
 HARD_TIMEOUT_S = 20.0
 FETCH_TIMEOUT_S = 5.0
 DNS_TIMEOUT_S = 1.5
-MAX_FETCH_BYTES = 500 * 1024
+# 2026-04-28 (R9): 500KB → 1.5MB so we capture meta tags on Next.js
+# / Nuxt / Webflow marketing sites where the meta block sits past byte
+# 500KB. DOM cost under BS4 is still within 512MB RUNNER_MEMORY.
+MAX_FETCH_BYTES = 1_500 * 1024
 MAX_URL_LEN = 200
 MAX_REDIRECTS = 3
 MAX_PAGE_CHARS = 12_000

@@ -41,7 +41,11 @@ FETCH_TIMEOUT_S = 5.0
 # realistic worst-case fetch (5s) + slow Gemini (12s) doesn't time out.
 # Still well under the 30s manifest timeout.
 TOTAL_BUDGET_S = 22.0
-MAX_RESPONSE_BYTES = 500_000
+# 2026-04-28 (R9): bumped from 500KB → 1.5MB. Modern marketing sites
+# (Next.js / Nuxt / Webflow) emit 1-2.5MB of HTML where the meta tags
+# we need for the fallback path can sit past byte 500KB. The DOM cost
+# under BS4 is still well within the 512MB RUNNER_MEMORY ceiling.
+MAX_RESPONSE_BYTES = 1_500_000
 MAX_URL_LEN = 200
 MAX_TEXT_CHARS = 12_000
 MAX_REDIRECTS = 3
