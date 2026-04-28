@@ -206,6 +206,7 @@ export function PublicFooter() {
           <div style={COL_LABEL_STYLE}>Product</div>
           <FootLink to="/apps">Apps</FootLink>
           <FootLink to="/docs">Docs</FootLink>
+          <FootLink to="/help">Help</FootLink>
           <FootLink to="/pricing">Pricing</FootLink>
           <FootLink to="/changelog">Changelog</FootLink>
           <FootLink to="/status">Status</FootLink>
