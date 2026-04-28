@@ -16,7 +16,8 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { StudioLayout } from '../components/studio/StudioLayout';
+import { WorkspacePageShell } from '../components/WorkspacePageShell';
+import { StudioAppTabs } from '../components/StudioAppTabs';
 import { AppHeader } from './MeAppPage';
 import * as api from '../api/client';
 import type { AppDetail } from '../lib/types';
@@ -105,11 +106,11 @@ export function StudioAppAccessPage() {
   const rateLimitValid = !rateLimitEnabled || (!isNaN(rateLimitNum) && rateLimitNum > 0);
 
   return (
-    <StudioLayout
+    <WorkspacePageShell
+      mode="studio"
       title={app ? `${app.name} · Access · Studio` : 'Access · Studio'}
-      activeAppSlug={slug}
-      activeSubsection="access"
     >
+      <StudioAppTabs slug={slug ?? ''} activeTab="access" />
       {loadError && (
         <div style={styles.errorBanner} data-testid="studio-access-load-error">
           {loadError}
@@ -281,7 +282,7 @@ export function StudioAppAccessPage() {
           </section>
         </div>
       )}
-    </StudioLayout>
+    </WorkspacePageShell>
   );
 }
 
