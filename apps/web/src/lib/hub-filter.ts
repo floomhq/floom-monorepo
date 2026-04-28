@@ -126,6 +126,15 @@ export interface HubFilterOptions {
    * want. Test fixtures are still filtered regardless of mode.
    */
   selfHost?: boolean;
+  /**
+   * True when the server reports `staging_mode: true` on
+   * `/api/session/me` (controlled by FLOOM_STAGING_MODE env var).
+   * Bypasses LAUNCH_LISTED_SLUGS so every ingested app appears in /apps
+   * and on the landing page. Intended for preview.floom.dev so new apps
+   * can be inspected before being added to the prod curated list. Test
+   * fixtures are still hidden regardless.
+   */
+  staging?: boolean;
 }
 
 export function isPubliclyListed(
@@ -134,6 +143,7 @@ export function isPubliclyListed(
 ): boolean {
   if (isTestFixture(app)) return false;
   if (opts.selfHost) return true;
+  if (opts.staging) return true;
   return LAUNCH_LISTED_SLUGS.has(app.slug);
 }
 

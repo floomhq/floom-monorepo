@@ -96,6 +96,10 @@ export function AppsDirectoryPage() {
   // fast-apps sidecar and any ingested apps were healthy.
   const { data: sessionData } = useSession();
   const selfHost = sessionData?.cloud_mode === false;
+  // Staging bypass: preview.floom.dev sets FLOOM_STAGING_MODE=1 so every
+  // ingested app (minus test fixtures) shows in /apps. Lets Federico see
+  // all apps before adding them to the prod curated allowlist.
+  const staging = sessionData?.staging_mode === true;
   // Category filter is URL-backed so browser back/forward and shared URLs
   // restore the filtered view (#100). ALL is the implicit default — we
   // only write `?category=<slug>` to the URL when the user picks a
@@ -219,7 +223,7 @@ export function AppsDirectoryPage() {
 
   const sortedApps = useMemo(() => {
     return apps
-      .filter((app) => isPubliclyListed(app, { selfHost }))
+      .filter((app) => isPubliclyListed(app, { selfHost, staging }))
       .sort((a, b) => {
         if ((a.featured ?? false) !== (b.featured ?? false)) {
           return a.featured ? -1 : 1;
@@ -231,7 +235,7 @@ export function AppsDirectoryPage() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [apps, selfHost]);
+  }, [apps, selfHost, staging]);
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>([[ALL, sortedApps.length]]);
