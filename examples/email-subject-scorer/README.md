@@ -1,30 +1,28 @@
 # Subject Line Scorer
 
 Rate any email subject line on its open-rate potential. Get a score from 1-10, the top problems,
-and 3 stronger rewrites — all in under 3 seconds.
+and 3 stronger rewrites in under 3 seconds.
 
 ## Setup
 
 ```bash
-pip install -r requirements.txt
 export GEMINI_API_KEY="your-key-here"
+PORT=4350 node examples/email-subject-scorer/server.mjs
 ```
 
 ## Run
 
 ```bash
-python examples/email-subject-scorer/main.py '{"inputs": {"subject": "Re: Your proposal from last week"}}'
+curl http://127.0.0.1:4350/openapi/email-subject-scorer.json
+curl -s http://127.0.0.1:4350/email-subject-scorer/run \
+  -H 'content-type: application/json' \
+  -d '{"subject":"Re: Your proposal from last week"}'
 ```
 
 ## Test
 
 ```bash
-# With Gemini key:
-python examples/email-subject-scorer/main.py '{"inputs": {"subject": "Quick question about your marketing strategy"}}'
-
-# Without key (dry-run):
-unset GEMINI_API_KEY
-python examples/email-subject-scorer/main.py '{"inputs": {"subject": "Test subject line here"}}'
+node --check examples/email-subject-scorer/server.mjs
 ```
 
 ## Output
@@ -37,7 +35,7 @@ python examples/email-subject-scorer/main.py '{"inputs": {"subject": "Test subje
   "rewrites": [
     {"angle": "curiosity", "subject": "The one gap I noticed in your proposal"},
     {"angle": "value", "subject": "3 ways to strengthen your proposal"},
-    {"angle": "directness", "subject": "Feedback — 2 quick points"}
+    {"angle": "directness", "subject": "Feedback: 2 quick points"}
   ],
   "explanation": "Re: prefix gives the reader no reason to open.",
   "dry_run": false,
@@ -48,7 +46,7 @@ python examples/email-subject-scorer/main.py '{"inputs": {"subject": "Test subje
 
 ## Build strategy
 
-BUILD_FRESH — no upstream repo. Pure Gemini 2.5 Flash Lite scoring with `response_json_schema`.
+BUILD_FRESH - no upstream repo. Pure Gemini 2.5 Flash Lite scoring with `response_json_schema`.
 
 ## Gate -1 search trail
 
