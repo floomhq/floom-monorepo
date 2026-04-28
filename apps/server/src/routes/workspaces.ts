@@ -39,7 +39,17 @@ import {
 import { isCloudMode } from '../lib/better-auth.js';
 import { requireAuthenticatedInCloud } from '../lib/auth.js';
 import { deleteWorkspaceRuns } from '../services/run-retention-sweeper.js';
-import type { WorkspaceMemberRole, WorkspaceRecord } from '../types.js';
+import type { AgentTokenRecord, AgentTokenScope, WorkspaceMemberRole, WorkspaceRecord } from '../types.js';
+import * as userSecrets from '../services/user_secrets.js';
+import { SecretDecryptError } from '../services/user_secrets.js';
+import {
+  extractAgentTokenPrefix,
+  generateAgentToken,
+  hashAgentToken,
+  isValidAgentTokenScope,
+  newAgentTokenId,
+} from '../lib/agent-tokens.js';
+import { db } from '../db.js';
 
 export const workspacesRouter = new Hono();
 export const sessionRouter = new Hono();
@@ -494,6 +504,264 @@ workspacesRouter.post('/:id/members/accept-invite', async (c) => {
       metadata: { workspace_id: member.workspace_id, user_id: member.user_id, source: 'invite' },
     });
     return c.json({ member });
+  } catch (err) {
+    const m = mapError(err);
+    return c.json(m.body, m.status);
+  }
+});
+
+// --------------------------------------------------------------------
+// Workspace-scoped secrets  GET/POST/DELETE /:id/secrets[/:key]
+// --------------------------------------------------------------------
+
+const WorkspaceSecretSetBody = z.object({
+  key: z.string().min(1).max(128),
+  value: z.string().min(1).max(65536),
+});
+
+/** Query masked workspace secrets directly for a given workspace_id. */
+function listWorkspaceSecretsMasked(workspace_id: string): { key: string; updated_at: string }[] {
+  return db
+    .prepare(`SELECT key, updated_at FROM workspace_secrets WHERE workspace_id = ? ORDER BY key`)
+    .all(workspace_id) as { key: string; updated_at: string }[];
+}
+
+/**
+ * GET /api/workspaces/:id/secrets
+ * Lists masked secret keys for the workspace. Requires admin role.
+ * Never returns plaintext values.
+ */
+workspacesRouter.get('/:id/secrets', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const id = c.req.param('id');
+  try {
+    ws.assertRole(ctx, id, 'admin');
+    const entries = listWorkspaceSecretsMasked(id);
+    return c.json({ entries });
+  } catch (err) {
+    const m = mapError(err);
+    return c.json(m.body, m.status);
+  }
+});
+
+/**
+ * POST /api/workspaces/:id/secrets
+ * Upserts a workspace-scoped secret. Requires admin role.
+ * Body: { key, value }. Value is never echoed back.
+ */
+workspacesRouter.post('/:id/secrets', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const id = c.req.param('id');
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Body must be JSON', code: 'invalid_body' }, 400);
+  }
+  const parsed = WorkspaceSecretSetBody.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: 'Invalid body shape', code: 'invalid_body', details: parsed.error.flatten() },
+      400,
+    );
+  }
+  try {
+    ws.assertRole(ctx, id, 'admin');
+    const existed = listWorkspaceSecretsMasked(id).some((entry) => entry.key === parsed.data.key);
+    userSecrets.setWorkspaceSecret(id, parsed.data.key, parsed.data.value);
+    auditLog({
+      actor: getAuditActor(c, ctx),
+      action: 'secret.updated',
+      target: { type: 'secret', id: `${id}:${parsed.data.key}` },
+      before: { exists: existed },
+      after: { exists: true },
+      metadata: { workspace_id: id, key: parsed.data.key, scope: 'workspace_vault' },
+    });
+    return c.json({ ok: true, key: parsed.data.key });
+  } catch (err) {
+    if (err instanceof SecretDecryptError) {
+      return c.json({ error: err.message, code: 'secret_encrypt_failed' }, 500);
+    }
+    const m = mapError(err);
+    return c.json(m.body, m.status);
+  }
+});
+
+/**
+ * DELETE /api/workspaces/:id/secrets/:key
+ * Removes a workspace-scoped secret. Requires admin role.
+ */
+workspacesRouter.delete('/:id/secrets/:key', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const id = c.req.param('id');
+  const key = c.req.param('key') || '';
+  try {
+    ws.assertRole(ctx, id, 'admin');
+    const existed = listWorkspaceSecretsMasked(id).some((entry) => entry.key === key);
+    const removed = userSecrets.delWorkspaceSecret(id, key);
+    auditLog({
+      actor: getAuditActor(c, ctx),
+      action: 'secret.deleted',
+      target: { type: 'secret', id: `${id}:${key}` },
+      before: { exists: existed },
+      after: { exists: !removed && existed },
+      metadata: { workspace_id: id, key, scope: 'workspace_vault', removed },
+    });
+    return c.json({ ok: true, removed });
+  } catch (err) {
+    const m = mapError(err);
+    return c.json(m.body, m.status);
+  }
+});
+
+// --------------------------------------------------------------------
+// Workspace-scoped agent tokens  GET/POST/DELETE /:id/agent-tokens[/:token_id]
+// --------------------------------------------------------------------
+
+const AgentTokenScopeEnum = z.enum(['read', 'read-write', 'publish-only']);
+const WorkspaceCreateAgentTokenBody = z.object({
+  label: z.string().trim().min(1).max(80),
+  scope: AgentTokenScopeEnum,
+  rate_limit_per_minute: z.number().int().min(1).max(10_000).optional(),
+});
+
+function normalizeRateLimit(value: number | undefined): number {
+  return value ?? 60;
+}
+
+function publicAgentToken(row: AgentTokenRecord): Record<string, unknown> {
+  return {
+    id: row.id,
+    prefix: row.prefix,
+    label: row.label,
+    scope: row.scope,
+    workspace_id: row.workspace_id,
+    created_at: row.created_at,
+    last_used_at: row.last_used_at,
+    revoked: row.revoked_at !== null,
+  };
+}
+
+/**
+ * GET /api/workspaces/:id/agent-tokens
+ * Lists all agent tokens for the workspace. Requires admin role.
+ */
+workspacesRouter.get('/:id/agent-tokens', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const id = c.req.param('id');
+  try {
+    ws.assertRole(ctx, id, 'admin');
+    const rows = db
+      .prepare(`SELECT * FROM agent_tokens WHERE workspace_id = ? ORDER BY created_at DESC`)
+      .all(id) as AgentTokenRecord[];
+    return c.json(rows.map(publicAgentToken));
+  } catch (err) {
+    const m = mapError(err);
+    return c.json(m.body, m.status);
+  }
+});
+
+/**
+ * POST /api/workspaces/:id/agent-tokens
+ * Mints a new agent token scoped to this workspace. Requires admin role.
+ * Body: { label, scope, rate_limit_per_minute? }
+ * Returns the raw_token ONCE — it cannot be recovered.
+ */
+workspacesRouter.post('/:id/agent-tokens', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const id = c.req.param('id');
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Body must be JSON', code: 'invalid_body' }, 400);
+  }
+  const parsed = WorkspaceCreateAgentTokenBody.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: 'Invalid body shape', code: 'invalid_body', details: parsed.error.flatten() },
+      400,
+    );
+  }
+  const scope = parsed.data.scope as AgentTokenScope;
+  if (!isValidAgentTokenScope(scope)) {
+    return c.json({ error: 'Invalid scope', code: 'invalid_scope' }, 400);
+  }
+  try {
+    ws.assertRole(ctx, id, 'admin');
+    const rawToken = generateAgentToken();
+    const createdAt = new Date().toISOString();
+    const row: AgentTokenRecord = {
+      id: newAgentTokenId(),
+      prefix: extractAgentTokenPrefix(rawToken),
+      hash: hashAgentToken(rawToken),
+      label: parsed.data.label,
+      scope,
+      workspace_id: id,
+      user_id: ctx.user_id,
+      created_at: createdAt,
+      last_used_at: null,
+      revoked_at: null,
+      rate_limit_per_minute: normalizeRateLimit(parsed.data.rate_limit_per_minute),
+    };
+    db.prepare(
+      `INSERT INTO agent_tokens
+         (id, prefix, hash, label, scope, workspace_id, user_id, created_at,
+          last_used_at, revoked_at, rate_limit_per_minute)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      row.id, row.prefix, row.hash, row.label, row.scope, row.workspace_id,
+      row.user_id, row.created_at, row.last_used_at, row.revoked_at,
+      row.rate_limit_per_minute,
+    );
+    auditLog({
+      actor: getAuditActor(c, ctx),
+      action: 'agent_token.minted',
+      target: { type: 'agent_token', id: row.id },
+      before: null,
+      after: { label: row.label, scope: row.scope, workspace_id: id, revoked: false, rate_limit_per_minute: row.rate_limit_per_minute },
+      metadata: { prefix: row.prefix },
+    });
+    return c.json(
+      { id: row.id, prefix: row.prefix, label: row.label, scope: row.scope, workspace_id: id, raw_token: rawToken },
+      201,
+    );
+  } catch (err) {
+    const m = mapError(err);
+    return c.json(m.body, m.status);
+  }
+});
+
+/**
+ * POST /api/workspaces/:id/agent-tokens/:token_id/revoke
+ * Revokes a workspace agent token. Requires admin role.
+ */
+workspacesRouter.post('/:id/agent-tokens/:token_id/revoke', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const id = c.req.param('id');
+  const tokenId = c.req.param('token_id');
+  try {
+    ws.assertRole(ctx, id, 'admin');
+    const before = db
+      .prepare(`SELECT * FROM agent_tokens WHERE id = ? AND workspace_id = ?`)
+      .get(tokenId, id) as AgentTokenRecord | undefined;
+    db.prepare(
+      `UPDATE agent_tokens SET revoked_at = COALESCE(revoked_at, ?) WHERE id = ? AND workspace_id = ?`,
+    ).run(new Date().toISOString(), tokenId, id);
+    if (before) {
+      const after = db
+        .prepare(`SELECT * FROM agent_tokens WHERE id = ? AND workspace_id = ?`)
+        .get(tokenId, id) as AgentTokenRecord | undefined;
+      auditLog({
+        actor: getAuditActor(c, ctx),
+        action: 'agent_token.revoked',
+        target: { type: 'agent_token', id: tokenId },
+        before: { label: before.label, scope: before.scope, workspace_id: id, revoked: before.revoked_at !== null },
+        after: { label: after?.label || before.label, scope: after?.scope || before.scope, workspace_id: id, revoked: true },
+        metadata: { prefix: before.prefix },
+      });
+    }
+    return new Response(null, { status: 204 });
   } catch (err) {
     const m = mapError(err);
     return c.json(m.body, m.status);
