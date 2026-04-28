@@ -33,6 +33,7 @@ import { agentsRouter } from './routes/agents.js';
 import { metricsRouter } from './routes/metrics.js';
 import { ogRouter } from './routes/og.js';
 import { ghStarsRouter } from './routes/gh-stars.js';
+import { ghReleasesRouter } from './routes/gh-releases.js';
 import { skillRouter } from './routes/skill.js';
 import { studioBuildRouter } from './routes/studio-build.js';
 import { db } from './db.js';
@@ -186,6 +187,10 @@ app.use('/api/healthz', openCors);
 // GH stars proxy — public read-only, no credentials.
 app.use('/api/gh-stars', openCors);
 app.use('/api/gh-stars/*', openCors);
+// GH releases proxy — public read-only, no credentials. Same model as
+// gh-stars: same-origin JSON, server-side PAT, 10-min in-process cache.
+app.use('/api/gh-releases', openCors);
+app.use('/api/gh-releases/*', openCors);
 app.use('/api/run', openCors);
 app.use('/api/agents', openCors);
 app.use('/api/agents/*', openCors);
@@ -294,6 +299,9 @@ app.route('/api/healthz', healthzRouter);
 // fetches from api.github.com were getting 403-rate-limited on every
 // page load (anonymous budget is 60/hour/IP). See routes/gh-stars.ts.
 app.route('/api/gh-stars', ghStarsRouter);
+// /changelog renders the floomhq/floom GitHub Releases feed inline.
+// Same-origin proxy with 10-min cache. See routes/gh-releases.ts.
+app.route('/api/gh-releases', ghReleasesRouter);
 // Admin surface (#362 publish-review gate, more to come). Every route inside
 // is gated by FLOOM_AUTH_TOKEN bearer in its own middleware; if the env var
 // isn't set, the router replies 404 to avoid advertising its existence.

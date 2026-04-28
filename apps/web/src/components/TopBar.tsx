@@ -8,6 +8,7 @@ import * as api from '../api/client';
 import { useDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
 import { CopyForClaudeButton } from './CopyForClaudeButton';
+import { GitHubStarsBadge } from './GitHubStarsBadge';
 import { MobileDrawer } from './MobileDrawer';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -378,13 +379,14 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
             alignItems: 'center',
           }}
         >
-          {/* GitHub stars badge — social proof for anonymous visitors only.
-              Hidden for authenticated users per §12.5: slim authenticated
-              TopBar = floom + Copy for Claude + + New app + avatar.
-              No badge clutter for signed-in users who know the product.
-              V11 fix 2026-04-27. */}
-          {/* GitHub badge: moved to footer per launch-mvp slim header spec.
-              Removed from primary nav to reduce noise. */}
+          {/* GitHub stars badge — social proof for anonymous visitors.
+              Sits between "Copy for Claude" and the Publish CTA so the
+              right cluster reads: GH stars · Copy for Claude · Publish.
+              Hidden on /login + /signup so auth surfaces stay focused.
+              R7.8 wire-up (2026-04-28): badge component existed but was
+              never mounted — landing page had no social-proof signal.
+              Footer version stays as a secondary mention. */}
+          {!isLoginPage && !showAuthedChrome && <GitHubStarsBadge compact />}
 
           {/* Get install snippet — anon only (authed users have the /home page).
               Hidden on auth pages. */}
