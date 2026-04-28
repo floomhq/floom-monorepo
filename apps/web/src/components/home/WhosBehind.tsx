@@ -100,7 +100,13 @@ export function WhosBehind() {
         {/* Photo: /team/fede.webp (225KB, q=85) is the primary source;
             /team/fede.jpg (757KB) stays in the repo as a fallback for
             browsers without webp support. <picture> lets the browser
-            pick the smaller file. 2026-04-24 size optimization. */}
+            pick the smaller file. 2026-04-24 size optimization.
+            R17 (2026-04-28): dropped loading="lazy". The WhosBehind
+            photo is the founder's face — it's a trust signal on
+            /about and a recognizable brand element on landing.
+            Lazy-loading made it appear as a gray placeholder during
+            screenshots and on slow phones; at 18-225KB the eager load
+            cost is acceptable for a brand-critical image. */}
         <div style={PHOTO_WRAP_STYLE}>
           <picture>
             <source srcSet="/team/fede.webp" type="image/webp" />
@@ -110,7 +116,7 @@ export function WhosBehind() {
               width={160}
               height={160}
               style={PHOTO_IMG_STYLE}
-              loading="lazy"
+              fetchPriority="high"
             />
           </picture>
         </div>

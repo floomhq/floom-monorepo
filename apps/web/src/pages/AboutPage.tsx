@@ -247,9 +247,14 @@ export function AboutPage() {
             label="MCP-native"
             body="Agents call the same endpoint humans see in their browser. One spec, three surfaces: the UI you click, the HTTP API you curl, the MCP tool Claude calls. No second adapter to maintain."
           />
+          {/* R17 (2026-04-28): rephrased per Federico's brand rule —
+              "MIT-licensed core." was the robotic license declaration
+              the rule explicitly bans. Same factual content, woven
+              naturally: self-host first, license as a parenthetical,
+              not the lede. */}
           <WhyFloomCard
             label="OSS by default"
-            body="MIT-licensed core. Self-host with one Docker command on your own box, your own VPS, your own Kubernetes cluster. The cloud version is a convenience, never a lock-in."
+            body="Self-host on your own box, your own VPS, or your own Kubernetes cluster — one Docker command. The cloud version is a convenience, never a lock-in. Source is permissive (MIT) so you can fork it and keep going."
           />
           <WhyFloomCard
             label="Open protocol"

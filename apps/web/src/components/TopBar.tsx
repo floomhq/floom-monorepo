@@ -230,6 +230,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
 
 
   return (
+    <>
     <header
       className="topbar"
       data-context={isStudio ? 'studio' : 'store'}
@@ -413,13 +414,29 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           {/* Sign in / Sign up. Hidden in waitlist mode (floom.dev) and
               while session is still loading (prevents the "Sign in +
               Join waitlist" contradiction Federico saw on preview on
-              2026-04-24). Shown on preview.floom.dev (deployEnabled). */}
+              2026-04-24). Shown on preview.floom.dev (deployEnabled).
+              R17 (2026-04-28): emphasis logic flipped. Previously the
+              filled-black pill highlighted the route the user was
+              already ON (e.g., "Sign in" filled on /login). That
+              competed with the body's primary CTA ("Sign in" button
+              inside the form) and gave the page two equally-loud
+              sign-in actions. Now the topbar pill emphasizes the
+              CROSS-TRAFFIC action — on /login the dominant pill is
+              "Sign up" (so a visitor with no account can switch
+              flows), on /signup the dominant pill is "Sign in". Off
+              auth pages keep "Sign up" filled as the primary CTA. */}
           {!isAuthenticated && deployEnabled && (
             <>
               <Link
                 to="/login"
                 data-testid="topbar-signin"
-                style={isLoginPage ? (isSignInRoute ? signUpStyle : signInStyle) : signInStyle}
+                style={
+                  isSignInRoute
+                    ? signInStyle // already on /login → quiet outlined
+                    : isSignUpRoute
+                      ? signUpStyle // on /signup → emphasize Sign-in (cross-traffic)
+                      : signInStyle // anywhere else → quiet outlined
+                }
               >
                 Sign in
               </Link>
@@ -427,9 +444,9 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                 to="/signup"
                 data-testid="topbar-signup"
                 style={
-                  isLoginPage
-                    ? (isSignUpRoute ? signUpStyle : signInStyle)
-                    : signUpStyle
+                  isSignUpRoute
+                    ? signInStyle // already on /signup → quiet outlined
+                    : signUpStyle // on /login OR anywhere else → loud filled
                 }
               >
                 Sign up
@@ -613,18 +630,6 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
         )}
       </div>
 
-      {/* Mobile fixed-bottom-right Copy-for-Claude pill (Federico-locked
-          2026-04-26, v23 wireframe line 484-487). Visible only at the
-          mobile breakpoint via CSS (`.topbar-mcp-mobile`). Hidden on
-          /login + /signup so auth surfaces stay focused. Reuses the
-          shared CopyForClaudeButton in mobile variant — same popover,
-          same context-aware row 3 logic. */}
-      {!isLoginPage && !showAuthedChrome && (
-        <div className="topbar-mcp-mobile" data-testid="topbar-mcp-mobile">
-          <CopyForClaudeButton variant="mobile" />
-        </div>
-      )}
-
       <MobileDrawer
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
@@ -632,7 +637,26 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           void handleLogout();
         }}
       />
-    </header>
+      </header>
+
+      {/* Mobile fixed-bottom-right Copy-for-Claude pill (Federico-locked
+          2026-04-26, v23 wireframe line 484-487). Visible only at the
+          mobile breakpoint via CSS (`.topbar-mcp-mobile`). Hidden on
+          /login + /signup so auth surfaces stay focused. Reuses the
+          shared CopyForClaudeButton in mobile variant — same popover,
+          same context-aware row 3 logic.
+          R17 (2026-04-28): MOVED OUT OF `<header>`. The header has
+          `backdrop-filter: blur(...)` which creates a containing block
+          for `position: fixed` descendants — so the inner pill was
+          anchoring to the topbar's bounds (rendering ABOVE the topbar
+          at right edge) instead of the viewport bottom-right. Sibling
+          placement makes `position: fixed` correctly viewport-relative. */}
+      {!isLoginPage && !showAuthedChrome && (
+        <div className="topbar-mcp-mobile" data-testid="topbar-mcp-mobile">
+          <CopyForClaudeButton variant="mobile" />
+        </div>
+      )}
+    </>
   );
 }
 

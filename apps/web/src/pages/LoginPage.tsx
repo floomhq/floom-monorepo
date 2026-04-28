@@ -405,7 +405,7 @@ const routeMode = getModeFromLocation(location.pathname, searchParams);
               display: 'flex',
               alignItems: 'center',
               gap: 10,
-              margin: '8px 0 4px',
+              margin: '8px 0 12px',
             }}
           >
             <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
@@ -414,16 +414,12 @@ const routeMode = getModeFromLocation(location.pathname, searchParams);
           </div>
         )}
 
-        <p
-          style={{
-            fontSize: 12,
-            color: 'var(--muted)',
-            lineHeight: 1.5,
-            margin: '0 0 16px',
-          }}
-        >
-          By continuing, you agree to our <Link to="/terms" style={{ color: 'var(--ink)' }}>Terms</Link> and <Link to="/privacy" style={{ color: 'var(--ink)' }}>Privacy Policy</Link>.
-        </p>
+        {/* R17 (2026-04-28): "By continuing..." line moved from above
+            the email field to just above the submit button. Previously
+            it was sandwiched between the OR divider and the Email
+            label, which read as "this divider has terms" — confusing.
+            Now it sits where standard auth flows put it: a final
+            consent micro-disclosure before the action button. */}
 
         {state === 'error' && errorCopy && (
           <div
@@ -522,6 +518,18 @@ const routeMode = getModeFromLocation(location.pathname, searchParams);
                 </Link>
               </div>
             )}
+
+            <p
+              style={{
+                fontSize: 12,
+                color: 'var(--muted)',
+                lineHeight: 1.5,
+                margin: '4px 0 12px',
+                textAlign: 'center',
+              }}
+            >
+              By continuing, you agree to our <Link to="/terms" style={{ color: 'var(--ink)' }}>Terms</Link> and <Link to="/privacy" style={{ color: 'var(--ink)' }}>Privacy Policy</Link>.
+            </p>
 
             <button
               type="submit"

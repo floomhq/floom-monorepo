@@ -95,15 +95,24 @@ const POPULAR_LINKS: PopLink[] = [
       </svg>
     ),
   },
+  // R17 (2026-04-28): replaced two stale 404 destinations.
+  //   - "Build an app" → /studio/build was out of MVP scope
+  //     (publishing flows through MCP, no /studio on launch-mvp).
+  //   - "Sign in" → /login was already in the TopBar right cluster as
+  //     a pill, so duplicating it in the popular grid was overkill.
+  // Replaced with "About" + "Help" — the two most likely cold-visitor
+  // destinations after a typoed URL. "Your dashboard" stays for authed
+  // users (anon visitors get redirected to /login via the route guard,
+  // which is acceptable as the dashboard IS the destination for them).
   {
-    to: '/studio/build',
-    title: 'Build an app',
-    path: '/studio/build',
+    to: '/about',
+    title: 'About Floom',
+    path: '/about',
     icon: (
       <svg viewBox="0 0 24 24">
-        <path d="M14 2 v6 h6" />
-        <path d="M14 2 H6 a2 2 0 0 0 -2 2 v16 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 V8 z" />
-        <path d="M9 14 l2 2 l4 -4" />
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="16" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12.01" y2="8" />
       </svg>
     ),
   },
@@ -119,14 +128,14 @@ const POPULAR_LINKS: PopLink[] = [
     ),
   },
   {
-    to: '/login',
-    title: 'Sign in',
-    path: '/login',
+    to: '/help',
+    title: 'Help & Support',
+    path: '/help',
     icon: (
       <svg viewBox="0 0 24 24">
-        <path d="M15 3 h4 a2 2 0 0 1 2 2 v14 a2 2 0 0 1 -2 2 h-4" />
-        <polyline points="10 17 15 12 10 7" />
-        <line x1="15" y1="12" x2="3" y2="12" />
+        <circle cx="12" cy="12" r="10" />
+        <path d="M9.09 9 a3 3 0 0 1 5.83 1 c0 2 -3 3 -3 3" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
     ),
   },

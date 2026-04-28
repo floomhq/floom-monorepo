@@ -277,6 +277,13 @@ export function HelpPage() {
               gap: 16,
             }}
           >
+            {/* R17 (2026-04-28): card order = fastest path first.
+                1. Docs (self-serve, instant) → 2. Discord (community,
+                fast badge) → 3. DM Federico (founder access) → 4. Email
+                (24h, fallback). Email loses position because it's the
+                slowest channel; ordering now matches the hero promise
+                ("pick the fastest path"). Email body also drops "or
+                billing" — no billing on launch-mvp, would mislead. */}
             <SupportCard
               to="/docs"
               icon={<IconBook />}
@@ -293,18 +300,18 @@ export function HelpPage() {
               cta="Join Discord"
             />
             <SupportCard
-              href="mailto:hello@floom.dev"
-              icon={<IconMail />}
-              title="Email us"
-              body="hello@floom.dev. We reply within 24 hours. Good for account issues or billing questions."
-              cta="Email us"
-            />
-            <SupportCard
               href="https://www.linkedin.com/in/federicodeponte"
               icon={<IconLinkedIn />}
               title="DM Federico"
               body="Reach the founder directly on LinkedIn. Good for partnerships, feedback, or anything that doesn't fit elsewhere."
               cta="DM on LinkedIn"
+            />
+            <SupportCard
+              href="mailto:hello@floom.dev"
+              icon={<IconMail />}
+              title="Email us"
+              body="hello@floom.dev. We reply within 24 hours. Good for account issues or anything that needs a paper trail."
+              cta="Email us"
             />
           </div>
 

@@ -1368,11 +1368,17 @@ export function RunSurface({
               gap: 8,
             }}
           >
+            {/* R17 (2026-04-28): idle eyebrow simplified from "OUTPUT ·
+                preview" → "OUTPUT". The "preview" qualifier implied a
+                draft of something existing; before run there's nothing
+                to preview. The idle title + body inside the empty card
+                already explain what will appear when the visitor runs.
+                Streaming + done eyebrows unchanged. */}
             {state.phase === 'streaming' || state.phase === 'job'
               ? 'STREAMING OUTPUT'
               : state.phase === 'done'
                 ? `OUTPUT · ${state.actionSpec.label || state.action || 'result'}`
-                : 'OUTPUT · preview'}
+                : 'OUTPUT'}
           </div>
           <OutputSlot
             app={app}
@@ -1600,12 +1606,18 @@ function RunStatusHeader({
   runLabel: string;
 }) {
   void _runLabel;
-  const showRunAgain = phase === 'done' || phase === 'error';
   // R10 polish (Gemini audit): only show the header Run button when
   // the action is meaningfully different from the InputCard's Run
   // button. In `ready` (idle), the InputCard already has a primary
   // green Run; surfacing the same affordance twice diluted the CTA.
-  const showHeaderRunButton = running || showRunAgain;
+  // R17 (2026-04-28): same logic now applied to phase=done. The
+  // input column already exposes "Run again" + "Edit & rerun" as the
+  // canonical post-run actions; surfacing a third "Run again" in the
+  // run-status header was a duplicate that read as "the designer
+  // didn't know where to put this so they put it twice." Header now
+  // shows the Run-again button ONLY while running (so Stop has a
+  // peer affordance) — never in the done/error end-states.
+  const showHeaderRunButton = running;
   return (
     <div
       data-testid="run-status-header"
@@ -2438,10 +2450,13 @@ function EmptyOutputCard({
   // state's skeleton bars confused visitors as "loading". When no sample
   // exists we now lead with a direct instruction ("Fill the form and
   // press Run to see your result here") instead of a fake table outline.
+  // R17 (2026-04-28): tightened idle hint. The title above already
+  // says "[Output] will appear here", so the body line repeating
+  // "to see your result here" was redundant. Now: instruction only.
   const outputHint = hasSample
     ? 'This is what your real result will look like once you press Run.'
     : heroOutput?.description?.trim() ||
-      `Fill the form and press Run to see your result here.`;
+      `Fill the form and press Run.`;
   const title = hasSample
     ? 'Your result will look like this'
     : `${outputLabel} will appear here`;
