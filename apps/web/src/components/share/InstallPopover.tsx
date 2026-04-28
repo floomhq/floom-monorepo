@@ -272,7 +272,7 @@ export function InstallPopover({
             <CodeBlock
               description={
                 <>
-                  Merge this <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>mcpServers</code> entry into your client's config (Claude Desktop, Cursor, Codex …).
+                  Add the <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>{slug}</code> entry to <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>mcpServers</code> in your client's config (Claude Desktop, Cursor, Codex). <a href="https://docs.floom.dev/mcp" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Where's my config?</a>
                 </>
               }
               value={mcpSnippet}
