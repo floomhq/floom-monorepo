@@ -1,0 +1,22 @@
+# Domain Picker — Gemini scoring + Dynadot availability cross-check.
+#
+# Start the upstream sidecar first:
+#   node examples/domain-picker/server.mjs
+#
+# Then point Floom at this file via FLOOM_APPS_CONFIG.
+#
+# Required secrets:
+#   GEMINI_API_KEY    — for AI scoring (mandatory)
+#   DYNADOT_API_KEY   — for live availability + price lookup (optional; omit for score-only mode)
+#
+# Set DYNADOT_API_KEY as a creator-secret in production via:
+#   POST /api/me/apps/domain-picker/creator-secrets/DYNADOT_API_KEY
+
+apps:
+  - slug: domain-picker
+    type: proxied
+    openapi_spec_url: http://127.0.0.1:4230/openapi/domain-picker.json
+    display_name: Domain Picker
+    description: "Score domain name candidates with AI and check live availability + price across up to 8 TLDs. Returns a ranked list with the best buyable extension per name."
+    category: marketing
+    icon: domain-picker
