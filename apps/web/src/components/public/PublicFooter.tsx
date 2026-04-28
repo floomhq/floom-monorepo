@@ -343,20 +343,9 @@ export function PublicFooter() {
         )}
       </div>
 
-      {/* Mobile: collapse to single column */}
-      <style>{`
-        @media (max-width: 760px) {
-          [data-testid="footer-columns"] {
-            grid-template-columns: 1fr 1fr !important;
-            gap: 28px !important;
-          }
-        }
-        @media (max-width: 480px) {
-          [data-testid="footer-columns"] {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
+      {/* R13 (2026-04-28): inline <style> migrated to
+          styles/csp-inline-style-migrations.css for CSP compliance.
+          Mobile column collapse. */}
     </footer>
   );
 }

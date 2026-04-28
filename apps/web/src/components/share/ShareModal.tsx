@@ -908,21 +908,9 @@ export function ShareModal({
         )}
       </div>
 
-      {/* Responsive polish: full-screen bottom-sheet on mobile. */}
-      <style>{`
-        @media (max-width: 640px) {
-          [data-testid="share-modal"] {
-            align-items: flex-end !important;
-            padding: 0 !important;
-          }
-          [data-testid="share-modal"] .share-modal-surface {
-            max-width: 100% !important;
-            width: 100% !important;
-            max-height: 92vh !important;
-            border-radius: 18px 18px 0 0 !important;
-          }
-        }
-      `}</style>
+      {/* R13 (2026-04-28): inline <style> migrated to
+          styles/csp-inline-style-migrations.css for CSP compliance.
+          Mobile bottom-sheet polish. */}
     </div>
   );
 }

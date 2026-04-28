@@ -269,20 +269,8 @@ export function DocsSidebar({ groups, currentPath }: Props) {
           );
         })}
       </div>
-      <style>{`
-        @media (max-width: 900px) {
-          .docs-sidebar {
-            position: static !important;
-            max-height: none !important;
-            border-right: none !important;
-            border-bottom: 1px solid var(--line);
-            padding: 16px 16px !important;
-          }
-          .docs-sidebar-mobile-toggle { display: flex !important; }
-          .docs-sidebar-groups { display: none; margin-top: 12px; }
-          .docs-sidebar-groups.is-open { display: block; }
-        }
-      `}</style>
+      {/* R13 (2026-04-28): inline <style> migrated to
+          styles/csp-inline-style-migrations.css for CSP compliance. */}
     </aside>
   );
 }

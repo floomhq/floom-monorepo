@@ -166,23 +166,8 @@ export function WhosBehind() {
           missing Github/Linkedin). All three icons share size+stroke
           so the chip row stays visually level. */}
 
-      <style>{`
-        @media (max-width: 640px) {
-          .whos-behind-grid {
-            grid-template-columns: 1fr !important;
-            justify-items: center !important;
-            text-align: center !important;
-            gap: 20px !important;
-          }
-          .whos-behind-grid > div:last-child {
-            text-align: center !important;
-          }
-          .whos-behind-grid > div:last-child > div[role="list"],
-          .whos-behind-grid > div:last-child > div:last-child {
-            justify-content: center !important;
-          }
-        }
-      `}</style>
+      {/* R13 (2026-04-28): inline <style> migrated to
+          styles/csp-inline-style-migrations.css for CSP compliance. */}
     </section>
   );
 }

@@ -756,16 +756,8 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               ))}
             </div>
           )}
-          <style>{`
-            @media (max-width: 880px) {
-              .mvp-showcase-grid { grid-template-columns: repeat(2, 1fr) !important; }
-              .mvp-showcase-grid-fallback { grid-template-columns: repeat(2, 1fr) !important; }
-            }
-            @media (max-width: 640px) {
-              .mvp-showcase-grid { grid-template-columns: 1fr !important; }
-              .mvp-showcase-grid-fallback { grid-template-columns: 1fr !important; }
-            }
-          `}</style>
+          {/* R13 (2026-04-28): inline <style> removed — rules already
+              live in csp-inline-style-migrations.css (lines 378-387). */}
         </section>
 
         {/* G9 (2026-04-28): inline app-directory grid on MVP landing.
@@ -856,14 +848,8 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 <span aria-hidden="true">→</span>
               </Link>
             </div>
-            <style>{`
-              @media (max-width: 880px) {
-                .mvp-directory-grid { grid-template-columns: repeat(2, 1fr) !important; }
-              }
-              @media (max-width: 640px) {
-                .mvp-directory-grid { grid-template-columns: 1fr !important; }
-              }
-            `}</style>
+            {/* R13 (2026-04-28): inline <style> removed — migrated to
+                csp-inline-style-migrations.css (origin block below). */}
           </section>
         )}
 

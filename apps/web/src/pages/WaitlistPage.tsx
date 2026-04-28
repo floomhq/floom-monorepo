@@ -718,14 +718,8 @@ export function WaitlistPage() {
         .
       </div>
 
-      <style>{`
-        @media (max-width: 860px) {
-          .waitlist-shipping-grid { grid-template-columns: minmax(0, 1fr) !important; }
-        }
-        @media (max-width: 560px) {
-          [data-testid="waitlist-hero"] h1 { font-size: 36px !important; }
-        }
-      `}</style>
+      {/* R13 (2026-04-28): inline <style> migrated to
+          styles/csp-inline-style-migrations.css for CSP compliance. */}
     </PageShell>
   );
 }

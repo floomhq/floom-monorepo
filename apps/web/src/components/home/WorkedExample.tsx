@@ -203,18 +203,8 @@ export function WorkedExample() {
         </Link>
       </div>
 
-      <style>{`
-        @media (max-width: 780px) {
-          .worked-example-grid {
-            grid-template-columns: 1fr !important;
-            gap: 12px !important;
-          }
-          .worked-example-grid > div[aria-hidden="true"] {
-            transform: rotate(90deg);
-            justify-self: center;
-          }
-        }
-      `}</style>
+      {/* R13 (2026-04-28): inline <style> migrated to
+          styles/csp-inline-style-migrations.css for CSP compliance. */}
     </section>
   );
 }

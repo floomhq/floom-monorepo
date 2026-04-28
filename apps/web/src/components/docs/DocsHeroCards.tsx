@@ -88,19 +88,8 @@ const subtitleStyle: CSSProperties = {
 export function DocsHeroCards() {
   return (
     <div className="docs-hero-cards" style={gridStyle}>
-      <style>{`
-        @media (max-width: 760px) {
-          .docs-hero-cards { grid-template-columns: 1fr !important; }
-        }
-        .docs-hero-card:hover { border-color: var(--accent) !important; }
-        .docs-hero-card:hover .docs-hero-card-arrow {
-          color: var(--accent);
-          transform: translateX(2px);
-        }
-        .docs-hero-card-arrow {
-          transition: color 0.15s, transform 0.15s;
-        }
-      `}</style>
+      {/* R13 (2026-04-28): inline <style> migrated to
+          styles/csp-inline-style-migrations.css for CSP compliance. */}
       {CARDS.map((card) => {
         const Icon = card.icon;
         return (

@@ -339,7 +339,8 @@ export function HeroDemo() {
       onMouseLeave={onLeave}
       style={WRAP_STYLE}
     >
-      <style>{SCOPED_CSS}</style>
+      {/* R13 (2026-04-28): inline <style> migrated to
+          styles/csp-inline-style-migrations.css for CSP compliance. */}
 
       <Tracker state={state} onJump={jumpTo} reducedMotion={reducedMotion} />
 
@@ -920,73 +921,9 @@ function RunSurface({
 // -----------------------------------------------------------------------------
 // Styles
 // -----------------------------------------------------------------------------
-const SCOPED_CSS = `
-  [data-testid="hero-demo"] .tok-kw{color:#b4481a;font-weight:600}
-  [data-testid="hero-demo"] .tok-fn{color:#1561a3;font-weight:600}
-  [data-testid="hero-demo"] .tok-str{color:#157a4a}
-  [data-testid="hero-demo"] .tok-cm{color:#8b8680;font-style:italic}
-  [data-testid="hero-demo"] .tok-pn{color:#2a2825}
-  [data-testid="hero-demo"] .tok-vr{color:#2a2825}
-  @keyframes hd-blink{50%{opacity:0}}
-  @keyframes hd-dot-bounce{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-2px)}}
-  @keyframes hd-live-pulse{
-    0%{transform:scale(1);opacity:.6}
-    70%{transform:scale(2.4);opacity:0}
-    100%{transform:scale(2.4);opacity:0}
-  }
-  @media (max-width:860px){
-    [data-testid="hero-demo"] [data-hd="editor-grid"]{grid-template-columns:1fr}
-    [data-testid="hero-demo"] [data-hd="sidebar"]{display:none}
-    [data-testid="hero-demo"] [data-hd="deploy-grid"]{grid-template-columns:1fr}
-    [data-testid="hero-demo"] [data-hd="deploy-grid"] > :last-child{display:none}
-    [data-testid="hero-demo"] [data-hd="use-grid"]{grid-template-columns:1fr;gap:10px}
-  }
-  /* Mobile: code snippet was overflowing past the viewport on ≤640px.
-     Shrink font + tighten padding so the full Python snippet fits, and
-     keep overflowX:auto on the pre for graceful scroll if it still
-     doesn't. Audit 2026-04-24 flagged this as the most visible mobile
-     regression on the hero.
-
-     UX sweep 2026-04-24 (issue #706): add a subtle right-edge fade on
-     the gutter-wrap container so users get a visual "swipe for more"
-     cue when the code still overflows at 375px. The fade is a pure CSS
-     mask — doesn't eat a DOM node, doesn't affect desktop. */
-  @media (max-width:640px){
-    [data-testid="hero-demo"] pre{font-size:11px !important;line-height:1.6 !important;padding:10px 12px !important;}
-    [data-testid="hero-demo"] [data-hd="deploy-grid"] > :first-child{padding:20px 18px;gap:14px}
-    [data-testid="hero-demo"] [data-hd="editor-pane"]{
-      -webkit-mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%);
-      mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%);
-    }
-  }
-  @media (max-width:480px){
-    [data-testid="hero-demo"] pre{font-size:10.5px !important;padding:10px 10px !important;}
-    [data-testid="hero-demo"] [data-hd="deploy-grid"] > :first-child{padding:20px 18px;gap:14px}
-  }
-  /* Mobile audit 2026-04-25 (Federico screenshot): the RUN panel's output
-     column was overflowing past the viewport on iPhone-width — the meta
-     line "run_a1f · 1.2s · Gemini 2.5 Flash" and the "Also available as"
-     secondary row both ran off-screen right. Fix: cap output column to
-     100% column width, force meta + secondary rows to wrap rather than
-     single-line, and shorten the meta to the essentials on ≤480px. */
-  @media (max-width:640px){
-    [data-testid="hero-demo"] [data-hd="use-grid"]{
-      overflow-x:hidden;
-    }
-    [data-testid="hero-demo"] [data-hd="use-grid"] > *{
-      min-width:0;
-      max-width:100%;
-    }
-    [data-testid="hero-demo"] [data-hd="run-output-header"]{
-      flex-wrap:wrap !important;
-      row-gap:4px !important;
-    }
-    [data-testid="hero-demo"] [data-hd="run-secondary"]{
-      flex-wrap:wrap !important;
-      row-gap:4px !important;
-    }
-  }
-`;
+// R13 (2026-04-28): SCOPED_CSS const removed — its rules now live in
+// styles/csp-inline-style-migrations.css under the
+// "origin: HeroDemo.tsx" block, scoped via [data-testid="hero-demo"].
 
 const WRAP_STYLE: CSSProperties = {
   // Federico 2026-04-23: "wider and bigger" (previously 720px — felt small

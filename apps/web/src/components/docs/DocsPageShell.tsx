@@ -53,17 +53,8 @@ export function DocsPageShell({ sidebar, children, banner }: Props) {
     <div className="docs-shell-v26">
       {banner}
       <main className="docs-shell-v26__grid" style={containerStyle}>
-        <style>{`
-          @media (max-width: 900px) {
-            .docs-shell-v26__grid {
-              flex-direction: column !important;
-            }
-            .docs-shell-v26__sidebar {
-              width: 100% !important;
-              flex-shrink: unset !important;
-            }
-          }
-        `}</style>
+        {/* R13 (2026-04-28): inline <style> migrated to
+            styles/csp-inline-style-migrations.css for CSP compliance. */}
         <div className="docs-shell-v26__sidebar" style={sidebarWrapStyle}>
           {sidebar}
         </div>

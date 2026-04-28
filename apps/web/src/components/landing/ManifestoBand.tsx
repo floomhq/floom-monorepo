@@ -53,19 +53,8 @@ export function ManifestoBand() {
         </p>
       </div>
 
-      <style>{`
-        @media (max-width: 780px) {
-          .manifesto-band { padding: 52px 20px !important; }
-          .manifesto-h2 { font-size: 40px !important; }
-          .manifesto-sub { font-size: 16px !important; }
-          .manifesto-body { font-size: 15px !important; }
-        }
-        @media (max-width: 480px) {
-          .manifesto-band { padding: 44px 18px !important; }
-          .manifesto-h2 { font-size: 32px !important; line-height: 1.08 !important; }
-          .manifesto-sub { font-size: 15px !important; }
-        }
-      `}</style>
+      {/* R13 (2026-04-28): inline <style> migrated to
+          styles/csp-inline-style-migrations.css for CSP compliance. */}
     </section>
   );
 }
