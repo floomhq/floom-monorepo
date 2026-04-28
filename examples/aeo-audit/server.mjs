@@ -61,6 +61,13 @@ function httpError(status, message, code) {
 
 // ---------- dry-run fallback ----------
 
+/** Deterministic hash to produce a stable integer 0-59 for a string. */
+function stableInt(str, mod) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  return Math.abs(h) % mod;
+}
+
 function dryRun(brand, competitors = []) {
   return {
     brand,
@@ -68,8 +75,8 @@ function dryRun(brand, competitors = []) {
     mentions: 3,
     competitors: competitors.map((c) => ({
       brand: c,
-      score: Math.floor(Math.random() * 60) + 20,
-      mentions: Math.floor(Math.random() * 8) + 1,
+      score: stableInt(c, 60) + 20,
+      mentions: stableInt(c + '_m', 8) + 1,
     })),
     verdict: 'low',
     top_queries: [`What is ${brand}?`, `${brand} alternatives`, `Best tools similar to ${brand}`],
