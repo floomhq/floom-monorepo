@@ -284,9 +284,9 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
               fontSize: 10,
               fontWeight: 700,
               letterSpacing: '0.04em',
-              background: 'var(--accent)',
-              color: '#fff',
-              border: '1px solid var(--accent)',
+              background: 'var(--accent-soft)',
+              color: 'var(--accent)',
+              border: '1px solid var(--accent-border, #a7f3d0)',
               flexShrink: 0,
             }}
           >
@@ -296,7 +296,7 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
                 width: 5,
                 height: 5,
                 borderRadius: 999,
-                background: '#fff',
+                background: 'var(--accent)',
                 display: 'inline-block',
               }}
             />
