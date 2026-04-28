@@ -388,6 +388,12 @@ body:has(.topbar-mobile-menu) {
   }
 }
 
+/* ── Filter chip keyboard focus ring ────────────────────────────────── */
+.filter-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ── Mobile responsive ───────────────────────────────────────────────── */
 @media (max-width: 640px) {
   /* Reduce main padding so content fits within 375px */
