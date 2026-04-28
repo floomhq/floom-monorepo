@@ -311,26 +311,29 @@ function ShowcaseCard({
         >
           {entry.category}
         </span>
-        {entry.topFeatured && (
-          <span
-            style={{
-              position: 'absolute',
-              top: 12,
-              right: 12,
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-              fontSize: 9.5,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              fontWeight: 700,
-              background: 'var(--accent, #047857)',
-              color: '#fff',
-              borderRadius: 6,
-              padding: '3px 7px',
-            }}
-          >
-            #1 Featured
-          </span>
-        )}
+        {/* R10 (2026-04-28): Gemini audit — all 3 cards in the showcase
+            row are equally featured, so the "#1 FEATURED" badge on only
+            the first card was confusing. Now we render the same
+            "FEATURED" pill on every showcase card so the band reads as
+            an editorial group, not a ranked list. */}
+        <span
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontSize: 9.5,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            background: 'var(--accent, #047857)',
+            color: '#fff',
+            borderRadius: 6,
+            padding: '3px 7px',
+          }}
+        >
+          Featured
+        </span>
         <BannerCard
           title={entry.bannerTitle}
           lines={entry.bannerLines}
@@ -455,8 +458,9 @@ function ShowcaseCard({
           <span
             style={{
               fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-              fontSize: 11.5,
+              fontSize: 12.5,
               color: 'var(--muted)',
+              fontWeight: 500,
             }}
           >
             {entry.installVia}
