@@ -10,6 +10,7 @@
 // Env: MARKITDOWN_PORT=4310 (default)
 
 import { createServer } from 'node:http';
+import { safeFetch } from '../../lib/ssrf-guard.mjs';
 
 const PORT = Number(process.env.MARKITDOWN_PORT || 4310);
 const HOST = process.env.MARKITDOWN_HOST || '127.0.0.1';
@@ -55,10 +56,11 @@ async function readJsonBody(req) {
   });
 }
 
-function httpError(status, message, code) {
+function httpError(status, message, code, extra = {}) {
   const err = new Error(message);
   err.statusCode = status;
   err.code = code || 'bad_request';
+  Object.assign(err, extra);
   return err;
 }
 
@@ -220,15 +222,18 @@ async function handleRun(body) {
       throw httpError(400, 'url must start with http:// or https://');
     }
     try {
-      const response = await fetch(url, {
+      const response = await safeFetch(url, {
         headers: { 'User-Agent': 'Floom-MarkItDown/0.1' },
-        signal: AbortSignal.timeout(8000),
+        timeoutMs: 8000,
       });
       if (!response.ok) {
         throw httpError(502, `URL returned HTTP ${response.status}`);
       }
       raw = await response.text();
     } catch (err) {
+      if (err.message?.startsWith('ssrf_blocked:')) {
+        throw httpError(400, 'ssrf_blocked', 'ssrf_blocked', { host: err.message.split(':').slice(1).join(':').trim() });
+      }
       if (err.statusCode) throw err;
       throw httpError(502, `Failed to fetch URL: ${err.message}`);
     }
@@ -361,6 +366,7 @@ const server = createServer(async (req, res) => {
     } catch (err) {
       return sendJson(res, err.statusCode || 500, {
         error: err.message,
+        ...(err.host ? { host: err.host } : {}),
         code: err.code || 'internal_error',
       });
     }
