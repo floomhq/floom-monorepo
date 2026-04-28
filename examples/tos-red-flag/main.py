@@ -179,7 +179,7 @@ def _dry_run(text: str) -> dict[str, Any]:
         flags.append({
             "clause": text[:80] + "...",
             "risk_type": "other",
-            "plain_english": "DRY RUN — no GEMINI_API_KEY. This is a placeholder analysis.",
+            "plain_english": "DRY RUN (no GEMINI_API_KEY). This is a placeholder analysis.",
             "severity": "low"
         })
 
