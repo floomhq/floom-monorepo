@@ -67,6 +67,10 @@ export interface RunSurfaceProps {
   initialRun?: RunRecord | null;
   onResetInitialRun?: () => void;
   onResult?: (result: RunSurfaceResult) => void;
+  /** R13 (2026-04-28): hoisted share handler from page level so
+   *  the inline IconShareButton in the output toolbar can fire
+   *  the same shareRun() flow as the hero Share button. */
+  onShare?: () => void;
 }
 
 type Phase = 'ready' | 'streaming' | 'job' | 'done' | 'error';
@@ -460,6 +464,7 @@ export function RunSurface({
   initialRun,
   onResetInitialRun,
   onResult,
+  onShare: _onShare,
 }: RunSurfaceProps) {
   // Upgrade 2 (2026-04-19): honor ?action=<name> on mount so multi-action
   // apps can be linked directly to a specific tab. Only the initial

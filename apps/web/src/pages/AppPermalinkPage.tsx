@@ -22,7 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
-import { RunSurface, type RunSurfaceResult } from '../components/runner/RunSurface';
+import { RunSurface, PastRunsDisclosure, type RunSurfaceResult } from '../components/runner/RunSurface';
 import { AppIcon } from '../components/AppIcon';
 import { AppReviews } from '../components/AppReviews';
 import { FeedbackButton } from '../components/FeedbackButton';
@@ -109,7 +109,38 @@ export function AppPermalinkPage() {
   // was removed in the same change.
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareModalUrl, setShareModalUrl] = useState<string>('');
-  // PR #761 follow-up: front-door for the /p/:slug/skill.md backend
+  // R13 (2026-04-28): hoisted shareRun() resolver so both the hero Share
+  // button AND the master output-toolbar's IconShareButton can fire the
+  // same flow. Replaces the heavy RunCompleteCard panel that used to
+  // render below the output card.
+  const openShareModal = useCallback(() => {
+    const resolve = async () => {
+      try {
+        const currentUrl = new URL(window.location.href);
+        const currentRunId = currentUrl.searchParams.get('run');
+        if (!currentRunId) {
+          setShareModalUrl(currentUrl.toString());
+          setShareModalOpen(true);
+          return;
+        }
+        try {
+          await shareRun(currentRunId);
+          setShareModalUrl(
+            `${window.location.origin}${buildPublicRunPath(currentRunId)}`,
+          );
+        } catch {
+          currentUrl.searchParams.delete('run');
+          setShareModalUrl(currentUrl.toString());
+        }
+        setShareModalOpen(true);
+      } catch {
+        setShareModalUrl(window.location.href);
+        setShareModalOpen(true);
+      }
+    };
+    void resolve();
+  }, []);
+// PR #761 follow-up: front-door for the /p/:slug/skill.md backend
   // route. The hero CTA "Install as Skill" opens this modal,
   // which shows the curl one-liner + an example agent prompt.
   // R7.6 (2026-04-28): SkillModal still exists for backwards-compat
@@ -123,10 +154,11 @@ export function AppPermalinkPage() {
   // Run is the default — the previous product-page layout made users scroll
   // past marketing copy to find the actual run surface. Shared-run URLs
   // (/p/:slug?run=<id>) auto-land on Run.
-  type PTab = 'run' | 'about' | 'install' | 'source';
+  // R10 (2026-04-28): added 5th tab "Earlier runs" (wireframe v17 parity).
+  type PTab = 'run' | 'about' | 'install' | 'source' | 'runs';
   const initialTab: PTab = searchParams.get('tab') as PTab | null ?? 'run';
   const [activeTab, setActiveTab] = useState<PTab>(
-    ['run', 'about', 'install', 'source'].includes(initialTab) ? initialTab : 'run',
+    ['run', 'about', 'install', 'source', 'runs'].includes(initialTab) ? initialTab : 'run',
   );
   // Run prefetched from /api/run/:id when the URL contains ?run=<id>. Lets
   // RunSurface hydrate directly into the `done` phase for shared links.
@@ -157,12 +189,10 @@ export function AppPermalinkPage() {
   const [confettiFire, setConfettiFire] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
-  // Issue #255 (2026-04-21): run completion and publish celebration are
-  // two different moments. The "Your app is live — send to coworkers"
-  // card only fires on PUBLISH (consumed via localStorage). Successful
-  // runs get a quieter "Run complete · Share this run" row instead.
-  const [runCompleteRunId, setRunCompleteRunId] = useState<string | null>(null);
-  const [runShareCopied, setRunShareCopied] = useState(false);
+  // R13 (2026-04-28): runCompleteRunId / runShareCopied state removed.
+  // The standalone RunCompleteCard panel that consumed them was demoted
+  // in favour of the master output-toolbar's IconShareButton — share is
+  // now inline with Copy/Download/Expand instead of a heavy card below.
 
   useEffect(() => {
     if (!slug) {
@@ -432,13 +462,10 @@ export function AppPermalinkPage() {
   }, [app?.slug]);
 
   const handleRunResult = useCallback(
-    (result: RunSurfaceResult) => {
+    (_result: RunSurfaceResult) => {
       if (!app) return;
-      if (result.exitCode !== 0) return;
-      // Surface the lightweight run-complete acknowledgement. The publish
-      // celebration is handled separately (see effect above).
-      setRunCompleteRunId(result.runId);
-      setRunShareCopied(false);
+      // R13 (2026-04-28): RunCompleteCard removed. Share is now inline
+      // in the master toolbar's IconShareButton via onShare prop.
     },
     [app],
   );
@@ -469,7 +496,7 @@ export function AppPermalinkPage() {
     // Canonical URL — every /p/:slug permalink on floom.dev should self-
     // reference, not inherit the landing page's canonical (issue #172).
     const canon = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-    if (canon) canon.setAttribute('href', `https://floom.dev/p/${app.slug}`);
+    if (canon) canon.setAttribute('href', `${window.location.origin}/p/${app.slug}`);
     // Per-app dynamic OG card (served by /og/:slug.svg on the same origin).
     setMeta('og:image', `${window.location.origin}/og/${app.slug}.svg`, true);
     setMeta('twitter:image', `${window.location.origin}/og/${app.slug}.svg`);
@@ -610,7 +637,7 @@ export function AppPermalinkPage() {
       <div className="page-root">
         <TopBar />
         <main
-          style={{ padding: '20px 24px 80px', maxWidth: 1200, margin: '0 auto' }}
+          style={{ padding: '20px 24px 80px', width: '100%', maxWidth: 1320, margin: '0 auto' }}
           data-testid="permalink-page"
           aria-busy="true"
         >
@@ -772,7 +799,7 @@ export function AppPermalinkPage() {
 
       <main
         id="main"
-        style={{ padding: '14px 24px 64px', maxWidth: 1200, margin: '0 auto' }}
+        style={{ padding: '14px 24px 64px', width: '100%', maxWidth: 1320, margin: '0 auto' }}
         data-testid="permalink-page"
       >
         {/* v17 breadcrumb: quiet Apps / app-name. Lives OUTSIDE the
@@ -822,22 +849,13 @@ export function AppPermalinkPage() {
           )}
         </div>
 
-        {/* G4 + G6 (2026-04-28): rounded white card wrapping hero+tabs+body
-            with proper padding, border-radius, soft shadow, and a LOCKED
-            width (1040px on <main> above) so EVERY tab body inherits the
-            same width. Federico: "the white background has no proper
-            padding; the background of the page should at least have a
-            radius on the white container" + "the white container should
-            stick to a certain width, and it does not matter whether I'm
-            on a certain tab; this is a bit confusing". */}
+        {/* R10 (2026-04-28): outer wrapper card REMOVED. Hero+tabs
+            now sit directly on the cream page bg. The run-unified-card
+            inside the Run tab is the only focal container. */}
         <div
           data-testid="permalink-card"
           style={{
-            background: 'var(--card)',
-            border: '1px solid var(--line)',
-            borderRadius: 18,
-            overflow: 'hidden',
-            boxShadow: '0 1px 2px rgba(22,21,18,0.04), 0 4px 24px rgba(22,21,18,0.05)',
+            background: 'transparent',
           }}
         >
 
@@ -994,13 +1012,15 @@ export function AppPermalinkPage() {
                   aria-expanded={installPopoverOpen}
                   onClick={() => setInstallPopoverOpen((o) => !o)}
                   style={{
+                    /* R10 (2026-04-28): demoted from primary ink-filled
+                       to secondary outlined. Run is the primary CTA. */
                     padding: '8px 14px',
-                    border: '1px solid var(--ink)',
+                    border: '1px solid var(--line)',
                     borderRadius: 10,
                     fontSize: 12.5,
                     fontWeight: 600,
-                    color: '#fff',
-                    background: 'var(--ink)',
+                    color: 'var(--ink)',
+                    background: 'var(--card)',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     display: 'inline-flex',
@@ -1032,41 +1052,7 @@ export function AppPermalinkPage() {
                 type="button"
                 data-testid="cta-share"
                 aria-label="Share link"
-                onClick={() => {
-                  // #640: open the Notion-style Share modal. We still pre-
-                  // resolve the best URL to seed the "Private signed link"
-                  // field so the modal is useful immediately: if the user
-                  // has a run selected, flip it to public first (same
-                  // shareRun() call the old handler used) and show the
-                  // /r/:id permalink. Otherwise fall back to the current
-                  // /p/:slug URL. Any failure just falls back to the page
-                  // URL — the modal still opens, never a dead-end.
-                  const resolve = async () => {
-                    try {
-                      const currentUrl = new URL(window.location.href);
-                      const currentRunId = currentUrl.searchParams.get('run');
-                      if (!currentRunId) {
-                        setShareModalUrl(currentUrl.toString());
-                        setShareModalOpen(true);
-                        return;
-                      }
-                      try {
-                        await shareRun(currentRunId);
-                        setShareModalUrl(
-                          `${window.location.origin}${buildPublicRunPath(currentRunId)}`,
-                        );
-                      } catch {
-                        currentUrl.searchParams.delete('run');
-                        setShareModalUrl(currentUrl.toString());
-                      }
-                      setShareModalOpen(true);
-                    } catch {
-                      setShareModalUrl(window.location.href);
-                      setShareModalOpen(true);
-                    }
-                  };
-                  void resolve();
-                }}
+                onClick={openShareModal}
                 style={{
                   padding: '8px 12px',
                   border: '1px solid var(--line)',
@@ -1106,7 +1092,7 @@ export function AppPermalinkPage() {
               alignItems: 'stretch',
               flexWrap: 'wrap',
               gap: 0,
-              padding: '0 28px',
+              padding: '0',
               borderBottom: '1px solid var(--line)',
               background: 'transparent',
             }}
@@ -1116,6 +1102,7 @@ export function AppPermalinkPage() {
               { id: 'about' as PTab, label: 'About' },
               { id: 'install' as PTab, label: 'Install' },
               { id: 'source' as PTab, label: 'Source' },
+              { id: 'runs' as PTab, label: 'Earlier runs' },
             ]).map((t) => {
               const isOn = activeTab === t.id;
               return (
@@ -1164,7 +1151,7 @@ export function AppPermalinkPage() {
           <div
             className="app-page-body"
             style={{
-              padding: '28px 32px 36px',
+              padding: '24px 0 36px',
               background: 'transparent',
             }}
           >
@@ -1253,6 +1240,7 @@ export function AppPermalinkPage() {
                   initialInputs={rerunInputs ?? samplePrefillInputs ?? undefined}
                   onResetInitialRun={handleResetInitialRun}
                   onResult={handleRunResult}
+                  onShare={openShareModal}
                 />
                 {/* R7.8 (2026-04-28): inline privacy/data-handling note.
                     Gemini audit P0: trust signals were missing on /p/:slug.
@@ -1321,25 +1309,8 @@ export function AppPermalinkPage() {
                     onDismiss={() => setCelebrate(false)}
                   />
                 )}
-                {!celebrate && runCompleteRunId && (
-                  <RunCompleteCard
-                    runId={runCompleteRunId}
-                    copied={runShareCopied}
-                    onCopy={() => {
-                      try {
-                        const url = new URL(window.location.href);
-                        url.pathname = buildPublicRunPath(runCompleteRunId);
-                        url.search = '';
-                        navigator.clipboard.writeText(url.toString());
-                        setRunShareCopied(true);
-                        window.setTimeout(() => setRunShareCopied(false), 1800);
-                      } catch {
-                        /* clipboard blocked */
-                      }
-                    }}
-                    onDismiss={() => setRunCompleteRunId(null)}
-                  />
-                )}
+                {/* R13 (2026-04-28): RunCompleteCard demoted. Share
+                    is now inline in the master output toolbar. */}
               </>
             )}
           </section>
@@ -1679,6 +1650,27 @@ export function AppPermalinkPage() {
                 value={`docker run -e GEMINI_BYOK=$KEY -p 3000:3000 ghcr.io/floomhq/${app.slug}:latest`}
               />
             </div>
+          </section>
+        )}
+
+        {/* R10 (2026-04-28): Earlier runs tab. PastRunsDisclosure renders
+            load-on-expand list of recent runs scoped to this slug. */}
+        {activeTab === 'runs' && (
+          <section data-testid="tab-content-runs">
+            <div
+              style={{
+                fontFamily: 'JetBrains Mono, monospace',
+                fontSize: 10.5,
+                color: 'var(--muted)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                marginBottom: 14,
+              }}
+            >
+              Earlier runs
+            </div>
+            <PastRunsDisclosure appSlug={app.slug} />
           </section>
         )}
           </div>
@@ -2088,105 +2080,9 @@ function CelebrationCard({
   );
 }
 
-/**
- * RunCompleteCard — quiet acknowledgement after a successful run. This is
- * intentionally lighter than CelebrationCard: no green accent wash, no
- * "send it to coworkers" copy (which only belongs to the first-publish
- * moment per Issue #255). Just "Run complete" + a Share-this-run link.
- */
-function RunCompleteCard({
-  runId,
-  copied,
-  onCopy,
-  onDismiss,
-}: {
-  runId: string;
-  copied: boolean;
-  onCopy: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <div
-      role="status"
-      data-testid="run-complete-card"
-      style={{
-        marginTop: 14,
-        padding: '12px 16px',
-        borderRadius: 10,
-        border: '1px solid var(--line, #e5e7eb)',
-        background: 'var(--card, #fff)',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 10,
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}
-    >
-      <div style={{ minWidth: 0 }}>
-        <strong style={{ fontSize: 13, color: 'var(--ink, #0f172a)' }}>
-          Run complete
-        </strong>
-        <span
-          style={{
-            marginLeft: 8,
-            color: 'var(--muted, #64748b)',
-            fontSize: 12,
-          }}
-        >
-          Share this specific run with a link.
-        </span>
-      </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          data-testid="run-complete-copy"
-          onClick={onCopy}
-          style={{
-            padding: '6px 12px',
-            borderRadius: 8,
-            background: 'var(--card, #fff)',
-            color: 'var(--ink, #0f172a)',
-            border: '1px solid var(--line, #e5e7eb)',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          {copied ? 'Copied!' : 'Share this run'}
-        </button>
-        <Link
-          to={buildPublicRunPath(runId)}
-          data-testid="run-complete-open"
-          style={{
-            padding: '6px 12px',
-            borderRadius: 8,
-            background: 'transparent',
-            color: 'var(--muted, #64748b)',
-            border: '1px solid transparent',
-            fontSize: 12,
-            fontWeight: 500,
-            textDecoration: 'none',
-          }}
-        >
-          Open
-        </Link>
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label="Dismiss run complete notice"
-          style={{
-            padding: '6px 8px',
-            borderRadius: 8,
-            background: 'transparent',
-            color: 'var(--muted, #64748b)',
-            border: 'none',
-            fontSize: 12,
-            cursor: 'pointer',
-          }}
-        >
-          ×
-        </button>
-      </div>
-    </div>
-  );
-}
+/* R13 (2026-04-28): RunCompleteCard component removed. Its job (giving
+ * the user a one-click way to share the run they just produced) is now
+ * served by the IconShareButton in the master output toolbar — same
+ * shareRun() flow, but inline with the output instead of a heavy panel
+ * below it. CelebrationCard above still fires on first PUBLISH (Issue
+ * #255), which is a different moment from a run completing. */
