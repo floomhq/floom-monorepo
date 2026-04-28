@@ -87,7 +87,7 @@ export function Sparkline({ slug, days = 7, muted = false }: SparklineProps) {
             data-date={b.date || undefined}
             style={{
               flex: 1,
-              minHeight: 2,
+              minHeight: 8,
               height: `${heightPct}%`,
               background: isPeak ? 'var(--accent, #059669)' : 'var(--accent-bg, #ecfdf5)',
               borderRadius: 2,
