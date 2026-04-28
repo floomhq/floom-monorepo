@@ -787,11 +787,12 @@ export function StudioAppsV26Page() {
                       </div>
                     )}
 
+                    <style>{`@media (max-width: 760px) { [data-testid="studio-apps-grid"] { grid-template-columns: 1fr !important; } }`}</style>
                     <div
                       data-testid="studio-apps-grid"
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gridTemplateColumns: 'repeat(2, 1fr)',
                         gap: 14,
                         marginBottom: 18,
                       }}

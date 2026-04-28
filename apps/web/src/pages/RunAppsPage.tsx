@@ -345,19 +345,22 @@ function AppCard({ app }: { app: RunApp }) {
 
 function AppsGrid({ apps }: { apps: RunApp[] }) {
   return (
-    <div
-      data-testid="run-apps-grid"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: 14,
-        marginBottom: 18,
-      }}
-    >
-      {apps.map((app) => (
-        <AppCard key={app.slug} app={app} />
-      ))}
-    </div>
+    <>
+      <style>{`@media (max-width: 760px) { [data-testid="run-apps-grid"] { grid-template-columns: 1fr !important; } }`}</style>
+      <div
+        data-testid="run-apps-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: 14,
+          marginBottom: 18,
+        }}
+      >
+        {apps.map((app) => (
+          <AppCard key={app.slug} app={app} />
+        ))}
+      </div>
+    </>
   );
 }
 
