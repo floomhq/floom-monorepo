@@ -1263,6 +1263,12 @@ export function AppPermalinkPage() {
                     the visitor what happens to their inputs without taking
                     visual real estate from the run flow itself. Links to
                     /privacy for the full policy. */}
+                {/* R16 (2026-04-28): Gemini flagged the privacy
+                    disclaimer as "easily missed" at 12px --muted.
+                    Federico's call: if it's a real privacy commitment,
+                    make it normal-size. Bumped to 13px and --ink so
+                    "Floom doesn't sell or share run data" actually
+                    reads as a commitment, not legalese fine print. */}
                 <div
                   data-testid="ap-privacy-note"
                   style={{
@@ -1274,9 +1280,9 @@ export function AppPermalinkPage() {
                     border: '1px solid var(--line)',
                     borderRadius: 10,
                     background: 'var(--bg)',
-                    fontSize: 12,
-                    color: 'var(--muted)',
-                    lineHeight: 1.5,
+                    fontSize: 13,
+                    color: 'var(--ink)',
+                    lineHeight: 1.55,
                   }}
                 >
                   <svg
