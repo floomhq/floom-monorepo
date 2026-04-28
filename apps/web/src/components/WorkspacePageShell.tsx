@@ -94,7 +94,13 @@ const shellStyle: CSSProperties = {
 
 const mainStyle: CSSProperties = {
   flex: 1,
-  padding: '32px 40px 120px',
+  paddingTop: 32,
+  paddingLeft: 40,
+  paddingRight: 40,
+  // Extra room ensures the cookie banner (position:fixed, bottom:0) never
+  // overlaps content. 80px base + --cookie-banner-height (set by
+  // CookieBanner.tsx via ResizeObserver; 0px when banner is dismissed).
+  paddingBottom: 'calc(80px + var(--cookie-banner-height, 0px))',
   margin: '0 auto',
   width: '100%',
   minWidth: 0,
