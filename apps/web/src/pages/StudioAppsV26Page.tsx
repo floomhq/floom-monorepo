@@ -697,7 +697,7 @@ export function StudioAppsV26Page() {
                 <h1
                   style={{
                     fontWeight: 800,
-                    fontSize: 28,
+                    fontSize: 30,
                     letterSpacing: '-0.02em',
                     lineHeight: 1.1,
                     margin: '0 0 5px',
