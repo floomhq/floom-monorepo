@@ -306,3 +306,103 @@ Auth: `floom auth <agent-token>` succeeded and bound to `https://mvp.floom.dev`.
   - MCP with read-write agent token allowed create/revoke in this test account.
   - CLI currently requires user session for agent-token management endpoints.
 
+
+---
+
+## 12) Re-Audit After Update (MCP + CLI)
+
+Date (UTC): 2026-04-28
+
+This section captures a fresh rerun after platform updates, including corrected sharing-transition checks.
+
+### 12.1 MCP re-audit summary
+
+Run timestamp: `20260428210233`
+
+- Temporary app slug: `mcp-reaudit-28210233`
+- Total actions: `34`
+- Passed: `31`
+- Failed: `3`
+- Cleanup: ✅ app deleted, temp secret deleted, temp token revoked
+
+#### MCP re-audit outcomes
+
+Passed highlights:
+
+- `tools/list` now reports `39` tools
+- Core read paths (`account_get`, `discover_apps`, `get_app_details`, `list_my_runs`, `studio_list_my_apps`) ✅
+- `run_app` + `get_run` (`base64`, `hash`, `floom-this`) ✅
+- `studio_detect_app`, `studio_publish_app` ✅
+- `studio_submit_app_review` and `studio_withdraw_app_review` ✅
+- `account_set_secret/list/delete` ✅
+- `account_create_agent_token` + `account_revoke_agent_token` ✅
+
+Failed/expected-validation paths:
+
+1. `studio_install_app` → `404 not_found`
+- Still reproducible for newly published pending-review app.
+
+2. `studio_set_secret_policy` with undeclared key `API_KEY` → `400 invalid_input`
+3. `studio_set_creator_secret` with undeclared key `API_KEY` → `400 invalid_input`
+- Expected validation given empty `valid_keys` for this app.
+
+#### Corrected sharing transition verification
+
+A separate focused rerun used valid tool calls:
+
+- Temporary slug: `mcp-sharecheck-28210305`
+- `studio_set_app_sharing(state=link)` ✅
+- `studio_set_app_sharing(state=private)` ✅
+- `studio_set_app_sharing(state=invited)` ✅
+- cleanup delete ✅
+
+Conclusion: MCP-side invited transition is functioning in the updated build.
+
+### 12.2 CLI re-audit summary
+
+Run timestamp: `20260428210329`
+
+- Temporary app slug: `cli-reaudit-28210329`
+- Total actions: `16`
+- Passed: `13`
+- Failed: `3`
+- Cleanup: ✅ app deleted and removal verified
+
+Passed highlights:
+
+- `floom init`, `floom deploy --dry-run`, `floom deploy` ✅
+- `floom apps get` ✅
+- `floom apps sharing set --state link` ✅
+- `floom apps sharing set --state private` ✅
+- `floom run <slug>` ✅
+- `floom apps uninstall` ✅
+- `floom account secrets set/list/delete` ✅
+
+CLI failures:
+
+1. `floom apps sharing set <slug> --state invited` → `409 illegal_transition`
+- This is now a clean 4xx contract response (improved over prior 500-style transition errors).
+
+2. `floom apps install <slug>` → `404 not_found`
+- Still consistent with pending-review install gate behavior.
+
+3. `floom account agent-tokens list` → `401 session_required`
+- CLI token-management remains user-session-gated.
+
+### 12.3 Delta vs previous audit
+
+Improvements observed:
+
+- Studio review transitions via MCP now succeed (`submit` / `withdraw` returned `ok: true`).
+- Sharing transition handling is cleaner in CLI (`409 illegal_transition` instead of runtime-style internal errors).
+
+Open items still reproducible:
+
+- Install by slug for fresh pending-review apps returns `404 not_found`.
+- Secret policy/creator secret enforcement requires declared keys and returns proper validation errors.
+- CLI agent-token management still requires user session auth.
+
+### 12.4 Current launch-readiness interpretation
+
+The updated build is more stable on lifecycle transitions than the prior pass. Remaining friction is concentrated in install semantics for pending-review apps and auth-mode constraints for CLI token management.
+
