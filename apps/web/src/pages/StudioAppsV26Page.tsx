@@ -736,9 +736,9 @@ export function StudioAppsV26Page() {
                 data-testid="studio-apps-new-app-cta"
                 style={{
                   padding: '8px 14px',
-                  background: 'var(--ink)',
+                  background: 'var(--accent)',
                   color: '#fff',
-                  border: '1px solid var(--ink)',
+                  border: '1px solid var(--accent)',
                   borderRadius: 8,
                   fontSize: 13,
                   fontWeight: 700,
@@ -841,9 +841,9 @@ export function StudioAppsV26Page() {
                 to="/studio/build"
                 style={{
                   padding: '8px 16px',
-                  background: 'var(--ink)',
+                  background: 'var(--accent)',
                   color: '#fff',
-                  border: '1px solid var(--ink)',
+                  border: '1px solid var(--accent)',
                   borderRadius: 8,
                   fontSize: 13,
                   fontWeight: 700,
