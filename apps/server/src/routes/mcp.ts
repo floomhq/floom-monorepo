@@ -11,7 +11,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { db } from '../db.js';
+import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newRunId, newJobId } from '../lib/ids.js';
 import { validateInputs, ManifestError } from '../services/manifest.js';
 import { dispatchRun, getRun } from '../services/runner.js';
@@ -30,16 +30,26 @@ import {
   DOCKER_PUBLISH_FLAG,
 } from '../services/docker-image-ingest.js';
 import { resolveUserContext } from '../services/session.js';
+import * as userSecrets from '../services/user_secrets.js';
+import * as creatorSecrets from '../services/app_creator_secrets.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import {
   AUTH_DOCS_URL,
   AUTH_HINT_CLOUD,
   checkAppVisibility,
 } from '../lib/auth.js';
+import {
+  extractAgentTokenPrefix,
+  generateAgentToken,
+  hashAgentToken,
+  isValidAgentTokenScope,
+  newAgentTokenId,
+} from '../lib/agent-tokens.js';
 import { checkMcpIngestLimit, extractIp } from '../lib/rate-limit.js';
 import { runGate } from '../lib/run-gate.js';
 import { filterTestFixtures } from '../lib/hub-filter.js';
 import { recordMcpToolCall } from '../lib/metrics-counters.js';
+import { auditLog, getAuditActor } from '../services/audit-log.js';
 import {
   agentToolErrorBody,
   AgentToolError,
@@ -50,12 +60,30 @@ import {
   runApp,
 } from '../services/agent_read_tools.js';
 import { invalidateHubCache } from '../lib/hub-cache.js';
+import { deleteAppRecordById } from '../services/app_delete.js';
+import {
+  canonicalVisibility,
+  isAppOwner,
+  listInvites,
+  transitionVisibility,
+  type AppInviteRow,
+} from '../services/sharing.js';
+import {
+  AppLibraryError,
+  claimApp,
+  forkApp,
+  installApp,
+  uninstallApp,
+} from '../services/app_library.js';
 import type {
   ActionSpec,
+  AgentTokenRecord,
+  AgentTokenScope,
   AppRecord,
   InputSpec,
   NormalizedManifest,
   RunRecord,
+  SecretPolicy,
   SessionContext,
 } from '../types.js';
 
@@ -307,6 +335,14 @@ function createPerAppMcpServer(
             )
             .all(fresh.id) as { name: string }[];
           for (const r of rows) available.add(r.name);
+          if (ctx) {
+            try {
+              const persisted = userSecrets.loadForRun(ctx, actionSecretsNeeded);
+              for (const key of Object.keys(persisted)) available.add(key);
+            } catch {
+              // The runner emits the decrypt warning and still honors per-call _auth.
+            }
+          }
           // Per-call secrets
           for (const k of Object.keys(perCallSecrets || {})) available.add(k);
 
@@ -362,9 +398,27 @@ function createPerAppMcpServer(
           };
         }
 
+        const runtimeCtx =
+          ctx ||
+          {
+            workspace_id: DEFAULT_WORKSPACE_ID,
+            user_id: DEFAULT_USER_ID,
+            device_id: DEFAULT_USER_ID,
+            is_authenticated: false,
+          };
         db.prepare(
-          `INSERT INTO runs (id, app_id, action, inputs, status) VALUES (?, ?, ?, ?, 'pending')`,
-        ).run(runId, fresh.id, actionName, JSON.stringify(validated));
+          `INSERT INTO runs
+             (id, app_id, thread_id, action, inputs, status, workspace_id, user_id, device_id)
+           VALUES (?, ?, NULL, ?, ?, 'pending', ?, ?, ?)`,
+        ).run(
+          runId,
+          fresh.id,
+          actionName,
+          JSON.stringify(validated),
+          runtimeCtx.workspace_id,
+          runtimeCtx.user_id,
+          runtimeCtx.device_id,
+        );
         // Parity with POST /api/run + POST /api/:slug/run: pass the
         // resolved SessionContext so dispatchRun can merge the caller's
         // user-vault secrets. Without this every authed MCP consumer
@@ -378,7 +432,7 @@ function createPerAppMcpServer(
           actionName,
           validated,
           perCallSecrets,
-          ctx,
+          runtimeCtx,
         );
         const done = await waitForRun(runId);
         return {
@@ -1087,6 +1141,17 @@ function mcpJson(payload: unknown) {
 }
 
 function mcpError(err: unknown) {
+  if (err instanceof AppLibraryError) {
+    const code =
+      err.status === 404
+        ? 'not_found'
+        : err.status === 401
+          ? 'auth_required'
+          : err.status === 403
+            ? 'forbidden_scope'
+            : 'invalid_input';
+    return mcpError(new AgentToolError(code, err.message, err.status, { code: err.code }));
+  }
   const { status, body } = agentToolErrorBody(err);
   return {
     isError: true,
@@ -1117,12 +1182,87 @@ function requireStudioScope(ctx: SessionContext): void {
   );
 }
 
+function requireAccountScope(ctx: SessionContext): void {
+  if (!ctx.agent_token_id || !ctx.agent_token_scope) {
+    throw new AgentToolError(
+      'auth_required',
+      'Authorization: Bearer floom_agent_<token> is required.',
+      401,
+    );
+  }
+  if (ctx.agent_token_scope === 'read-write') {
+    return;
+  }
+  throw new AgentToolError(
+    'forbidden_scope',
+    'This tool requires read-write agent-token scope.',
+    403,
+  );
+}
+
 function canUseRunTools(ctx: SessionContext): boolean {
   return ctx.agent_token_scope === 'read' || ctx.agent_token_scope === 'read-write';
 }
 
 function canUseStudioTools(ctx: SessionContext): boolean {
   return ctx.agent_token_scope === 'read-write' || ctx.agent_token_scope === 'publish-only';
+}
+
+function canUseAccountTools(ctx: SessionContext): boolean {
+  return ctx.agent_token_scope === 'read-write';
+}
+
+function loadOwnedStudioApp(ctx: SessionContext, slug: string): AppRecord {
+  const app = db.prepare(`SELECT * FROM apps WHERE slug = ?`).get(slug) as AppRecord | undefined;
+  if (!app || !isAppOwner(app, ctx)) {
+    throw new AgentToolError('not_found', 'App not found.', 404);
+  }
+  return app;
+}
+
+function parseStudioManifest(app: AppRecord): NormalizedManifest {
+  const manifest = safeParseManifest(app.manifest);
+  if (!manifest) {
+    throw new AgentToolError(
+      'runtime_error',
+      'This app has an invalid manifest and cannot be edited through MCP.',
+      500,
+    );
+  }
+  return manifest;
+}
+
+function manifestSecretKeys(manifest: NormalizedManifest): string[] {
+  return Array.from(new Set(manifest.secrets_needed || [])).sort();
+}
+
+function serializeAgentToken(row: AgentTokenRecord): Record<string, unknown> {
+  return {
+    id: row.id,
+    prefix: row.prefix,
+    label: row.label,
+    scope: row.scope,
+    workspace_id: row.workspace_id,
+    issued_by_user_id: row.issued_by_user_id || row.user_id,
+    created_at: row.created_at,
+    last_used_at: row.last_used_at,
+    revoked: row.revoked_at !== null,
+    rate_limit_per_minute: row.rate_limit_per_minute,
+  };
+}
+
+function serializeInviteForMcp(invite: AppInviteRow): Record<string, unknown> {
+  return {
+    id: invite.id,
+    state: invite.state,
+    invited_user_id: invite.invited_user_id,
+    invited_email: invite.invited_email,
+    invited_user_name: invite.invited_user_name || null,
+    invited_user_email: invite.invited_user_email || null,
+    created_at: invite.created_at,
+    accepted_at: invite.accepted_at,
+    revoked_at: invite.revoked_at,
+  };
 }
 
 function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
@@ -1470,6 +1610,863 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
               owner_url: `${baseUrl}/studio/${row.slug}`,
             })),
           });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_fork_app',
+      {
+        title: 'Fork app',
+        description:
+          'Create a private editable copy of an accessible app. Runs, invites, link tokens, and secrets are not copied.',
+        inputSchema: {
+          source_slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+          name: z.string().min(1).max(160).optional(),
+          link_key: z.string().min(1).max(512).optional(),
+        },
+      },
+      async ({ source_slug, slug, name, link_key }) => {
+        recordMcpToolCall('studio_fork_app');
+        try {
+          requireStudioScope(ctx);
+          const result = forkApp(ctx, source_slug, { slug, name, linkToken: link_key });
+          invalidateHubCache();
+          return mcpJson({
+            ok: true,
+            slug: result.app.slug,
+            source_slug: result.source.slug,
+            visibility: canonicalVisibility(result.app.visibility),
+            publish_status: result.app.publish_status,
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_claim_app',
+      {
+        title: 'Claim app',
+        description:
+          'Claim an unowned/local app into this workspace and make it private.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        },
+      },
+      async ({ slug }) => {
+        recordMcpToolCall('studio_claim_app');
+        try {
+          requireStudioScope(ctx);
+          const result = claimApp(ctx, slug);
+          invalidateHubCache();
+          return mcpJson({
+            ok: true,
+            claimed: true,
+            slug: result.app.slug,
+            visibility: canonicalVisibility(result.app.visibility),
+            workspace_id: result.app.workspace_id,
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_install_app',
+      {
+        title: 'Install app',
+        description:
+          'Pin a public Store app to this workspace. Installing does not grant edit rights.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        },
+      },
+      async ({ slug }) => {
+        recordMcpToolCall('studio_install_app');
+        try {
+          requireStudioScope(ctx);
+          const result = installApp(ctx, slug);
+          return mcpJson({ ok: true, installed: true, created: result.installed, slug: result.app.slug });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_uninstall_app',
+      {
+        title: 'Uninstall app',
+        description:
+          'Remove a pinned Store app from this workspace. The app itself is not deleted.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        },
+      },
+      async ({ slug }) => {
+        recordMcpToolCall('studio_uninstall_app');
+        try {
+          requireStudioScope(ctx);
+          const result = uninstallApp(ctx, slug);
+          return mcpJson({ ok: true, removed: result.removed, slug: result.app.slug });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_get_app_rate_limit',
+      {
+        title: 'Get app rate limit',
+        description:
+          'Return the creator-configured per-hour run limit for an owned app. null means global default.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        },
+      },
+      async ({ slug }) => {
+        recordMcpToolCall('studio_get_app_rate_limit');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          return mcpJson({ slug, run_rate_limit_per_hour: app.run_rate_limit_per_hour ?? null });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_set_app_rate_limit',
+      {
+        title: 'Set app rate limit',
+        description:
+          'Set or clear the creator-configured per-hour run limit for an owned app.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          run_rate_limit_per_hour: z.union([z.number().int().min(1).max(100_000), z.null()]),
+        },
+      },
+      async ({ slug, run_rate_limit_per_hour }) => {
+        recordMcpToolCall('studio_set_app_rate_limit');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          db.prepare(
+            `UPDATE apps
+                SET run_rate_limit_per_hour = ?,
+                    updated_at = datetime('now')
+              WHERE id = ?`,
+          ).run(run_rate_limit_per_hour, app.id);
+          auditLog({
+            actor: getAuditActor(c, ctx),
+            action: 'app.rate_limit_updated',
+            target: { type: 'app', id: app.id },
+            before: { run_rate_limit_per_hour: app.run_rate_limit_per_hour ?? null },
+            after: { run_rate_limit_per_hour },
+            metadata: { slug, via: 'mcp' },
+          });
+          invalidateHubCache();
+          return mcpJson({ ok: true, slug, run_rate_limit_per_hour });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_update_app',
+      {
+        title: 'Update app settings',
+        description:
+          'Update mutable owner-controlled app settings that do not affect Store review state.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          primary_action: z.union([z.string().min(1).max(128), z.null()]).optional(),
+          run_rate_limit_per_hour: z
+            .union([z.number().int().min(1).max(100_000), z.null()])
+            .optional(),
+        },
+      },
+      async ({ slug, primary_action, run_rate_limit_per_hour }) => {
+        recordMcpToolCall('studio_update_app');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const updates: string[] = [];
+          const values: unknown[] = [];
+          if (primary_action !== undefined) {
+            const manifest = parseStudioManifest(app);
+            const previousPrimary =
+              'primary_action' in manifest
+                ? (manifest as NormalizedManifest & { primary_action?: string }).primary_action || null
+                : null;
+            if (primary_action === null) {
+              delete (manifest as NormalizedManifest & { primary_action?: string }).primary_action;
+            } else {
+              if (!manifest.actions[primary_action]) {
+                throw new AgentToolError(
+                  'invalid_input',
+                  `primary_action "${primary_action}" is not declared on this app.`,
+                  400,
+                  { valid_actions: Object.keys(manifest.actions) },
+                );
+              }
+              (manifest as NormalizedManifest & { primary_action?: string }).primary_action =
+                primary_action;
+            }
+            updates.push('manifest = ?');
+            values.push(JSON.stringify(manifest));
+            auditLog({
+              actor: getAuditActor(c, ctx),
+              action: 'app.updated',
+              target: { type: 'app', id: app.id },
+              before: { primary_action: previousPrimary },
+              after: { primary_action },
+              metadata: { slug, field: 'primary_action', via: 'mcp' },
+            });
+          }
+          if (run_rate_limit_per_hour !== undefined) {
+            updates.push('run_rate_limit_per_hour = ?');
+            values.push(run_rate_limit_per_hour);
+            auditLog({
+              actor: getAuditActor(c, ctx),
+              action: 'app.updated',
+              target: { type: 'app', id: app.id },
+              before: { run_rate_limit_per_hour: app.run_rate_limit_per_hour ?? null },
+              after: { run_rate_limit_per_hour },
+              metadata: { slug, field: 'run_rate_limit_per_hour', via: 'mcp' },
+            });
+          }
+          if (updates.length === 0) {
+            throw new AgentToolError('invalid_input', 'No app settings supplied.', 400);
+          }
+          updates.push("updated_at = datetime('now')");
+          values.push(app.id);
+          db.prepare(`UPDATE apps SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+          invalidateHubCache();
+          return mcpJson({
+            ok: true,
+            slug,
+            primary_action: primary_action === undefined ? undefined : primary_action,
+            run_rate_limit_per_hour:
+              run_rate_limit_per_hour === undefined
+                ? app.run_rate_limit_per_hour ?? null
+                : run_rate_limit_per_hour,
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_delete_app',
+      {
+        title: 'Delete app',
+        description:
+          'Delete an app owned by this token workspace. This is destructive and cascades runs/triggers attached to the app.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          confirm: z.literal(true).describe('Must be true to confirm deletion.'),
+        },
+      },
+      async ({ slug, confirm }) => {
+        recordMcpToolCall('studio_delete_app');
+        try {
+          requireStudioScope(ctx);
+          if (confirm !== true) {
+            throw new AgentToolError('invalid_input', 'confirm=true is required.', 400);
+          }
+          const app = loadOwnedStudioApp(ctx, slug);
+          auditLog({
+            actor: getAuditActor(c, ctx),
+            action: 'app.deleted',
+            target: { type: 'app', id: app.id },
+            before: {
+              slug: app.slug,
+              visibility: app.visibility,
+              publish_status: app.publish_status,
+              workspace_id: app.workspace_id,
+              author: app.author,
+            },
+            after: null,
+            metadata: { slug: app.slug, via: 'mcp' },
+          });
+          deleteAppRecordById(app.id);
+          invalidateHubCache();
+          return mcpJson({ ok: true, slug });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_get_app_sharing',
+      {
+        title: 'Get app sharing',
+        description:
+          'Return owner-only sharing state for an app, including link token when link sharing is active and invite summaries.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        },
+      },
+      async ({ slug }) => {
+        recordMcpToolCall('studio_get_app_sharing');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const visibility = canonicalVisibility(app.visibility);
+          return mcpJson({
+            slug,
+            visibility,
+            link_share_token: visibility === 'link' ? app.link_share_token : null,
+            link_url:
+              visibility === 'link' && app.link_share_token
+                ? `${baseUrl}/p/${slug}?key=${app.link_share_token}`
+                : null,
+            invites: listInvites(app.id).map(serializeInviteForMcp),
+            review: {
+              submitted_at: app.review_submitted_at,
+              decided_at: app.review_decided_at,
+              decided_by: app.review_decided_by,
+              comment: app.review_comment,
+            },
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_set_app_sharing',
+      {
+        title: 'Set app sharing',
+        description:
+          'Move an owned app between private, link-shared, and invited sharing states. Public Store listing still goes through review tools.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          state: z.enum(['private', 'link', 'invited']),
+          rotate_link_token: z.boolean().optional(),
+          comment: z.string().max(5000).optional(),
+        },
+      },
+      async ({ slug, state, rotate_link_token, comment }) => {
+        recordMcpToolCall('studio_set_app_sharing');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const current = canonicalVisibility(app.visibility);
+          let next = app;
+          if (current !== state || (state === 'link' && rotate_link_token)) {
+            next = transitionVisibility(app, state, {
+              actorUserId: ctx.user_id,
+              actorTokenId: ctx.agent_token_id,
+              actorIp: ip,
+              reason:
+                state === 'private'
+                  ? current === 'public_live'
+                    ? 'owner_unlist'
+                    : 'owner_set_private'
+                  : state === 'link'
+                    ? 'owner_enable_link'
+                    : 'owner_set_invited',
+              rotateLinkToken: rotate_link_token,
+              metadata: comment ? { comment } : undefined,
+            });
+            invalidateHubCache();
+          }
+          const visibility = canonicalVisibility(next.visibility);
+          return mcpJson({
+            ok: true,
+            slug,
+            visibility,
+            link_share_token: visibility === 'link' ? next.link_share_token : null,
+            link_url:
+              visibility === 'link' && next.link_share_token
+                ? `${baseUrl}/p/${slug}?key=${next.link_share_token}`
+                : null,
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_submit_app_review',
+      {
+        title: 'Submit app for Store review',
+        description:
+          'Submit an owned private/changed app for public Store review.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        },
+      },
+      async ({ slug }) => {
+        recordMcpToolCall('studio_submit_app_review');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const next = transitionVisibility(app, 'pending_review', {
+            actorUserId: ctx.user_id,
+            actorTokenId: ctx.agent_token_id,
+            actorIp: ip,
+            reason:
+              canonicalVisibility(app.visibility) === 'changes_requested'
+                ? 'owner_resubmit_review'
+                : 'owner_submit_review',
+          });
+          invalidateHubCache();
+          return mcpJson({ ok: true, slug, visibility: canonicalVisibility(next.visibility) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_withdraw_app_review',
+      {
+        title: 'Withdraw app review',
+        description:
+          'Withdraw a pending Store review and return the app to private.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        },
+      },
+      async ({ slug }) => {
+        recordMcpToolCall('studio_withdraw_app_review');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const next = transitionVisibility(app, 'private', {
+            actorUserId: ctx.user_id,
+            actorTokenId: ctx.agent_token_id,
+            actorIp: ip,
+            reason: 'owner_withdraw_review',
+          });
+          invalidateHubCache();
+          return mcpJson({ ok: true, slug, visibility: canonicalVisibility(next.visibility) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_list_secret_policies',
+      {
+        title: 'List app secret policies',
+        description:
+          'List required app secret keys and whether each is supplied by the runner workspace vault or by the app creator.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        },
+      },
+      async ({ slug }) => {
+        recordMcpToolCall('studio_list_secret_policies');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const manifest = parseStudioManifest(app);
+          const explicit = new Map(
+            creatorSecrets.listPolicies(app.id).map((policy) => [policy.key, policy]),
+          );
+          const keys = manifestSecretKeys(manifest);
+          return mcpJson({
+            slug,
+            policies: keys.map((key) => {
+              const policy = explicit.get(key);
+              return (
+                policy || {
+                  key,
+                  policy: 'user_vault',
+                  creator_has_value: creatorSecrets.hasCreatorValue(app.id, key),
+                }
+              );
+            }),
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_set_secret_policy',
+      {
+        title: 'Set app secret policy',
+        description:
+          'Choose whether a declared app secret key is provided by each runner workspace or by the app creator.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          key: z.string().min(1).max(128),
+          policy: z.enum(['user_vault', 'creator_override']),
+        },
+      },
+      async ({ slug, key, policy }) => {
+        recordMcpToolCall('studio_set_secret_policy');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const manifest = parseStudioManifest(app);
+          const allowed = new Set(manifestSecretKeys(manifest));
+          if (!allowed.has(key)) {
+            throw new AgentToolError(
+              'invalid_input',
+              `Key "${key}" is not declared in secrets_needed for this app.`,
+              400,
+              { valid_keys: Array.from(allowed).sort() },
+            );
+          }
+          const previousPolicy = creatorSecrets.getPolicy(app.id, key);
+          creatorSecrets.setPolicy(app.id, key, policy as SecretPolicy);
+          auditLog({
+            actor: getAuditActor(c, ctx),
+            action: 'secret.policy_updated',
+            target: { type: 'secret', id: `${app.id}:${key}` },
+            before: { policy: previousPolicy },
+            after: { policy },
+            metadata: { app_id: app.id, slug: app.slug, key, workspace_id: app.workspace_id },
+          });
+          return mcpJson({ ok: true, slug, key, policy });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_set_creator_secret',
+      {
+        title: 'Set app creator secret',
+        description:
+          'Store a write-only creator-provided secret for an app key whose policy is creator_override.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          key: z.string().min(1).max(128),
+          value: z.string().min(1).max(65536),
+        },
+      },
+      async ({ slug, key, value }) => {
+        recordMcpToolCall('studio_set_creator_secret');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const manifest = parseStudioManifest(app);
+          const allowed = new Set(manifestSecretKeys(manifest));
+          if (!allowed.has(key)) {
+            throw new AgentToolError(
+              'invalid_input',
+              `Key "${key}" is not declared in secrets_needed for this app.`,
+              400,
+              { valid_keys: Array.from(allowed).sort() },
+            );
+          }
+          if (creatorSecrets.getPolicy(app.id, key) !== 'creator_override') {
+            throw new AgentToolError(
+              'invalid_input',
+              'Policy for this key is not creator_override. Call studio_set_secret_policy first.',
+              400,
+            );
+          }
+          creatorSecrets.setCreatorSecret(app.id, app.workspace_id || ctx.workspace_id, key, value);
+          auditLog({
+            actor: getAuditActor(c, ctx),
+            action: 'secret.updated',
+            target: { type: 'secret', id: `${app.id}:${key}` },
+            before: null,
+            after: { key, encrypted: true },
+            metadata: { app_id: app.id, slug: app.slug, key, scope: 'creator_secret' },
+          });
+          return mcpJson({ ok: true, slug, key });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_delete_creator_secret',
+      {
+        title: 'Delete app creator secret',
+        description:
+          'Delete a creator-provided app secret value. The value is never returned by MCP.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          key: z.string().min(1).max(128),
+        },
+      },
+      async ({ slug, key }) => {
+        recordMcpToolCall('studio_delete_creator_secret');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const removed = creatorSecrets.deleteCreatorSecret(app.id, key);
+          auditLog({
+            actor: getAuditActor(c, ctx),
+            action: 'secret.deleted',
+            target: { type: 'secret', id: `${app.id}:${key}` },
+            before: { key, existed: removed },
+            after: null,
+            metadata: { app_id: app.id, slug: app.slug, key, scope: 'creator_secret' },
+          });
+          return mcpJson({ ok: true, slug, key, removed });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+  }
+
+  if (canUseAccountTools(ctx)) {
+    server.registerTool(
+      'account_get',
+      {
+        title: 'Get account context',
+        description:
+          'Return the current agent-token account context: user id, workspace id, scope, and rate limit.',
+        inputSchema: {},
+      },
+      async () => {
+        recordMcpToolCall('account_get');
+        try {
+          requireAccountScope(ctx);
+          return mcpJson({
+            user_id: ctx.user_id,
+            workspace_id: ctx.workspace_id,
+            agent_token_id: ctx.agent_token_id,
+            agent_token_scope: ctx.agent_token_scope,
+            agent_token_rate_limit_per_minute: ctx.agent_token_rate_limit_per_minute,
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_list_secrets',
+      {
+        title: 'List workspace BYOK keys',
+        description:
+          'List masked workspace BYOK/API key names. Secret values are never returned.',
+        inputSchema: {},
+      },
+      async () => {
+        recordMcpToolCall('account_list_secrets');
+        try {
+          requireAccountScope(ctx);
+          return mcpJson({ entries: userSecrets.listWorkspaceMasked(ctx) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_set_secret',
+      {
+        title: 'Set workspace BYOK key',
+        description:
+          'Set a write-only workspace BYOK/API key. The value is encrypted and never echoed back.',
+        inputSchema: {
+          key: z.string().min(1).max(128),
+          value: z.string().min(1).max(65536),
+        },
+      },
+      async ({ key, value }) => {
+        recordMcpToolCall('account_set_secret');
+        try {
+          requireAccountScope(ctx);
+          userSecrets.setWorkspaceSecret(ctx.workspace_id, key, value);
+          auditLog({
+            actor: getAuditActor(c, ctx),
+            action: 'secret.updated',
+            target: { type: 'secret', id: `${ctx.workspace_id}:${key}` },
+            before: null,
+            after: { key, encrypted: true },
+            metadata: { workspace_id: ctx.workspace_id, key, scope: 'workspace_secret' },
+          });
+          return mcpJson({ ok: true, key });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_delete_secret',
+      {
+        title: 'Delete workspace BYOK key',
+        description:
+          'Delete a workspace BYOK/API key by name.',
+        inputSchema: {
+          key: z.string().min(1).max(128),
+        },
+      },
+      async ({ key }) => {
+        recordMcpToolCall('account_delete_secret');
+        try {
+          requireAccountScope(ctx);
+          const removed = userSecrets.delWorkspaceSecret(ctx.workspace_id, key);
+          auditLog({
+            actor: getAuditActor(c, ctx),
+            action: 'secret.deleted',
+            target: { type: 'secret', id: `${ctx.workspace_id}:${key}` },
+            before: { key, existed: removed },
+            after: null,
+            metadata: { workspace_id: ctx.workspace_id, key, scope: 'workspace_secret' },
+          });
+          return mcpJson({ ok: true, key, removed });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_list_agent_tokens',
+      {
+        title: 'List agent tokens',
+        description:
+          'List agent tokens for this workspace. Raw token values are never returned.',
+        inputSchema: {},
+      },
+      async () => {
+        recordMcpToolCall('account_list_agent_tokens');
+        try {
+          requireAccountScope(ctx);
+          const rows = db
+            .prepare(
+              `SELECT * FROM agent_tokens
+                WHERE workspace_id = ?
+                ORDER BY created_at DESC`,
+            )
+            .all(ctx.workspace_id) as AgentTokenRecord[];
+          return mcpJson({ tokens: rows.map(serializeAgentToken) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_create_agent_token',
+      {
+        title: 'Create agent token',
+        description:
+          'Create a new workspace agent token. Returns the raw token once; store it immediately.',
+        inputSchema: {
+          label: z.string().trim().min(1).max(80),
+          scope: z.enum(['read', 'read-write', 'publish-only']),
+          rate_limit_per_minute: z.number().int().min(1).max(10000).optional(),
+        },
+      },
+      async ({ label, scope, rate_limit_per_minute }) => {
+        recordMcpToolCall('account_create_agent_token');
+        try {
+          requireAccountScope(ctx);
+          if (!isValidAgentTokenScope(scope)) {
+            throw new AgentToolError('invalid_input', 'Invalid token scope.', 400);
+          }
+          const rawToken = generateAgentToken();
+          const createdAt = new Date().toISOString();
+          const row = {
+            id: newAgentTokenId(),
+            prefix: extractAgentTokenPrefix(rawToken),
+            hash: hashAgentToken(rawToken),
+            label,
+            scope: scope as AgentTokenScope,
+            workspace_id: ctx.workspace_id,
+            user_id: ctx.user_id,
+            created_at: createdAt,
+            rate_limit_per_minute: rate_limit_per_minute ?? 60,
+          };
+          db.prepare(
+            `INSERT INTO agent_tokens
+               (id, prefix, hash, label, scope, workspace_id, user_id, created_at,
+                last_used_at, revoked_at, rate_limit_per_minute)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
+          ).run(
+            row.id,
+            row.prefix,
+            row.hash,
+            row.label,
+            row.scope,
+            row.workspace_id,
+            row.user_id,
+            row.created_at,
+            row.rate_limit_per_minute,
+          );
+          auditLog({
+            actor: getAuditActor(c, ctx),
+            action: 'agent_token.minted',
+            target: { type: 'agent_token', id: row.id },
+            before: null,
+            after: {
+              label: row.label,
+              scope: row.scope,
+              workspace_id: row.workspace_id,
+              issued_by_user_id: row.user_id,
+              revoked: false,
+              rate_limit_per_minute: row.rate_limit_per_minute,
+            },
+            metadata: { prefix: row.prefix, via: 'mcp' },
+          });
+          return mcpJson({
+            ...serializeAgentToken({
+              ...row,
+              last_used_at: null,
+              revoked_at: null,
+            } as AgentTokenRecord),
+            raw_token: rawToken,
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_revoke_agent_token',
+      {
+        title: 'Revoke agent token',
+        description:
+          'Revoke an agent token by id in this workspace.',
+        inputSchema: {
+          token_id: z.string().min(1).max(160),
+        },
+      },
+      async ({ token_id }) => {
+        recordMcpToolCall('account_revoke_agent_token');
+        try {
+          requireAccountScope(ctx);
+          const result = db.prepare(
+            `UPDATE agent_tokens
+               SET revoked_at = COALESCE(revoked_at, ?)
+             WHERE id = ?
+               AND workspace_id = ?`,
+          ).run(new Date().toISOString(), token_id, ctx.workspace_id);
+          auditLog({
+            actor: getAuditActor(c, ctx),
+            action: 'agent_token.revoked',
+            target: { type: 'agent_token', id: token_id },
+            before: null,
+            after: { revoked: result.changes > 0 },
+            metadata: { workspace_id: ctx.workspace_id, via: 'mcp' },
+          });
+          return mcpJson({ ok: true, token_id, revoked: result.changes > 0 });
         } catch (err) {
           return mcpError(err);
         }
