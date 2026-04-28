@@ -123,7 +123,7 @@ function CompactHeroStrip({
   totalRuns,
 }: {
   apps: CreatorApp[] | null;
-  totalRuns: number;
+  totalRuns: number | null;
 }) {
   // TODO: success_rate + p95 require a server-side aggregates endpoint.
   //       Only surface metrics we can verify (totalRuns, apps count).
@@ -153,7 +153,7 @@ function CompactHeroStrip({
       }}
     >
       <span style={{ color: 'var(--ink)', fontWeight: 700 }}>
-        {totalRuns.toLocaleString()}
+        {totalRuns !== null ? totalRuns.toLocaleString() : '—'}
       </span>
       <span>runs this week</span>
       <span aria-hidden style={{ color: 'var(--line)', userSelect: 'none' }}>·</span>
@@ -624,8 +624,7 @@ export function StudioAppsV26Page() {
       .then((resp) => {
         if (cancelled) return;
         const filtered = resp.runs
-          .filter((r) => r.app_slug && ownedSlugs.has(r.app_slug))
-          .slice(0, 6);
+          .filter((r) => r.app_slug && ownedSlugs.has(r.app_slug));
         setRecentRuns(filtered);
       })
       .catch(() => {
@@ -640,13 +639,15 @@ export function StudioAppsV26Page() {
     !!session && session.cloud_mode && session.user.is_local;
 
   // Client-side metrics: 7-day run count from recent runs (not all-time totals).
-  // recentRuns is filtered to owned slugs and capped at 6; for a more accurate
-  // 7d count we use runs fetched above if available.
+  // recentRuns holds the full filtered array (no slice); the activity panel
+  // handles its own display slice. We only count runs within the last 7 days.
+  // When recentRuns is null (loading) we return null so the UI can show —
+  // rather than falling back to an all-time total that contradicts the label.
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const totalRuns =
     recentRuns !== null
       ? recentRuns.filter((r) => new Date(r.started_at) >= weekAgo).length
-      : apps?.reduce((s, a) => s + (a.run_count || 0), 0) ?? 0;
+      : null;
 
   return (
     <WorkspacePageShell mode="studio" title="Studio apps · Floom">
