@@ -18,4 +18,5 @@ paths = [
   '''^examples/fast-apps/README\.md$''',
   '''^examples/fast-apps/server\.mjs$''',
   '''^packages/hub-smoke/tests/fixtures\.ts$''',
+  '''^apps/web/src/lib/sample-inputs\.ts$''',
 ]
