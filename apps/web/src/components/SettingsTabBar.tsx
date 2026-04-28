@@ -26,8 +26,8 @@ const TABS: Tab[] = [
   { label: 'BYOK keys', to: '/settings/byok-keys', match: '/settings/byok-keys' },
   { label: 'Agent tokens', to: '/settings/agent-tokens', match: '/settings/agent-tokens' },
   { label: 'Studio settings', to: '/settings/studio', match: '/settings/studio' },
-  { label: 'Members', to: '/settings/members', match: '/settings/members', soon: true },
-  { label: 'Billing', to: '/settings/billing', match: '/settings/billing', soon: true },
+  { label: 'Members v1.1', to: '/settings/members', match: '/settings/members', soon: true },
+  { label: 'Billing v1.1', to: '/settings/billing', match: '/settings/billing', soon: true },
 ];
 
 const wrapStyle: CSSProperties = {
