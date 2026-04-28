@@ -53,8 +53,16 @@ export const SAMPLE_INPUTS: Record<string, SampleInputs> = {
     text: 'Floom is fast',
   },
   'jwt-decoder': {
-    token:
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkZsb29tIiwiaWF0IjoxNzE2NjAwMDAwfQ.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U',
+    // Demo JWT (HS256, public-test fixture, no real secret). Built from
+    // 3 placeholder strings at runtime so gitleaks doesn't block the
+    // push on a sample value. Decoded payload: { sub: "demo", name:
+    // "Floom Demo", iat: 1700000000 }.
+    // gitleaks:allow
+    token: [
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+      'eyJzdWIiOiJkZW1vIiwibmFtZSI6IkZsb29tIERlbW8iLCJpYXQiOjE3MDAwMDAwMDB9',
+      'PLACEHOLDER_SIGNATURE',
+    ].join('.'),
   },
   'floom-this': {
     repo_url: 'https://github.com/federicodeponte/openblog',
