@@ -1,0 +1,24 @@
+# OpenDraft (Outline Preview) — Floom preview wrapper for federicodeponte/opendraft.
+#
+# The full OpenDraft engine runs 19 agents, verifies citations against 250M+ academic
+# papers (Crossref, OpenAlex, Semantic Scholar), and produces a 20k-word thesis draft
+# in ~10 minutes. This Floom app gives researchers the outline + key search terms in
+# under 8 seconds, then deep-links to the full open-source engine.
+#
+# Full engine: https://github.com/federicodeponte/opendraft
+# Live demo:   https://opendraft.xyz
+#
+# Start the sidecar first:
+#   node examples/opendraft-outline/server.mjs
+#
+# Required secrets:
+#   GEMINI_API_KEY — Gemini 2.5 Flash Lite (mandatory)
+
+apps:
+  - slug: opendraft-outline
+    type: proxied
+    openapi_spec_url: http://127.0.0.1:4240/openapi.json
+    display_name: OpenDraft (Outline Preview)
+    description: "OpenDraft turns a research question into a verified-citation thesis draft in 10 minutes. This Floom preview gives you the outline + key sources in 8 seconds — then deep-links to the full open-source engine at github.com/federicodeponte/opendraft."
+    category: writing
+    icon: opendraft-outline

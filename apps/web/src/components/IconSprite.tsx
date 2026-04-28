@@ -409,6 +409,36 @@ export function IconSprite() {
         />
       </symbol>
 
+      <symbol id="app-opendraft-outline" viewBox="0 0 24 24">
+        {/* Research document with numbered outline rows — evokes academic
+            section structure. Dot at top-left marks a searchable source.
+            Lucide stroke style: 1.5 width, round caps. */}
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14 2v6h6"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          d="M8 13h8M8 17h5"
+        />
+        <circle cx="8" cy="10" r="1" fill="currentColor" stroke="none" />
+      </symbol>
+
       {/* Default fallback app icon */}
       <symbol id="app-default" viewBox="0 0 24 24">
         <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" strokeWidth="1.5" />
