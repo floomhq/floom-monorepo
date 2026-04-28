@@ -33,14 +33,23 @@ const containerStyle: CSSProperties = {
 
 export const DOCS_SIDEBAR_WIDTH = 260;
 
+// R19 (2026-04-28): make the sidebar wrapper itself sticky so the
+// sidebar stays in view as the article column scrolls. Previously
+// the inner <aside> in DocsSidebar.tsx was sticky, but a flex item
+// that wraps a sticky child only works while the wrapper is at least
+// as tall as the article — and on short pages the sticky sidebar
+// would unsticky and disappear when the user scrolled past the
+// shell. Sticky on the wrapper anchors the column to viewport top
+// (offset by the 56px TopBar), and `align-self: flex-start` keeps it
+// from stretching to full content height.
 const sidebarWrapStyle: CSSProperties = {
   width: DOCS_SIDEBAR_WIDTH,
   flexShrink: 0,
-  // Sticky so the sidebar stays in view while the article scrolls. The
-  // sticky offset accounts for the TopBar (56px) + optional waitlist banner
-  // (~40px) — using 0 here means it sticks just below the natural flow
-  // top; DocsSidebar itself sets position:sticky top:0, so the sidebar
-  // column anchors at viewport top.
+  position: 'sticky',
+  top: 56,
+  alignSelf: 'flex-start',
+  maxHeight: 'calc(100vh - 56px)',
+  overflowY: 'auto',
 };
 
 const contentStyle: CSSProperties = {

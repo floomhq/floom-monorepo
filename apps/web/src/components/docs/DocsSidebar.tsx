@@ -82,15 +82,15 @@ const asideStyle: CSSProperties = {
   padding: '30px 20px 30px 28px',
   background: 'transparent',
   minWidth: 0,
-  // Desktop: stick the sidebar below the TopBar + waitlist banner so it
-  // stays in view while the article scrolls. On mobile the wrapper
-  // disables sticky via the `docs-sidebar` class so the collapsible
-  // drawer lives at the top of the flow.
-  position: 'sticky',
-  top: 0,
-  alignSelf: 'start',
-  maxHeight: '100vh',
-  overflowY: 'auto',
+  // R19 (2026-04-28): sticky now lives on the parent wrapper in
+  // DocsPageShell.tsx (position:sticky, top:56, max-height: calc(100vh
+  // - 56px), overflow-y:auto). Keeping sticky here too would create
+  // nested sticky columns and fight the wrapper's maxHeight: the
+  // article column would still scroll, but the inner aside would clip
+  // its own scroll. The mobile breakpoint in
+  // csp-inline-style-migrations.css already overrides position:static
+  // there. Leaving non-sticky here makes the wrapper the single
+  // source of truth for the desktop sticky behaviour.
 };
 
 const mobileToggleStyle: CSSProperties = {
@@ -292,13 +292,16 @@ export const DOCS_SIDEBAR_GROUPS: DocsSidebarGroup[] = [
   },
   // v17 Examples group (#549). Each link goes to a runnable app on
   // /p/<slug>; /docs/examples is the markdown index with deploy snippets.
+  // R18B (2026-04-28): swapped lead-scorer / competitor-analyzer / resume-screener
+  // (demoted by the <10s demo-app cap, /p/* routes 404) for the live featured
+  // apps that ship in launch-mvp.
   {
     heading: 'Examples',
     links: [
       { to: '/docs/examples', label: 'All examples' },
-      { to: '/p/lead-scorer', label: 'Lead scorer' },
-      { to: '/p/competitor-analyzer', label: 'Competitor analyzer' },
-      { to: '/p/resume-screener', label: 'Resume screener' },
+      { to: '/p/competitor-lens', label: 'Competitor lens' },
+      { to: '/p/ai-readiness-audit', label: 'AI readiness audit' },
+      { to: '/p/pitch-coach', label: 'Pitch coach' },
     ],
   },
   {

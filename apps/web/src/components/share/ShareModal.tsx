@@ -32,6 +32,8 @@ import { Mail, Link as LinkIcon, Users, Check, X, Trash2, Copy } from 'lucide-re
 import { inviteToApp, type InvitePermission } from '../../api/client';
 import type { AppVisibility } from '../../lib/types';
 
+export type ShareModalMode = 'app' | 'run';
+
 export interface ShareModalProps {
   open: boolean;
   onClose: () => void;
@@ -69,6 +71,28 @@ export interface ShareModalProps {
    * Non-owners only see the public URL + copy button.
    */
   isOwner?: boolean;
+  /**
+   * Whether this share dialog is for an app permalink (default) or a
+   * specific run permalink (`/r/<run-id>`). Drives:
+   *   - Title: "Share Competitor Lens" (app) vs "Share this run" (run)
+   *   - Eyebrow badge above OG preview: "APP" vs "RUN"
+   *   - OG preview src: /og/<slug>.svg vs /og/r/<runId>.svg
+   *   - Default share blurb the caller can grab via `defaultShareText`
+   *
+   * If absent, inferred from `runId`: presence of runId implies 'run' mode.
+   */
+  mode?: ShareModalMode;
+  /**
+   * Run ID when sharing a run permalink. Used to build the run-specific
+   * OG preview URL (/og/r/<runId>.svg). Required when mode='run'.
+   */
+  runId?: string;
+  /**
+   * Optional share token for run OG previews. Forwarded as a query
+   * parameter so the OG endpoint can render owner-only runs that have
+   * been explicitly link-shared.
+   */
+  ogShareToken?: string;
 }
 
 export interface AccessRow {
@@ -136,7 +160,15 @@ export function ShareModal({
   accessList,
   onVisibilityChange,
   isOwner = false,
+  mode,
+  runId,
+  ogShareToken,
 }: ShareModalProps) {
+  // Mode is explicit when provided, otherwise inferred from runId presence.
+  // This keeps existing callers (which only pass slug + shareUrl) on the
+  // 'app' surface without breaking changes.
+  const resolvedMode: ShareModalMode = mode ?? (runId ? 'run' : 'app');
+  const isRunMode = resolvedMode === 'run';
   const dialogRef = useRef<HTMLDivElement>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const [emailInput, setEmailInput] = useState('');
@@ -342,7 +374,7 @@ export function ShareModal({
               id="share-modal-title"
               style={{ fontSize: 15.5, fontWeight: 600, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
             >
-              Share {appName}
+              {isRunMode ? 'Share this run' : `Share ${appName}`}
             </h2>
             <span
               data-testid="share-modal-visibility-pill"
@@ -379,11 +411,13 @@ export function ShareModal({
           </button>
         </header>
 
-        {/* ───────── OG card preview (R7.6 2026-04-28) ─────────
+        {/* ───────── OG card preview (R7.6 2026-04-28; R19 2026-04-28: APP/RUN badge) ─────────
             Shows what the share will look like when pasted into Twitter,
             Slack, LinkedIn, iMessage, etc. Lazy: only loads when the
             modal is actually open (img has no `src` outside open state).
-            Aspect ratio is locked to 1200x630 (the standard OG size). */}
+            Aspect ratio is locked to 1200x630 (the standard OG size).
+            R19: an APP / RUN eyebrow badge clarifies what the user is
+            actually sharing — an evergreen app vs. a specific run. */}
         <section
           data-testid="share-modal-og-preview"
           style={{
@@ -392,15 +426,38 @@ export function ShareModal({
         >
           <div
             style={{
-              fontSize: 11.5,
-              fontWeight: 600,
-              color: 'var(--muted, #6c6a66)',
-              letterSpacing: 0.4,
-              textTransform: 'uppercase',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
               margin: '0 0 8px',
             }}
           >
-            Preview
+            <span
+              data-testid="share-modal-og-mode-badge"
+              style={{
+                fontSize: 10.5,
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: 'var(--accent, #047857)',
+                color: '#ffffff',
+                letterSpacing: 0.6,
+                textTransform: 'uppercase',
+              }}
+            >
+              {isRunMode ? 'Run' : 'App'}
+            </span>
+            <span
+              style={{
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: 'var(--muted, #6c6a66)',
+                letterSpacing: 0.4,
+                textTransform: 'uppercase',
+              }}
+            >
+              Preview
+            </span>
           </div>
           <div
             style={{
@@ -414,8 +471,18 @@ export function ShareModal({
             }}
           >
             <img
-              src={`/og/${encodeURIComponent(slug)}.svg`}
-              alt={`Social preview for ${appName}`}
+              src={
+                isRunMode && runId
+                  ? `/og/r/${encodeURIComponent(runId)}.svg${
+                      ogShareToken ? `?share_token=${encodeURIComponent(ogShareToken)}` : ''
+                    }`
+                  : `/og/${encodeURIComponent(slug)}.svg`
+              }
+              alt={
+                isRunMode
+                  ? `Social preview for this ${appName} run`
+                  : `Social preview for ${appName}`
+              }
               data-testid="share-modal-og-image"
               loading="lazy"
               style={{
@@ -916,3 +983,19 @@ export function ShareModal({
 }
 
 export default ShareModal;
+
+/**
+ * Default share text for an app vs. run permalink. Callers grab this
+ * when wiring native share / Twitter / X intents off the dialog. Kept
+ * as a pure helper so it's easy to unit test the copy independently of
+ * the dialog's render logic.
+ */
+export function defaultShareText(opts: {
+  mode: ShareModalMode;
+  appName: string;
+}): string {
+  if (opts.mode === 'run') {
+    return `Look what ${opts.appName} just generated on Floom →`;
+  }
+  return `Check out ${opts.appName} on Floom →`;
+}

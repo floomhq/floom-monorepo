@@ -1,4 +1,5 @@
 // GET /og/:slug.svg — dynamic social preview image for /p/:slug.
+// GET /og/r/:run_id.svg — run-specific social preview image for /r/:id.
 // GET /og/main.svg — the Floom landing OG image.
 //
 // Produces a 1200x630 SVG with:
@@ -8,9 +9,14 @@
 //     <font-face> definitions when SVGs are referenced via og:image.
 //   - App name (large, bold) with subtle ink gradient for visual weight.
 //   - App description (up to 2 lines).
-//   - Sample output card — per-slug curated SAMPLES map, with three
-//     known launch apps hand-tuned to match real outputs.
+//   - Sample output card — per-slug curated SAMPLES map, with the
+//     launch apps hand-tuned to match real outputs.
 //   - Footer: "floom.dev · Free to run · MIT" with a tight accent dot.
+//
+// Run-specific cards (/og/r/:run_id.svg) swap the description for an
+// auto-formatted "RUN · {relative-time}" eyebrow and the sample card
+// for the actual run's output (truncated). 404 when the run is missing
+// or owner-only (and no matching `share_token` query param is provided).
 //
 // Served with Cache-Control: public, max-age=300 so crawlers hit the
 // route but we can update the copy by deploying.
@@ -19,12 +25,21 @@
 // (Discord, Slack, OG parsers, most previewers) render SVG og:image.
 import { Hono } from 'hono';
 import { db } from '../db.js';
+import { getRun } from '../services/runner.js';
 import type { AppRecord } from '../types.js';
 
 export const ogRouter = new Hono();
 
 const WIDTH = 1200;
 const HEIGHT = 630;
+
+// System font stack — every platform renders its own native bold sans
+// without needing a <font-face> we can't ship. Inter is left out
+// deliberately: when previewers strip the @font-face, Inter falls back
+// to "default sans" which on some platforms (e.g. Slack desktop on
+// Linux) is a thin geometric face that wrecks the visual weight.
+const SANS = "system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const MONO = "ui-monospace, 'JetBrains Mono', Menlo, 'SF Mono', Consolas, monospace";
 
 function escapeXml(s: string): string {
   return s
@@ -102,6 +117,85 @@ interface OgCopy {
   description: string;
   author: string | null;
   slug: string;
+  /**
+   * Optional run-specific override. When present:
+   *   - Eyebrow line ("RUN · 2 hours ago") replaces the "APP" badge
+   *   - Sample card uses run output preview instead of curated samples
+   *   - Footer routes to /r/<runId> instead of /p/<slug>
+   */
+  run?: {
+    runId: string;
+    relativeTime: string;
+    outputPreview: string[];
+    label: string;
+  };
+}
+
+// Format a run timestamp into a friendly relative string suitable for
+// social cards. We avoid pulling Intl.RelativeTimeFormat — it's locale
+// sensitive and previewers expect English. Mirrors formatRelative in
+// ShareModal.tsx but produces "2 hours ago" instead of "2h ago" for a
+// less developer-y vibe in the OG card.
+function formatRunRelative(iso?: string | null): string {
+  if (!iso) return 'just now';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return 'just now';
+  const diffMs = Math.max(0, Date.now() - t);
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
+  // Fallback to a date string for older runs.
+  const d = new Date(t);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// Pull a small text preview out of a run.outputs JSON payload. Apps
+// return wildly different shapes (markdown strings, arrays, structured
+// objects) so this walks the JSON and extracts the first useful string
+// values. Returns up to 3 lines, each truncated to ~100 chars.
+function previewFromRunOutputs(rawJson: string | null): string[] {
+  if (!rawJson) return ['Look what just got generated on Floom.'];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    // Plain string output — return as a single line.
+    return [truncate(rawJson, 120)];
+  }
+  const lines: string[] = [];
+  const visit = (val: unknown): void => {
+    if (lines.length >= 3) return;
+    if (val == null) return;
+    if (typeof val === 'string') {
+      const trimmed = val.replace(/\s+/g, ' ').trim();
+      if (trimmed.length > 0) lines.push(truncate(trimmed, 100));
+      return;
+    }
+    if (typeof val === 'number' || typeof val === 'boolean') {
+      lines.push(String(val));
+      return;
+    }
+    if (Array.isArray(val)) {
+      for (const item of val) {
+        visit(item);
+        if (lines.length >= 3) return;
+      }
+      return;
+    }
+    if (typeof val === 'object') {
+      for (const v of Object.values(val as Record<string, unknown>)) {
+        visit(v);
+        if (lines.length >= 3) return;
+      }
+    }
+  };
+  visit(parsed);
+  if (lines.length === 0) return ['Run completed on Floom.'];
+  return lines;
 }
 
 // Wrap description text into lines of at most maxChars per line.
@@ -125,88 +219,179 @@ function wrapText(text: string, maxChars: number): string[] {
 
 function renderSvg(copy: OgCopy): string {
   const title = escapeXml(truncate(copy.title, 44));
-  const rawDesc = truncate(copy.description || 'Run this AI app on Floom.', 160);
-  const descLines = wrapText(rawDesc, 68);
   const author = copy.author ? escapeXml(`by @${copy.author.replace(/^@/, '')}`) : '';
+  const isRun = !!copy.run;
 
-  // Color palette matches current Floom brand: deep ink on near-white,
-  // emerald accent. Typography uses system stack so the SVG renders
-  // consistently across previewers that strip <font-face>.
+  // Color palette: warm near-white background, deep ink, brand emerald.
+  // Card uses a clean white surface so it reads as a discrete output
+  // surface without the AI-slop "everything has a gradient" look.
   const ink = '#0e0e0c';
   const muted = '#585550';
   const accent = '#047857';
-  const bg = '#FAFAF7';
+  const accentBright = '#10b981';
+  const bg = '#fafaf8';
+  const bgWarm = '#f4f2ec';
   const line = '#e8e6e0';
-  const cardBg = '#F0EFE9';
+  const cardBg = '#ffffff';
 
-  // Curated sample output, or a generic "Try it" card.
-  const sample = CURATED_SAMPLES[copy.slug];
-  const scoreLabel = sample ? escapeXml(sample.score) : escapeXml('Try it on Floom');
-  const bulletLines = sample
-    ? sample.bullets.slice(0, 3).map((b) => escapeXml(truncate(b, 60)))
-    : [
-        escapeXml(truncate(copy.description || 'Run AI tasks in seconds.', 60)),
-        escapeXml('Powered by Floom — the AI app runtime.'),
+  // Eyebrow line above the title.
+  // - App mode: small "APP" pill.
+  // - Run mode: "RUN · {relativeTime}" so the social preview
+  //   communicates "this is a fresh result, not an evergreen app".
+  const eyebrow = isRun ? `RUN · ${copy.run!.relativeTime.toUpperCase()}` : 'APP';
+
+  // Sample card content. Run mode pulls the actual run output preview;
+  // app mode uses the curated SAMPLES map (or a generic fallback).
+  let scoreLabel: string;
+  let bulletLines: string[];
+  if (isRun) {
+    scoreLabel = escapeXml(copy.run!.label);
+    bulletLines = copy.run!.outputPreview
+      .slice(0, 3)
+      .map((b) => escapeXml(truncate(b, 64)));
+  } else {
+    const sample = CURATED_SAMPLES[copy.slug];
+    if (sample) {
+      scoreLabel = escapeXml(sample.score);
+      bulletLines = sample.bullets.slice(0, 3).map((b) => escapeXml(truncate(b, 64)));
+    } else {
+      const rawDesc = truncate(copy.description || 'Run AI tasks in seconds.', 160);
+      const wrapped = wrapText(rawDesc, 60);
+      scoreLabel = escapeXml('Try it on Floom');
+      bulletLines = [
+        ...wrapped.slice(0, 2).map((s) => escapeXml(s)),
         escapeXml('Free to run. No account required.'),
       ];
+    }
+  }
 
-  // Vertical layout
-  const descY1 = 310;
-  const descY2 = descY1 + 38;
-  const cardTop = descLines.length > 1 ? 376 : 338;
-  const cardPad = 22;
+  // Description (app mode only — run mode replaces it with the eyebrow + run output card).
+  const rawDesc = truncate(copy.description || 'Run this AI app on Floom.', 160);
+  const descLines = !isRun ? wrapText(rawDesc, 56) : [];
+
+  // Vertical layout. Title sits a bit higher to leave room for the
+  // bigger sample card. Sample card width spans the content column.
+  const cardPad = 26;
   const cardWidth = WIDTH - 160;
-  const cardHeight = bulletLines.length * 34 + cardPad * 2 + 26;
+  const titleY = 252;
+  const descY1 = 310;
+  const descY2 = descY1 + 40;
+  const cardTop = isRun ? 320 : descLines.length > 1 ? 384 : 348;
+  const cardHeight = bulletLines.length * 36 + cardPad * 2 + 30;
+
+  // Footer: routes to /r/<runId> on run cards, /p/<slug> on app cards.
+  const footerRoute = isRun
+    ? `floom.dev/r/${escapeXml(copy.run!.runId)}`
+    : `floom.dev/p/${escapeXml(copy.slug)}`;
+  const footerCta = isRun ? 'open this run' : 'try it on';
+
+  // Eyebrow pill width — proportional to label length so spacing reads.
+  const eyebrowWidth = eyebrow.length * 9 + 24;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
   <defs>
-    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">
+    <!-- Brand mark gradient (matches /floom-mark-glow.svg) -->
+    <linearGradient id="markGrad" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="${accent}"/>
-      <stop offset="100%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="${accentBright}"/>
+    </linearGradient>
+    <!-- Wide accent strip (top of card) -->
+    <linearGradient id="stripGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="${accent}"/>
+      <stop offset="55%" stop-color="${accentBright}"/>
+      <stop offset="100%" stop-color="${accent}"/>
+    </linearGradient>
+    <!-- Title gradient — subtle ink-to-charcoal so the headline gains
+         visual weight without becoming Lovable-style rainbow. -->
+    <linearGradient id="titleGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${ink}"/>
+      <stop offset="100%" stop-color="#2a2620"/>
+    </linearGradient>
+    <!-- Soft background gradient (warm cream to bg) -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${bg}"/>
+      <stop offset="100%" stop-color="${bgWarm}"/>
     </linearGradient>
   </defs>
 
   <!-- Background -->
-  <rect width="${WIDTH}" height="${HEIGHT}" fill="${bg}"/>
+  <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#bgGrad)"/>
 
-  <!-- Top accent bar -->
-  <rect x="0" y="0" width="${WIDTH}" height="5" fill="url(#accentGrad)"/>
+  <!-- Top accent strip (8px, was 5px) -->
+  <rect x="0" y="0" width="${WIDTH}" height="8" fill="url(#stripGrad)"/>
 
-  <!-- Floom wordmark — two stacked bars + name -->
-  <g transform="translate(80, 48)">
-    <rect x="0" y="0" width="9" height="28" rx="2.5" fill="${accent}"/>
-    <rect x="14" y="0" width="9" height="20" rx="2.5" fill="${accent}" opacity="0.5"/>
-    <text x="36" y="22" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="22" fill="${ink}" letter-spacing="-0.5">floom</text>
+  <!-- Floom mark + wordmark.
+       Path comes from /apps/web/public/floom-mark-glow.svg. The
+       canonical path uses 100x100 art space; we translate into the OG
+       header at (80, 56) and scale 0.62 so the mark sits at ~52px tall. -->
+  <g transform="translate(80, 56)">
+    <g transform="scale(0.62)">
+      <path
+        d="M32 26 h20 l22 22 a3 3 0 0 1 0 4 l-22 22 h-20 a6 6 0 0 1 -6 -6 v-36 a6 6 0 0 1 6 -6 z"
+        fill="url(#markGrad)"
+      />
+    </g>
+    <text x="64" y="38" font-family="${SANS}" font-weight="800" font-size="30" fill="${ink}" letter-spacing="-1">floom</text>
+    <!-- Bigger accent dot, replaces the old thin bar marker -->
+    <circle cx="160" cy="32" r="5" fill="${accent}"/>
   </g>
 
-  <!-- Subtle divider below wordmark -->
-  <line x1="80" y1="94" x2="${WIDTH - 80}" y2="94" stroke="${line}" stroke-width="1"/>
+  <!-- Eyebrow badge (APP / RUN · time) -->
+  <g transform="translate(80, 168)">
+    <rect x="0" y="0" width="${eyebrowWidth}" height="26" rx="13" fill="${accent}"/>
+    <text x="${eyebrowWidth / 2}" y="18" font-family="${MONO}" font-weight="700" font-size="12" fill="#ffffff" text-anchor="middle" letter-spacing="1.2">${escapeXml(eyebrow)}</text>
+  </g>
 
-  <!-- App title -->
-  <text x="80" y="228" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="76" letter-spacing="-2" fill="${ink}">${title}</text>
+  <!-- App title (gradient ink) -->
+  <text x="80" y="${titleY}" font-family="${SANS}" font-weight="800" font-size="88" letter-spacing="-2.5" fill="url(#titleGrad)">${title}</text>
 
-  <!-- Description lines -->
-  <text x="80" y="${descY1}" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="27" fill="${muted}">${escapeXml(descLines[0] ?? '')}</text>
-  ${descLines[1] ? `<text x="80" y="${descY2}" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="27" fill="${muted}">${escapeXml(descLines[1])}</text>` : ''}
+  <!-- Description lines (app mode only) -->
+  ${
+    !isRun && descLines[0]
+      ? `<text x="80" y="${descY1}" font-family="${SANS}" font-size="27" fill="${muted}">${escapeXml(descLines[0])}</text>`
+      : ''
+  }
+  ${
+    !isRun && descLines[1]
+      ? `<text x="80" y="${descY2}" font-family="${SANS}" font-size="27" fill="${muted}">${escapeXml(descLines[1])}</text>`
+      : ''
+  }
 
   <!-- Sample output card -->
-  <rect x="80" y="${cardTop}" width="${cardWidth}" height="${cardHeight}" rx="10" fill="${cardBg}" stroke="${line}" stroke-width="1.5"/>
+  <g>
+    <rect x="80" y="${cardTop}" width="${cardWidth}" height="${cardHeight}" rx="14" fill="${cardBg}" stroke="${line}" stroke-width="1.5"/>
+    <!-- Subtle accent left rail so the card reads as "Floom output" -->
+    <rect x="80" y="${cardTop}" width="6" height="${cardHeight}" rx="3" fill="${accent}" opacity="0.85"/>
 
-  <!-- Score / label in accent -->
-  <text x="${80 + cardPad}" y="${cardTop + cardPad + 14}" font-family="'JetBrains Mono', Menlo, monospace" font-size="16" font-weight="700" fill="${accent}">${scoreLabel}</text>
+    <!-- Score / label (accent, mono) -->
+    <text x="${80 + cardPad}" y="${cardTop + cardPad + 16}" font-family="${MONO}" font-size="17" font-weight="700" fill="${accent}">${scoreLabel}</text>
 
-  <!-- Divider inside card -->
-  <line x1="${80 + cardPad}" y1="${cardTop + cardPad + 24}" x2="${80 + cardWidth - cardPad}" y2="${cardTop + cardPad + 24}" stroke="${line}" stroke-width="1"/>
+    <!-- Divider -->
+    <line x1="${80 + cardPad}" y1="${cardTop + cardPad + 28}" x2="${80 + cardWidth - cardPad}" y2="${cardTop + cardPad + 28}" stroke="${line}" stroke-width="1"/>
 
-  <!-- Bullet lines -->
-  ${bulletLines.map((b, i) => `<text x="${80 + cardPad}" y="${cardTop + cardPad + 52 + i * 34}" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="19" fill="${ink}">• ${b}</text>`).join('\n  ')}
+    <!-- Bullet lines -->
+    ${bulletLines
+      .map(
+        (b, i) =>
+          `<text x="${80 + cardPad}" y="${cardTop + cardPad + 60 + i * 36}" font-family="${SANS}" font-size="20" fill="${ink}">• ${b}</text>`,
+      )
+      .join('\n    ')}
+  </g>
 
-  <!-- Footer -->
-  <line x1="80" y1="${HEIGHT - 56}" x2="${WIDTH - 80}" y2="${HEIGHT - 56}" stroke="${line}" stroke-width="1"/>
-  <g transform="translate(80, ${HEIGHT - 32})">
-    ${author ? `<text x="0" y="0" font-family="'JetBrains Mono', Menlo, monospace" font-size="16" fill="${muted}">${author}</text>` : ''}
-    <text x="${WIDTH - 160}" y="0" font-family="'JetBrains Mono', Menlo, monospace" font-size="16" fill="${accent}" font-weight="600" text-anchor="end">run it on floom.dev/p/${escapeXml(copy.slug)}</text>
+  <!-- Footer divider -->
+  <line x1="80" y1="${HEIGHT - 60}" x2="${WIDTH - 80}" y2="${HEIGHT - 60}" stroke="${line}" stroke-width="1"/>
+
+  <!-- Footer: brand strip on left, CTA on right -->
+  <g transform="translate(80, ${HEIGHT - 30})">
+    <circle cx="6" cy="-5" r="4" fill="${accent}"/>
+    <text x="20" y="0" font-family="${MONO}" font-size="15" fill="${muted}">floom.dev</text>
+    <text x="120" y="0" font-family="${MONO}" font-size="15" fill="${muted}">·</text>
+    <text x="138" y="0" font-family="${MONO}" font-size="15" fill="${muted}">Free to run</text>
+    <text x="248" y="0" font-family="${MONO}" font-size="15" fill="${muted}">·</text>
+    <text x="266" y="0" font-family="${MONO}" font-size="15" fill="${muted}">MIT</text>
+    ${author ? `<text x="320" y="0" font-family="${MONO}" font-size="15" fill="${muted}">·</text><text x="340" y="0" font-family="${MONO}" font-size="15" fill="${muted}">${author}</text>` : ''}
+    <text x="${WIDTH - 160}" y="0" font-family="${MONO}" font-size="15" fill="${accent}" font-weight="700" text-anchor="end">${footerCta} ${escapeXml(footerRoute)}</text>
   </g>
 </svg>`;
 }
@@ -264,6 +449,84 @@ function renderMainSvg(): string {
 
 ogRouter.get('/main.svg', (_c) => {
   const svg = renderMainSvg();
+  return new Response(svg, {
+    status: 200,
+    headers: {
+      'content-type': 'image/svg+xml; charset=utf-8',
+      'cache-control': 'public, max-age=300',
+    },
+  });
+});
+
+// GET /og/r/:run_id.svg — run-specific OG card.
+//
+// Rules:
+//   - Run must exist; otherwise 404.
+//   - Run must be public (`is_public = 1`) OR the caller must present
+//     a matching `share_token` query parameter that matches the parent
+//     app's `link_share_token`. Owner-only runs return 404 to avoid
+//     leaking the existence of private runs to crawlers.
+//   - Output preview pulled from the run's `outputs` JSON via the
+//     same recursive walk used elsewhere on the share-card surface.
+ogRouter.get('/r/:runIdSvg{[a-zA-Z0-9_-]+\\.svg}', (c) => {
+  const param = c.req.param('runIdSvg');
+  const runId = param.replace(/\.svg$/, '');
+
+  const run = getRun(runId);
+  if (!run) {
+    return c.json({ error: 'Run not found' }, 404);
+  }
+
+  // Look up the parent app for slug + name + author.
+  const appRow = db
+    .prepare(
+      `SELECT apps.*, users.name AS author_name, users.email AS author_email
+         FROM apps
+         LEFT JOIN users ON apps.author = users.id
+        WHERE apps.id = ?`,
+    )
+    .get(run.app_id) as
+    | (AppRecord & { author_name: string | null; author_email: string | null })
+    | undefined;
+
+  // Visibility gate. Public runs are always renderable. Otherwise the
+  // caller must present a share_token that matches the app's share link.
+  const isPublic = run.is_public === 1;
+  const tokenParam = c.req.query('share_token') || '';
+  const tokenOk =
+    !!appRow?.link_share_token &&
+    tokenParam.length > 0 &&
+    tokenParam === appRow.link_share_token;
+  if (!isPublic && !tokenOk) {
+    return c.json({ error: 'Run not found' }, 404);
+  }
+
+  const appName = appRow?.name || run.action || 'Floom run';
+  const slug = appRow?.slug || '';
+  const authorRaw =
+    appRow?.author_name && String(appRow.author_name).trim()
+      ? String(appRow.author_name).trim()
+      : appRow?.author_email && appRow.author_email.includes('@')
+      ? appRow.author_email.split('@')[0] || null
+      : null;
+
+  const outputPreview = previewFromRunOutputs(run.outputs);
+  const relativeTime = formatRunRelative(run.finished_at || run.started_at);
+
+  const copy: OgCopy = {
+    title: appName,
+    description: '',
+    author: authorRaw,
+    slug,
+    run: {
+      runId,
+      relativeTime,
+      outputPreview,
+      label: `output · ${run.action}`,
+    },
+  };
+
+  const svg = renderSvg(copy);
   return new Response(svg, {
     status: 200,
     headers: {
