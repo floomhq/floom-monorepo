@@ -334,10 +334,13 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
             className="topbar-links topbar-links-desktop topbar-centre-nav"
             aria-label="Primary"
             style={{
-              position: 'absolute',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
+              // R10.1 (2026-04-29): switched from absolute-centered to
+              // inline flex. Absolute centering caused the nav to
+              // overlap the right cluster (GH stars + auth buttons) at
+              // 1200px width — Changelog text rendered under the GH "6"
+              // badge. Inline flex with margin-left: 32 keeps spacing
+              // honest while letting the right cluster push to the edge.
+              marginLeft: 32,
               pointerEvents: 'auto',
               display: 'inline-flex',
               alignItems: 'center',
@@ -392,6 +395,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           style={{
             gap: 8,
             marginLeft: 'auto',
+            paddingLeft: 24,
             alignItems: 'center',
           }}
         >
