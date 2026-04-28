@@ -238,3 +238,71 @@ MVP readiness status:
   - lifecycle transition 500s (`invited` sharing, studio review actions)
   - install semantics for pending-review apps
 
+
+---
+
+## 11) Floom CLI Parity Test (vs MCP)
+
+Date (UTC): 2026-04-28
+
+CLI binary: `/Users/federicodeponte/.local/bin/floom`
+
+Auth: `floom auth <agent-token>` succeeded and bound to `https://mvp.floom.dev`.
+
+### CLI suite summary
+
+- Total CLI actions: `36`
+- Passed: `30`
+- Failed: `6`
+- Temporary CLI app slug: `cli-stress-28090741`
+- Cleanup: ✅ app deleted and removal verified
+
+### CLI actions that passed
+
+- `floom init --name ... --slug ... --openapi-url ...`
+- `floom deploy --dry-run`
+- `floom deploy`
+- `floom apps get/about/source/source openapi/reviews list`
+- `floom apps sharing get/set (link/private)`
+- `floom apps update --primary-action/--clear-primary-action/--run-rate-limit-per-hour`
+- `floom apps rate-limit get/set/reset`
+- `floom run <slug> '{...}'`
+- `floom apps uninstall`
+- `floom apps secret-policies list`
+- `floom apps creator-secrets delete`
+- `floom apps sharing submit-review`
+- `floom apps sharing withdraw-review`
+- `floom apps review ...` and `floom apps reviews submit ...`
+- `floom account secrets set/list/delete`
+- `floom apps delete` + verify removal via `floom apps list`
+
+### CLI failures and interpretation
+
+1. `floom apps update <slug> --visibility link` failed
+- Error: CLI validation blocks visibility updates except `private`.
+- Message suggests using `floom apps sharing submit-review <slug>` for public store review flow.
+- Interpretation: expected CLI contract split (visibility link/invited handled by sharing subcommands).
+
+2. `floom apps install <slug>` failed with `404 not_found`
+- Same behavior observed via MCP for pending-review owned apps.
+- Interpretation: likely policy/availability gate, but error semantics remain ambiguous.
+
+3. `floom apps secret-policies set <slug> API_KEY ...` failed `400 unknown_secret_key`
+4. `floom apps creator-secrets set <slug> API_KEY ...` failed `400 unknown_secret_key`
+- For this generated app, valid secret key from policy list was `api_key` (lowercase), not `API_KEY`.
+- Interpretation: expected key validation behavior.
+
+5. `floom account agent-tokens list` failed `401 session_required`
+6. `floom account agent-tokens create ...` failed `401 session_required`
+- Interpretation: CLI token-management operations require user-session auth, not agent-token auth.
+
+### CLI ↔ MCP parity conclusions
+
+- Broad parity exists for app lifecycle, run, sharing, review submission, secret policy introspection, and account secrets.
+- Cross-channel consistent behavior observed on install gate (`404 not_found`) for pending-review app.
+- CLI presents some behaviors more clearly than MCP in this build:
+  - `sharing submit-review/withdraw-review` returned structured success, where MCP studio review transitions previously surfaced `500 illegal_transition` on certain tested app states.
+- Account token lifecycle diverges by auth mode:
+  - MCP with read-write agent token allowed create/revoke in this test account.
+  - CLI currently requires user session for agent-token management endpoints.
+
