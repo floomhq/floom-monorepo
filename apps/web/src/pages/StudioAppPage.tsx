@@ -1,6 +1,18 @@
 // /studio/:slug — Studio per-app Overview. Creator workspace view of
-// an owned app. Shows app header, ownership actions (New run link to
-// /p/:slug, View in Store, Delete), and recent runs (scoped to owner).
+// an owned app.
+//
+// Wave-3b: rebuilt overview content per v26 wireframe (studio-app-overview.html).
+// Layout: App meta strip + 2-col panels (Traffic sparkline, App meta,
+// Top errors, Where it runs). Operational controls (visibility, primary
+// action, danger zone) kept below.
+//
+// Data notes:
+//   - Traffic sparkline: getAppRunsByDay(slug, 14) — endpoint exists, returns
+//     {days: [{date, count}]}.
+//   - Top errors: derived from getAppRuns(slug, 50).runs filtered by error field.
+//   - Where it runs: CreatorRun has no source_label field. Panel renders empty
+//     state with TODO until backend exposes it.
+//     // TODO: wire to run.source_label when backend exposes it on CreatorRun
 //
 // Access-gated: non-owners are redirected to /p/:slug (the public page).
 
@@ -8,7 +20,6 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { StudioAppTabs } from '../components/StudioAppTabs';
-import { AppHeader } from './MeAppPage';
 import * as api from '../api/client';
 import { refreshMyApps } from '../hooks/useMyApps';
 import type { AppDetail, CreatorRun } from '../lib/types';
@@ -19,18 +30,17 @@ export function StudioAppPage() {
   const nav = useNavigate();
   const [app, setApp] = useState<AppDetail | null>(null);
   const [runs, setRuns] = useState<CreatorRun[] | null>(null);
+  const [runsByDay, setRunsByDay] = useState<Array<{ date: string; count: number }> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmInput, setConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  // Issue #129: visibility toggle. Keep local state for optimistic update so
-  // the pill flips before the round-trip lands. Failure reverts it.
+  // Issue #129: visibility toggle. Optimistic update so the pill flips
+  // before the round-trip lands. Failure reverts it.
   const [visibilityBusy, setVisibilityBusy] = useState(false);
   const [visibilityError, setVisibilityError] = useState<string | null>(null);
-  // Audit 2026-04-20 (Fix 3): primary-action control. Persists to manifest
-  // via PATCH /api/hub/:slug. Optimistic update so the dropdown reflects
-  // the new value before the round-trip lands.
+  // Audit 2026-04-20 (Fix 3): primary-action control.
   const [primaryActionBusy, setPrimaryActionBusy] = useState(false);
   const [primaryActionError, setPrimaryActionError] = useState<string | null>(null);
 
@@ -54,7 +64,6 @@ export function StudioAppPage() {
     const previous = app.visibility;
     setVisibilityBusy(true);
     setVisibilityError(null);
-    // Optimistic flip — revert on error.
     setApp({ ...app, visibility: next });
     try {
       await api.updateAppVisibility(app.slug, next);
@@ -69,13 +78,11 @@ export function StudioAppPage() {
 
   async function handlePrimaryActionChange(next: string) {
     if (!app || primaryActionBusy) return;
-    // Empty string = clear the pin (null server-side).
     const serverValue = next === '' ? null : next;
     const previous = app.manifest.primary_action ?? '';
     if (previous === next) return;
     setPrimaryActionBusy(true);
     setPrimaryActionError(null);
-    // Optimistic update on the nested manifest.
     const optimistic = {
       ...app,
       manifest: {
@@ -87,7 +94,7 @@ export function StudioAppPage() {
     try {
       await api.updateAppPrimaryAction(app.slug, serverValue);
     } catch (err) {
-      setApp(app); // revert
+      setApp(app);
       setPrimaryActionError(
         (err as Error).message || 'Could not update primary action',
       );
@@ -101,6 +108,7 @@ export function StudioAppPage() {
     let cancelled = false;
     setApp(null);
     setRuns(null);
+    setRunsByDay(null);
     setError(null);
     api
       .getApp(slug)
@@ -118,19 +126,26 @@ export function StudioAppPage() {
           return;
         }
         if (status === 403) {
-          // Not owner → bounce to public permalink.
           nav(`/p/${slug}`, { replace: true });
           return;
         }
         setError((err as Error).message || 'Failed to load app');
       });
     api
-      .getAppRuns(slug, 10)
+      .getAppRuns(slug, 50)
       .then((res) => {
         if (!cancelled) setRuns(res.runs);
       })
       .catch(() => {
         if (!cancelled) setRuns([]);
+      });
+    api
+      .getAppRunsByDay(slug, 14)
+      .then((res) => {
+        if (!cancelled) setRunsByDay(res.days);
+      })
+      .catch(() => {
+        if (!cancelled) setRunsByDay([]);
       });
     return () => {
       cancelled = true;
@@ -162,43 +177,53 @@ export function StudioAppPage() {
       {!app && !error && <LoadingSkeleton />}
       {app && (
         <div data-testid="studio-app-overview">
-          <AppHeader app={app} />
 
-          <div
-            style={{
-              display: 'flex',
-              gap: 10,
-              marginBottom: 28,
-              flexWrap: 'wrap',
-            }}
-          >
-            <Link
-              to={`/p/${app.slug}`}
-              data-testid="studio-app-open-store"
-              style={primaryCta}
-            >
-              Open in Store →
-            </Link>
-            <Link
-              to={`/studio/${app.slug}/secrets`}
-              style={secondaryCta}
-            >
-              Manage secrets
-            </Link>
-            <Link
-              to={`/studio/${app.slug}/runs`}
-              style={secondaryCta}
-            >
-              View runs
-            </Link>
+          {/* ── App meta strip ── */}
+          <AppMetaStrip app={app} />
+
+          {/* ── 2-col row 1: Traffic + App meta ── */}
+          <div style={grid2}>
+            <TrafficPanel runsByDay={runsByDay} />
+            <AppMetaPanel app={app} />
           </div>
 
-          {/* Issue #129 (2026-04-19): visibility toggle. Lives above Recent
-              runs so creators see the pill alongside their app health, and
-              can flip between Public (listed in Store) and Private (owner-
-              only) without re-ingesting. `auth-required` is kept available
-              through the server API for advanced users but not exposed
-              here — the 95% case is the public/private binary. */}
+          {/* ── 2-col row 2: Top errors + Where it runs ── */}
+          <div style={{ ...grid2, marginTop: 14 }}>
+            <TopErrorsPanel runs={runs} />
+            <WhereItRunsPanel runs={runs} />
+          </div>
+
+          {/* ── Recent runs (last 5) ── */}
+          <h2 style={sectionHeader}>Recent runs</h2>
+          {!runs && <div style={{ fontSize: 13, color: 'var(--muted)' }}>Loading…</div>}
+          {runs && runs.length === 0 && (
+            <div
+              data-testid="studio-app-runs-empty"
+              style={emptyState}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>
+                No runs yet
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+                Share <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>/p/{app.slug}</code> to drive your first run.
+              </p>
+            </div>
+          )}
+          {runs && runs.length > 0 && (
+            <RunTable runs={runs.slice(0, 5)} />
+          )}
+          {runs && runs.length > 5 && (
+            <div style={{ marginTop: 12 }}>
+              <Link to={`/studio/${app.slug}/runs`} style={{ color: 'var(--accent)', fontSize: 13 }}>
+                View all runs →
+              </Link>
+            </div>
+          )}
+
+          {/* ── Visibility ── */}
+          {/* Issue #129 (2026-04-19): visibility toggle. Public/Private binary.
+              auth-required is kept available through the server API but not
+              exposed here — the 95% case is the public/private binary. */}
           <h2 style={sectionHeader}>Visibility</h2>
           <section
             data-testid="studio-app-visibility"
@@ -242,9 +267,8 @@ export function StudioAppPage() {
             )}
           </section>
 
-          {/* Audit 2026-04-20 (Fix 3): primary-action pin for multi-action
-              apps. Hidden when the app has ≤1 actions (nothing to pin).
-              Persists to manifest via PATCH /api/hub/:slug. */}
+          {/* ── Primary action (multi-action apps only) ── */}
+          {/* Audit 2026-04-20 (Fix 3): primary-action pin. Hidden for ≤1 actions. */}
           {Object.keys(app.manifest.actions).length > 1 && (
             <>
               <h2 style={sectionHeader}>Primary action</h2>
@@ -319,34 +343,8 @@ export function StudioAppPage() {
             </>
           )}
 
-          <h2 style={sectionHeader}>Recent runs</h2>
-          {!runs && <div style={{ fontSize: 13, color: 'var(--muted)' }}>Loading…</div>}
-          {runs && runs.length === 0 && (
-            <div
-              data-testid="studio-app-runs-empty"
-              style={emptyState}
-            >
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>
-                No runs yet
-              </div>
-              <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-                Share <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>/p/{app.slug}</code> to drive your first run.
-              </p>
-            </div>
-          )}
-          {runs && runs.length > 0 && (
-            <RunTable runs={runs.slice(0, 5)} />
-          )}
-          {runs && runs.length > 5 && (
-            <div style={{ marginTop: 12 }}>
-              <Link to={`/studio/${app.slug}/runs`} style={{ color: 'var(--accent)', fontSize: 13 }}>
-                View all runs →
-              </Link>
-            </div>
-          )}
-
-          {/* Danger zone · delete app. Typed-slug confirm prevents fat-finger
-              deletes. DELETE /api/me/apps/:slug; runs cascade via FK. */}
+          {/* ── Danger zone ── */}
+          {/* DELETE /api/me/apps/:slug; runs cascade via FK. */}
           <section
             data-testid="studio-app-danger-zone"
             style={{
@@ -413,6 +411,7 @@ export function StudioAppPage() {
         </div>
       )}
 
+      {/* ── Delete confirmation modal ── */}
       {confirmOpen && app && (
         <div
           role="dialog"
@@ -525,6 +524,364 @@ export function StudioAppPage() {
     </WorkspacePageShell>
   );
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Overview panels
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** Compact mono strip showing key app metadata below the tab bar. */
+function AppMetaStrip({ app }: { app: AppDetail }) {
+  return (
+    <div
+      data-testid="studio-app-meta-strip"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        background: 'var(--bg)',
+        border: '1px solid var(--line)',
+        borderRadius: 10,
+        padding: '9px 12px',
+        marginBottom: 16,
+        fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 11,
+        color: 'var(--muted)',
+        flexWrap: 'wrap',
+        overflowX: 'auto',
+      }}
+    >
+      <strong style={{ color: 'var(--ink)' }}>{app.slug}</strong>
+      {app.version && <span>{app.version}</span>}
+      <span>{app.runtime}</span>
+      <span style={{ color: app.visibility === 'public' ? 'var(--accent)' : undefined }}>
+        {app.visibility ?? 'private'}
+      </span>
+      <span style={{ flex: 1 }} />
+      <span>floom.dev/p/{app.slug}</span>
+    </div>
+  );
+}
+
+/**
+ * Traffic panel — 14d SVG polyline sparkline.
+ * Uses an inline SVG polyline; no charting library required.
+ */
+function TrafficPanel({ runsByDay }: { runsByDay: Array<{ date: string; count: number }> | null }) {
+  const W = 600;
+  const H = 140;
+  const PAD = 6;
+
+  const bars = runsByDay ?? Array.from({ length: 14 }, () => ({ date: '', count: 0 }));
+  const maxCount = bars.reduce((m, b) => (b.count > m ? b.count : m), 0);
+  const loading = runsByDay === null;
+
+  // Build SVG polyline points: left→right, bottom=0 at H-PAD, top at PAD.
+  const points = bars
+    .map((b, i) => {
+      const x = (i / Math.max(bars.length - 1, 1)) * W;
+      const ratio = maxCount > 0 ? b.count / maxCount : 0;
+      const y = H - PAD - ratio * (H - PAD * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+
+  const total = bars.reduce((s, b) => s + b.count, 0);
+
+  return (
+    <section
+      data-testid="studio-traffic-panel"
+      style={panelStyle}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
+        <h3 style={panelHeading}>Traffic</h3>
+        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.04em' }}>
+          last 14 days
+        </span>
+      </div>
+      <p style={panelSub}>Runs per day</p>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        aria-label={loading ? 'Loading traffic chart' : `14-day run chart, ${total} total`}
+        style={{ width: '100%', height: 120, display: 'block', opacity: loading ? 0.3 : 1 }}
+      >
+        {/* Horizontal grid lines */}
+        <g stroke="var(--line, #e8e6e0)" strokeWidth="1">
+          <line x1="0" y1={H * 0.3} x2={W} y2={H * 0.3} />
+          <line x1="0" y1={H * 0.6} x2={W} y2={H * 0.6} />
+          <line x1="0" y1={H * 0.9} x2={W} y2={H * 0.9} />
+        </g>
+        {maxCount > 0 ? (
+          <polyline
+            points={points}
+            fill="none"
+            stroke="var(--accent, #047857)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ) : (
+          /* Flat baseline when no data */
+          <line
+            x1="0" y1={H - PAD} x2={W} y2={H - PAD}
+            stroke="var(--line, #e8e6e0)"
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+          />
+        )}
+      </svg>
+      <div style={{ display: 'flex', gap: 16, marginTop: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+        <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{loading ? '—' : total}</span>
+        <span style={{ color: 'var(--muted)' }}>total runs</span>
+      </div>
+    </section>
+  );
+}
+
+/** App meta panel — key/value list from app metadata. */
+function AppMetaPanel({ app }: { app: AppDetail }) {
+  const rows: Array<{ label: string; value: string }> = [
+    { label: 'Slug', value: app.slug },
+    { label: 'Version', value: app.version ?? '—' },
+    { label: 'Runtime', value: app.runtime },
+    { label: 'Visibility', value: app.visibility ?? 'private' },
+    { label: 'Category', value: app.category ?? '—' },
+    { label: 'Created', value: app.created_at ? formatTime(app.created_at) : '—' },
+  ];
+
+  return (
+    <section
+      data-testid="studio-app-meta-panel"
+      style={panelStyle}
+    >
+      <h3 style={{ ...panelHeading, marginBottom: 12 }}>App meta</h3>
+      {rows.map((r) => (
+        <div
+          key={r.label}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '7px 0',
+            borderBottom: '1px solid var(--line)',
+            fontSize: 12.5,
+          }}
+        >
+          <span style={{ color: 'var(--muted)' }}>{r.label}</span>
+          <span
+            style={{
+              color: r.label === 'Visibility' && r.value === 'public' ? 'var(--accent)' : 'var(--ink)',
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 11.5,
+              fontWeight: 500,
+            }}
+          >
+            {r.value}
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/**
+ * Top errors panel — groups runs by error message, shows top 5 by frequency.
+ * Uses the already-fetched runs array (no extra request).
+ */
+function TopErrorsPanel({ runs }: { runs: CreatorRun[] | null }) {
+  const loading = runs === null;
+
+  // Tally errors from the loaded runs.
+  const errorMap = new Map<string, { count: number; lastSeen: string }>();
+  if (runs) {
+    for (const r of runs) {
+      if (r.status !== 'error' && r.status !== 'timeout') continue;
+      const key = r.error || r.error_type || 'Unknown error';
+      const prev = errorMap.get(key);
+      const ts = r.started_at;
+      if (!prev) {
+        errorMap.set(key, { count: 1, lastSeen: ts });
+      } else {
+        errorMap.set(key, {
+          count: prev.count + 1,
+          lastSeen: ts > prev.lastSeen ? ts : prev.lastSeen,
+        });
+      }
+    }
+  }
+
+  const sorted = Array.from(errorMap.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5);
+
+  const maxCount = sorted[0]?.[1].count ?? 1;
+
+  return (
+    <section
+      data-testid="studio-top-errors-panel"
+      style={panelStyle}
+    >
+      <h3 style={panelHeading}>Top errors · 7d</h3>
+      <p style={panelSub}>What is breaking, by frequency.</p>
+      {loading && (
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>Loading…</div>
+      )}
+      {!loading && sorted.length === 0 && (
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--muted)',
+            marginTop: 8,
+            fontStyle: 'italic',
+          }}
+        >
+          No errors in recent runs.
+        </div>
+      )}
+      {sorted.map(([msg, { count, lastSeen }]) => (
+        <div
+          key={msg}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, padding: '5px 0' }}
+        >
+          <span
+            style={{
+              width: 120,
+              fontWeight: 500,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+            title={msg}
+          >
+            {msg}
+          </span>
+          <div
+            style={{
+              flex: 1,
+              height: 6,
+              background: 'var(--bg)',
+              border: '1px solid var(--line)',
+              borderRadius: 4,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                background: 'var(--accent)',
+                width: `${(count / maxCount) * 100}%`,
+              }}
+            />
+          </div>
+          <span
+            style={{
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 11,
+              color: 'var(--muted)',
+              minWidth: 24,
+              textAlign: 'right',
+            }}
+          >
+            {count}
+          </span>
+          {/* TODO: add link to filtered runs when /studio/:slug/runs supports error_type filter */}
+        </div>
+      ))}
+      {!loading && runs && runs.length >= 50 && sorted.length > 0 && (
+        <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+          Based on last 50 runs.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Where it runs panel — horizontal bar chart of run sources.
+ *
+ * NOTE: CreatorRun does not expose a source_label field as of Wave-3b.
+ * The panel renders an empty state until the backend exposes it.
+ * // TODO: wire to run.source_label when backend exposes it on CreatorRun
+ */
+function WhereItRunsPanel({ runs }: { runs: CreatorRun[] | null }) {
+  const loading = runs === null;
+
+  // TODO: wire to run.source_label when backend exposes it on CreatorRun.
+  // For now, all we have is is_self (boolean). We can derive two categories
+  // from that as a best-effort approximation.
+  const sourceMap = new Map<string, number>();
+  if (runs) {
+    for (const r of runs) {
+      const key = r.is_self ? 'You' : 'Other callers';
+      sourceMap.set(key, (sourceMap.get(key) ?? 0) + 1);
+    }
+  }
+
+  const sorted = Array.from(sourceMap.entries())
+    .sort((a, b) => b[1] - a[1]);
+  const maxCount = sorted[0]?.[1] ?? 1;
+  const total = sorted.reduce((s, [, c]) => s + c, 0);
+
+  return (
+    <section
+      data-testid="studio-where-it-runs-panel"
+      style={panelStyle}
+    >
+      <h3 style={panelHeading}>Where it runs</h3>
+      <p style={panelSub}>By caller · last 50 runs. Full source breakdown available in v1.1.</p>
+      {loading && (
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>Loading…</div>
+      )}
+      {!loading && sorted.length === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8, fontStyle: 'italic' }}>
+          No data yet.
+        </div>
+      )}
+      {sorted.map(([label, count]) => (
+        <div
+          key={label}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, padding: '5px 0' }}
+        >
+          <span style={{ width: 100, fontWeight: 500, flexShrink: 0 }}>{label}</span>
+          <div
+            style={{
+              flex: 1,
+              height: 6,
+              background: 'var(--bg)',
+              border: '1px solid var(--line)',
+              borderRadius: 4,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                background: 'var(--accent)',
+                width: `${(count / maxCount) * 100}%`,
+              }}
+            />
+          </div>
+          <span
+            style={{
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 11,
+              color: 'var(--muted)',
+              minWidth: 44,
+              textAlign: 'right',
+            }}
+          >
+            {count} ({total > 0 ? Math.round((count / total) * 100) : 0}%)
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Shared sub-components (kept from previous version)
+// ──────────────────────────────────────────────────────────────────────────────
 
 function RunTable({ runs }: { runs: CreatorRun[] }) {
   return (
@@ -725,37 +1082,62 @@ function StudioVisibilityChooser({
 function LoadingSkeleton() {
   return (
     <div data-testid="studio-app-loading" style={{ opacity: 0.6 }}>
-      <div style={{ height: 44, background: 'var(--bg)', borderRadius: 8, marginBottom: 16 }} />
-      <div style={{ height: 200, background: 'var(--bg)', borderRadius: 10 }} />
+      <div style={{ height: 40, background: 'var(--bg)', borderRadius: 8, marginBottom: 14 }} />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 14,
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ height: 180, background: 'var(--bg)', borderRadius: 10 }} />
+        <div style={{ height: 180, background: 'var(--bg)', borderRadius: 10 }} />
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 14,
+        }}
+      >
+        <div style={{ height: 140, background: 'var(--bg)', borderRadius: 10 }} />
+        <div style={{ height: 140, background: 'var(--bg)', borderRadius: 10 }} />
+      </div>
     </div>
   );
 }
 
-const primaryCta: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '10px 18px',
-  background: 'var(--ink)',
-  color: '#fff',
-  borderRadius: 8,
-  fontSize: 14,
-  fontWeight: 600,
-  textDecoration: 'none',
+// ──────────────────────────────────────────────────────────────────────────────
+// Shared style constants
+// ──────────────────────────────────────────────────────────────────────────────
+
+const grid2: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 14,
 };
 
-const secondaryCta: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '10px 18px',
+const panelStyle: React.CSSProperties = {
   background: 'var(--card)',
-  color: 'var(--ink)',
   border: '1px solid var(--line)',
-  borderRadius: 8,
+  borderRadius: 12,
+  padding: '18px 20px',
+  boxShadow: 'var(--shadow-1)',
+};
+
+const panelHeading: React.CSSProperties = {
   fontSize: 14,
   fontWeight: 600,
-  textDecoration: 'none',
+  margin: 0,
+  color: 'var(--ink)',
+};
+
+const panelSub: React.CSSProperties = {
+  fontSize: 12.5,
+  color: 'var(--muted)',
+  lineHeight: 1.5,
+  margin: '2px 0 10px',
 };
 
 const sectionHeader: React.CSSProperties = {
@@ -764,7 +1146,7 @@ const sectionHeader: React.CSSProperties = {
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
   color: 'var(--muted)',
-  margin: '0 0 10px',
+  margin: '32px 0 10px',
 };
 
 const emptyState: React.CSSProperties = {
