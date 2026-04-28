@@ -1,0 +1,52 @@
+# Boring Pack — five business utility apps bundled as one proxied-mode sidecar.
+#
+# The sidecar server (examples/boring-pack/server.mjs) runs as a child process
+# next to the main Floom server on localhost:$BORING_PACK_PORT (default 4220).
+# This file is ingested at boot via ingestOpenApiApps. Each entry fetches
+# an OpenAPI 3.0 spec from the sidecar and registers the app as a proxied
+# row in the apps table with base_url = http://127.0.0.1:4220.
+#
+# Deterministic, sub-500ms handlers. No external APIs, no secrets.
+# Every app ships with a Lucide-style SVG icon in
+# apps/web/src/components/IconSprite.tsx mapped by slug.
+
+apps:
+  - slug: receipt
+    type: proxied
+    openapi_spec_url: http://127.0.0.1:4220/openapi/receipt.json
+    display_name: Receipt Generator
+    description: "Generate a printable A6 receipt from line items with integer-cents math and currency formatting."
+    category: business
+    icon: receipt
+
+  - slug: vcard
+    type: proxied
+    openapi_spec_url: http://127.0.0.1:4220/openapi/vcard.json
+    display_name: vCard Generator
+    description: "Generate an RFC 6350 v3.0 vCard contact file and data URL from structured contact fields."
+    category: productivity
+    icon: vcard
+
+  - slug: ics
+    type: proxied
+    openapi_spec_url: http://127.0.0.1:4220/openapi/ics.json
+    display_name: Calendar Event (ICS)
+    description: "Generate an RFC 5545 .ics calendar event string and download URL. Stable UID, attendees, timezone support."
+    category: productivity
+    icon: ics
+
+  - slug: iban-validate
+    type: proxied
+    openapi_spec_url: http://127.0.0.1:4220/openapi/iban-validate.json
+    display_name: IBAN Validator
+    description: "Validate an IBAN using mod-97-10. Returns country, bank code, account number, and a human-readable error."
+    category: finance
+    icon: iban-validate
+
+  - slug: cover-letter-format
+    type: proxied
+    openapi_spec_url: http://127.0.0.1:4220/openapi/cover-letter-format.json
+    display_name: Cover Letter Formatter
+    description: "Generate short, medium, and long cover letter variants from bullet points. Three tones: formal, warm, direct. No AI."
+    category: writing
+    icon: cover-letter-format
