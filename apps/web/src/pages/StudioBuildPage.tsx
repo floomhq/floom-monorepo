@@ -7,13 +7,13 @@
 
 import type { ReactNode } from 'react';
 import { BuildPage } from './BuildPage';
-import { StudioLayout } from '../components/studio/StudioLayout';
+import { WorkspacePageShell } from '../components/WorkspacePageShell';
 
 function StudioLayoutAdapter({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <StudioLayout title={title} allowSignedOutShell>
+    <WorkspacePageShell mode="studio" title={title} allowSignedOutShell>
       {children}
-    </StudioLayout>
+    </WorkspacePageShell>
   );
 }
 
