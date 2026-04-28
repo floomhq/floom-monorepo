@@ -208,7 +208,7 @@ export const railStyle: CSSProperties = {
   width: RAIL_WIDTH,
   flexShrink: 0,
   borderRight: '1px solid var(--line)',
-  background: 'var(--bg)',
+  background: 'var(--studio)',
   display: 'flex',
   flexDirection: 'column',
   height: '100vh',
