@@ -220,7 +220,7 @@ function InstallTabs({ token }: { token: string }) {
       <div style={{ padding: '16px 18px' }}>
         {active === 'mcp' && (
           <p style={{ fontSize: 12, color: MUTED, margin: '0 0 10px', lineHeight: 1.5 }}>
-            Works with Claude Desktop, Cursor, Codex, and any MCP client.
+            Works with any MCP client.
           </p>
         )}
         {active === 'cli' && (
@@ -423,6 +423,129 @@ function TokenCard() {
   );
 }
 
+// ---------- TestItSection ----------
+
+const TEST_PROMPT = 'use the floom MCP server to generate a uuid';
+
+function TestItSection() {
+  const [copied, setCopied] = useState(false);
+  async function handleCopy() {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(TEST_PROMPT);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = TEST_PROMPT;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch { /* silent */ }
+  }
+
+  const steps = [
+    {
+      num: '1',
+      title: 'Paste your MCP config',
+      body: (
+        <>
+          Open{' '}
+          <code style={{ fontFamily: MONO, fontSize: 12, background: '#f4f4f2', padding: '1px 5px', borderRadius: 4 }}>
+            ~/Library/Application Support/Claude/claude_desktop_config.json
+          </code>{' '}
+          and paste the MCP config from the Install tab above.
+        </>
+      ),
+    },
+    {
+      num: '2',
+      title: 'Restart Claude Desktop',
+      body: 'Quit and reopen Claude Desktop so it picks up the new MCP server.',
+    },
+    {
+      num: '3',
+      title: 'Ask Claude to test it',
+      body: (
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          <code
+            data-testid="test-prompt-text"
+            style={{ fontFamily: MONO, fontSize: 12, background: '#1b1a17', color: '#d4d4c8', padding: '8px 12px', borderRadius: 6, flex: 1 }}
+          >
+            {TEST_PROMPT}
+          </code>
+          <button
+            type="button"
+            data-testid="test-prompt-copy-btn"
+            onClick={() => void handleCopy()}
+            style={{
+              flexShrink: 0,
+              fontSize: 12,
+              fontWeight: 600,
+              color: copied ? MUTED : ACCENT,
+              background: BG,
+              border: `1px solid ${LINE}`,
+              borderRadius: 6,
+              padding: '6px 12px',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: CARD, padding: '22px 24px' }}>
+      <h2 style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: ACCENT, margin: '0 0 16px' }}>
+        Test it in 3 steps
+      </h2>
+      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 16 }}>
+        {steps.map((s) => (
+          <div key={s.num} style={{ display: 'flex', gap: 14 }}>
+            <div style={{
+              flexShrink: 0,
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: ACCENT,
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 11,
+              fontWeight: 700,
+              fontFamily: MONO,
+              marginTop: 2,
+            }}>
+              {s.num}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>{s.title}</div>
+              <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.55 }}>{s.body}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 20, paddingTop: 20, borderTop: `1px solid ${LINE}` }}>
+        <p style={{ fontSize: 12, color: MUTED, margin: '0 0 10px', fontWeight: 600 }}>Alternative: use the HTTP API directly</p>
+        <pre style={{ fontFamily: MONO, fontSize: 11.5, background: '#1b1a17', color: '#d4d4c8', borderRadius: 8, padding: '12px 14px', overflowX: 'auto', whiteSpace: 'pre', lineHeight: 1.6, margin: 0 }}>
+          {`curl -X POST https://floom.dev/api/uuid/run \\
+  -H 'Authorization: Bearer floom_agent_<your_token>'`}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 // ---------- MvpHomePage ----------
 
 export function MvpHomePage() {
@@ -475,6 +598,10 @@ export function MvpHomePage() {
             </p>
           </div>
         )}
+
+        <div style={{ marginTop: 24 }}>
+          <TestItSection />
+        </div>
       </div>
     </MvpAuthShell>
   );
