@@ -147,45 +147,65 @@ function FilterChipBar({
 }) {
   const filters: RunAppFilter[] = ['all', 'recent'];
   return (
+    // Wireframe .content-toolbar: space-between with filters left, secondary action right
     <div
       data-testid="run-apps-filter-chips"
       style={{
         display: 'flex',
-        gap: 8,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 14,
         flexWrap: 'wrap',
         marginBottom: 16,
       }}
     >
-      {filters.map((f) => {
-        const isActive = f === active;
-        return (
-          <button
-            key={f}
-            type="button"
-            data-testid={`run-apps-chip-${f}`}
-            onClick={() => onChange(f)}
-            className="filter-chip"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              padding: '5px 11px',
-              borderRadius: 999,
-              background: isActive ? 'var(--accent-soft)' : 'var(--card)',
-              border: `1px solid ${isActive ? 'var(--accent-border, #a7f3d0)' : 'var(--line)'}`,
-              color: isActive ? 'var(--accent)' : 'var(--muted)',
-              fontWeight: isActive ? 600 : 500,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              transition: 'all 0.12s ease',
-            }}
-          >
-            {RUN_APP_FILTER_LABELS[f]}
-            <span style={{ opacity: 0.7, marginLeft: 2 }}>{counts[f]}</span>
-          </button>
-        );
-      })}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {filters.map((f) => {
+          const isActive = f === active;
+          return (
+            <button
+              key={f}
+              type="button"
+              data-testid={`run-apps-chip-${f}`}
+              onClick={() => onChange(f)}
+              className="filter-chip"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                fontSize: 12,
+                padding: '5px 11px',
+                borderRadius: 999,
+                background: isActive ? 'var(--accent-soft)' : 'var(--card)',
+                border: `1px solid ${isActive ? 'var(--accent-border, #a7f3d0)' : 'var(--line)'}`,
+                color: isActive ? 'var(--accent)' : 'var(--muted)',
+                fontWeight: isActive ? 600 : 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.12s ease',
+              }}
+            >
+              {RUN_APP_FILTER_LABELS[f]}
+              <span style={{ opacity: 0.7, marginLeft: 2 }}>{counts[f]}</span>
+            </button>
+          );
+        })}
+      </div>
+      {/* Browse store: secondary action in toolbar row per wireframe .content-toolbar */}
+      <Link
+        to="/apps"
+        data-testid="run-apps-browse-store"
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'var(--muted)',
+          textDecoration: 'none',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+        }}
+      >
+        Browse store →
+      </Link>
     </div>
   );
 }
@@ -348,6 +368,9 @@ function AppCard({ app }: { app: RunApp }) {
 }
 
 function AppsGrid({ apps }: { apps: RunApp[] }) {
+  // Odd-count grids: show a "+ Install app" placeholder in the last slot so
+  // the 2-col layout doesn't look broken with a lone card.
+  const showPlaceholder = apps.length % 2 !== 0;
   return (
     <>
       <style>{`@media (max-width: 760px) { [data-testid="run-apps-grid"] { grid-template-columns: 1fr !important; } }`}</style>
@@ -363,6 +386,29 @@ function AppsGrid({ apps }: { apps: RunApp[] }) {
         {apps.map((app) => (
           <AppCard key={app.slug} app={app} />
         ))}
+        {showPlaceholder && (
+          <Link
+            to="/apps"
+            data-testid="run-apps-grid-placeholder"
+            style={{
+              background: 'transparent',
+              border: '1px dashed var(--line)',
+              borderRadius: 14,
+              padding: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              textDecoration: 'none',
+              color: 'var(--muted)',
+              minHeight: 140,
+            }}
+          >
+            <span style={{ fontSize: 22, lineHeight: 1 }}>+</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>Install more apps</span>
+          </Link>
+        )}
       </div>
     </>
   );
@@ -570,10 +616,15 @@ function EmptyState() {
 // Page
 // ------------------------------------------------------------------
 
+// Module-level cache so skeleton only shows on first load per session, not on
+// every route change back to this page. Cleared on full page reload.
+let _cachedInstalled: InstalledApp[] | null = null;
+let _cachedRuns: MeRunSummary[] | null = null;
+
 export function RunAppsPage() {
   const { data: session, loading: sessionLoading, error: sessionError } = useSession();
-  const [installed, setInstalled] = useState<InstalledApp[] | null>(null);
-  const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
+  const [installed, setInstalled] = useState<InstalledApp[] | null>(_cachedInstalled);
+  const [runs, setRuns] = useState<MeRunSummary[] | null>(_cachedRuns);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const sessionPending =
@@ -602,15 +653,18 @@ export function RunAppsPage() {
 
   useEffect(() => {
     if (sessionPending) return;
+    // Skip fetch if we already have cached data (stale-while-revalidate pattern).
+    // This prevents the skeleton from flashing on every route change.
     let cancelled = false;
-    // Fetch both in parallel; grid renders once both resolve.
     Promise.all([
       api.getInstalledApps().catch(() => ({ apps: [] as InstalledApp[] })),
       api.getMyRuns(FETCH_LIMIT).catch(() => ({ runs: [] as MeRunSummary[] })),
     ]).then(([installedRes, runsRes]) => {
       if (cancelled) return;
-      setInstalled(installedRes.apps as InstalledApp[]);
-      setRuns(runsRes.runs);
+      _cachedInstalled = installedRes.apps as InstalledApp[];
+      _cachedRuns = runsRes.runs;
+      setInstalled(_cachedInstalled);
+      setRuns(_cachedRuns);
     });
     return () => {
       cancelled = true;
@@ -648,52 +702,24 @@ export function RunAppsPage() {
     <WorkspacePageShell mode="run" title="Apps · Run · Floom">
       <div data-testid="run-apps-page">
         {/* Page head */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            gap: 18,
-            flexWrap: 'wrap',
-            marginBottom: 18,
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                fontWeight: 800,
-                fontSize: 30,
-                letterSpacing: '-0.02em',
-                lineHeight: 1.1,
-                margin: '0 0 5px',
-                color: 'var(--ink)',
-              }}
-            >
-              Apps
-            </h1>
-            <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.55 }}>
-              {appCount > 0
-                ? `${appCount} runnable app${appCount !== 1 ? 's' : ''} in your workspace. Available in browser, Claude, Cursor, and HTTP.`
-                : 'Install apps from the store to run them here.'}
-            </p>
-          </div>
-          <Link
-            to="/apps"
-            data-testid="run-apps-browse-store"
+        <div style={{ marginBottom: 18 }}>
+          <h1
             style={{
-              padding: '8px 14px',
-              background: 'var(--card)',
-              border: '1px solid var(--line)',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'var(--muted)',
-              textDecoration: 'none',
-              whiteSpace: 'nowrap',
+              fontWeight: 800,
+              fontSize: 30,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+              margin: '0 0 5px',
+              color: 'var(--ink)',
             }}
           >
-            Browse store →
-          </Link>
+            Apps
+          </h1>
+          <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.55 }}>
+            {appCount > 0
+              ? `${appCount} runnable app${appCount !== 1 ? 's' : ''} in your workspace. Available in browser, Claude, Cursor, and HTTP.`
+              : 'Install apps from the store to run them here.'}
+          </p>
         </div>
 
         {/* Compact hero metric strip (issue #913: NOT 4-card grid) */}
@@ -702,8 +728,8 @@ export function RunAppsPage() {
           runCount={dataReady ? runCount : null}
         />
 
-        {/* Filter chip toolbar (wireframe run-apps.html lines 136–143) */}
-        {dataReady && appCount > 0 && (
+        {/* Filter chip toolbar + Browse store — always shown when data ready */}
+        {dataReady && (
           <FilterChipBar
             active={activeFilter}
             counts={filterCounts}
