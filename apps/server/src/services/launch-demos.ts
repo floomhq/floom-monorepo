@@ -112,6 +112,16 @@ export const DEMOS: LaunchDemo[] = [
       node_dependencies: {},
       secrets_needed: ['GEMINI_API_KEY'],
       manifest_version: '2.0',
+      // R9 launch fix 2026-04-28: bare "*" = any publicly-resolvable host.
+      // Private/loopback IPs are still blocked by resolvePublicAddresses().
+      // Without this, the legacy default (api.openai.com,
+      // generativelanguage.googleapis.com, api.anthropic.com) blocks every
+      // user-supplied URL and the demo errors with "ProxyError" on real
+      // input, only succeeding when the floom.dev/n8n.io fixture in
+      // sample-cache.json short-circuits the fetch.
+      network: {
+        allowed_domains: ['*', 'generativelanguage.googleapis.com'],
+      },
       actions: {
         analyze: {
           label: 'Compare Pages',
@@ -171,6 +181,12 @@ export const DEMOS: LaunchDemo[] = [
       node_dependencies: {},
       secrets_needed: ['GEMINI_API_KEY'],
       manifest_version: '2.0',
+      // R9 launch fix 2026-04-28: same rationale as competitor-lens —
+      // single-URL audit needs to reach any publicly-resolvable host.
+      // SSRF is still blocked by resolvePublicAddresses().
+      network: {
+        allowed_domains: ['*', 'generativelanguage.googleapis.com'],
+      },
       actions: {
         audit: {
           label: 'Run Audit',

@@ -91,9 +91,26 @@ export function isPrivateOrLocalIp(address: string): boolean {
   return false;
 }
 
+// Special bare "*" entry means: allow any publicly-resolvable host at
+// runtime. SSRF is still blocked by resolvePublicAddresses() (rejects
+// private/loopback IPs) and IP-literal targets are still rejected by
+// authorizeTarget(). Used by built-in demo apps whose whole premise is
+// fetching user-supplied URLs (competitor-lens, ai-readiness-audit).
+//
+// IMPORTANT: this is only reachable for *first-party* manifests that are
+// hand-built in TS and stored verbatim in the apps table (see
+// services/launch-demos.ts which serializes `demo.manifest` directly,
+// bypassing normalizeManifest). User-published manifests still go through
+// `normalizeAllowedDomain`, which throws for "*" — preserving the
+// publish-time invariant that no third-party can declare an unbounded
+// allow-list. Test coverage: test/stress/test-trust-safety-network-deny.mjs.
+//
+// 2026-04-28 R9 launch fix.
+export const ANY_PUBLIC_HOST = '*';
+
 export function normalizeAllowedDomain(entry: string, field: string): string {
   const normalized = normalizeHostname(entry);
-  if (normalized === '*') {
+  if (normalized === ANY_PUBLIC_HOST) {
     throw new ManifestError(`${field} cannot be "*"`, field);
   }
   if (normalized.includes('/') || normalized.includes(':') || normalized.includes('@')) {
@@ -168,6 +185,11 @@ export function getEffectiveAllowedDomains(manifest: NormalizedManifest | undefi
 function matchesAllowedDomain(hostname: string, allowedDomains: string[]): boolean {
   const host = normalizeHostname(hostname);
   return allowedDomains.some((allowed) => {
+    if (allowed === ANY_PUBLIC_HOST) {
+      // Bare "*" lets any publicly-resolvable host through. The
+      // private-IP guard in resolvePublicAddresses() still blocks SSRF.
+      return true;
+    }
     if (allowed.startsWith('*.')) {
       const suffix = allowed.slice(2);
       return host !== suffix && host.endsWith(`.${suffix}`);

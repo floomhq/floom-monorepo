@@ -1766,17 +1766,29 @@ if (webDist) {
           }
         | undefined;
       if (!appRow) {
-        return c.html(rewriteTitle(servedIndexHtml, 'App not found · Floom'), 404);
+        return new Response(rewriteTitle(servedIndexHtml, 'App not found · Floom'), {
+          status: 404,
+          headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
+        });
       }
       const ctx = await resolveUserContext(c);
       const access = getAppAccessDecision(appRow, ctx, url.searchParams.get('key'));
       if (!access.ok) {
         if (access.status === 401) {
-          return c.html(rewriteTitle(servedIndexHtml, 'Authentication required · Floom'), 401);
+          return new Response(rewriteTitle(servedIndexHtml, 'Authentication required · Floom'), {
+            status: 401,
+            headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
+          });
         }
-        return c.html(rewriteTitle(servedIndexHtml, 'App not found · Floom'), 404);
+        return new Response(rewriteTitle(servedIndexHtml, 'App not found · Floom'), {
+          status: 404,
+          headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
+        });
       }
-      return c.html(rewriteHeadForSlug(servedIndexHtml, slugMatch[1]));
+      return new Response(rewriteHeadForSlug(servedIndexHtml, slugMatch[1]), {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
+      });
     }
     // 2026-04-20 (PRR tail cleanup): explicit /404 path returns 404 status.
     if (pathname === '/404' || pathname === '/404.html') {
@@ -1806,7 +1818,15 @@ if (webDist) {
         },
       );
     }
-    return c.html(rewriteHeadForPath(servedIndexHtml, pathname));
+    // 2026-04-28 (R9 cache-bust): index.html (this SPA fallback) MUST send
+    // `cache-control: no-cache` so browsers always revalidate. Vite-hashed
+    // /assets/* are immutable and keep their `public, max-age=3600` from
+    // the file branch above. Without this, browsers cache stale index.html
+    // → which references hashed asset URLs that no longer exist on deploy.
+    return new Response(rewriteHeadForPath(servedIndexHtml, pathname), {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
+    });
   });
 } else {
   console.log('[web] no built web bundle found — backend-only mode');
