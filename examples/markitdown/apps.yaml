@@ -1,0 +1,17 @@
+apps:
+  - slug: markitdown
+    display_name: MarkItDown
+    category: developer-tools
+    description: >
+      Convert any HTML, text, or document content to clean Markdown for AI pipelines.
+      No API key needed.
+    runtime: node
+    entrypoint: examples/markitdown/server.mjs
+    port: 4310
+    visibility: public
+    env: []
+    icon: markitdown
+    tags:
+      - markdown
+      - conversion
+      - developer-tools
