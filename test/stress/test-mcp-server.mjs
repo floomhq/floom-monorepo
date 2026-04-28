@@ -194,12 +194,9 @@ try {
   });
   const writeNames = (writeList.json?.result?.tools || []).map((tool) => tool.name).sort();
   const writeExpected = [
-    'account_create_agent_token',
     'account_delete_secret',
     'account_get',
-    'account_list_agent_tokens',
     'account_list_secrets',
-    'account_revoke_agent_token',
     'account_set_secret',
     'cancel_job',
     'create_job',
@@ -261,7 +258,7 @@ try {
     'workspace_switch',
     'workspace_update',
   ].sort();
-  log('read-write token exposes run + studio + account tools', JSON.stringify(writeNames) === JSON.stringify(writeExpected), JSON.stringify(writeNames));
+  log('read-write token exposes run + studio + account tools without token-governance tools', JSON.stringify(writeNames) === JSON.stringify(writeExpected), JSON.stringify(writeNames));
 
   const publishList = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',
@@ -779,33 +776,11 @@ try {
       arguments: { label: 'mcp child token', scope: 'read', rate_limit_per_minute: 77 },
     },
   });
-  const accountCreateTokenPayload = parseToolText(accountCreateToken);
-  log('account_create_agent_token returns raw token once', typeof accountCreateTokenPayload?.raw_token === 'string' && accountCreateTokenPayload.raw_token.startsWith('floom_agent_'), accountCreateToken.text);
-  log('account_create_agent_token does not leak hash material', accountCreateTokenPayload && !('hash' in accountCreateTokenPayload) && !accountCreateToken.text.includes(agentTokens.hashAgentToken(accountCreateTokenPayload.raw_token || '')), accountCreateToken.text);
-
-  const accountListTokens = await callMcp(server.port, writeToken, {
-    jsonrpc: '2.0',
-    id: 27,
-    method: 'tools/call',
-    params: { name: 'account_list_agent_tokens', arguments: {} },
-  });
-  const accountListTokensPayload = parseToolText(accountListTokens);
-  const childTokenListRow = (accountListTokensPayload?.tokens || []).find((token) => token.id === accountCreateTokenPayload?.id);
-  log('account_list_agent_tokens returns child token metadata', Boolean(childTokenListRow) && childTokenListRow.rate_limit_per_minute === 77, accountListTokens.text);
-  log('account_list_agent_tokens never returns raw token or hash', Boolean(childTokenListRow) && !('raw_token' in childTokenListRow) && !('hash' in childTokenListRow), accountListTokens.text);
-
-  const accountRevokeToken = await callMcp(server.port, writeToken, {
-    jsonrpc: '2.0',
-    id: 28,
-    method: 'tools/call',
-    params: { name: 'account_revoke_agent_token', arguments: { token_id: accountCreateTokenPayload?.id } },
-  });
-  const accountRevokeTokenPayload = parseToolText(accountRevokeToken);
-  log('account_revoke_agent_token revokes workspace child token', accountRevokeTokenPayload?.ok === true && accountRevokeTokenPayload?.revoked === true, accountRevokeToken.text);
+  log('account_create_agent_token is not callable through agent-token MCP auth', Boolean(accountCreateToken.json?.error) || accountCreateToken.json?.result?.isError === true, accountCreateToken.text);
 
   const initialSharing = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',
-    id: 29,
+    id: 27,
     method: 'tools/call',
     params: { name: 'studio_get_app_sharing', arguments: { slug: 'agent-studio-publish' } },
   });
