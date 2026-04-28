@@ -178,6 +178,17 @@ export function StreamingTerminal({ app, lines, onCancel }: Props) {
   const stepLabel = useMemo(() => pickStepLabel(lines), [lines]);
   const activeStepIndex = useMemo(() => deriveStepIndex(stepLabel), [stepLabel]);
   const showSlowHint = elapsedMs > 5000;
+  // R13 (2026-04-28): graduated reassurance for slow runs. After 30s we
+  // remind the user the typical bound; after 60s we acknowledge it's
+  // longer than usual so they don't think the page is stuck.
+  const slowHintCopy =
+    elapsedMs > 60000
+      ? 'This is taking longer than usual.'
+      : elapsedMs > 30000
+        ? 'Still working… expected up to 22s on this app.'
+        : showSlowHint
+          ? 'Some apps take 20–40 seconds.'
+          : null;
 
   const toggleDetails = useCallback(() => {
     setDetailsOpen((prev) => {
@@ -260,12 +271,12 @@ export function StreamingTerminal({ app, lines, onCancel }: Props) {
         })}
       </div>
 
-      {showSlowHint && (
+      {slowHintCopy && (
         <p
           className="run-progress-hint"
           data-testid="stream-slow-hint"
         >
-          Some apps take 20–40 seconds.
+          {slowHintCopy}
         </p>
       )}
 

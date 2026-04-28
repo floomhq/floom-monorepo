@@ -96,26 +96,9 @@ const signUpStyle: CSSProperties = {
   transition: 'opacity 0.12s',
 };
 
-// Primary Publish CTA — brand green pill, eye-draw. Always visible to
-// signed-out + signed-in alike. Routes to /studio/build on preview, opens
-// the waitlist on prod (waitlistMode). #572 — single primary action on the
-// right side; everything else is text or chrome.
-const publishCtaStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '7px 14px',
-  borderRadius: 6,
-  fontSize: 13,
-  fontWeight: 600,
-  lineHeight: 1,
-  textDecoration: 'none',
-  color: '#fff',
-  background: ACCENT,
-  border: '1px solid ' + ACCENT,
-  cursor: 'pointer',
-  fontFamily: 'inherit',
-  transition: 'filter 0.12s',
-};
+// R13 (2026-04-28): publishCtaStyle removed alongside the Publish CTA.
+// Publishing now flows through the MCP `studio_publish_app` tool, not
+// the web UI — /studio/build is out of MVP scope.
 
 const menuItemStyle: CSSProperties = {
   display: 'block',
@@ -241,13 +224,10 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
     location.pathname.startsWith('/protocol') ||
     location.pathname.startsWith('/docs');
   const isStudio = location.pathname.startsWith('/studio');
-  const isPublishNav =
-    location.pathname === '/studio/build' || location.pathname === '/deploy';
+  // R13 (2026-04-28): isPublishNav + goWaitlistPublish removed alongside
+  // the Publish CTA. Publishing flows through MCP `studio_publish_app`,
+  // not the web TopBar.
 
-  function goWaitlistPublish(source: string) {
-    // TODO(Agent 9): open WaitlistModal instead of routing.
-    navigate(waitlistHref(source));
-  }
 
   return (
     <header
@@ -424,39 +404,11 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               the right cluster. */}
           {!isLoginPage && !showAuthedChrome && !isAppPermalinkRoute && <CopyForClaudeButton />}
 
-          {/* Primary CTA — brand-green pill for anon only on launch-mvp.
-              Authed users use /home (token + install). Drop "+ New app" from
-              authed TopBar for launch-mvp simplicity. */}
-          {!isLoginPage && showAuthedChrome && (
-            <Link
-              to="/studio/build"
-              data-testid="topbar-new-app-cta"
-              aria-current={isPublishNav ? 'page' : undefined}
-              style={{ ...publishCtaStyle, display: 'none' }}
-            >
-              + New app
-            </Link>
-          )}
-          {!isLoginPage && !showAuthedChrome && deployEnabled && !isAppPermalinkRoute && (
-            <Link
-              to="/studio/build"
-              data-testid="topbar-publish-cta"
-              aria-current={isPublishNav ? 'page' : undefined}
-              style={publishCtaStyle}
-            >
-              Publish
-            </Link>
-          )}
-          {!isLoginPage && !showAuthedChrome && waitlistMode && !isAppPermalinkRoute && (
-            <button
-              type="button"
-              data-testid="topbar-publish-cta-waitlist"
-              onClick={() => goWaitlistPublish('topbar-publish')}
-              style={publishCtaStyle}
-            >
-              Publish
-            </button>
-          )}
+          {/* R13 (2026-04-28): Publish CTA removed from MVP TopBar. The
+              "+ New app" / Publish / Publish-waitlist trio was redundant
+              with /studio/build (which is out of MVP scope) — publishing
+              now flows exclusively through the MCP `studio_publish_app`
+              tool. Federico locked this for launch-mvp. */}
 
           {/* Sign in / Sign up. Hidden in waitlist mode (floom.dev) and
               while session is still loading (prevents the "Sign in +

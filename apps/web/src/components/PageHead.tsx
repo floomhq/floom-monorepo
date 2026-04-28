@@ -19,7 +19,15 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-const SITE = 'https://floom.dev';
+// R13 (2026-04-28): resolve at runtime so canonical/og:url track the actual
+// host. Post-flip mvp.floom.dev → floom.dev keeps working without a rebuild.
+// Fallback to floom.dev only if window is unavailable (SSR / pre-mount).
+function siteOrigin(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return 'https://floom.dev';
+}
 
 function setMeta(selector: string, attr: 'content' | 'href', value: string) {
   let el = document.head.querySelector<HTMLMetaElement | HTMLLinkElement>(selector);
@@ -47,7 +55,7 @@ export function PageHead({ title, description, pathname }: PageHeadProps) {
     // Strip trailing slash (except root) so /about/ and /about share the
     // same canonical — mirrors how Google's canonicalisation works.
     const clean = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
-    const url = `${SITE}${clean}`;
+    const url = `${siteOrigin()}${clean}`;
 
     document.title = title;
     setMeta('link[rel="canonical"]', 'href', url);

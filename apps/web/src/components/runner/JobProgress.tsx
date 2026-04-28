@@ -43,6 +43,17 @@ export function JobProgress({ app, job, onCancel }: Props) {
   const elapsedBase = startedAt ? startedAt.getTime() : componentMountedAt;
   const elapsed = Math.max(0, now - elapsedBase);
   const showSlowHint = elapsed > 5000;
+  // R13 (2026-04-28): graduated reassurance for slow runs. After 30s we
+  // remind the user the typical bound; after 60s we acknowledge it's
+  // longer than usual so they don't think the page is stuck.
+  const slowHintCopy =
+    elapsed > 60000
+      ? 'This is taking longer than usual.'
+      : elapsed > 30000
+        ? 'Still working… expected up to 22s on this app.'
+        : showSlowHint
+          ? 'Some apps take 20–40 seconds.'
+          : null;
 
   return (
     <div className="assistant-turn" data-testid="job-progress">
@@ -80,7 +91,7 @@ export function JobProgress({ app, job, onCancel }: Props) {
               {status === 'queued'
                 ? 'A worker will pick this up in a moment. You can leave this page; the job keeps running.'
                 : 'Polling for completion. This page updates when the run finishes.'}
-              {showSlowHint && ' Some apps take 20–40 seconds.'}
+              {slowHintCopy && ` ${slowHintCopy}`}
             </p>
           </div>
         </div>

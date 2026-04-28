@@ -110,7 +110,13 @@ export function BaseLayout({
     if (typeof document === 'undefined') return;
     if (title) document.title = title;
 
-    const site = 'https://floom.dev';
+    // R13 (2026-04-28): resolve at runtime so canonical/og:url track the
+    // actual host. Post-flip mvp.floom.dev → floom.dev keeps working
+    // without a rebuild. Fallback only if window unavailable.
+    const site =
+      typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : 'https://floom.dev';
     // Strip trailing slash (except root) so /about/ and /about collapse
     // onto the same canonical — mirrors Google's own canonicalisation.
     const rawPath = location.pathname || '/';
