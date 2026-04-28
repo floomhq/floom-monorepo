@@ -208,6 +208,50 @@ export function AboutPage() {
         </div>
       </section>
 
+      {/* 1b. Why Floom / Under the hood — R15 UI-4 (2026-04-28).
+          Tackles Vladimir persona's "black box" complaint from the launch
+          user feedback PDF. Visitors leaving the hero want to know what
+          actually happens inside Floom before reading the persona cards
+          below. Four short paragraphs explaining the real architecture
+          choices: workspace-scoped runtime, MCP-native, OSS by default,
+          open protocol. Plain language; one verifiable fact each. */}
+      <section data-testid="about-why-floom" style={SECTION_BORDERED}>
+        <p style={EYEBROW_STYLE}>Under the hood</p>
+        <h2 style={H2_STYLE}>Why Floom.</h2>
+        <p style={MUTED_BODY_STYLE}>
+          Four choices we made early. Each one is verifiable from the
+          source — not a tagline.
+        </p>
+
+        <div
+          data-testid="about-why-floom-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: 20,
+            margin: '28px 0 0',
+          }}
+          className="about-why-floom-grid"
+        >
+          <WhyFloomCard
+            label="Workspace-scoped runtime"
+            body="Every app runs in an isolated container with workspace-level secrets, rate limits, and quotas. Your Anthropic key, your colleagues' Stripe key, and the public hub all live in different sandboxes. No shared state, no key bleed."
+          />
+          <WhyFloomCard
+            label="MCP-native"
+            body="Agents call the same endpoint humans see in their browser. One spec, three surfaces: the UI you click, the HTTP API you curl, the MCP tool Claude calls. No second adapter to maintain."
+          />
+          <WhyFloomCard
+            label="OSS by default"
+            body="MIT-licensed core. Self-host with one Docker command on your own box, your own VPS, your own Kubernetes cluster. The cloud version is a convenience, never a lock-in."
+          />
+          <WhyFloomCard
+            label="Open protocol"
+            body="The OpenAPI spec is the source of truth. No proprietary YAML, no Floom-specific DSL. If you can describe your app's inputs and outputs in OpenAPI, Floom can run it. Your spec is portable."
+          />
+        </div>
+      </section>
+
       {/* 2. Who Floom is for */}
       <section data-testid="about-who-for" style={SECTION_BORDERED}>
         <p style={EYEBROW_STYLE}>Who Floom is for</p>
@@ -641,6 +685,50 @@ function HeroStat({ number, label }: { number: string; label: string }) {
       >
         {label}
       </span>
+    </div>
+  );
+}
+
+/**
+ * R15 UI-4 (2026-04-28): one card in the "Why Floom / Under the hood"
+ * grid. Mono uppercase label + a short prose paragraph. Matches the
+ * card chrome used elsewhere on /about (var(--card) bg, var(--line)
+ * border, 12px radius) so it slots into the existing visual system.
+ */
+function WhyFloomCard({ label, body }: { label: string; body: string }) {
+  return (
+    <div
+      data-testid={`about-why-floom-card-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+      style={{
+        background: 'var(--card)',
+        border: '1px solid var(--line)',
+        borderRadius: 12,
+        padding: '22px 22px 24px',
+      }}
+    >
+      <p
+        style={{
+          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontSize: 11,
+          fontWeight: 700,
+          color: 'var(--accent)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          margin: '0 0 12px',
+        }}
+      >
+        {label}
+      </p>
+      <p
+        style={{
+          fontSize: 15,
+          lineHeight: 1.65,
+          color: 'var(--ink)',
+          margin: 0,
+        }}
+      >
+        {body}
+      </p>
     </div>
   );
 }

@@ -270,7 +270,11 @@ export function InstallPopover({
               copyLabel="Copy URL"
             />
             <CodeBlock
-              description="Paste this into your MCP client's config file."
+              description={
+                <>
+                  Merge this <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>mcpServers</code> entry into your client's config (Claude Desktop, Cursor, Codex …).
+                </>
+              }
               value={mcpSnippet}
               testId="install-popover-mcp-snippet"
               copyLabel="Copy JSON config"
@@ -279,7 +283,7 @@ export function InstallPopover({
         )}
         {activeTab === 'cli' && (
           <CodeBlock
-            description="Run from any shell — Node 18+ required."
+            description="Run from any shell. Node 18+ required."
             value={cliSnippet}
             testId="install-popover-cli-snippet"
             copyLabel="Copy command"
@@ -472,7 +476,7 @@ function TokenSection({
           />
         </div>
         <p style={helperStyle}>
-          Stays in your browser. Snippet below updates as you type.
+          Not stored or sent anywhere; just substituted into the snippet below as you type.
         </p>
       </div>
     );
@@ -615,7 +619,7 @@ function TokenSection({
         />
       </div>
       <p style={helperStyle}>
-        Raw token is shown once at mint time. Pasted tokens stay in your browser only.
+        Raw token is shown once at mint time. Pasted tokens are not stored; they only swap into the snippet locally.
       </p>
     </div>
   );

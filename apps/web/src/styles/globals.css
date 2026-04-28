@@ -2441,3 +2441,27 @@ body:has(.topbar-mobile-menu) {
     margin-right: 4px;
   }
 }
+
+/* R15 UI-4 (2026-04-28): /about "Why Floom" 2-up card grid collapses to
+ * a single column on narrow screens to keep readability. */
+@media (max-width: 700px) {
+  .about-why-floom-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* R15 UI-3 (2026-04-28): "How Floom works" 4-stage diagram. Desktop is
+ * a 4-up horizontal grid with right-pointing arrow connectors in the
+ * gutters. Below 900px we drop to a single column and rotate the arrow
+ * 90deg so it points down between stacked cards. */
+@media (max-width: 900px) {
+  .how-it-works-stages {
+    grid-template-columns: 1fr !important;
+  }
+  .how-it-works-arrow {
+    right: 50% !important;
+    top: auto !important;
+    bottom: -22px !important;
+    transform: translateX(50%) rotate(90deg) !important;
+  }
+}

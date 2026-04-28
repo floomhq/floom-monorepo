@@ -43,6 +43,7 @@ import { useSession } from '../../hooks/useSession';
 import * as api from '../../api/client';
 import { ApiError, CsvRowCapExceededError, FileInputTooLargeError, getAppQuota, readUserGeminiKey } from '../../api/client';
 import { buildPublicRunPath, getRunStartErrorMessage } from '../../lib/publicPermalinks';
+import { getSampleInputs } from '../../lib/sample-inputs';
 import { useDeployEnabled } from '../../lib/flags';
 import { waitlistHref } from '../../lib/waitlistCta';
 import { BYOKModal } from '../BYOKModal';
@@ -1064,6 +1065,11 @@ export function RunSurface({
 
   const hasInputs = (state.actionSpec?.inputs?.length ?? 0) > 0;
 
+  // R15 UI-1 (2026-04-28): registered sample-input prefill for this slug
+  // (lib/sample-inputs.ts). Drives the "Try sample" button in InputCard.
+  // undefined for any slug without a sample — the button hides.
+  const sampleInputs = getSampleInputs(app.slug);
+
   // Shared-run banner visibility — see deriveSharedRunBanner() below for
   // the pure decision logic + stress test hook.
   const viewingSharedRun = deriveSharedRunBanner({
@@ -1314,6 +1320,24 @@ export function RunSurface({
               }));
               onResetInitialRun?.();
             }}
+            onTrySample={
+              // R15 UI-1: render the button only when this app has a
+              // registered sample payload. Filling spans every input
+              // declared in the action spec — onChange handles errors
+              // clearing for free (#256).
+              sampleInputs
+                ? () => {
+                    setState((s) => {
+                      const next = { ...s.inputs };
+                      for (const inp of state.actionSpec.inputs) {
+                        const v = sampleInputs[inp.name];
+                        if (v !== undefined) next[inp.name] = v;
+                      }
+                      return { ...s, inputs: next, inputErrors: undefined };
+                    });
+                  }
+                : undefined
+            }
             hasInputs={hasInputs}
           />
         </section>
@@ -1706,6 +1730,13 @@ interface InputCardProps {
    * back to phase='ready' while preserving the inputs.
    */
   onEditRerun: () => void;
+  /**
+   * R15 UI-1 (2026-04-28): "Try sample" handler. When defined, the
+   * input card renders a small button next to Run that fills the form
+   * with a hardcoded known-good payload. Hidden when undefined (apps
+   * with no registered sample). Only relevant in `edit` mode.
+   */
+  onTrySample?: () => void;
 }
 
 function InputCard({
@@ -1722,6 +1753,7 @@ function InputCard({
   onRun,
   onReset,
   onEditRerun,
+  onTrySample,
 }: InputCardProps) {
   // Fix 5 (2026-04-19): progressive disclosure of optional inputs.
   // Required fields render inline, optional fields stay collapsed behind
@@ -2021,6 +2053,23 @@ function InputCard({
             >
               Reset
             </button>
+            {/* R15 UI-1 (2026-04-28): "Try sample" — Eva persona feedback
+                "paste what exactly?" Only renders when the app has a
+                registered sample payload + we're not running. Click
+                fills every required + optional field via onChange. */}
+            {onTrySample && mode === 'edit' && (
+              <button
+                type="button"
+                className="btn-ghost"
+                data-testid="run-surface-try-sample-btn"
+                onClick={onTrySample}
+                disabled={running || disabledVisual}
+                style={{ marginLeft: 'auto' }}
+              >
+                Try sample
+                <span aria-hidden="true" style={{ marginLeft: 4 }}>→</span>
+              </button>
+            )}
           </div>
         </form>
       ) : (
@@ -3153,16 +3202,25 @@ export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
           // the shared-run path.
           <ul className="run-surface-past-list" data-testid="run-surface-past-list">
             {runs.slice(0, 5).map((r) => {
-              const inputPeek = summarizeInputs(r.inputs);
-              const outputPeek = summarizeOutputs(r.outputs, r.status, r.error);
-              const oneLine = `Input: ${inputPeek || '—'} · Output: ${outputPeek || '—'}`;
+              // R15 UI-2 (2026-04-28): Esteban persona feedback — "no
+              // visibility after deploy". Each row now surfaces 4 facts:
+              //   • status dot + relative time (when)
+              //   • duration (e.g. "1.2s")
+              //   • first 60 chars of the result text (or "Pending..." /
+              //     status copy for non-success)
+              //   • explicit "View →" link to /r/<id> (the row is also
+              //     a Link, but the explicit affordance closes the
+              //     "where do I go for details" gap)
+              const resultPeek = summarizeRunResultPreview(r);
+              const durationLabel = formatDurationMs(r.duration_ms);
+              const titleAttr = `${r.status} · ${durationLabel || 'in progress'} · ${resultPeek || 'no preview'}`;
               return (
               <li key={r.id}>
                 <Link
                   to={buildPublicRunPath(r.id)}
                   data-testid={`run-surface-past-row-${r.id}`}
                   className="run-surface-past-row"
-                  title={oneLine}
+                  title={titleAttr}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -3188,6 +3246,7 @@ export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
                   />
                   <span
                     className="run-surface-past-preview-line"
+                    data-testid={`run-surface-past-preview-${r.id}`}
                     style={{
                       fontFamily: 'JetBrains Mono, ui-monospace, monospace',
                       fontSize: 12,
@@ -3199,8 +3258,22 @@ export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {oneLine}
+                    {resultPeek || 'Click View → for details'}
                   </span>
+                  {durationLabel && (
+                    <span
+                      className="run-surface-past-duration"
+                      data-testid={`run-surface-past-duration-${r.id}`}
+                      style={{
+                        fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                        fontSize: 11,
+                        color: 'var(--muted)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {durationLabel}
+                    </span>
+                  )}
                   <span
                     className="run-surface-past-when"
                     style={{
@@ -3210,6 +3283,18 @@ export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
                     }}
                   >
                     {formatWhen(r.started_at)}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    data-testid={`run-surface-past-view-${r.id}`}
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--accent, #047857)',
+                      fontWeight: 600,
+                      flexShrink: 0,
+                    }}
+                  >
+                    View →
                   </span>
                 </Link>
               </li>
@@ -3285,6 +3370,68 @@ export function summarizeOutputs(
     if (keys.length > 0) return `{${keys.slice(0, 3).join(', ')}…}`;
   }
   return '';
+}
+
+/**
+ * R15 UI-2 (2026-04-28): per-row result preview for the Earlier runs
+ * disclosure. Bumps the cap from 40 to 60 chars so the row reads as a
+ * "logs preview" (Federico's brief). For pending/streaming rows
+ * (status: pending/running) returns "Pending…" so the row isn't blank.
+ * For error/timeout returns the truncated error string.
+ */
+export function summarizeRunResultPreview(run: MeRunSummary): string {
+  if (run.status === 'pending' || run.status === 'running') return 'Pending…';
+  if (run.status === 'error' || run.status === 'timeout') {
+    const msg = (run.error || '').trim();
+    if (!msg) return run.status;
+    return msg.length > 60 ? `${msg.slice(0, 57)}…` : msg;
+  }
+  const outputs = run.outputs;
+  if (outputs == null) return '';
+  if (typeof outputs === 'string') {
+    return outputs.length > 60 ? `${outputs.slice(0, 57)}…` : outputs;
+  }
+  if (typeof outputs === 'object') {
+    const o = outputs as Record<string, unknown>;
+    const preferred = ['summary', 'uuid', 'result', 'output', 'text', 'message'];
+    for (const key of preferred) {
+      const v = o[key];
+      if (typeof v === 'string' && v.trim()) {
+        return v.length > 60 ? `${v.slice(0, 57)}…` : v;
+      }
+      if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'string') {
+        const first = v[0] as string;
+        return first.length > 60 ? `${first.slice(0, 57)}…` : first;
+      }
+    }
+    for (const v of Object.values(o)) {
+      if (typeof v === 'string' && v.trim()) {
+        return v.length > 60 ? `${v.slice(0, 57)}…` : v;
+      }
+      if (typeof v === 'number' || typeof v === 'boolean') {
+        return String(v);
+      }
+    }
+    const keys = Object.keys(o);
+    if (keys.length > 0) return `{${keys.slice(0, 3).join(', ')}…}`;
+  }
+  return '';
+}
+
+/**
+ * R15 UI-2 (2026-04-28): format a duration in milliseconds for the
+ * Earlier runs row. <1s → "950ms"; <60s → "1.2s"; >=60s → "1m 4s".
+ * Returns null when the run hasn't finished yet (so the caller hides
+ * the column entirely instead of showing "0ms").
+ */
+export function formatDurationMs(ms: number | null | undefined): string | null {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return null;
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const totalSec = Math.round(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
 function formatWhen(iso: string): string {

@@ -41,6 +41,7 @@ import { HeroDemo } from '../components/home/HeroDemo';
 import { SectionEyebrow } from '../components/home/SectionEyebrow';
 import { WorkedExample } from '../components/home/WorkedExample';
 import { ThreeSurfacesDiagram } from '../components/home/ThreeSurfacesDiagram';
+import { HowItWorksDiagram } from '../components/home/HowItWorksDiagram';
 import { FitBand } from '../components/home/FitBand';
 import { WhosBehind } from '../components/home/WhosBehind';
 import { DiscordCta } from '../components/home/DiscordCta';
@@ -75,7 +76,20 @@ async function copyText(text: string) {
   document.body.removeChild(ta);
 }
 
-function MvpHeroInstall() {
+interface MvpHeroInstallProps {
+  /**
+   * R15 UI-6 (2026-04-28): hero trust signals. Total live apps + sum of
+   * runs_7d across visible apps. Both can be 0 on cold launch — when
+   * apps>0 we render "<N> apps live"; when runs_7d sum > 0 we append
+   * "<N> runs this week". Stars come from GitHubStarsBadge which fetches
+   * its own data. When all 3 stats are 0/missing, the strip hides
+   * entirely (no empty placeholder).
+   */
+  appsCount: number;
+  runs7dSum: number;
+}
+
+function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -173,6 +187,89 @@ function MvpHeroInstall() {
           <span aria-hidden="true">→</span>
         </a>
       </div>
+      {/* R15 UI-6 (2026-04-28): hero trust-signals strip. Real numbers
+          sourced from /api/hub (apps count + runs_7d sum) and
+          GitHubStarsBadge's /api/gh-stars cache. Renders as one quiet
+          gray line below the npx + "try live app" CTAs. Each stat hides
+          when it's zero/missing so a cold launch never shows "0 runs". */}
+      <HeroTrustSignals appsCount={appsCount} runs7dSum={runs7dSum} />
+    </div>
+  );
+}
+
+/**
+ * R15 UI-6 (2026-04-28): trust-signal strip for the MVP hero. Reads the
+ * apps + runs_7d totals as props (LandingV17Page already fetches /api/hub
+ * for the showcase, so we pass the data down rather than re-fetching).
+ * GitHub stars come from `/api/gh-stars` via the same cache key the
+ * GitHubStarsBadge uses — we read the cache synchronously and refresh
+ * it in the background.
+ */
+function HeroTrustSignals({
+  appsCount,
+  runs7dSum,
+}: {
+  appsCount: number;
+  runs7dSum: number;
+}) {
+  const [stars, setStars] = useState<number | null>(() => {
+    // Cheap synchronous read of the GitHubStarsBadge cache. Same key.
+    try {
+      const raw = window.localStorage?.getItem('floom:gh-stars');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { count?: number; ts?: number };
+      if (typeof parsed.count === 'number') return parsed.count;
+    } catch {
+      /* ignore */
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/gh-stars', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { count?: number } | null) => {
+        if (cancelled || !d || typeof d.count !== 'number') return;
+        setStars(d.count);
+      })
+      .catch(() => {
+        /* keep cached/null fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Build the visible parts. Each stat hides when its value isn't
+  // meaningful so a cold launch reads as "10 apps live · ★ 6 stars"
+  // rather than "10 apps live · 0 runs this week · ★ 6 stars".
+  const parts: string[] = [];
+  if (appsCount > 0) {
+    parts.push(`${appsCount} app${appsCount === 1 ? '' : 's'} live`);
+  }
+  if (runs7dSum > 0) {
+    parts.push(`${runs7dSum} run${runs7dSum === 1 ? '' : 's'} this week`);
+  }
+  if (stars && stars > 0) {
+    parts.push(`★ ${stars} star${stars === 1 ? '' : 's'}`);
+  }
+
+  // Hide entirely when nothing meaningful to show (would render as
+  // empty whitespace otherwise).
+  if (parts.length === 0) return null;
+
+  return (
+    <div
+      data-testid="hero-trust-signals"
+      style={{
+        marginTop: 14,
+        fontSize: 12.5,
+        color: 'var(--muted)',
+        lineHeight: 1.5,
+      }}
+    >
+      {parts.join(' · ')}
     </div>
   );
 }
@@ -241,6 +338,10 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
   const [directoryApps, setDirectoryApps] = useState<Stripe[]>([]);
   const [directoryHubApps, setDirectoryHubApps] = useState<HubApp[]>([]);
   const [totalAppsCount, setTotalAppsCount] = useState<number>(0);
+  // R15 UI-6 (2026-04-28): sum of runs_7d across all visible apps.
+  // Renders into the hero trust-signals strip ("47 runs this week").
+  // Drops to 0 on cold launch — HeroTrustSignals hides the stat then.
+  const [runs7dSum, setRuns7dSum] = useState<number>(0);
   const deployEnabledFlag = useDeployEnabled();
   const deployEnabled = deployEnabledFlag ?? readDeployEnabled();
   // v26 §3 option C: logged-in-aware landing.
@@ -263,6 +364,13 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
         if (visible.length > 0) {
           setStripes(pickStripes(visible));
           setTotalAppsCount(visible.length);
+          // R15 UI-6: sum runs_7d across visible apps for hero trust strip.
+          // HubApp.runs_7d is optional; missing/undefined coerces to 0.
+          const totalRuns7d = visible.reduce(
+            (acc, app) => acc + (typeof app.runs_7d === 'number' ? app.runs_7d : 0),
+            0,
+          );
+          setRuns7dSum(totalRuns7d);
           // R8 #25: keep full HubApp shape for AppGrid (sample-output
           // preview chip needs thumbnail + manifest + sample data).
           const curatedSlugs = new Set<string>(PREFERRED_SLUGS as readonly string[]);
@@ -442,7 +550,10 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 Full variant: runtime-gated by DEPLOY_ENABLED. */}
             {isMvp ? (
               <>
-                <MvpHeroInstall />
+                <MvpHeroInstall
+                  appsCount={totalAppsCount}
+                  runs7dSum={runs7dSum}
+                />
                 {/* WorksWithBelt moved to the eyebrow above H1 (Federico
                     2026-04-28). No longer rendered under the snippet — it
                     was a second hero element competing with H1+snippet. */}
@@ -667,6 +778,14 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
             })}
           </div>
         </section>
+
+        {/* R15 UI-3 (2026-04-28): "How Floom works" 4-stage diagram.
+            Tackles Vladimir persona's "black box" complaint from the
+            launch user feedback PDF — visitors couldn't tell what Floom
+            actually does once they hit Run. Sits between the 3-step
+            narrative and the showcase so readers get conceptual model
+            BEFORE the apps. */}
+        <HowItWorksDiagram />
 
         {/* HeroDemo moved back to right under the hero install snippet
             (R7.6 followup) — was pushed here in R7.6 first pass; Federico
