@@ -156,23 +156,17 @@ export function PublicFooter() {
               gap: 8,
             }}
           >
-            <span
+            {/* R7.5: footer logo matches header (real Floom mark, not generic F square).
+                Federico flagged the mismatch — header used floom-mark-glow.svg, footer
+                used a black F-mark. Now both use the same SVG. */}
+            <img
+              src="/floom-mark-glow.svg"
+              alt=""
               aria-hidden="true"
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 6,
-                background: 'var(--accent)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 800,
-              }}
-            >
-              F
-            </span>
+              width={22}
+              height={22}
+              style={{ display: 'inline-block' }}
+            />
             Floom
           </Link>
           <p
@@ -196,16 +190,15 @@ export function PublicFooter() {
               maxWidth: 280,
             }}
           >
-            Built in Hamburg + SF. Backed by{' '}
+            Built in Hamburg + SF ·{' '}
             <a
               href="https://f.inc"
               target="_blank"
               rel="noreferrer"
               style={{ color: 'var(--ink)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid var(--line)' }}
             >
-              Founders Inc
+              Founders Inc cohort
             </a>
-            .
           </p>
         </div>
 

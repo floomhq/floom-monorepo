@@ -126,7 +126,7 @@ export function WhosBehind() {
             me is email.
           </p>
           <p style={{ ...BODY_STYLE, marginTop: 12, fontSize: 13, color: 'var(--muted)' }}>
-            Backed by <a href="https://f.inc" target="_blank" rel="noreferrer" style={{ color: 'var(--ink)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid var(--line)' }}>Founders Inc</a>.
+            Floom is in the <a href="https://f.inc" target="_blank" rel="noreferrer" style={{ color: 'var(--ink)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid var(--line)' }}>Founders Inc</a> cohort.
           </p>
           <div style={LINKS_ROW_STYLE}>
             <a

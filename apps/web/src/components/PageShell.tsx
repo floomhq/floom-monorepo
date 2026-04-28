@@ -48,8 +48,14 @@ export function PageShell({
       footer={<Footer />}
       mainStyle={{
         padding: '32px 24px 120px',
+        // R7.5 (2026-04-28): explicit width:100% prevents the <main> from
+        // shrinking to fit-content. Symptom: /help width jumped 722 -> 1008
+        // when an FAQ disclosure opened, because the content area
+        // recomputed to its widest child. Federico flagged this.
+        width: '100%',
         maxWidth: 1080,
         margin: '0 auto',
+        boxSizing: 'border-box',
         minHeight: 'calc(100vh - 56px - 80px)',
         ...contentStyle,
       }}

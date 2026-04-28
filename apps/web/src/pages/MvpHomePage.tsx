@@ -556,6 +556,126 @@ function TestItSection() {
   );
 }
 
+// ---------- HomeHero ----------
+//
+// R7.5 (2026-04-28): /home redesign — Federico's brief: "make it sexier".
+// Adds a hero-y greeting at the top: name + outcome line, plus a thin
+// ambient status row (workspace · token state · agent reachability) so
+// the page feels alive instead of inert.
+
+function HomeHero({ name, hasToken }: { name: string; hasToken: boolean }) {
+  // Time-of-day greeting. Cheap, ambient, doesn't fake intelligence.
+  const hour = new Date().getHours();
+  const tod =
+    hour < 5 ? 'late shift' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+
+  return (
+    <header
+      style={{
+        marginBottom: 28,
+      }}
+    >
+      <p
+        data-testid="home-eyebrow"
+        style={{
+          fontFamily: MONO,
+          fontSize: 10.5,
+          fontWeight: 700,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase' as const,
+          color: ACCENT,
+          margin: '0 0 10px',
+        }}
+      >
+        Good {tod}, {name}
+      </p>
+      <h1
+        style={{
+          fontFamily: 'var(--font-display, Inter), system-ui, sans-serif',
+          fontSize: 32,
+          fontWeight: 800,
+          letterSpacing: '-0.025em',
+          color: INK,
+          margin: '0 0 10px',
+          lineHeight: 1.1,
+        }}
+      >
+        {hasToken ? "You're in. Connect any agent." : "You're in. Mint a token to connect any agent."}
+      </h1>
+      <p
+        style={{
+          fontSize: 15,
+          color: MUTED,
+          margin: 0,
+          lineHeight: 1.55,
+          maxWidth: 540,
+        }}
+      >
+        One token, every MCP client + the HTTP API. No SDKs to install, no per-app keys.
+      </p>
+    </header>
+  );
+}
+
+function AmbientStatus({
+  workspaceName,
+  hasToken,
+}: {
+  workspaceName: string | null;
+  hasToken: boolean;
+}) {
+  const dot = (color: string) => (
+    <span
+      aria-hidden="true"
+      style={{
+        display: 'inline-block',
+        width: 7,
+        height: 7,
+        borderRadius: '50%',
+        background: color,
+        flexShrink: 0,
+      }}
+    />
+  );
+  const cell: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 7,
+    fontSize: 12,
+    color: MUTED,
+    fontFamily: MONO,
+  };
+  return (
+    <div
+      data-testid="home-ambient-status"
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap' as const,
+        gap: 18,
+        rowGap: 8,
+        padding: '10px 14px',
+        background: 'var(--studio, #f5f4f0)',
+        border: `1px solid ${LINE}`,
+        borderRadius: 10,
+        marginBottom: 24,
+      }}
+    >
+      <span style={cell}>
+        {dot(ACCENT)}
+        workspace · {workspaceName ?? 'loading'}
+      </span>
+      <span style={cell}>
+        {dot(hasToken ? ACCENT : '#e0a93b')}
+        token · {hasToken ? 'active' : 'not minted'}
+      </span>
+      <span style={cell}>
+        {dot(ACCENT)}
+        api · {HOST_ORIGIN.replace(/^https?:\/\//, '')}
+      </span>
+    </div>
+  );
+}
+
 // ---------- MvpHomePage ----------
 
 export function MvpHomePage() {
@@ -566,6 +686,9 @@ export function MvpHomePage() {
   // Holds the most recently minted raw token so InstallTabs shows real value
   // immediately on mint without requiring a page refresh (#911).
   const [liveRawToken, setLiveRawToken] = useState<string | null>(null);
+  // R7.5: brief animated feedback on mint — Federico's "animated mint
+  // feedback on token creation".
+  const [mintFlash, setMintFlash] = useState(false);
 
   // Load tokens to know whether any token exists (to show/hide InstallTabs)
   useEffect(() => {
@@ -586,18 +709,38 @@ export function MvpHomePage() {
   // (e.g. after page reload — the user has to rotate to see a new raw token).
   const installToken = liveRawToken ?? (hasToken ? 'floom_agent_••••••••' : '');
 
+  // Pull a sane greeting label from the session.
+  const user = session?.user;
+  const greetingName = (user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'builder');
+
   return (
     <MvpAuthShell>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '48px 24px 64px' }}>
-        <TokenCard onTokenReady={(raw) => {
-          setLiveRawToken(raw);
-          // Ensure token list reflects the newly minted token
-          if (workspace) {
-            api.listWorkspaceAgentTokens(workspace.id)
-              .then(list => setTokens(list.filter(t => !t.revoked)))
-              .catch(() => {});
-          }
-        }} />
+        <HomeHero name={greetingName} hasToken={hasToken || liveRawToken !== null} />
+        <AmbientStatus
+          workspaceName={workspace?.name ?? null}
+          hasToken={hasToken || liveRawToken !== null}
+        />
+        <div
+          style={{
+            // Ambient mint flash — green outer ring fades after 1.5s.
+            transition: 'box-shadow 0.6s ease-out',
+            boxShadow: mintFlash ? `0 0 0 4px rgba(4,120,87,0.18)` : '0 0 0 0 transparent',
+            borderRadius: 12,
+          }}
+        >
+          <TokenCard onTokenReady={(raw) => {
+            setLiveRawToken(raw);
+            setMintFlash(true);
+            window.setTimeout(() => setMintFlash(false), 1600);
+            // Ensure token list reflects the newly minted token
+            if (workspace) {
+              api.listWorkspaceAgentTokens(workspace.id)
+                .then(list => setTokens(list.filter(t => !t.revoked)))
+                .catch(() => {});
+            }
+          }} />
+        </div>
 
         <h2 style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: INK, margin: '36px 0 12px' }}>
           Install

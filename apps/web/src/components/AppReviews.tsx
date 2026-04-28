@@ -99,8 +99,12 @@ export function AppReviews({ slug }: { slug: string }) {
             Leave a review
           </button>
         ) : (
+          // R7.5 (2026-04-28): preserve return path so /login lands the
+          // user back on this app's permalink, where they can leave the
+          // review they came to leave. Federico's brief — frictionless
+          // redirect. Login page reads `?next=`, see LoginPage.tsx:63.
           <Link
-            to="/login"
+            to={`/login?next=${encodeURIComponent(`/p/${slug}#reviews`)}`}
             data-testid="reviews-sign-in"
             style={{
               padding: '8px 14px',

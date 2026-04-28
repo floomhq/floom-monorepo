@@ -15,6 +15,7 @@
 import { useState } from 'react';
 import { CopyButton } from './CopyButton';
 import { SectionHeader } from './SectionHeader';
+import { FullscreenButton, TableFullscreenModal } from './OutputActionBar';
 
 export interface RowTableProps {
   rows: Array<Record<string, unknown>>;
@@ -185,6 +186,8 @@ export function RowTable({ rows, label, maxRows = 50, maxCols = 8, appSlug, runI
   const extra = rows.length - visible.length;
   const columns = deriveColumns(visible, maxCols);
   const copyValue = JSON.stringify(rows, null, 2);
+  // R7.5 (2026-04-28): per-table fullscreen — Federico's brief.
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Issue #282: biz users want "a scored version of their spreadsheet",
   // not a JSON blob. Generate the CSV from ALL rows (not just the
@@ -209,6 +212,71 @@ export function RowTable({ rows, label, maxRows = 50, maxCols = 8, appSlug, runI
     // sessions where the user downloads many runs.
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+
+  // R7.5: extracted so the same table body renders inline AND in the
+  // fullscreen modal (where the maxHeight cap is removed).
+  const tableBody = (capHeight: boolean) => (
+    <div style={{ maxHeight: capHeight ? 480 : undefined, overflow: 'auto' }}>
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: 13,
+          lineHeight: 1.5,
+        }}
+      >
+        <thead>
+          <tr>
+            {columns.map((col) => (
+              <th
+                key={col}
+                style={{
+                  position: 'sticky',
+                  top: 0,
+                  background: 'var(--card)',
+                  borderBottom: '1px solid var(--line)',
+                  textAlign: 'left',
+                  padding: '10px 12px',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 11,
+                  color: 'var(--muted)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  fontWeight: 600,
+                }}
+              >
+                {humanizeKey(col)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((row, i) => (
+            <tr
+              key={i}
+              style={{
+                borderTop: i === 0 ? 'none' : '1px solid var(--line)',
+              }}
+            >
+              {columns.map((col) => (
+                <td
+                  key={col}
+                  style={{
+                    padding: '8px 12px',
+                    color: 'var(--ink)',
+                    wordBreak: 'break-word',
+                    verticalAlign: 'top',
+                  }}
+                >
+                  {renderCell(row[col])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div
@@ -236,69 +304,17 @@ export function RowTable({ rows, label, maxRows = 50, maxCols = 8, appSlug, runI
               Download CSV
             </button>
             <CopyButton value={copyValue} label="Copy JSON" />
+            {/* R7.5 (2026-04-28): per-table fullscreen affordance.
+                Visible by default — Federico called for "discoverable"
+                affordance, not a hover-only easter egg. */}
+            <FullscreenButton
+              onClick={() => setFullscreen(true)}
+              label={`Expand ${label ?? 'table'} to fullscreen`}
+            />
           </>
         }
       />
-      <div style={{ maxHeight: 480, overflow: 'auto' }}>
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: 13,
-            lineHeight: 1.5,
-          }}
-        >
-          <thead>
-            <tr>
-              {columns.map((col) => (
-                <th
-                  key={col}
-                  style={{
-                    position: 'sticky',
-                    top: 0,
-                    background: 'var(--card)',
-                    borderBottom: '1px solid var(--line)',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 11,
-                    color: 'var(--muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    fontWeight: 600,
-                  }}
-                >
-                  {humanizeKey(col)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((row, i) => (
-              <tr
-                key={i}
-                style={{
-                  borderTop: i === 0 ? 'none' : '1px solid var(--line)',
-                }}
-              >
-                {columns.map((col) => (
-                  <td
-                    key={col}
-                    style={{
-                      padding: '8px 12px',
-                      color: 'var(--ink)',
-                      wordBreak: 'break-word',
-                      verticalAlign: 'top',
-                    }}
-                  >
-                    {renderCell(row[col])}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {tableBody(true)}
       {extra > 0 && (
         <div
           style={{
@@ -312,6 +328,13 @@ export function RowTable({ rows, label, maxRows = 50, maxCols = 8, appSlug, runI
           + {extra} more
         </div>
       )}
+      <TableFullscreenModal
+        open={fullscreen}
+        onClose={() => setFullscreen(false)}
+        title={label ?? 'Rows'}
+      >
+        {tableBody(false)}
+      </TableFullscreenModal>
     </div>
   );
 }

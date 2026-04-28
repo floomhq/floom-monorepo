@@ -50,6 +50,7 @@ import { RowTable } from './RowTable';
 import { ScoredRowsTable } from './ScoredRowsTable';
 import { ScalarBig } from './ScalarBig';
 import { SectionHeader } from './SectionHeader';
+import { OutputActionBar } from './OutputActionBar';
 import { StringList } from './StringList';
 import { TextBig } from './TextBig';
 import { UrlLink } from './UrlLink';
@@ -496,9 +497,8 @@ function autoPick(
               flexDirection: 'column',
             }}
           >
-            <SectionHeader
+            <OutputActionBar
               label="Output"
-              bordered
               actions={<CopyButton value={JSON.stringify(runOutput, null, 2)} label="Copy JSON" />}
             />
             {/* G7 (2026-04-28): tighten inner padding + gap.

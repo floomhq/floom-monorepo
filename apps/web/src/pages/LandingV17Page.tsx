@@ -21,7 +21,7 @@
  * The existing CreatorHeroPage.tsx is kept in the tree for reference;
  * main.tsx wires "/" to this page.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Code2, Rocket, Share2 } from 'lucide-react';
 
@@ -51,10 +51,17 @@ import { readDeployEnabled, useDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
 import { useSession } from '../hooks/useSession';
 
-// MVP hero install snippet — generic MCP config, no per-app slug.
-// IMPORTANT: use the current origin so tokens minted on mvp.floom.dev /
-// v26.floom.dev / floom.dev (post-flip) point at the SAME host they were
-// minted on. Hardcoding floom.dev breaks the 401-on-cross-host case.
+// MVP hero install — R7.5 (2026-04-28): single npx command is the primary
+// affordance, MCP/CLI snippets demoted into a popover behind a secondary
+// link. Federico's brief: "Replace MCP JSON snippet block in hero with
+// ONE primary command: npx @floomhq/cli@latest setup". The npx setup flow
+// handles token auth interactively, so the "Need a token? Sign up" line
+// is dropped.
+//
+// IMPORTANT: secondary snippets still use the current origin so tokens
+// minted on mvp.floom.dev / floom.dev point at the host they were minted
+// on. Hardcoding floom.dev breaks the 401-on-cross-host case.
+const NPX_SETUP_COMMAND = 'npx @floomhq/cli@latest setup';
 const MCP_HOST = typeof window !== 'undefined' ? window.location.origin : 'https://floom.dev';
 const MVP_MCP_SNIPPET = `{
   "mcpServers": {
@@ -66,85 +73,228 @@ const MVP_MCP_SNIPPET = `{
     }
   }
 }`;
+const MVP_CLI_SNIPPET = `curl -fsSL ${MCP_HOST}/install.sh | bash
+floom auth login`;
+
+async function copyText(text: string) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch { /* fall through */ }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+}
 
 function MvpHeroInstall() {
   const [copied, setCopied] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [popoverTab, setPopoverTab] = useState<'mcp' | 'cli'>('mcp');
+  const [popoverCopied, setPopoverCopied] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
   async function handleCopy() {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(MVP_MCP_SNIPPET);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = MVP_MCP_SNIPPET;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch { /* silent */ }
+    await copyText(NPX_SETUP_COMMAND);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
   }
+
+  async function handlePopoverCopy(snippet: string) {
+    await copyText(snippet);
+    setPopoverCopied(true);
+    window.setTimeout(() => setPopoverCopied(false), 1500);
+  }
+
+  // Click-outside + escape handlers for popover.
+  useEffect(() => {
+    if (!popoverOpen) return;
+    function onClick(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setPopoverOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPopoverOpen(false);
+    }
+    document.addEventListener('mousedown', onClick);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [popoverOpen]);
+
+  const activeSnippet = popoverTab === 'mcp' ? MVP_MCP_SNIPPET : MVP_CLI_SNIPPET;
+
   return (
-    <div style={{ maxWidth: 480, margin: '20px auto 0', textAlign: 'left' }}>
-      <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 8px', textAlign: 'center' }}>
-        Paste in your MCP client config:
+    <div style={{ maxWidth: 540, margin: '20px auto 0', textAlign: 'left' }}>
+      <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 10px', textAlign: 'center' }}>
+        One command. Sets up MCP, mints a token, and you&rsquo;re live.
       </p>
       <div style={{ position: 'relative' }}>
-        {/* F7 (2026-04-28): copy boxes use light tinted bg (var(--studio)),
-            not dark. Federico-locked global rule. */}
         <pre
-          data-testid="hero-mcp-snippet"
+          data-testid="hero-npx-command"
           style={{
             fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-            fontSize: 11,
+            fontSize: 14,
             background: 'var(--studio, #f5f4f0)',
             color: 'var(--ink)',
             border: '1px solid var(--line)',
-            borderRadius: 8,
-            padding: '10px 12px',
-            paddingRight: 64,
+            borderRadius: 10,
+            padding: '14px 90px 14px 18px',
             overflowX: 'auto',
             whiteSpace: 'pre',
             lineHeight: 1.5,
             margin: 0,
+            display: 'flex',
+            alignItems: 'center',
           }}
         >
-          {MVP_MCP_SNIPPET}
+          <span style={{ color: 'var(--muted)', userSelect: 'none', marginRight: 10 }}>$</span>
+          {NPX_SETUP_COMMAND}
         </pre>
         <button
           type="button"
-          data-testid="install-copy-btn"
+          data-testid="hero-npx-copy-btn"
           onClick={() => void handleCopy()}
           style={{
             position: 'absolute',
-            top: 10,
+            top: '50%',
+            transform: 'translateY(-50%)',
             right: 10,
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 600,
-            color: copied ? 'var(--muted)' : 'var(--accent)',
-            background: 'var(--card)',
-            border: `1px solid ${copied ? 'var(--line)' : 'rgba(4,120,87,0.35)'}`,
+            color: copied ? '#fff' : 'var(--accent)',
+            background: copied ? 'var(--accent)' : 'var(--card)',
+            border: `1px solid ${copied ? 'var(--accent)' : 'rgba(4,120,87,0.35)'}`,
             borderRadius: 6,
-            padding: '3px 10px',
+            padding: '6px 14px',
             cursor: 'pointer',
             fontFamily: 'inherit',
             letterSpacing: '0.03em',
           }}
-          aria-label={copied ? 'Copied' : 'Copy MCP config'}
+          aria-label={copied ? 'Copied' : 'Copy command'}
         >
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '10px 0 0', textAlign: 'center' }}>
-        Need a token?{' '}
-        <Link to="/signup" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
-          Sign up to get one
-        </Link>
-        {' '}→
-      </p>
+      {/* Secondary affordance: MCP/CLI snippet popover for advanced users.
+          Drops the old "Need a token? Sign up" line — npx setup handles auth. */}
+      <div style={{ position: 'relative', textAlign: 'center', marginTop: 12 }} ref={popoverRef}>
+        <button
+          type="button"
+          data-testid="hero-snippet-popover-trigger"
+          onClick={() => setPopoverOpen((o) => !o)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            color: 'var(--muted)',
+            fontSize: 12.5,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            textDecoration: 'underline',
+            textDecorationColor: 'var(--line)',
+            textUnderlineOffset: 3,
+          }}
+          aria-expanded={popoverOpen}
+          aria-haspopup="dialog"
+        >
+          Prefer MCP config or CLI snippet? →
+        </button>
+        {popoverOpen && (
+          <div
+            role="dialog"
+            data-testid="hero-snippet-popover"
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 'min(520px, calc(100vw - 48px))',
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderRadius: 10,
+              boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+              padding: 14,
+              textAlign: 'left',
+              zIndex: 50,
+            }}
+          >
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10, borderBottom: '1px solid var(--line)' }}>
+              {(['mcp', 'cli'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setPopoverTab(tab)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '6px 12px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    fontFamily: 'inherit',
+                    color: popoverTab === tab ? 'var(--ink)' : 'var(--muted)',
+                    borderBottom: popoverTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    marginBottom: -1,
+                  }}
+                >
+                  {tab.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <div style={{ position: 'relative' }}>
+              <pre
+                style={{
+                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontSize: 11,
+                  background: 'var(--studio, #f5f4f0)',
+                  color: 'var(--ink)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 8,
+                  padding: '10px 64px 10px 12px',
+                  overflowX: 'auto',
+                  whiteSpace: 'pre',
+                  lineHeight: 1.5,
+                  margin: 0,
+                  maxHeight: 220,
+                }}
+              >
+                {activeSnippet}
+              </pre>
+              <button
+                type="button"
+                onClick={() => void handlePopoverCopy(activeSnippet)}
+                style={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: popoverCopied ? 'var(--muted)' : 'var(--accent)',
+                  background: 'var(--card)',
+                  border: `1px solid ${popoverCopied ? 'var(--line)' : 'rgba(4,120,87,0.35)'}`,
+                  borderRadius: 6,
+                  padding: '3px 10px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+                aria-label={popoverCopied ? 'Copied' : `Copy ${popoverTab.toUpperCase()} snippet`}
+              >
+                {popoverCopied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -347,18 +497,18 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                   textAlign: 'center',
                 }}
               >
-                Backed by{' '}
                 <a
                   href="https://f.inc"
                   target="_blank"
                   rel="noreferrer"
                   style={{
-                    color: 'var(--ink)',
-                    fontWeight: 700,
+                    color: 'inherit',
+                    fontWeight: 600,
                     textDecoration: 'none',
+                    letterSpacing: 'inherit',
                   }}
                 >
-                  Founders Inc
+                  FOUNDERS INC COHORT
                 </a>
               </p>
             )}
