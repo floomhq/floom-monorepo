@@ -1,0 +1,5 @@
+# Build artifacts — recreated on every npm publish via prepublishOnly.
+dist/
+vendor/
+*.tgz
+node_modules/

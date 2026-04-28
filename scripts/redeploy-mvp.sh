@@ -31,6 +31,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CANONICAL_ENV="${REPO_ROOT}/scripts/mvp.env.canonical"
+KILL_LIST="${REPO_ROOT}/scripts/launch-kill-list.txt"
 CONTAINER=floom-mvp-preview
 HOST_PORT=3057
 CONTAINER_PORT=3000
@@ -181,6 +182,24 @@ print(f"merged env: {len(env)} keys", file=sys.stderr)
 PY
 
 log "merged env file: $MERGED_ENV"
+
+# --- 3b. Append FLOOM_STORE_HIDE_SLUGS from the kill list, if present. ---
+#
+# data/launch-kill-list.txt is the durable in-repo source of truth for which
+# SaaS-relay apps to suppress from the public directory. The server reads
+# FLOOM_STORE_HIDE_SLUGS at boot (apps/server/src/routes/hub.ts), so we
+# materialize it into the merged env file here. Canonical env wins on
+# conflict — if the file already declares FLOOM_STORE_HIDE_SLUGS we leave
+# it alone.
+
+if [ -f "$KILL_LIST" ] && ! grep -q '^FLOOM_STORE_HIDE_SLUGS=' "$MERGED_ENV"; then
+  KILL_CSV=$(grep -v '^[[:space:]]*#' "$KILL_LIST" | grep -v '^[[:space:]]*$' | paste -sd, -)
+  if [ -n "$KILL_CSV" ]; then
+    echo "FLOOM_STORE_HIDE_SLUGS=${KILL_CSV}" >> "$MERGED_ENV"
+    KILL_COUNT=$(echo "$KILL_CSV" | tr ',' '\n' | wc -l)
+    log "FLOOM_STORE_HIDE_SLUGS loaded from data/launch-kill-list.txt (${KILL_COUNT} slugs)"
+  fi
+fi
 
 # --- 4. Stop + remove old container ---
 

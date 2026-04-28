@@ -1,0 +1,36 @@
+{
+  "name": "@floomhq/cli",
+  "version": "0.2.0",
+  "description": "One command to set up Floom: mints a token, configures MCP, and you're live.",
+  "type": "commonjs",
+  "bin": {
+    "floom": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "vendor",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js",
+    "prepublishOnly": "node scripts/build.js"
+  },
+  "keywords": [
+    "floom",
+    "cli",
+    "mcp",
+    "agent",
+    "setup"
+  ],
+  "author": "Federico De Ponte <hello@floom.dev>",
+  "license": "MIT",
+  "homepage": "https://floom.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/floomhq/floom.git",
+    "directory": "cli-npm"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}

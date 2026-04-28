@@ -1,0 +1,131 @@
+# launch-kill-list.txt
+#
+# Source of truth for the MVP-launch "do something or get cut" curation.
+# These slugs are pure SaaS API relays salvaged from APIs-guru. They have
+# no transform, no analysis, no value-add: just a passthrough to a third-
+# party endpoint. For the launch storefront, hide them from /api/hub
+# (public directory list) so the catalog reads as 100% Floom-curated
+# value-add apps.
+#
+# Read at runtime by:
+#   - apps/server/src/routes/hub.ts  via FLOOM_STORE_HIDE_SLUGS env
+#   - scripts/redeploy-mvp.sh        (loads canonical env which sets the var)
+#
+# This list is the single curation gate for the MVP launch (Round 7.5).
+# Federico's brief: "Identify pure SaaS API relays. Criterion: app's
+# only 'action' is to expose a SaaS endpoint with no logic, no transform,
+# no analysis. Keep apps that DO something."
+#
+# KEPT (do something, NOT in this list):
+#   Launch showcase: competitor-lens, ai-readiness-audit, pitch-coach
+#   First-party AI:  floom-this, yc-pitch-deck-critic, claude-wrapped,
+#                    hook-stats, session-recall
+#   Utilities:       uuid, password, hash, base64, json-format,
+#                    jwt-decode, word-count, slugify, url-encode,
+#                    regex-test, qr-code, utm-builder
+#   Private:         ig-nano-scout
+#
+# To re-enable a slug, remove it from this list and run
+#   bash scripts/redeploy-mvp.sh
+# to apply.
+#
+# Comments (#) and blank lines are ignored.
+
+1forge-finance-apis
+advicent-factfinderservice
+afterbanks-api
+agco-api
+api-clarify-io
+api-isendpro
+api-reference-ideal-postcodes
+apimatic-api-transformer
+apis-guru
+auckland-museum-api
+balldontlie
+bc-geographical-names-web-service-rest-api
+beanstream-payments
+betriebsstellen
+big-red-cloud-api
+bikewise-api-v2
+bills-api
+bin-lookup-api
+biztoc
+bng2latlong
+branch-locator-api
+bunq-api
+canada-holidays-api
+car-configurator
+chaingateway-io
+cnab-online
+color-name-api
+corrently-io
+crossbar-data-api
+d-d-5e-api
+daymet-single-pixel-extraction-tool-api
+deed-api
+departureboard-io-api
+easypdfserver
+ecosystem-api
+ecwid
+elevenlabs-api-documentation
+enanomapper-database
+europeana-search-record-api
+evemarketer-marketstat-api
+exchangerate-api
+exude-api-service
+flickr-api-schema
+flight-offers-search
+fraudlabs-pro-fraud-detection
+geodatasource-location-search
+gotomeeting
+greenwire-public-api
+handwrytten-api
+health-repository-provider-specifications-for-hip
+healthcare
+highways-england-api
+hydra-movies
+ibm-containers-api
+image-charts
+image-moderation
+interzoid-convert-currency-rate-api
+ip-geolocation-api
+ip-geolocation-api-2
+ip2location-io-ip-geolocation-api
+ip2location-ip-geolocation
+ip2proxy-proxy-detection
+ip2whois-domain-lookup
+json-storage
+jumpseller-api
+languagetool-api
+listen-api-podcast-search-directory-and-insights-a
+magento-b2b
+medcorder-nearby-doctor-api
+miataru
+mtaa-api-documentation
+nba-stats-api
+news-plugin
+notion-api
+nowpayments-api
+ntropy-transaction-api-v1
+odweather
+omdb
+open-ai-klarna-product-api
+open-data-api
+openai-api
+opencage-geocoder
+openfintech-io
+osdb-rest-api-v1
+osf-apiv2-documentation
+oxford-dictionaries
+papinet-api
+poemist-api
+postman-api
+radio-music-services
+search-services
+searchly-api-v1
+shinobiapi
+swagger2openapi-converter
+the-consumer-financial-protection-bureau
+u-s-epa-enforcement-and-compliance-history-online-
+use-a-new-version-https-icons8-github-io-icons8-do
+vehicle-enquiry-api
