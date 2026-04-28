@@ -409,6 +409,80 @@ export function IconSprite() {
         />
       </symbol>
 
+      {/* Scorecards v2: readme-roaster, cold-email-roaster, tweet-predictor */}
+      <symbol id="app-readme-roaster" viewBox="0 0 24 24">
+        {/* Document with flame tip: roasting a README file. */}
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14 2v6h6"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 18c-1.5-1-2-2.5-1-4 .5 1 1.5 1.5 2 1 .5-.5.5-1.5-.5-2.5 1 0 2 1 2 2.5 0 1.7-1.1 2.9-2.5 3z"
+        />
+      </symbol>
+      <symbol id="app-cold-email-roaster" viewBox="0 0 24 24">
+        {/* Envelope with X mark: roasting a bad cold email. */}
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M22 6l-10 7L2 6"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          d="M9 13l6 5M15 13l-6 5"
+        />
+      </symbol>
+      <symbol id="app-tweet-predictor" viewBox="0 0 24 24">
+        {/* Chat bubble with upward trend arrow: predicting tweet engagement. */}
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 11l3-3 2 2 3-4"
+        />
+      </symbol>
+
       {/* Default fallback app icon */}
       <symbol id="app-default" viewBox="0 0 24 24">
         <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -579,6 +653,10 @@ export function iconForSlug(slug: string): string {
     'competitor-lens': 'app-competitor-lens',
     'ai-readiness-audit': 'app-ai-readiness-audit',
     'pitch-coach': 'app-pitch-coach',
+    // Scorecards v2
+    'readme-roaster': 'app-readme-roaster',
+    'cold-email-roaster': 'app-cold-email-roaster',
+    'tweet-predictor': 'app-tweet-predictor',
   };
   const explicit = map[slug];
   if (explicit) return explicit;

@@ -16,3 +16,24 @@ apps:
     display_name: YC Pitch Deck Critic
     description: "Upload a pitch deck outline or text export and return a focused YC-style diagnosis."
     category: fundraising
+
+  - slug: readme-roaster
+    type: proxied
+    openapi_spec_url: http://localhost:4120/readme-roaster/openapi.json
+    display_name: README Roaster
+    description: "Paste a GitHub repo URL and get a roast of your README with clarity score, top issues, and a rewritten opener."
+    category: developer-tools
+
+  - slug: cold-email-roaster
+    type: proxied
+    openapi_spec_url: http://localhost:4120/cold-email-roaster/openapi.json
+    display_name: Cold Email Roaster
+    description: "Paste your cold email and get a cringe score, top issues, and a rewritten subject line and body."
+    category: marketing
+
+  - slug: tweet-predictor
+    type: proxied
+    openapi_spec_url: http://localhost:4120/tweet-predictor/openapi.json
+    display_name: Tweet Predictor
+    description: "Paste a tweet draft and get a predicted engagement level, top issues, a sharper rewrite, and an alternative angle."
+    category: marketing

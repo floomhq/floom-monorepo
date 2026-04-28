@@ -6,14 +6,22 @@
 //   GET  /openapi.json
 //   GET  /linkedin-roaster/openapi.json
 //   GET  /yc-pitch-deck-critic/openapi.json
+//   GET  /readme-roaster/openapi.json
+//   GET  /cold-email-roaster/openapi.json
+//   GET  /tweet-predictor/openapi.json
 //   POST /linkedin-roaster/score
 //   POST /yc-pitch-deck-critic/score
+//   POST /readme-roaster/score
+//   POST /cold-email-roaster/score
+//   POST /tweet-predictor/score
 //
 // Pure Node.js, no external dependencies. LinkedIn URL scraping uses APIFY_API_KEY
 // when configured, with pasted profile text as a deterministic fallback.
+// readme-roaster, cold-email-roaster, tweet-predictor use Gemini AI
+// (GEMINI_API_KEY required). Model: gemini-2.5-flash-lite.
 //
 // Run: node examples/launch-scorecards/server.mjs
-// Env: PORT=4120 (default)
+// Env: PORT=4120 (default), GEMINI_API_KEY (required for v2 apps)
 
 import { createServer } from 'node:http';
 
@@ -24,6 +32,73 @@ const LINKEDIN_ACTOR_ID =
   process.env.APIFY_LINKEDIN_ACTOR_ID || 'harvestapi~linkedin-profile-scraper';
 const APIFY_TIMEOUT_MS = Number(process.env.APIFY_LINKEDIN_TIMEOUT_MS || 45_000);
 const APIFY_POLL_MS = Number(process.env.APIFY_LINKEDIN_POLL_MS || 2_500);
+
+// ---------------------------------------------------------------------------
+// Gemini helpers (readme-roaster, cold-email-roaster, tweet-predictor)
+// ---------------------------------------------------------------------------
+
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+function geminiKey() {
+  return process.env.GEMINI_API_KEY || '';
+}
+
+async function callGemini({ prompt, responseSchema, timeoutMs = 20_000 }) {
+  const key = geminiKey();
+  if (!key) {
+    throw httpError(503, 'GEMINI_API_KEY is not configured');
+  }
+
+  const url = `${GEMINI_API_BASE}/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      response_mime_type: 'application/json',
+      response_schema: responseSchema,
+    },
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    let detail = text.slice(0, 400);
+    try {
+      const parsed = JSON.parse(text);
+      detail = parsed?.error?.message || detail;
+    } catch {
+      /* ignore */
+    }
+    throw httpError(res.status >= 500 ? 502 : res.status, `Gemini error: ${detail}`);
+  }
+
+  let outer;
+  try {
+    outer = JSON.parse(text);
+  } catch {
+    throw httpError(502, 'Gemini returned non-JSON response');
+  }
+
+  const raw = outer?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw httpError(502, 'Gemini returned no content');
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw httpError(502, 'Gemini response was not valid JSON');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// OpenAPI spec builder
+// ---------------------------------------------------------------------------
 
 function appSpec({ title, description, path, operationId, inputProperties, required }) {
   return {
@@ -106,6 +181,10 @@ function scorecardSchema() {
   };
 }
 
+// ---------------------------------------------------------------------------
+// OpenAPI specs
+// ---------------------------------------------------------------------------
+
 const linkedinSpec = appSpec({
   title: 'LinkedIn Roaster',
   description:
@@ -170,19 +249,86 @@ const deckSpec = appSpec({
   },
 });
 
+const readmeRoasterSpec = appSpec({
+  title: 'README Roaster',
+  description:
+    'Paste a GitHub repo URL. The app fetches the README, then roasts it for clarity, completeness, and first-impression impact.',
+  path: '/readme-roaster/score',
+  operationId: 'scoreReadme',
+  required: ['repo_url'],
+  inputProperties: {
+    repo_url: {
+      type: 'string',
+      format: 'uri',
+      description:
+        'Public GitHub repository URL, for example https://github.com/owner/repo.',
+    },
+  },
+});
+
+const coldEmailRoasterSpec = appSpec({
+  title: 'Cold Email Roaster',
+  description:
+    'Paste a cold email you wrote. The app scores cringe level, rewrites subject and body, and highlights the top issues.',
+  path: '/cold-email-roaster/score',
+  operationId: 'scoreColdEmail',
+  required: ['email_text'],
+  inputProperties: {
+    email_text: {
+      type: 'string',
+      minLength: 50,
+      maxLength: 2000,
+      description: 'The full cold email text to roast (50-2000 characters).',
+    },
+    goal: {
+      type: 'string',
+      description: 'Optional intended goal of the email, for example "book a demo".',
+    },
+  },
+});
+
+const tweetPredictorSpec = appSpec({
+  title: 'Tweet Predictor',
+  description:
+    'Paste a tweet draft. The app predicts engagement level, identifies weaknesses, rewrites it, and offers an alternative angle.',
+  path: '/tweet-predictor/score',
+  operationId: 'scoreTweet',
+  required: ['draft'],
+  inputProperties: {
+    draft: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 280,
+      description: 'Tweet draft text (1-280 characters).',
+    },
+    audience: {
+      type: 'string',
+      description: 'Optional target audience description, for example "indie hackers".',
+    },
+  },
+});
+
 const combinedSpec = {
   openapi: '3.0.0',
   info: {
     title: 'Launch Scorecards',
-    version: '0.1.0',
-    description: 'Deterministic launch scorecards for LinkedIn profiles and YC-style pitch decks.',
+    version: '0.2.0',
+    description:
+      'Launch scorecards for LinkedIn profiles, YC-style pitch decks, GitHub READMEs, cold emails, and tweet drafts.',
   },
   servers: [{ url: `http://localhost:${PORT}` }],
   paths: {
     ...linkedinSpec.paths,
     ...deckSpec.paths,
+    ...readmeRoasterSpec.paths,
+    ...coldEmailRoasterSpec.paths,
+    ...tweetPredictorSpec.paths,
   },
 };
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
 
 function clampScore(n) {
   return Math.max(0, Math.min(100, Math.round(n)));
@@ -661,6 +807,313 @@ function scorePitchDeck(body) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// README Roaster
+// ---------------------------------------------------------------------------
+
+const README_MAX_BYTES = 30 * 1024;
+
+function parseGithubRepoUrl(rawUrl) {
+  const trimmed = String(rawUrl || '').trim();
+  let url;
+  try {
+    url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
+  } catch {
+    throw httpError(400, 'repo_url must be a valid GitHub repository URL');
+  }
+  const host = url.hostname.toLowerCase().replace(/^www\./, '');
+  if (host !== 'github.com') {
+    throw httpError(400, 'repo_url must point to a github.com repository');
+  }
+  const parts = url.pathname.replace(/\.git$/, '').split('/').filter(Boolean);
+  if (parts.length < 2) {
+    throw httpError(400, 'repo_url must include owner and repo name, e.g. https://github.com/owner/repo');
+  }
+  return { owner: parts[0], repo: parts[1] };
+}
+
+async function fetchReadme(owner, repo) {
+  const ghToken = process.env.GITHUB_TOKEN || '';
+  const headers = {
+    Accept: 'application/vnd.github.raw+json',
+    'User-Agent': 'floom-launch-scorecards/0.2',
+    ...(ghToken ? { Authorization: `Bearer ${ghToken}` } : {}),
+  };
+
+  try {
+    const apiRes = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/readme`,
+      { headers, signal: AbortSignal.timeout(8_000) },
+    );
+    if (apiRes.status === 429 || apiRes.status === 403) {
+      throw Object.assign(new Error('rate-limited'), { statusCode: 429 });
+    }
+    if (apiRes.ok) {
+      const contentType = apiRes.headers.get('content-type') || '';
+      let text;
+      if (contentType.includes('json') && !contentType.includes('raw')) {
+        const blob = await apiRes.json();
+        if (blob?.content) {
+          text = Buffer.from(blob.content, 'base64').toString('utf-8');
+        } else {
+          text = '';
+        }
+      } else {
+        text = await apiRes.text();
+      }
+      return text.slice(0, README_MAX_BYTES);
+    }
+    if (apiRes.status === 404) {
+      throw httpError(404, `No README found in ${owner}/${repo}`);
+    }
+  } catch (err) {
+    if (err.statusCode && err.statusCode !== 429) throw err;
+  }
+
+  // Fallback: unauthenticated raw fetch
+  const candidates = ['README.md', 'readme.md', 'README.txt', 'README'];
+  for (const name of candidates) {
+    try {
+      const rawRes = await fetch(
+        `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${name}`,
+        { signal: AbortSignal.timeout(6_000) },
+      );
+      if (rawRes.ok) {
+        const text = await rawRes.text();
+        return text.slice(0, README_MAX_BYTES);
+      }
+    } catch { /* try next */ }
+  }
+  throw httpError(
+    404,
+    `Could not fetch README for ${owner}/${repo}. The repo may be private or have no README.`,
+  );
+}
+
+const readmeRoasterGeminiSchema = {
+  type: 'OBJECT',
+  properties: {
+    clarity_score: { type: 'INTEGER' },
+    what_it_actually_says: { type: 'STRING' },
+    top_3_issues: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          issue: { type: 'STRING' },
+          fix: { type: 'STRING' },
+        },
+        required: ['issue', 'fix'],
+      },
+    },
+    rewritten_first_two_paragraphs: { type: 'STRING' },
+    screenshot_card_summary: { type: 'STRING' },
+  },
+  required: [
+    'clarity_score',
+    'what_it_actually_says',
+    'top_3_issues',
+    'rewritten_first_two_paragraphs',
+    'screenshot_card_summary',
+  ],
+};
+
+async function scoreReadme(body) {
+  const { owner, repo } = parseGithubRepoUrl(body.repo_url);
+  const readmeText = await fetchReadme(owner, repo);
+
+  if (readmeText.trim().length < 20) {
+    throw httpError(422, `The README for ${owner}/${repo} is too short to roast.`);
+  }
+
+  const prompt = [
+    `You are a senior developer advocate who roasts GitHub READMEs with honest, actionable criticism.`,
+    `Analyze the README below for the repository "${owner}/${repo}".`,
+    ``,
+    `Score clarity from 1 (total disaster) to 10 (crystal clear).`,
+    `Describe what the project actually does in one plain sentence.`,
+    `List the top 3 issues, each with a concrete fix.`,
+    `Rewrite the first two paragraphs as tight, scannable markdown that makes a developer immediately understand what this is and why they should care.`,
+    `Write a screenshot_card_summary of about 140 characters: one punchy sentence for a share card targeting developers.`,
+    `Be direct and specific. Do not pad or soften. Do not use emojis.`,
+    ``,
+    `README:`,
+    `---`,
+    readmeText,
+    `---`,
+  ].join('\n');
+
+  const result = await callGemini({
+    prompt,
+    responseSchema: readmeRoasterGeminiSchema,
+    timeoutMs: 15_000,
+  });
+
+  return {
+    repo: `${owner}/${repo}`,
+    clarity_score: Math.max(1, Math.min(10, Math.round(result.clarity_score))),
+    what_it_actually_says: result.what_it_actually_says,
+    top_3_issues: result.top_3_issues,
+    rewritten_first_two_paragraphs: result.rewritten_first_two_paragraphs,
+    screenshot_card_summary: result.screenshot_card_summary,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Cold Email Roaster
+// ---------------------------------------------------------------------------
+
+const coldEmailRoasterGeminiSchema = {
+  type: 'OBJECT',
+  properties: {
+    cringe_score: { type: 'INTEGER' },
+    top_3_issues: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          issue: { type: 'STRING' },
+          fix: { type: 'STRING' },
+        },
+        required: ['issue', 'fix'],
+      },
+    },
+    rewritten_subject_line: { type: 'STRING' },
+    rewritten_body: { type: 'STRING' },
+    screenshot_card_summary: { type: 'STRING' },
+  },
+  required: [
+    'cringe_score',
+    'top_3_issues',
+    'rewritten_subject_line',
+    'rewritten_body',
+    'screenshot_card_summary',
+  ],
+};
+
+async function scoreColdEmail(body) {
+  const emailText = String(body.email_text || '').trim();
+  if (emailText.length < 50) throw httpError(400, 'email_text must be at least 50 characters');
+  if (emailText.length > 2000) throw httpError(400, 'email_text must be at most 2000 characters');
+
+  const goal = String(body.goal || '').trim();
+
+  const prompt = [
+    `You are a ruthless cold email coach who helps salespeople and founders stop sending cringe emails.`,
+    `Analyze the cold email below${goal ? ` (goal: ${goal})` : ''}.`,
+    ``,
+    `Score cringe level from 1 (respectful, human, sharp) to 10 (maximum cringe, generic, spammy).`,
+    `List the top 3 issues, each with a concrete fix.`,
+    `Rewrite the subject line in under 80 characters.`,
+    `Rewrite the body in under 150 words: clear value prop, specific hook, simple CTA.`,
+    `Write a screenshot_card_summary of about 140 characters for a share card targeting marketers and salespeople.`,
+    `Be direct and specific. Do not use emojis.`,
+    ``,
+    `Cold email:`,
+    `---`,
+    emailText,
+    `---`,
+  ].join('\n');
+
+  const result = await callGemini({
+    prompt,
+    responseSchema: coldEmailRoasterGeminiSchema,
+    timeoutMs: 12_000,
+  });
+
+  return {
+    cringe_score: Math.max(1, Math.min(10, Math.round(result.cringe_score))),
+    top_3_issues: result.top_3_issues,
+    rewritten_subject_line: result.rewritten_subject_line,
+    rewritten_body: result.rewritten_body,
+    screenshot_card_summary: result.screenshot_card_summary,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tweet Predictor
+// ---------------------------------------------------------------------------
+
+const tweetPredictorGeminiSchema = {
+  type: 'OBJECT',
+  properties: {
+    predicted_engagement: { type: 'STRING', enum: ['low', 'medium', 'high'] },
+    why: { type: 'STRING' },
+    top_2_issues: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          issue: { type: 'STRING' },
+          fix: { type: 'STRING' },
+        },
+        required: ['issue', 'fix'],
+      },
+    },
+    sharper_rewrite: { type: 'STRING' },
+    alt_angle: { type: 'STRING' },
+    screenshot_card_summary: { type: 'STRING' },
+  },
+  required: [
+    'predicted_engagement',
+    'why',
+    'top_2_issues',
+    'sharper_rewrite',
+    'alt_angle',
+    'screenshot_card_summary',
+  ],
+};
+
+async function scoreTweet(body) {
+  const draft = String(body.draft || '').trim();
+  if (!draft) throw httpError(400, 'draft is required');
+  if (draft.length > 280) throw httpError(400, 'draft must be 280 characters or fewer');
+
+  const audience = String(body.audience || '').trim();
+
+  const prompt = [
+    `You are a social media strategist who predicts tweet performance and rewrites drafts for maximum engagement.`,
+    `Analyze this tweet draft${audience ? ` for the audience: ${audience}` : ''}.`,
+    ``,
+    `Predict engagement as exactly one of: low, medium, or high.`,
+    `Explain why in one sentence.`,
+    `List the top 2 issues holding it back, each with a concrete fix.`,
+    `Rewrite it as a sharper version in 280 characters or fewer.`,
+    `Write an alt_angle version with a completely different framing in 280 characters or fewer.`,
+    `Write a screenshot_card_summary of about 140 characters for a share card.`,
+    `Be specific and direct. Do not use emojis.`,
+    ``,
+    `Tweet draft:`,
+    `---`,
+    draft,
+    `---`,
+  ].join('\n');
+
+  const result = await callGemini({
+    prompt,
+    responseSchema: tweetPredictorGeminiSchema,
+    timeoutMs: 10_000,
+  });
+
+  const validEngagement = ['low', 'medium', 'high'];
+  const engagement = validEngagement.includes(result.predicted_engagement)
+    ? result.predicted_engagement
+    : 'medium';
+
+  return {
+    predicted_engagement: engagement,
+    why: result.why,
+    top_2_issues: result.top_2_issues,
+    sharper_rewrite: result.sharper_rewrite,
+    alt_angle: result.alt_angle,
+    screenshot_card_summary: result.screenshot_card_summary,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// HTTP transport
+// ---------------------------------------------------------------------------
+
 function sendJson(res, status, payload) {
   const body = JSON.stringify(payload, null, 2);
   res.writeHead(status, {
@@ -704,7 +1157,16 @@ async function route(req, res) {
   const { pathname } = url;
 
   if (req.method === 'GET' && pathname === '/health') {
-    sendJson(res, 200, { ok: true, apps: ['linkedin-roaster', 'yc-pitch-deck-critic'] });
+    sendJson(res, 200, {
+      ok: true,
+      apps: [
+        'linkedin-roaster',
+        'yc-pitch-deck-critic',
+        'readme-roaster',
+        'cold-email-roaster',
+        'tweet-predictor',
+      ],
+    });
     return;
   }
 
@@ -723,6 +1185,21 @@ async function route(req, res) {
     return;
   }
 
+  if (req.method === 'GET' && pathname === '/readme-roaster/openapi.json') {
+    sendJson(res, 200, readmeRoasterSpec);
+    return;
+  }
+
+  if (req.method === 'GET' && pathname === '/cold-email-roaster/openapi.json') {
+    sendJson(res, 200, coldEmailRoasterSpec);
+    return;
+  }
+
+  if (req.method === 'GET' && pathname === '/tweet-predictor/openapi.json') {
+    sendJson(res, 200, tweetPredictorSpec);
+    return;
+  }
+
   if (req.method === 'POST' && pathname === '/linkedin-roaster/score') {
     try {
       sendJson(res, 200, await scoreLinkedinProfile(await readJson(req)));
@@ -735,6 +1212,33 @@ async function route(req, res) {
   if (req.method === 'POST' && pathname === '/yc-pitch-deck-critic/score') {
     try {
       sendJson(res, 200, scorePitchDeck(await readJson(req)));
+    } catch (error) {
+      sendJson(res, error.statusCode || 400, { error: error.message });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/readme-roaster/score') {
+    try {
+      sendJson(res, 200, await scoreReadme(await readJson(req)));
+    } catch (error) {
+      sendJson(res, error.statusCode || 400, { error: error.message });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/cold-email-roaster/score') {
+    try {
+      sendJson(res, 200, await scoreColdEmail(await readJson(req)));
+    } catch (error) {
+      sendJson(res, error.statusCode || 400, { error: error.message });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/tweet-predictor/score') {
+    try {
+      sendJson(res, 200, await scoreTweet(await readJson(req)));
     } catch (error) {
       sendJson(res, error.statusCode || 400, { error: error.message });
     }

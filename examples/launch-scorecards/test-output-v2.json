@@ -1,0 +1,60 @@
+{
+  "readme_roaster": {
+    "repo": "floomhq/floom",
+    "clarity_score": 7,
+    "what_it_actually_says": "Floom is a framework for quickly building and deploying AI-powered applications by describing them once with an OpenAPI spec, which it then exposes as an MCP server, an HTTP endpoint, and a shareable web form.",
+    "top_3_issues": [
+      {
+        "issue": "The 'Launching 2026-04-27' message in the quote block is confusing and implies the project is not ready, contradicting the self-hostable nature and existing live apps.",
+        "fix": "Remove or rephrase the launch date. Clarify that the self-hosted version is available now and the cloud version has a future launch date."
+      },
+      {
+        "issue": "The CLI installation instruction 'curl -fsSL https://floom.dev/install.sh | bash' is presented without immediate context or explanation of what the CLI does, and is preceded by a strong 'Do NOT run npm install floom' warning that might scare users.",
+        "fix": "Introduce the CLI installation with a clear statement of its purpose and benefits before providing the command. Group installation instructions logically."
+      },
+      {
+        "issue": "The README uses a lot of marketing-style language and feature lists without clearly prioritizing what a developer needs to know first (i.e., what it is and how to run it).",
+        "fix": "Restructure the top of the README to immediately present the core value proposition and the simplest way to get started (e.g., the Docker quickstart)."
+      }
+    ],
+    "rewritten_first_two_paragraphs": "## Floom: Ship AI Apps Fast\n\nFloom is the protocol and runtime for building agentic AI applications. Describe your app once using an OpenAPI specification. Floom then automatically provides you with an MCP server for agentic calls, a standard HTTP endpoint for integrations, and a shareable web form for user interaction. All surfaces come with built-in authentication, rate limiting, secret management, run history, and output pages, eliminating the need for boilerplate integration code.\n\nGet started immediately by self-hosting Floom in a single Docker container. For those preferring a managed experience, Floom Cloud launches on April 27, 2026. Explore live examples of Floom-powered apps like Lead Scorer, Competitor Analyzer, and Resume Screener at [floom.dev/apps](https://floom.dev/apps).",
+    "screenshot_card_summary": "Floom: Ship AI apps in minutes. Describe with OpenAPI, get HTTP API, agentic MCP server, & shareable web forms\u2014all self-hostable."
+  },
+  "cold_email_roaster": {
+    "cringe_score": 8,
+    "top_3_issues": [
+      {
+        "issue": "Generic opening and buzzwords. 'Hope this email finds you well', 'revolutionary AI-powered platform', 'leverage synergies', and 'disrupt their industry' are overused and vague.",
+        "fix": "Replace with a personalized observation or a direct statement about a potential pain point relevant to the recipient's industry or role."
+      },
+      {
+        "issue": "Lack of clear value proposition. The email doesn't explain *how* the platform helps or what specific problem it solves.",
+        "fix": "Clearly state a specific benefit or outcome the platform delivers, supported by a relevant data point or social proof if possible."
+      },
+      {
+        "issue": "Unspecific and long Call to Action. 'Quick 30-minute call to discuss how we can help you achieve your goals' is a common, low-conversion CTA.",
+        "fix": "Propose a very short, low-commitment next step focused on a specific topic, like a 15-minute discovery call to explore a particular challenge."
+      }
+    ],
+    "rewritten_subject_line": "Improving [Recipient Company Name]'s outreach",
+    "rewritten_body": "Hi [Recipient Name],\n\nYour work in [specific industry/area] caught my eye. Many leaders in your space struggle with [specific pain point, e.g., converting leads effectively].\n\nOur platform helps companies like yours [specific benefit, e.g., increase demo conversion rates by 25%] by [brief explanation of how, e.g., providing AI-driven insights on prospect engagement].\n\nWould you be open to a brief 15-minute chat next week to see if this is relevant for [Recipient Company Name]?",
+    "screenshot_card_summary": "Stop sending cringe emails. Get clear on your value prop, personalize your outreach, and book more demos. #sales #marketing"
+  },
+  "tweet_predictor": {
+    "predicted_engagement": "low",
+    "why": "The tweet lacks any compelling information or call to action, making it uninteresting to the target audience.",
+    "top_2_issues": [
+      {
+        "issue": "No value proposition or hook.",
+        "fix": "Clearly state what the SaaS does and the problem it solves for indie hackers."
+      },
+      {
+        "issue": "Generic and uninspired call to action.",
+        "fix": "Encourage specific interaction, such as feedback, a particular feature test, or signing up for a trial."
+      }
+    ],
+    "sharper_rewrite": "Launched my new SaaS, designed to [solve specific problem] for indie hackers. Cut your [pain point] time by 50%. Try it free and let me know what you think: [link]",
+    "alt_angle": "Struggling with [pain point]? I built a SaaS to solve it for indie hackers. After months of work, it's live! Seeking feedback on [specific feature]: [link]",
+    "screenshot_card_summary": "New SaaS for indie hackers launched! Solves [problem] with [key benefit]. Try it now."
+  }
+}
