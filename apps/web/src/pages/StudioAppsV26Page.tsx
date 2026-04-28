@@ -709,7 +709,7 @@ export function StudioAppsV26Page() {
                 justifyContent: 'space-between',
                 gap: 18,
                 flexWrap: 'wrap',
-                marginBottom: 10,
+                marginBottom: 18,
               }}
             >
               <div>
