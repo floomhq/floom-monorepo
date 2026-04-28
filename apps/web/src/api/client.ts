@@ -989,6 +989,18 @@ export function getMyApps(): Promise<{ apps: CreatorApp[] }> {
   return request('/api/hub/mine');
 }
 
+/** Installed apps for the caller (not necessarily owned). */
+export function getInstalledApps(): Promise<{
+  apps: Array<{
+    slug: string;
+    name: string;
+    description: string;
+    installed: boolean;
+  }>;
+}> {
+  return request('/api/hub/installed');
+}
+
 export function getAppRuns(
   slug: string,
   limit = 20,

@@ -5,8 +5,8 @@
 //
 // Shell: WorkspacePageShell mode="run" (RunRail + ModeToggle per v26 §12).
 // Hero: COMPACT single-line stat strip (NOT 4-card grid — issue #913).
-// Grid: installed apps derived from /me/runs run history.
-// Filter chips: All / Recently used / Scheduled / Drafts (URL param ?filter=).
+// Grid: installed apps from /api/hub/installed merged with run history metadata.
+// Filter chips: All / Recently used (URL param ?filter=).
 // Recent runs: compact panel sourced from api.getMyRuns.
 // Bottom CTA: Browse the app store → /apps.
 //
@@ -18,58 +18,109 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { useSession } from '../hooks/useSession';
-import { useMyApps } from '../hooks/useMyApps';
 import { formatTime } from '../lib/time';
 import * as api from '../api/client';
 import type { MeRunSummary } from '../lib/types';
 
 const FETCH_LIMIT = 200;
 
-/** Per-app summary derived from run history. */
+/** Per-app summary for the Run-mode grid. */
 interface RunApp {
   slug: string;
   name: string;
   description?: string;
   runCount: number;
   lastRunAt: string | null;
-  lastRunId: string;
-  lastRunAction: string;
-  lastRunStatus: string;
+  lastRunId: string | null;
+  lastRunAction: string | null;
+  lastRunStatus: string | null;
 }
 
-function deriveApps(runs: MeRunSummary[]): RunApp[] {
-  const seen = new Map<string, RunApp>();
+/** Installed app shape returned by /api/hub/installed. */
+interface InstalledApp {
+  slug: string;
+  name: string;
+  description: string;
+}
+
+/**
+ * Build the app grid from installed apps (primary source) merged with
+ * run-history metadata (run count, last run, last status).
+ * Apps that are installed but have never been run still appear (runCount=0).
+ */
+function mergeInstalledWithRuns(
+  installed: InstalledApp[],
+  runs: MeRunSummary[],
+): RunApp[] {
+  // Build run metadata map keyed by slug
+  const runMeta = new Map<
+    string,
+    { runCount: number; lastRunAt: string; lastRunId: string; lastRunAction: string; lastRunStatus: string }
+  >();
   for (const run of runs) {
     if (!run.app_slug) continue;
-    const existing = seen.get(run.app_slug);
+    const existing = runMeta.get(run.app_slug);
     if (existing) {
       existing.runCount += 1;
-      continue;
+    } else {
+      runMeta.set(run.app_slug, {
+        runCount: 1,
+        lastRunAt: run.started_at,
+        lastRunId: run.id,
+        lastRunAction: run.action,
+        lastRunStatus: run.status,
+      });
     }
-    seen.set(run.app_slug, {
-      slug: run.app_slug,
-      name: run.app_name || run.app_slug,
-      runCount: 1,
-      lastRunAt: run.started_at,
-      lastRunId: run.id,
-      lastRunAction: run.action,
-      lastRunStatus: run.status,
+  }
+
+  // Merge: installed apps are primary; fill in slugs from runs that
+  // aren't in the installed list (edge case: app removed after run).
+  const result: RunApp[] = installed.map((a) => {
+    const meta = runMeta.get(a.slug);
+    return {
+      slug: a.slug,
+      name: a.name,
+      description: a.description || undefined,
+      runCount: meta?.runCount ?? 0,
+      lastRunAt: meta?.lastRunAt ?? null,
+      lastRunId: meta?.lastRunId ?? null,
+      lastRunAction: meta?.lastRunAction ?? null,
+      lastRunStatus: meta?.lastRunStatus ?? null,
+    };
+  });
+
+  // Add run-only apps (installed but not in /installed list, e.g. removed apps)
+  const installedSlugs = new Set(installed.map((a) => a.slug));
+  for (const [slug, meta] of runMeta) {
+    if (installedSlugs.has(slug)) continue;
+    // Find name from runs
+    const nameRun = runs.find((r) => r.app_slug === slug);
+    result.push({
+      slug,
+      name: nameRun?.app_name || slug,
+      description: undefined,
+      runCount: meta.runCount,
+      lastRunAt: meta.lastRunAt,
+      lastRunId: meta.lastRunId,
+      lastRunAction: meta.lastRunAction,
+      lastRunStatus: meta.lastRunStatus,
     });
   }
-  return Array.from(seen.values());
+
+  return result;
 }
 
 // ------------------------------------------------------------------
 // Filter chips (wireframe run-apps.html lines 136–143)
+// Only functional chips: All / Recently used.
+// Scheduled and Drafts deferred until backend supports them.
 // ------------------------------------------------------------------
 
-type RunAppFilter = 'all' | 'recent' | 'scheduled' | 'drafts';
+type RunAppFilter = 'all' | 'recent';
 
 const RUN_APP_FILTER_LABELS: Record<RunAppFilter, string> = {
   all: 'All',
   recent: 'Recently used',
-  scheduled: 'Scheduled',
-  drafts: 'Drafts',
 };
 
 function filterApps(apps: RunApp[], filter: RunAppFilter): RunApp[] {
@@ -82,9 +133,7 @@ function filterApps(apps: RunApp[], filter: RunAppFilter): RunApp[] {
       return Number.isFinite(t) && t >= cutoff;
     });
   }
-  // 'scheduled' and 'drafts' require backend fields not yet in RunApp.
-  // Graceful: show empty (per spec "show empty if data missing").
-  return [];
+  return apps;
 }
 
 function FilterChipBar({
@@ -96,7 +145,7 @@ function FilterChipBar({
   counts: Record<RunAppFilter, number>;
   onChange: (f: RunAppFilter) => void;
 }) {
-  const filters: RunAppFilter[] = ['all', 'recent', 'scheduled', 'drafts'];
+  const filters: RunAppFilter[] = ['all', 'recent'];
   return (
     <div
       data-testid="run-apps-filter-chips"
@@ -256,8 +305,9 @@ function AppCard({ app }: { app: RunApp }) {
               marginTop: 2,
             }}
           >
-            {app.runCount} run{app.runCount !== 1 ? 's' : ''}
-            {app.lastRunAt ? ` · ${formatTime(app.lastRunAt)}` : ''}
+            {app.runCount === 0
+              ? 'Not run yet'
+              : `${app.runCount} run${app.runCount !== 1 ? 's' : ''}${app.lastRunAt ? ` · ${formatTime(app.lastRunAt)}` : ''}`}
           </div>
         </div>
       </div>
@@ -287,7 +337,7 @@ function AppCard({ app }: { app: RunApp }) {
           marginTop: 'auto',
         }}
       >
-        {failed ? 'Last run failed →' : 'Run again →'}
+        {failed ? 'Last run failed →' : app.runCount === 0 ? 'Run →' : 'Run again →'}
       </div>
     </Link>
   );
@@ -497,7 +547,7 @@ function EmptyState() {
 
 export function RunAppsPage() {
   const { data: session, loading: sessionLoading, error: sessionError } = useSession();
-  const { apps: myApps } = useMyApps();
+  const [installed, setInstalled] = useState<InstalledApp[] | null>(null);
   const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -507,9 +557,7 @@ export function RunAppsPage() {
   // Read filter from URL param; default to 'all'
   const rawFilter = searchParams.get('filter');
   const activeFilter: RunAppFilter =
-    rawFilter === 'recent' || rawFilter === 'scheduled' || rawFilter === 'drafts'
-      ? rawFilter
-      : 'all';
+    rawFilter === 'recent' ? 'recent' : 'all';
 
   function handleFilterChange(f: RunAppFilter) {
     if (f === 'all') {
@@ -530,31 +578,24 @@ export function RunAppsPage() {
   useEffect(() => {
     if (sessionPending) return;
     let cancelled = false;
-    api
-      .getMyRuns(FETCH_LIMIT)
-      .then((res) => {
-        if (!cancelled) setRuns(res.runs);
-      })
-      .catch(() => {
-        if (!cancelled) setRuns([]);
-      });
+    // Fetch both in parallel; grid renders once both resolve.
+    Promise.all([
+      api.getInstalledApps().catch(() => ({ apps: [] as InstalledApp[] })),
+      api.getMyRuns(FETCH_LIMIT).catch(() => ({ runs: [] as MeRunSummary[] })),
+    ]).then(([installedRes, runsRes]) => {
+      if (cancelled) return;
+      setInstalled(installedRes.apps as InstalledApp[]);
+      setRuns(runsRes.runs);
+    });
     return () => {
       cancelled = true;
     };
   }, [sessionPending]);
 
   const apps = useMemo<RunApp[]>(() => {
-    if (!runs) return [];
-    const derived = deriveApps(runs);
-    // Merge description from useMyApps (CreatorApp.description) by slug.
-    const descBySlug = new Map<string, string>(
-      (myApps ?? []).map((a) => [a.slug, a.description]),
-    );
-    return derived.map((app) => ({
-      ...app,
-      description: descBySlug.get(app.slug) || undefined,
-    }));
-  }, [runs, myApps]);
+    if (!installed || !runs) return [];
+    return mergeInstalledWithRuns(installed, runs);
+  }, [installed, runs]);
 
   const filteredApps = useMemo(
     () => filterApps(apps, activeFilter),
@@ -562,18 +603,21 @@ export function RunAppsPage() {
   );
 
   const appCount = apps.length;
-  // TODO: replace with real 7-day metric from /api/workspace/stats
-  const runCount = runs?.length ?? 0;
+  // Hero count: runs in the last 7 days
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const runCount =
+    runs?.filter((r) => new Date(r.started_at) >= weekAgo).length ?? 0;
 
   const filterCounts: Record<RunAppFilter, number> = useMemo(
     () => ({
       all: apps.length,
       recent: filterApps(apps, 'recent').length,
-      scheduled: 0,
-      drafts: 0,
     }),
     [apps],
   );
+
+  // Data is ready when both fetches have resolved
+  const dataReady = installed !== null && runs !== null;
 
   return (
     <WorkspacePageShell mode="run" title="Apps · Run · Floom">
@@ -628,12 +672,12 @@ export function RunAppsPage() {
         </div>
 
         {/* Compact hero metric strip (issue #913: NOT 4-card grid) */}
-        {runs !== null && (
+        {dataReady && (
           <CompactHeroStrip appCount={appCount} runCount={runCount} />
         )}
 
         {/* Filter chip toolbar (wireframe run-apps.html lines 136–143) */}
-        {runs !== null && appCount > 0 && (
+        {dataReady && appCount > 0 && (
           <FilterChipBar
             active={activeFilter}
             counts={filterCounts}
@@ -642,7 +686,7 @@ export function RunAppsPage() {
         )}
 
         {/* Apps grid */}
-        {runs === null ? (
+        {!dataReady ? (
           <div
             data-testid="run-apps-loading"
             style={{ color: 'var(--muted)', padding: '32px 0', fontSize: 14 }}
@@ -672,6 +716,7 @@ export function RunAppsPage() {
 
         {/* Recent runs panel */}
         {runs && runs.length > 0 && <RecentRunsPanel runs={runs} />}
+
 
         {/* Bottom CTA */}
         <div data-testid="run-apps-bottom-cta" style={{ marginTop: 4 }}>
