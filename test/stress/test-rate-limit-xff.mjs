@@ -10,12 +10,16 @@
 // Why this test exists: PRR v2 confirmed 30/30 calls passed with
 // rotating XFF. The fix reads x-real-ip (nginx-set, non-spoofable)
 // first, then falls back to the LAST entry of XFF. After the fix,
-// ~60 should pass + ~10 should 429 against the 60/hr anon cap.
+// the rate limiter MUST collapse all 200 spoofed-XFF calls onto the
+// single real peer IP and start emitting 429 once we cross the anon
+// cap (FLOOM_RATE_LIMIT_IP_PER_HOUR, default 150 since 2026-04-21).
 
 import { randomBytes } from 'node:crypto';
 
 const URL_ = process.argv[2] || 'https://preview.floom.dev/api/uuid/run';
-const N = 70;
+// Must exceed the live anon cap (default 150/hr). 200 leaves ~50 calls
+// of headroom for 429s without overshooting the abuse-detector.
+const N = 200;
 const BODY = JSON.stringify({ version: 'v4', count: 1 });
 
 function randomIp() {
@@ -86,10 +90,10 @@ const assert = (label, ok, detail) => {
 
 // Primary assertion: at least one 429. If zero 429s, the XFF spoof still
 // works and #142 is not fixed. We don't pin an exact count because the
-// anon cap (60/hr) bucket state depends on prior traffic — we just want
-// to see the rate limiter engage.
+// anon cap bucket state depends on prior traffic — we just want to see
+// the rate limiter engage.
 assert(
-  'at least one 429 in 70 XFF-spoofed requests',
+  `at least one 429 in ${N} XFF-spoofed requests`,
   (counts[429] || 0) >= 1,
   `got ${JSON.stringify(counts)}`,
 );

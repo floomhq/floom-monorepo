@@ -14,6 +14,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { db } from '../db.js';
+import { isCloudMode } from '../lib/better-auth.js';
 import { resolveUserContext } from '../services/session.js';
 import type { AppReviewRecord } from '../types.js';
 
@@ -83,12 +84,28 @@ reviewsRouter.get('/:slug/reviews', async (c) => {
  * POST /api/apps/:slug/reviews
  * Body: { rating: 1-5, title?, body? }
  * Upsert on (workspace_id, app_slug, user_id). Anonymous callers (device
- * cookie only) cannot leave reviews: we require a logged-in user OR the
- * synthetic local user (OSS mode).
+ * cookie only) cannot leave reviews in Cloud mode: we require a logged-in
+ * user (session cookie or agent token). OSS mode falls through to the
+ * synthetic local user so self-hosters can demo the UI without auth.
  */
 reviewsRouter.post('/:slug/reviews', async (c) => {
   const ctx = await resolveUserContext(c);
   const slug = c.req.param('slug') || '';
+
+  // Cloud mode: anonymous (device-only) callers must NOT be able to spam
+  // reviews under the synthetic DEFAULT_USER_ID. Block before any DB write.
+  // OSS mode keeps the existing demo flow (is_authenticated false but the
+  // synthetic local user is the only user — no spam vector).
+  if (isCloudMode() && !ctx.is_authenticated) {
+    return c.json(
+      {
+        error: 'Sign in to leave a review.',
+        code: 'auth_required',
+        hint: 'Reviews must be tied to a logged-in user or agent token.',
+      },
+      401,
+    );
+  }
 
   // Confirm the app exists so we don't accumulate orphan reviews.
   const app = db
