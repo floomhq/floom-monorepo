@@ -24,8 +24,6 @@ floom --help
 
 > **Do not run `npm install floom`.** The unscoped `floom` name on npm belongs to an unrelated third-party streaming tool; installing it will not give you the Floom CLI. Use the curl installer or the manual clone above.
 
-> **Do not run `npm install floom`.** The unscoped `floom` name on npm belongs to an unrelated third-party streaming tool; installing it will not give you the Floom CLI. Use the curl installer or the manual clone above.
-
 ## Requirements
 
 - `bash` (4+ preferred, works on 3.2)
@@ -36,12 +34,56 @@ floom --help
 ## Commands
 
 ```text
-floom init                     scaffold a floom.yaml in the current directory
-floom deploy [--dry-run]       validate + publish the current app
-floom status                   list your apps and recent runs
-floom auth <api-key> [url]     save API key to ~/.floom/config.json
-floom --help                   show usage
-floom --version                print version
+floom auth <agent-token> [url]       save an Agent token to ~/.floom/config.json
+floom auth login --token=<token>     save an Agent token with explicit flags
+floom auth whoami                    print identity for the current token
+floom auth logout                    clear saved auth
+
+floom account secrets list           list workspace secrets
+floom account secrets set <key> ...  set a workspace secret
+floom account agent-tokens list      list workspace Agent tokens
+floom account agent-tokens create    create a workspace Agent token
+
+floom apps list                      list your workspace apps
+floom apps get <slug>                inspect one of your apps
+floom apps update <slug> ...         update app metadata and controls
+floom apps delete <slug>             delete an app
+
+floom store list                     browse public Store apps
+floom store search <query>           search public Store apps
+floom store get <slug>               inspect a public Store app
+
+floom runs list                      list recent runs
+floom runs get <run-id>              inspect a run
+floom runs share <run-id>            create a public run share link
+floom runs delete <run-id>           delete a run
+floom runs activity                  list recent Studio activity
+
+floom jobs create <slug>             start an async app job
+floom jobs get <slug> <job-id>       inspect an async job
+floom jobs cancel <slug> <job-id>    cancel an async job
+
+floom quota get <slug>               inspect app run quota
+
+floom triggers list                  list app triggers
+floom triggers create <slug> ...     create schedule or webhook triggers
+floom triggers update <trigger-id>   update a trigger
+floom triggers delete <trigger-id>   delete a trigger
+
+floom workspaces me                  inspect current workspace session
+floom workspaces create ...          create a workspace
+floom workspaces update <id> ...     update workspace metadata
+floom workspaces members ...         manage workspace members
+floom workspaces invites ...         manage workspace invites
+floom workspaces runs delete <id>    delete workspace runs
+
+floom feedback submit ...            submit product feedback
+floom run <slug> [inputs-json]       run a Floom app by slug
+floom init                           scaffold a floom.yaml in the current directory
+floom deploy [--dry-run]             validate + publish the current app
+floom status                         list your apps and recent runs
+floom --help                         show usage
+floom --version                      print version
 ```
 
 ## Auth
@@ -52,7 +94,7 @@ Order of resolution:
 2. `~/.floom/config.json` with `{"api_key": "...", "api_url": "https://floom.dev"}`
 3. Legacy `~/.claude/floom-skill-config.json` (from the old Claude Code skill)
 
-Get your API key at https://floom.dev/me/api-keys, then:
+Get your Agent token at https://floom.dev/home, then:
 
 ```bash
 floom auth sk_live_xxx

@@ -178,6 +178,9 @@ function processTrigger(trigger: TriggerRecord, now: number): boolean {
       app,
       action: trigger.action,
       inputs,
+      workspaceId: trigger.workspace_id,
+      userId: trigger.user_id,
+      deviceId: null,
       // Tag the job so the outgoing webhook (v0.3.0 delivery path) can
       // include `triggered_by` context. Uses webhookUrlOverride=null to
       // keep the app's default webhook target (creators don't lose their

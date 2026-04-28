@@ -5,7 +5,7 @@
 #   1. File parses as YAML.
 #   2. Required fields present: name, slug, description.
 #   3. Slug matches ^[a-z0-9][a-z0-9-]{0,47}$.
-#   4. Either openapi_spec_url OR (runtime + actions) is present.
+#   4. Either a publish source OR (runtime + actions) is present.
 #   5. network.allowed_domains is valid when present.
 #
 # Exit 0 on success, 1 on any validation failure. First error wins and is
@@ -55,23 +55,66 @@ if not re.match(r"^[a-z0-9][a-z0-9-]{0,47}$", slug):
     )
     sys.exit(1)
 
-has_openapi = bool(m.get("openapi_spec_url"))
+openapi_url = m.get("openapi_url")
+openapi_spec_url = m.get("openapi_spec_url")
+openapi_spec = m.get("openapi_spec")
+docker_image_ref = m.get("docker_image_ref")
+has_openapi = bool(openapi_spec_url or openapi_url)
+has_inline_openapi = bool(openapi_spec)
+has_docker_image = bool(docker_image_ref)
 has_runtime = bool(m.get("runtime")) and bool(m.get("actions"))
-if not has_openapi and not has_runtime:
+if not has_openapi and not has_inline_openapi and not has_docker_image and not has_runtime:
     print(
-        "floom-validate: manifest must declare either openapi_spec_url "
+        "floom-validate: manifest must declare either openapi_spec_url/openapi_url, "
+        "openapi_spec, docker_image_ref, "
         "(proxied app) or runtime + actions (custom-code app)",
         file=sys.stderr,
     )
     sys.exit(1)
 
+publish_modes = [
+    bool(openapi_spec_url or openapi_url),
+    bool(openapi_spec),
+    bool(docker_image_ref),
+]
+if sum(1 for mode in publish_modes if mode) > 1:
+    print(
+        "floom-validate: declare exactly one publish source: "
+        "openapi_spec_url/openapi_url, openapi_spec, or docker_image_ref",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 if has_openapi:
-    url = m["openapi_spec_url"]
-    if not (url.startswith("http://") or url.startswith("https://")):
+    if openapi_spec_url and openapi_url and openapi_spec_url != openapi_url:
         print(
-            f"floom-validate: openapi_spec_url must be http(s) (got '{url}')",
+            "floom-validate: openapi_spec_url and openapi_url must match when both are present",
             file=sys.stderr,
         )
+        sys.exit(1)
+    url = openapi_spec_url or openapi_url
+    field_name = "openapi_spec_url" if openapi_spec_url else "openapi_url"
+    if not isinstance(url, str):
+        print(f"floom-validate: {field_name} must be a string", file=sys.stderr)
+        sys.exit(1)
+    if not (url.startswith("http://") or url.startswith("https://")):
+        print(
+            f"floom-validate: {field_name} must be http(s) (got '{url}')",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+if has_inline_openapi:
+    if not isinstance(openapi_spec, (str, dict)):
+        print("floom-validate: openapi_spec must be a file path string or inline mapping", file=sys.stderr)
+        sys.exit(1)
+    if isinstance(openapi_spec, str) and not openapi_spec.strip():
+        print("floom-validate: openapi_spec must not be empty", file=sys.stderr)
+        sys.exit(1)
+
+if has_docker_image:
+    if not isinstance(docker_image_ref, str) or not docker_image_ref.strip():
+        print("floom-validate: docker_image_ref must be a non-empty string", file=sys.stderr)
         sys.exit(1)
 
 if has_runtime:

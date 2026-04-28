@@ -168,11 +168,15 @@ try {
   const readTools = readList.json?.result?.tools || [];
   const readNames = readTools.map((tool) => tool.name).sort();
   const readExpected = [
+    'create_job',
     'discover_apps',
+    'feedback_submit',
+    'get_app_quota',
     'get_app_about',
     'get_app_details',
     'get_app_skill',
     'get_app_source',
+    'get_job',
     'get_run',
     'list_app_reviews',
     'list_my_runs',
@@ -197,16 +201,23 @@ try {
     'account_list_secrets',
     'account_revoke_agent_token',
     'account_set_secret',
+    'cancel_job',
+    'create_job',
+    'delete_run',
     'discover_apps',
+    'feedback_submit',
+    'get_app_quota',
     'get_app_about',
     'get_app_details',
     'get_app_skill',
     'get_app_source',
+    'get_job',
     'get_run',
     'list_app_reviews',
     'list_my_runs',
     'leave_app_review',
     'run_app',
+    'share_run',
     'submit_app_review',
     'studio_claim_app',
     'studio_delete_app',
@@ -220,6 +231,9 @@ try {
     'studio_list_my_apps',
     'studio_list_secret_policies',
     'studio_publish_app',
+    'studio_invite_app_user',
+    'studio_revoke_app_invite',
+    'studio_search_app_share_users',
     'studio_set_app_rate_limit',
     'studio_set_app_sharing',
     'studio_set_creator_secret',
@@ -228,6 +242,24 @@ try {
     'studio_uninstall_app',
     'studio_update_app',
     'studio_withdraw_app_review',
+    'trigger_create',
+    'trigger_delete',
+    'trigger_list',
+    'trigger_update',
+    'workspace_accept_invite',
+    'workspace_create',
+    'workspace_create_invite',
+    'workspace_delete',
+    'workspace_delete_runs',
+    'workspace_get',
+    'workspace_list',
+    'workspace_list_invites',
+    'workspace_list_members',
+    'workspace_remove_member',
+    'workspace_revoke_invite',
+    'workspace_set_member_role',
+    'workspace_switch',
+    'workspace_update',
   ].sort();
   log('read-write token exposes run + studio + account tools', JSON.stringify(writeNames) === JSON.stringify(writeExpected), JSON.stringify(writeNames));
 
@@ -239,6 +271,7 @@ try {
   });
   const publishNames = (publishList.json?.result?.tools || []).map((tool) => tool.name).sort();
   const publishExpected = [
+    'feedback_submit',
     'studio_claim_app',
     'studio_delete_app',
     'studio_delete_creator_secret',
@@ -251,6 +284,9 @@ try {
     'studio_list_my_apps',
     'studio_list_secret_policies',
     'studio_publish_app',
+    'studio_invite_app_user',
+    'studio_revoke_app_invite',
+    'studio_search_app_share_users',
     'studio_set_app_rate_limit',
     'studio_set_app_sharing',
     'studio_set_creator_secret',
@@ -271,7 +307,19 @@ try {
   const run = tools.find((tool) => tool.name === 'run_app');
   const getRun = tools.find((tool) => tool.name === 'get_run');
   const listRuns = tools.find((tool) => tool.name === 'list_my_runs');
+  const shareRun = tools.find((tool) => tool.name === 'share_run');
+  const deleteRun = tools.find((tool) => tool.name === 'delete_run');
+  const createJobTool = tools.find((tool) => tool.name === 'create_job');
+  const getJobTool = tools.find((tool) => tool.name === 'get_job');
+  const cancelJobTool = tools.find((tool) => tool.name === 'cancel_job');
+  const appQuota = tools.find((tool) => tool.name === 'get_app_quota');
+  const feedbackSubmit = tools.find((tool) => tool.name === 'feedback_submit');
+  const triggerCreate = tools.find((tool) => tool.name === 'trigger_create');
+  const workspaceCreate = tools.find((tool) => tool.name === 'workspace_create');
   const publish = tools.find((tool) => tool.name === 'studio_publish_app');
+  const appShareSearch = tools.find((tool) => tool.name === 'studio_search_app_share_users');
+  const appInvite = tools.find((tool) => tool.name === 'studio_invite_app_user');
+  const appInviteRevoke = tools.find((tool) => tool.name === 'studio_revoke_app_invite');
   log('discover_apps schema exposes q + category + limit + cursor', Boolean(discover?.inputSchema?.properties?.q) && Boolean(discover?.inputSchema?.properties?.category) && Boolean(discover?.inputSchema?.properties?.limit) && Boolean(discover?.inputSchema?.properties?.cursor));
   log('get_app_skill requires slug', Array.isArray(skill?.inputSchema?.required) && skill.inputSchema.required.includes('slug'));
   log('get_app_details requires slug', Array.isArray(detail?.inputSchema?.required) && detail.inputSchema.required.includes('slug'));
@@ -280,7 +328,19 @@ try {
   log('run_app schema exposes slug + action + inputs', Boolean(run?.inputSchema?.properties?.slug) && Boolean(run?.inputSchema?.properties?.action) && Boolean(run?.inputSchema?.properties?.inputs));
   log('get_run requires run_id', Array.isArray(getRun?.inputSchema?.required) && getRun.inputSchema.required.includes('run_id'));
   log('list_my_runs schema exposes pagination args', Boolean(listRuns?.inputSchema?.properties?.limit) && Boolean(listRuns?.inputSchema?.properties?.cursor));
+  log('share_run requires run_id', Array.isArray(shareRun?.inputSchema?.required) && shareRun.inputSchema.required.includes('run_id'));
+  log('delete_run requires run_id', Array.isArray(deleteRun?.inputSchema?.required) && deleteRun.inputSchema.required.includes('run_id'));
+  log('create_job schema exposes slug + action + inputs', Boolean(createJobTool?.inputSchema?.properties?.slug) && Boolean(createJobTool?.inputSchema?.properties?.action) && Boolean(createJobTool?.inputSchema?.properties?.inputs));
+  log('get_job requires slug + job_id', Array.isArray(getJobTool?.inputSchema?.required) && getJobTool.inputSchema.required.includes('slug') && getJobTool.inputSchema.required.includes('job_id'));
+  log('cancel_job requires slug + job_id', Array.isArray(cancelJobTool?.inputSchema?.required) && cancelJobTool.inputSchema.required.includes('slug') && cancelJobTool.inputSchema.required.includes('job_id'));
+  log('get_app_quota requires slug', Array.isArray(appQuota?.inputSchema?.required) && appQuota.inputSchema.required.includes('slug'));
+  log('feedback_submit requires text', Array.isArray(feedbackSubmit?.inputSchema?.required) && feedbackSubmit.inputSchema.required.includes('text'));
+  log('trigger_create schema exposes slug + type + action', Boolean(triggerCreate?.inputSchema?.properties?.slug) && Boolean(triggerCreate?.inputSchema?.properties?.trigger_type) && Boolean(triggerCreate?.inputSchema?.properties?.action));
+  log('workspace_create schema exposes name + slug', Boolean(workspaceCreate?.inputSchema?.properties?.name) && Boolean(workspaceCreate?.inputSchema?.properties?.slug));
   log('studio_publish_app schema exposes OpenAPI publish args', Boolean(publish?.inputSchema?.properties?.openapi_url) && Boolean(publish?.inputSchema?.properties?.openapi_spec) && Boolean(publish?.inputSchema?.properties?.visibility));
+  log('studio_search_app_share_users requires slug + q', Array.isArray(appShareSearch?.inputSchema?.required) && appShareSearch.inputSchema.required.includes('slug') && appShareSearch.inputSchema.required.includes('q'));
+  log('studio_invite_app_user exposes username/email invite inputs', Boolean(appInvite?.inputSchema?.properties?.username) && Boolean(appInvite?.inputSchema?.properties?.email));
+  log('studio_revoke_app_invite requires slug + invite_id', Array.isArray(appInviteRevoke?.inputSchema?.required) && appInviteRevoke.inputSchema.required.includes('slug') && appInviteRevoke.inputSchema.required.includes('invite_id'));
 
   const call = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',
@@ -347,6 +407,198 @@ try {
   log('publish-only token can publish via studio_publish_app', publishPayload?.ok === true && publishPayload?.slug === 'agent-studio-publish', publishCall.text);
   log('studio_publish_app persists owner-scoped app', Boolean(publishedRow) && publishedRow.workspace_id === 'local' && publishedRow.author === 'local', JSON.stringify(publishedRow));
   log('studio_publish_app returns request-origin URLs', publishPayload?.permalink === `http://localhost:${server.port}/p/agent-studio-publish` && publishPayload?.mcp_url === `http://localhost:${server.port}/mcp/app/agent-studio-publish`, JSON.stringify(publishPayload));
+
+  const runCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 118,
+    method: 'tools/call',
+    params: { name: 'run_app', arguments: { slug: 'agent-studio-publish', action: 'echo', inputs: { message: 'hello' } } },
+  });
+  const runPayload = parseToolText(runCall);
+  log('run_app creates an owned run for run-management tools', typeof runPayload?.run_id === 'string', runCall.text);
+
+  const shareRunCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 119,
+    method: 'tools/call',
+    params: { name: 'share_run', arguments: { run_id: runPayload?.run_id } },
+  });
+  const shareRunPayload = parseToolText(shareRunCall);
+  log('share_run flips owned run public and returns URLs', shareRunPayload?.is_public === true && typeof shareRunPayload?.share_url === 'string', shareRunCall.text);
+
+  const deleteRunCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 120,
+    method: 'tools/call',
+    params: { name: 'delete_run', arguments: { run_id: runPayload?.run_id } },
+  });
+  const deleteRunPayload = parseToolText(deleteRunCall);
+  log('delete_run removes only an owned run', deleteRunPayload?.deleted_count === 1 && !db.prepare('SELECT id FROM runs WHERE id = ?').get(runPayload?.run_id), deleteRunCall.text);
+
+  db.prepare(`UPDATE apps SET is_async = 1, async_mode = 'queued' WHERE slug = 'agent-studio-publish'`).run();
+
+  const createJobCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 127,
+    method: 'tools/call',
+    params: { name: 'create_job', arguments: { slug: 'agent-studio-publish', action: 'echo', inputs: { message: 'async' } } },
+  });
+  const createJobPayload = parseToolText(createJobCall);
+  log('create_job queues an owned async job', createJobPayload?.job?.status === 'queued' && createJobPayload?.job?.workspace_id === 'local' && createJobPayload?.job?.user_id === 'local', createJobCall.text);
+
+  const getJobCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 128,
+    method: 'tools/call',
+    params: { name: 'get_job', arguments: { slug: 'agent-studio-publish', job_id: createJobPayload?.job?.id } },
+  });
+  const getJobPayload = parseToolText(getJobCall);
+  log('get_job returns the owned queued job', getJobPayload?.id === createJobPayload?.job?.id && getJobPayload?.status === 'queued', getJobCall.text);
+
+  const cancelJobCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 129,
+    method: 'tools/call',
+    params: { name: 'cancel_job', arguments: { slug: 'agent-studio-publish', job_id: createJobPayload?.job?.id } },
+  });
+  const cancelJobPayload = parseToolText(cancelJobCall);
+  log('cancel_job cancels the owned queued job', cancelJobPayload?.id === createJobPayload?.job?.id && cancelJobPayload?.status === 'cancelled', cancelJobCall.text);
+
+  const quotaCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 130,
+    method: 'tools/call',
+    params: { name: 'get_app_quota', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const quotaPayload = parseToolText(quotaCall);
+  log('get_app_quota returns BYOK/rate-limit decision payload', quotaPayload?.slug === 'agent-studio-publish' && typeof quotaPayload?.byok_required === 'boolean' && quotaPayload?.rate_limit, quotaCall.text);
+
+  const feedbackCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 131,
+    method: 'tools/call',
+    params: { name: 'feedback_submit', arguments: { text: 'Headless feedback path', email: 'agent@example.com', url: `http://localhost:${server.port}/p/agent-studio-publish` } },
+  });
+  const feedbackPayload = parseToolText(feedbackCall);
+  log('feedback_submit stores feedback with workspace context', feedbackPayload?.ok === true && db.prepare('SELECT workspace_id, user_id FROM feedback WHERE id = ?').get(feedbackPayload.id)?.workspace_id === 'local', feedbackCall.text);
+
+  const triggerCreateCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 132,
+    method: 'tools/call',
+    params: { name: 'trigger_create', arguments: { slug: 'agent-studio-publish', action: 'echo', trigger_type: 'webhook', inputs: { message: 'webhook' } } },
+  });
+  const triggerCreatePayload = parseToolText(triggerCreateCall);
+  log('trigger_create creates owned webhook trigger and returns one-time secret', triggerCreatePayload?.trigger?.trigger_type === 'webhook' && typeof triggerCreatePayload?.webhook_secret === 'string' && typeof triggerCreatePayload?.webhook_url === 'string', triggerCreateCall.text);
+
+  const triggerListCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 133,
+    method: 'tools/call',
+    params: { name: 'trigger_list', arguments: {} },
+  });
+  const triggerListPayload = parseToolText(triggerListCall);
+  log('trigger_list returns owned trigger with app slug', Boolean((triggerListPayload?.triggers || []).find((trigger) => trigger.id === triggerCreatePayload?.trigger?.id && trigger.app_slug === 'agent-studio-publish')), triggerListCall.text);
+
+  const triggerUpdateCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 134,
+    method: 'tools/call',
+    params: { name: 'trigger_update', arguments: { trigger_id: triggerCreatePayload?.trigger?.id, enabled: false } },
+  });
+  const triggerUpdatePayload = parseToolText(triggerUpdateCall);
+  log('trigger_update disables owned trigger', triggerUpdatePayload?.trigger?.enabled === false, triggerUpdateCall.text);
+
+  const triggerDeleteCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 135,
+    method: 'tools/call',
+    params: { name: 'trigger_delete', arguments: { trigger_id: triggerCreatePayload?.trigger?.id } },
+  });
+  const triggerDeletePayload = parseToolText(triggerDeleteCall);
+  log('trigger_delete removes owned trigger', triggerDeletePayload?.deleted === true && !db.prepare('SELECT id FROM triggers WHERE id = ?').get(triggerCreatePayload?.trigger?.id), triggerDeleteCall.text);
+
+  const workspaceListCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 136,
+    method: 'tools/call',
+    params: { name: 'workspace_list', arguments: {} },
+  });
+  const workspaceListPayload = parseToolText(workspaceListCall);
+  log('workspace_list returns local workspace without wrapped_dek', Boolean((workspaceListPayload?.workspaces || []).find((workspace) => workspace.id === 'local' && !('wrapped_dek' in workspace))), workspaceListCall.text);
+
+  const workspaceCreateCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 137,
+    method: 'tools/call',
+    params: { name: 'workspace_create', arguments: { name: 'Agent Workspace', slug: 'agent-workspace' } },
+  });
+  const workspaceCreatePayload = parseToolText(workspaceCreateCall);
+  const workspaceId = workspaceCreatePayload?.workspace?.id;
+  log('workspace_create creates admin membership for token user', typeof workspaceId === 'string' && db.prepare('SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ?').get(workspaceId, 'local')?.role === 'admin', workspaceCreateCall.text);
+
+  const workspaceUpdateCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 138,
+    method: 'tools/call',
+    params: { name: 'workspace_update', arguments: { workspace_id: workspaceId, name: 'Agent Workspace Updated' } },
+  });
+  const workspaceUpdatePayload = parseToolText(workspaceUpdateCall);
+  log('workspace_update changes owned workspace metadata', workspaceUpdatePayload?.workspace?.name === 'Agent Workspace Updated', workspaceUpdateCall.text);
+
+  const workspaceMembersCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 139,
+    method: 'tools/call',
+    params: { name: 'workspace_list_members', arguments: { workspace_id: workspaceId } },
+  });
+  const workspaceMembersPayload = parseToolText(workspaceMembersCall);
+  log('workspace_list_members returns token user membership', Boolean((workspaceMembersPayload?.members || []).find((member) => member.user_id === 'local' && member.role === 'admin')), workspaceMembersCall.text);
+
+  const workspaceInviteCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 140,
+    method: 'tools/call',
+    params: { name: 'workspace_create_invite', arguments: { workspace_id: workspaceId, email: 'invitee@example.com', role: 'viewer' } },
+  });
+  const workspaceInvitePayload = parseToolText(workspaceInviteCall);
+  log('workspace_create_invite creates pending invite with accept URL', workspaceInvitePayload?.invite?.email === 'invitee@example.com' && typeof workspaceInvitePayload?.accept_url === 'string', workspaceInviteCall.text);
+
+  const workspaceInvitesCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 141,
+    method: 'tools/call',
+    params: { name: 'workspace_list_invites', arguments: { workspace_id: workspaceId } },
+  });
+  const workspaceInvitesPayload = parseToolText(workspaceInvitesCall);
+  log('workspace_list_invites returns created invite', Boolean((workspaceInvitesPayload?.invites || []).find((invite) => invite.id === workspaceInvitePayload?.invite?.id)), workspaceInvitesCall.text);
+
+  const workspaceRevokeCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 142,
+    method: 'tools/call',
+    params: { name: 'workspace_revoke_invite', arguments: { workspace_id: workspaceId, invite_id: workspaceInvitePayload?.invite?.id } },
+  });
+  const workspaceRevokePayload = parseToolText(workspaceRevokeCall);
+  log('workspace_revoke_invite revokes invite', workspaceRevokePayload?.revoked === true && db.prepare('SELECT status FROM workspace_invites WHERE id = ?').get(workspaceInvitePayload?.invite?.id)?.status === 'revoked', workspaceRevokeCall.text);
+
+  const workspaceDeleteRunsCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 143,
+    method: 'tools/call',
+    params: { name: 'workspace_delete_runs', arguments: { workspace_id: workspaceId, confirm: true } },
+  });
+  const workspaceDeleteRunsPayload = parseToolText(workspaceDeleteRunsCall);
+  log('workspace_delete_runs returns deletion count for owned workspace', workspaceDeleteRunsPayload?.ok === true && typeof workspaceDeleteRunsPayload?.deleted_count === 'number', workspaceDeleteRunsCall.text);
+
+  const workspaceDeleteCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 144,
+    method: 'tools/call',
+    params: { name: 'workspace_delete', arguments: { workspace_id: workspaceId, confirm: true } },
+  });
+  const workspaceDeletePayload = parseToolText(workspaceDeleteCall);
+  log('workspace_delete removes owned workspace with confirm=true', workspaceDeletePayload?.deleted === true && !db.prepare('SELECT id FROM workspaces WHERE id = ?').get(workspaceId), workspaceDeleteCall.text);
 
   const detailsCall = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',
@@ -586,6 +838,57 @@ try {
   });
   const privateSharingPayload = parseToolText(privateSharing);
   log('studio_set_app_sharing returns app to private', privateSharingPayload?.visibility === 'private' && privateSharingPayload?.link_share_token === null, privateSharing.text);
+
+  db.prepare(
+    `INSERT OR REPLACE INTO users (id, workspace_id, email, name, auth_provider, auth_subject)
+     VALUES ('sharee_user', 'local', 'sharee@example.com', 'Sharee User', 'test', 'sharee-user')`,
+  ).run();
+
+  const shareUserSearch = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 321,
+    method: 'tools/call',
+    params: { name: 'studio_search_app_share_users', arguments: { slug: 'agent-studio-publish', q: 'sharee' } },
+  });
+  const shareUserSearchPayload = parseToolText(shareUserSearch);
+  log('studio_search_app_share_users returns registered users for owned app', Boolean((shareUserSearchPayload?.users || []).find((user) => user.id === 'sharee_user' && user.email === 'sharee@example.com')), shareUserSearch.text);
+
+  const appInviteCall = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 322,
+    method: 'tools/call',
+    params: { name: 'studio_invite_app_user', arguments: { slug: 'agent-studio-publish', email: 'sharee@example.com' } },
+  });
+  const appInvitePayload = parseToolText(appInviteCall);
+  log('studio_invite_app_user creates pending app invite and switches private app to invited', appInvitePayload?.invite?.invited_user_id === 'sharee_user' && appInvitePayload?.invite?.state === 'pending_accept' && appInvitePayload?.visibility === 'invited', appInviteCall.text);
+  log('studio_invite_app_user does not return plaintext accept token', appInvitePayload && !appInviteCall.text.includes('/login?invite_id=') && !('accept_url' in appInvitePayload), appInviteCall.text);
+
+  const appInviteSharing = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 323,
+    method: 'tools/call',
+    params: { name: 'studio_get_app_sharing', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const appInviteSharingPayload = parseToolText(appInviteSharing);
+  log('studio_get_app_sharing lists MCP-created app invite', Boolean((appInviteSharingPayload?.invites || []).find((invite) => invite.id === appInvitePayload?.invite?.id && invite.invited_user_email === 'sharee@example.com')), appInviteSharing.text);
+
+  const appInviteRevokeCall = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 324,
+    method: 'tools/call',
+    params: { name: 'studio_revoke_app_invite', arguments: { slug: 'agent-studio-publish', invite_id: appInvitePayload?.invite?.id } },
+  });
+  const appInviteRevokePayload = parseToolText(appInviteRevokeCall);
+  log('studio_revoke_app_invite revokes app invite', appInviteRevokePayload?.revoked === true && db.prepare('SELECT state FROM app_invites WHERE id = ?').get(appInvitePayload?.invite?.id)?.state === 'revoked', appInviteRevokeCall.text);
+
+  const privateAfterInvite = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 325,
+    method: 'tools/call',
+    params: { name: 'studio_set_app_sharing', arguments: { slug: 'agent-studio-publish', state: 'private' } },
+  });
+  const privateAfterInvitePayload = parseToolText(privateAfterInvite);
+  log('studio_set_app_sharing returns invited app to private after invite tests', privateAfterInvitePayload?.visibility === 'private', privateAfterInvite.text);
 
   const submitReview = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',

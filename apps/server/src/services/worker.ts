@@ -9,11 +9,12 @@
 //
 // One worker per server process. Multiple replicas are safe because claimJob
 // uses an atomic UPDATE...WHERE status='queued'.
-import { db } from '../db.js';
+import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newRunId } from '../lib/ids.js';
 import {
   claimJob,
   completeJob,
+  decodePerCallSecrets,
   failJob,
   getJob,
   nextQueuedJob,
@@ -27,6 +28,7 @@ import type {
   JobRecord,
   NormalizedManifest,
   RunRecord,
+  SessionContext,
 } from '../types.js';
 
 const POLL_INTERVAL_MS = Number(process.env.FLOOM_JOB_POLL_MS || 1000);
@@ -105,16 +107,35 @@ export async function processOneJob(): Promise<JobRecord | null> {
     claimed.input_json === null
       ? {}
       : (JSON.parse(claimed.input_json) as Record<string, unknown>);
-  const perCallSecrets = claimed.per_call_secrets_json
-    ? (JSON.parse(claimed.per_call_secrets_json) as Record<string, string>)
-    : undefined;
+  let perCallSecrets: Record<string, string> | undefined;
+  try {
+    perCallSecrets = decodePerCallSecrets(claimed);
+  } catch (err) {
+    failJob(
+      claimed.id,
+      { message: `Failed to decrypt per-call secrets: ${(err as Error).message}` },
+      null,
+    );
+    await deliverCompletion(claimed.id);
+    return claimed;
+  }
+  const ctx = buildJobSessionContext(claimed);
 
   const runId = newRunId();
   db.prepare(
-    `INSERT INTO runs (id, app_id, action, inputs, status) VALUES (?, ?, ?, ?, 'pending')`,
-  ).run(runId, app.id, claimed.action, JSON.stringify(inputs));
+    `INSERT INTO runs (id, app_id, action, inputs, status, workspace_id, user_id, device_id)
+     VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+  ).run(
+    runId,
+    app.id,
+    claimed.action,
+    JSON.stringify(inputs),
+    ctx.workspace_id,
+    ctx.user_id,
+    ctx.device_id,
+  );
 
-  dispatchRun(app, manifest, runId, claimed.action, inputs, perCallSecrets);
+  dispatchRun(app, manifest, runId, claimed.action, inputs, perCallSecrets, ctx);
 
   const run = await waitForRunOrTimeout(runId, claimed.timeout_ms);
 
@@ -147,6 +168,16 @@ export async function processOneJob(): Promise<JobRecord | null> {
     runId,
   );
   return getJob(claimed.id) || claimed;
+}
+
+function buildJobSessionContext(job: JobRecord): SessionContext {
+  const userId = job.user_id || DEFAULT_USER_ID;
+  return {
+    workspace_id: job.workspace_id || DEFAULT_WORKSPACE_ID,
+    user_id: userId,
+    device_id: job.device_id || userId,
+    is_authenticated: userId !== DEFAULT_USER_ID,
+  };
 }
 
 async function handleFailure(

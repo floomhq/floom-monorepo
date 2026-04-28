@@ -9,7 +9,7 @@
 // The background worker (services/worker.ts) drains the queue and fires the
 // creator's webhook_url on completion.
 import { Hono } from 'hono';
-import { db } from '../db.js';
+import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newJobId } from '../lib/ids.js';
 import { createJob, formatJob, getJobBySlug, cancelJob } from '../services/jobs.js';
 import { validateInputs, ManifestError } from '../services/manifest.js';
@@ -17,7 +17,7 @@ import { checkAppVisibility } from '../lib/auth.js';
 import { resolveUserContext } from '../services/session.js';
 import { parseJsonBody, bodyParseError } from '../lib/body.js';
 import { runGate } from '../lib/run-gate.js';
-import type { AppRecord, NormalizedManifest } from '../types.js';
+import type { AppRecord, JobRecord, NormalizedManifest, SessionContext } from '../types.js';
 
 export const jobsRouter = new Hono<{ Variables: { slug: string } }>();
 
@@ -27,6 +27,24 @@ function buildJobUrls(publicUrl: string, slug: string, jobId: string) {
     webhook_url_template: `${publicUrl}/api/${slug}/jobs/${jobId}`,
     cancel_url: `${publicUrl}/api/${slug}/jobs/${jobId}/cancel`,
   };
+}
+
+function isOwnedJob(ctx: SessionContext, job: JobRecord): boolean {
+  const workspaceId = job.workspace_id || DEFAULT_WORKSPACE_ID;
+  const jobUserId = job.user_id || DEFAULT_USER_ID;
+  if (workspaceId !== ctx.workspace_id || jobUserId !== ctx.user_id) {
+    return false;
+  }
+  if (ctx.is_authenticated) return true;
+  return Boolean(job.device_id && job.device_id === ctx.device_id);
+}
+
+function formatRestJob(job: JobRecord): Record<string, unknown> {
+  const formatted = formatJob(job);
+  delete formatted.workspace_id;
+  delete formatted.user_id;
+  delete formatted.device_id;
+  return formatted;
 }
 
 /**
@@ -119,6 +137,9 @@ jobsRouter.post('/', async (c) => {
     app: row,
     action: actionName,
     inputs: validated,
+    workspaceId: ctx.workspace_id,
+    userId: ctx.user_id,
+    deviceId: ctx.device_id,
     webhookUrlOverride:
       typeof body.webhook_url === 'string' ? body.webhook_url : null,
     timeoutMsOverride:
@@ -167,7 +188,8 @@ jobsRouter.get('/:job_id', async (c) => {
   if (blocked) return blocked;
   const job = getJobBySlug(slug, jobId);
   if (!job) return c.json({ error: `Job not found: ${jobId}` }, 404);
-  return c.json(formatJob(job));
+  if (!isOwnedJob(ctx, job)) return c.json({ error: 'Job not found' }, 404);
+  return c.json(formatRestJob(job));
 });
 
 /**
@@ -193,6 +215,7 @@ jobsRouter.post('/:job_id/cancel', async (c) => {
   if (blocked) return blocked;
   const job = getJobBySlug(slug, jobId);
   if (!job) return c.json({ error: `Job not found: ${jobId}` }, 404);
+  if (!isOwnedJob(ctx, job)) return c.json({ error: 'Job not found' }, 404);
   const updated = cancelJob(jobId);
-  return c.json(formatJob(updated || job));
+  return c.json(formatRestJob(updated || job));
 });

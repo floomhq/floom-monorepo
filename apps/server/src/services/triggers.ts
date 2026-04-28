@@ -209,6 +209,20 @@ export function listTriggersForUser(userId: string): TriggerRecord[] {
     .all(userId) as TriggerRecord[];
 }
 
+export function listTriggersForWorkspaceUser(
+  workspaceId: string,
+  userId: string,
+): TriggerRecord[] {
+  return db
+    .prepare(
+      `SELECT * FROM triggers
+        WHERE workspace_id = ?
+          AND user_id = ?
+        ORDER BY created_at DESC`,
+    )
+    .all(workspaceId, userId) as TriggerRecord[];
+}
+
 export function listTriggersForApp(appId: string): TriggerRecord[] {
   return db
     .prepare(

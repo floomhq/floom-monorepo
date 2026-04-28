@@ -20,9 +20,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
+const requireFromServer = createRequire(new URL('../../apps/server/package.json', import.meta.url));
+const Database = requireFromServer('better-sqlite3');
 
 let passed = 0;
 let failed = 0;
@@ -39,6 +42,7 @@ function log(label, ok, detail) {
 const SLOW_ECHO_PORT = 4201;
 const WEBHOOK_PORT = 4202;
 const FLOOM_PORT = 14301; // avoid collision with any running server
+const DEVICE_COOKIE = 'floom_device=dev-jobs-e2e-owner';
 
 const tmpDataDir = mkdtempSync(join(tmpdir(), 'floom-e2e-jobs-'));
 const appsYamlPath = join(tmpDataDir, 'apps.yaml');
@@ -210,7 +214,10 @@ try {
     `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs`,
     {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        cookie: DEVICE_COOKIE,
+      },
       body: JSON.stringify({
         action: 'slow_echo',
         inputs: { message: 'hello world', delay_ms: 500 },
@@ -233,6 +240,11 @@ try {
     typeof createJson.poll_url === 'string' && createJson.poll_url.includes(createJson.job_id),
     createJson.poll_url,
   );
+  log(
+    'POST /jobs: owner device cookie supplied for polling',
+    createRes.status === 202,
+    DEVICE_COOKIE,
+  );
 
   // ---- 6. poll until done ----
   const jobId = createJson.job_id;
@@ -242,6 +254,7 @@ try {
   while (Date.now() < deadline) {
     const res = await fetch(
       `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs/${jobId}`,
+      { headers: { cookie: DEVICE_COOKIE } },
     );
     if (res.ok) {
       const body = await res.json();
@@ -266,6 +279,49 @@ try {
     finalJob && finalJob.attempts === 1,
     `attempts=${finalJob?.attempts}`,
   );
+  if (finalJob?.run_id) {
+    const inspectDb = new Database(join(tmpDataDir, 'floom-chat.db'), {
+      readonly: true,
+      fileMustExist: true,
+    });
+    try {
+      const ownerRow = inspectDb
+        .prepare(
+          `SELECT jobs.workspace_id AS job_workspace_id,
+                  jobs.user_id AS job_user_id,
+                  jobs.device_id AS job_device_id,
+                  runs.workspace_id AS run_workspace_id,
+                  runs.user_id AS run_user_id,
+                  runs.device_id AS run_device_id
+             FROM jobs
+             JOIN runs ON runs.id = jobs.run_id
+            WHERE jobs.id = ?`,
+        )
+        .get(jobId);
+      log(
+        'worker run ownership: workspace_id preserved',
+        ownerRow?.run_workspace_id === ownerRow?.job_workspace_id &&
+          ownerRow?.run_workspace_id === 'local',
+        JSON.stringify(ownerRow),
+      );
+      log(
+        'worker run ownership: user_id preserved',
+        ownerRow?.run_user_id === ownerRow?.job_user_id &&
+          ownerRow?.run_user_id === 'local',
+        JSON.stringify(ownerRow),
+      );
+      log(
+        'worker run ownership: device_id preserved',
+        ownerRow?.run_device_id === ownerRow?.job_device_id &&
+          ownerRow?.run_device_id === 'dev-jobs-e2e-owner',
+        JSON.stringify(ownerRow),
+      );
+    } finally {
+      inspectDb.close();
+    }
+  } else {
+    log('worker run ownership: run_id present for DB inspection', false, JSON.stringify(finalJob));
+  }
 
   // ---- 7. webhook was delivered ----
   // Give the worker a moment to POST the webhook after completion.
@@ -306,7 +362,10 @@ try {
   // ---- 8. cancelling an already-terminal job is a no-op ----
   const cancelRes = await fetch(
     `http://localhost:${FLOOM_PORT}/api/slow-echo/jobs/${jobId}/cancel`,
-    { method: 'POST' },
+    {
+      method: 'POST',
+      headers: { cookie: DEVICE_COOKIE },
+    },
   );
   const cancelBody = await cancelRes.json();
   log(

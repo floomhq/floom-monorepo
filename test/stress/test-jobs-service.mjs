@@ -69,15 +69,49 @@ const created = jobs.createJob(jobId, {
   app,
   action: 'run',
   inputs: { msg: 'hello' },
-  perCallSecrets: { API_KEY: 'secret' },
+  perCallSecrets: { API_KEY: 'super_plaintext_secret_123' },
 });
+const rawCreated = db
+  .prepare('SELECT per_call_secrets_json FROM jobs WHERE id = ?')
+  .get(jobId);
 log('createJob: row is queued', created.status === 'queued', created.status);
 log('createJob: input_json captured', created.input_json.includes('hello'));
 log('createJob: webhook_url defaulted from app', created.webhook_url === 'https://hook.example/done');
 log('createJob: timeout_ms defaulted from app', created.timeout_ms === 60_000);
 log('createJob: max_retries from app', created.max_retries === 2);
 log('createJob: attempts=0', created.attempts === 0);
-log('createJob: per_call_secrets_json stored', created.per_call_secrets_json.includes('secret'));
+log(
+  'createJob: per_call_secrets_json stored encrypted envelope',
+  created.per_call_secrets_json.includes('"aes-256-gcm"'),
+  created.per_call_secrets_json,
+);
+log(
+  'createJob: per_call_secrets_json has no plaintext secret at rest',
+  !rawCreated.per_call_secrets_json.includes('super_plaintext_secret_123'),
+  rawCreated.per_call_secrets_json,
+);
+const decodedPerCallSecrets = jobs.decodePerCallSecrets(created);
+log(
+  'decodePerCallSecrets: decrypts per-call secret for worker',
+  decodedPerCallSecrets?.API_KEY === 'super_plaintext_secret_123',
+);
+const tooManySecrets = Object.fromEntries(
+  Array.from({ length: 65 }, (_, i) => [`K_${i}`, 'v']),
+);
+try {
+  jobs.createJob(newJobId(), {
+    app,
+    action: 'run',
+    inputs: {},
+    perCallSecrets: tooManySecrets,
+  });
+  log('createJob: rejects oversized per-call secret map', false);
+} catch (err) {
+  log(
+    'createJob: rejects oversized per-call secret map',
+    /at most 64 keys/.test(String(err?.message || err)),
+  );
+}
 
 // 2. getJob returns the row
 const fetched = jobs.getJob(jobId);

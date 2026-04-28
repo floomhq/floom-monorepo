@@ -54,77 +54,131 @@ fi
 
 bash "$LIB_DIR/floom-validate.sh" floom.yaml
 
-# Read fields out of floom.yaml. Prefer yq when present; fall back to python3.
-read_field() {
-  local field="$1"
-  if command -v yq >/dev/null 2>&1; then
-    yq -r ".$field // \"\"" floom.yaml
-  else
-    python3 -c "
+BODY_AND_META=$(python3 - <<'PY'
+import json
 import sys
+from pathlib import Path
+
 try:
     import yaml
 except ImportError:
-    print('floom deploy: need yq or PyYAML (pip install pyyaml)', file=sys.stderr)
+    print("floom deploy: need PyYAML (pip install pyyaml)", file=sys.stderr)
     sys.exit(1)
-m = yaml.safe_load(open('floom.yaml'))
-v = m.get('$field', '')
-print(v if v is not None else '')
-"
-  fi
-}
 
-SLUG=$(read_field slug)
-NAME=$(read_field name)
-DESC=$(read_field description)
-SPEC=$(read_field openapi_spec_url)
-VIS=$(read_field visibility)
-RETENTION_DAYS=$(read_field max_run_retention_days)
-[[ -z "$VIS" ]] && VIS="private"
-LINK_SHARE_REQUIRES_AUTH=$(read_field link_share_requires_auth)
-AUTH_REQUIRED=$(read_field auth_required)
+manifest_path = Path("floom.yaml")
+try:
+    manifest = yaml.safe_load(manifest_path.read_text()) or {}
+except yaml.YAMLError as exc:
+    print(f"floom deploy: YAML parse error: {exc}", file=sys.stderr)
+    sys.exit(1)
 
-if [[ -n "$SPEC" ]]; then
-  BODY=$(python3 -c "
-import json
+def add_if_present(body, key, value):
+    if value is not None and value != "":
+        body[key] = value
+
+openapi_spec_url = manifest.get("openapi_spec_url")
+openapi_url = manifest.get("openapi_url")
+openapi_spec = manifest.get("openapi_spec")
+docker_image_ref = manifest.get("docker_image_ref")
+
+if openapi_spec_url and openapi_url and openapi_spec_url != openapi_url:
+    print(
+        "floom deploy: openapi_spec_url and openapi_url must match when both are present.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+sources = [
+    bool(openapi_spec_url or openapi_url),
+    bool(openapi_spec),
+    bool(docker_image_ref),
+]
+if sum(1 for source in sources if source) != 1:
+    print(
+        "floom deploy: declare exactly one publish source: openapi_spec_url/openapi_url, openapi_spec, or docker_image_ref",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 body = {
-    'openapi_url': '$SPEC',
-    'slug': '$SLUG',
-    'name': '$NAME',
-    'description': '$DESC',
-    'visibility': '$VIS',
-    **({'link_share_requires_auth': True} if '$LINK_SHARE_REQUIRES_AUTH'.lower() == 'true' else {}),
-    **({'auth_required': True} if '$AUTH_REQUIRED'.lower() == 'true' else {}),
+    "slug": manifest.get("slug", ""),
+    "name": manifest.get("name", ""),
+    "description": manifest.get("description", ""),
+    "visibility": manifest.get("visibility") or "private",
 }
-retention = '$RETENTION_DAYS'
-if retention:
-    body['max_run_retention_days'] = int(retention)
-print(json.dumps(body))")
 
-  if [[ "$DRY_RUN" == "1" ]]; then
-    export FLOOM_DRY_RUN=1
-  fi
+if manifest.get("link_share_requires_auth") is True:
+    body["link_share_requires_auth"] = True
+if manifest.get("auth_required") is True:
+    body["auth_required"] = True
+add_if_present(body, "max_run_retention_days", manifest.get("max_run_retention_days"))
 
-  RESPONSE=$(bash "$LIB_DIR/floom-api.sh" POST /api/hub/ingest "$BODY")
-  printf '%s\n' "$RESPONSE"
+if openapi_spec_url or openapi_url:
+    body["openapi_url"] = openapi_url or openapi_spec_url
+elif openapi_spec:
+    if isinstance(openapi_spec, dict):
+        body["openapi_spec"] = openapi_spec
+    elif isinstance(openapi_spec, str):
+        spec_path = (manifest_path.parent / openapi_spec).resolve()
+        if spec_path.exists():
+            body["openapi_spec"] = yaml.safe_load(spec_path.read_text())
+        else:
+            parsed = yaml.safe_load(openapi_spec)
+            if not isinstance(parsed, dict):
+                print(
+                    f"floom deploy: openapi_spec path not found or inline spec is not a mapping: {openapi_spec}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            body["openapi_spec"] = parsed
+    else:
+        print("floom deploy: openapi_spec must be a file path string or inline mapping", file=sys.stderr)
+        sys.exit(1)
+else:
+    body["docker_image_ref"] = docker_image_ref
+    add_if_present(body, "manifest", manifest.get("manifest"))
+    add_if_present(body, "secret_bindings", manifest.get("secret_bindings"))
 
-  if [[ "$DRY_RUN" != "1" ]]; then
-    API_URL="$(resolve_api_url)"
-    DEPLOYED_SLUG=$(printf '%s' "$RESPONSE" | python3 -c "
+print(json.dumps({"body": body, "slug": body.get("slug") or "", "name": body.get("name") or ""}))
+PY
+)
+
+BODY=$(printf '%s' "$BODY_AND_META" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["body"]))')
+SLUG=$(printf '%s' "$BODY_AND_META" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("slug",""))')
+NAME=$(printf '%s' "$BODY_AND_META" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name",""))')
+
+if [[ "$DRY_RUN" == "1" ]]; then
+  export FLOOM_DRY_RUN=1
+fi
+
+set +e
+RESPONSE=$(bash "$LIB_DIR/floom-api.sh" POST /api/hub/ingest "$BODY")
+API_STATUS=$?
+set -e
+printf '%s\n' "$RESPONSE"
+if [[ "$API_STATUS" -ne 0 ]]; then
+  exit "$API_STATUS"
+fi
+
+if [[ "$DRY_RUN" != "1" ]]; then
+  API_URL="$(resolve_api_url)"
+  DEPLOYED_SLUG=$(printf '%s' "$RESPONSE" | python3 -c "
 import json, sys
+fallback = '''$SLUG'''
 try:
-    print(json.load(sys.stdin).get('slug') or '$SLUG')
+    print(json.load(sys.stdin).get('slug') or fallback)
 except Exception:
-    print('$SLUG')
+    print(fallback)
 ")
-    DEPLOYED_NAME=$(printf '%s' "$RESPONSE" | python3 -c "
+  DEPLOYED_NAME=$(printf '%s' "$RESPONSE" | python3 -c "
 import json, sys
+fallback = '''$NAME'''
 try:
-    print(json.load(sys.stdin).get('name') or '$NAME')
+    print(json.load(sys.stdin).get('name') or fallback)
 except Exception:
-    print('$NAME')
+    print(fallback)
 ")
-    cat <<EOF
+  cat <<EOF
 
 Published: $DEPLOYED_NAME
   App page:    ${API_URL%/}/p/$DEPLOYED_SLUG
@@ -134,12 +188,4 @@ Published: $DEPLOYED_NAME
 Add to Claude Desktop config:
   {"mcpServers":{"floom-$DEPLOYED_SLUG":{"url":"${API_URL%/}/mcp/app/$DEPLOYED_SLUG"}}}
 EOF
-  fi
-else
-  cat <<EOF
-floom deploy: custom Python/Node apps can't be published via HTTP yet. Options:
-  1. Open a PR against floomhq/floom with your dir under examples/$SLUG/.
-  2. Wrap your code in a thin HTTP server, publish an OpenAPI spec, then re-run 'floom deploy'.
-EOF
-  exit 1
 fi

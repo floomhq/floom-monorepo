@@ -15,6 +15,7 @@ import { hasValidAdminBearer } from './auth.js';
 import { extractIp } from './client-ip.js';
 import { recordRateLimitHit } from './metrics-counters.js';
 import { sendDiscordAlert } from './alerts.js';
+import { noteEmergencyRateLimitHit } from '../middleware/emergency.js';
 
 type Scope = 'ip' | 'user' | 'app' | 'agent_token' | 'mcp_ingest';
 
@@ -239,6 +240,7 @@ function buildRateLimitBlock(
 ): RunRateLimitBlock {
   recordRateLimitHit(scope);
   noteRateLimitHitForAbuse(extractIp(c), scope, Date.now());
+  noteEmergencyRateLimitHit(scope, Date.now());
   const retryAfter = clampRetryAfter(result.retryAfterSec);
   return {
     ok: false,
@@ -266,6 +268,7 @@ function writeRateLimitResponse(
 ): Response {
   recordRateLimitHit(scope);
   noteRateLimitHitForAbuse(extractIp(c), scope, Date.now());
+  noteEmergencyRateLimitHit(scope, Date.now());
   const retryAfter = clampRetryAfter(result.retryAfterSec);
   return c.json(
     {

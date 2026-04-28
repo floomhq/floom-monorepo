@@ -5,18 +5,39 @@
 // Claiming uses an atomic UPDATE...WHERE status='queued' pattern so multiple
 // workers or concurrent replicas never double-dispatch a row.
 import { db } from '../db.js';
+import { decryptValue, encryptValue } from './user_secrets.js';
 import type { AppRecord, JobRecord, JobStatus } from '../types.js';
 
 export const DEFAULT_JOB_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_PER_CALL_SECRET_COUNT = 64;
+const MAX_PER_CALL_SECRET_KEY_BYTES = 256;
+const MAX_PER_CALL_SECRET_VALUE_BYTES = 64 * 1024;
 
 export interface CreateJobInput {
   app: AppRecord;
   action: string;
   inputs: Record<string, unknown>;
+  workspaceId?: string | null;
+  userId?: string | null;
+  deviceId?: string | null;
   webhookUrlOverride?: string | null;
   timeoutMsOverride?: number | null;
   maxRetriesOverride?: number | null;
   perCallSecrets?: Record<string, string> | null;
+}
+
+interface EncryptedPerCallSecretsEnvelope {
+  v: 1;
+  alg: 'aes-256-gcm';
+  workspace_id: string;
+  secrets: Record<
+    string,
+    {
+      ciphertext: string;
+      nonce: string;
+      auth_tag: string;
+    }
+  >;
 }
 
 export function createJob(jobId: string, args: CreateJobInput): JobRecord {
@@ -27,16 +48,18 @@ export function createJob(jobId: string, args: CreateJobInput): JobRecord {
     args.maxRetriesOverride ??
     (typeof args.app.retries === 'number' && args.app.retries >= 0 ? args.app.retries : 0);
   const webhook = args.webhookUrlOverride ?? args.app.webhook_url ?? null;
+  const workspaceId = args.workspaceId || args.app.workspace_id || 'local';
   const perCallSecretsJson =
     args.perCallSecrets && Object.keys(args.perCallSecrets).length > 0
-      ? JSON.stringify(args.perCallSecrets)
+      ? JSON.stringify(encryptPerCallSecrets(workspaceId, args.perCallSecrets))
       : null;
 
   db.prepare(
     `INSERT INTO jobs (
        id, slug, app_id, action, status, input_json, webhook_url,
-       timeout_ms, max_retries, attempts, per_call_secrets_json
-     ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, 0, ?)`,
+       timeout_ms, max_retries, attempts, per_call_secrets_json,
+       workspace_id, user_id, device_id
+     ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
   ).run(
     jobId,
     args.app.slug,
@@ -47,10 +70,100 @@ export function createJob(jobId: string, args: CreateJobInput): JobRecord {
     timeout,
     maxRetries,
     perCallSecretsJson,
+    workspaceId,
+    args.userId || null,
+    args.deviceId || null,
   );
   const row = getJob(jobId);
   if (!row) throw new Error(`createJob: failed to re-read row ${jobId}`);
   return row;
+}
+
+export function decodePerCallSecrets(row: JobRecord): Record<string, string> | undefined {
+  if (!row.per_call_secrets_json) return undefined;
+  const parsed = JSON.parse(row.per_call_secrets_json) as unknown;
+  if (isEncryptedPerCallSecretsEnvelope(parsed)) {
+    const out: Record<string, string> = {};
+    const workspaceId = parsed.workspace_id || row.workspace_id || 'local';
+    for (const [key, secret] of Object.entries(parsed.secrets)) {
+      out[key] = decryptValue(
+        workspaceId,
+        secret.ciphertext,
+        secret.nonce,
+        secret.auth_tag,
+      );
+    }
+    return out;
+  }
+
+  // Backward compatibility for queued jobs created before per-call secret
+  // encryption shipped. New writes always use the encrypted envelope above.
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value === 'string') out[key] = value;
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
+  }
+
+  return undefined;
+}
+
+function encryptPerCallSecrets(
+  workspaceId: string,
+  secrets: Record<string, string>,
+): EncryptedPerCallSecretsEnvelope {
+  const encrypted: EncryptedPerCallSecretsEnvelope['secrets'] = {};
+  const entries = Object.entries(secrets);
+  if (entries.length > MAX_PER_CALL_SECRET_COUNT) {
+    throw new Error(`per-call secrets can contain at most ${MAX_PER_CALL_SECRET_COUNT} keys`);
+  }
+  for (const [key, value] of entries) {
+    if (typeof value !== 'string' || value.length === 0) continue;
+    if (Buffer.byteLength(key, 'utf-8') > MAX_PER_CALL_SECRET_KEY_BYTES) {
+      throw new Error(`per-call secret key is too long: ${key.slice(0, 32)}`);
+    }
+    if (Buffer.byteLength(value, 'utf-8') > MAX_PER_CALL_SECRET_VALUE_BYTES) {
+      throw new Error(`per-call secret value is too large: ${key}`);
+    }
+    encrypted[key] = encryptValue(workspaceId, value);
+  }
+  return {
+    v: 1,
+    alg: 'aes-256-gcm',
+    workspace_id: workspaceId,
+    secrets: encrypted,
+  };
+}
+
+function isEncryptedPerCallSecretsEnvelope(
+  value: unknown,
+): value is EncryptedPerCallSecretsEnvelope {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Partial<EncryptedPerCallSecretsEnvelope>;
+  if (
+    !(
+    candidate.v === 1 &&
+    candidate.alg === 'aes-256-gcm' &&
+    typeof candidate.workspace_id === 'string' &&
+    !!candidate.secrets &&
+    typeof candidate.secrets === 'object' &&
+    !Array.isArray(candidate.secrets)
+    )
+  ) {
+    return false;
+  }
+  const entries = Object.entries(candidate.secrets);
+  if (entries.length > MAX_PER_CALL_SECRET_COUNT) return false;
+  return entries.every(([, secret]) => {
+    if (!secret || typeof secret !== 'object' || Array.isArray(secret)) return false;
+    const row = secret as Record<string, unknown>;
+    return (
+      typeof row.ciphertext === 'string' &&
+      typeof row.nonce === 'string' &&
+      typeof row.auth_tag === 'string'
+    );
+  });
 }
 
 export function getJob(jobId: string): JobRecord | undefined {
@@ -178,6 +291,9 @@ export function formatJob(row: JobRecord): Record<string, unknown> {
     timeout_ms: row.timeout_ms,
     max_retries: row.max_retries,
     attempts: row.attempts,
+    workspace_id: row.workspace_id,
+    user_id: row.user_id,
+    device_id: row.device_id,
     created_at: row.created_at,
     started_at: row.started_at,
     finished_at: row.finished_at,

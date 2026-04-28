@@ -8,7 +8,7 @@
 // `/app/:slug` below so Hono does not swallow the root path as a slug.
 import type { Context } from 'hono';
 import { Hono } from 'hono';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
@@ -16,7 +16,7 @@ import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newRunId, newJobId } from '../lib/ids.js';
 import { validateInputs, ManifestError } from '../services/manifest.js';
 import { dispatchRun, getRun } from '../services/runner.js';
-import { createJob } from '../services/jobs.js';
+import { cancelJob, createJob, formatJob, getJobBySlug } from '../services/jobs.js';
 import { pickApps } from '../services/embeddings.js';
 import {
   buildIngestHint,
@@ -34,6 +34,7 @@ import {
 import { resolveUserContext } from '../services/session.js';
 import * as userSecrets from '../services/user_secrets.js';
 import * as creatorSecrets from '../services/app_creator_secrets.js';
+import * as workspaces from '../services/workspaces.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import {
   AUTH_DOCS_URL,
@@ -49,10 +50,12 @@ import {
   newAgentTokenId,
 } from '../lib/agent-tokens.js';
 import { checkMcpIngestLimit, extractIp } from '../lib/rate-limit.js';
-import { runGate } from '../lib/run-gate.js';
+import { extractUserApiKey, runGate } from '../lib/run-gate.js';
+import { decideByok, hashUserAgent, isByokGated } from '../lib/byok-gate.js';
 import { filterTestFixtures } from '../lib/hub-filter.js';
 import { recordMcpToolCall } from '../lib/metrics-counters.js';
 import { auditLog, getAuditActor } from '../services/audit-log.js';
+import { renderAppInviteEmail, sendEmail } from '../lib/email.js';
 import {
   agentToolErrorBody,
   AgentToolError,
@@ -65,11 +68,30 @@ import {
 import { invalidateHubCache } from '../lib/hub-cache.js';
 import { deleteAppRecordById } from '../services/app_delete.js';
 import {
+  deleteRunForOwner,
+  RunDeleteForbiddenError,
+  RunDeleteNotFoundError,
+} from '../services/run-retention-sweeper.js';
+import { deleteWorkspaceRuns } from '../services/run-retention-sweeper.js';
+import {
+  createTrigger,
+  deleteTrigger,
+  getTrigger,
+  listTriggersForWorkspaceUser,
+  serializeTrigger,
+  updateTrigger,
+  validateCronExpression,
+} from '../services/triggers.js';
+import {
   canonicalVisibility,
+  findUserByEmail,
+  findUserByUsername,
   getAppAccessDecision,
   isAppOwner,
   listInvites,
+  revokeInvite,
   transitionVisibility,
+  upsertInvite,
   type AppInviteRow,
 } from '../services/sharing.js';
 import {
@@ -86,10 +108,13 @@ import type {
   AppRecord,
   AppReviewRecord,
   InputSpec,
+  JobRecord,
   NormalizedManifest,
   RunRecord,
   SecretPolicy,
   SessionContext,
+  WorkspaceMemberRole,
+  WorkspaceRecord,
 } from '../types.js';
 
 export const mcpRouter = new Hono();
@@ -378,6 +403,9 @@ function createPerAppMcpServer(
             app: fresh,
             action: actionName,
             inputs: validated,
+            workspaceId: ctx?.workspace_id,
+            userId: ctx?.user_id,
+            deviceId: ctx?.device_id,
             perCallSecrets,
           });
           const publicUrl =
@@ -1324,8 +1352,26 @@ function requireAccountScope(ctx: SessionContext): void {
   );
 }
 
+function requireRunScope(ctx: SessionContext): void {
+  if (!ctx.agent_token_id || !ctx.agent_token_scope) {
+    throw new AgentToolError(
+      'auth_required',
+      'Authorization: Bearer floom_agent_<token> is required.',
+      401,
+    );
+  }
+  if (ctx.agent_token_scope === 'read' || ctx.agent_token_scope === 'read-write') {
+    return;
+  }
+  throw new AgentToolError(
+    'forbidden_scope',
+    'This tool requires read or read-write agent-token scope.',
+    403,
+  );
+}
+
 function canUseRunTools(ctx: SessionContext): boolean {
-  return ctx.agent_token_scope === 'read' || ctx.agent_token_scope === 'read-write';
+  return Boolean(ctx.agent_token_id);
 }
 
 function canUseStudioTools(ctx: SessionContext): boolean {
@@ -1336,12 +1382,57 @@ function canUseAccountTools(ctx: SessionContext): boolean {
   return ctx.agent_token_scope === 'read-write';
 }
 
+const PUBLISH_ONLY_HIDDEN_TOOL_NAMES = new Set([
+  'create_job',
+  'discover_apps',
+  'get_app_about',
+  'get_app_details',
+  'get_app_quota',
+  'get_app_skill',
+  'get_app_source',
+  'get_job',
+  'get_run',
+  'list_app_reviews',
+  'list_my_runs',
+  'run_app',
+]);
+
 function loadOwnedStudioApp(ctx: SessionContext, slug: string): AppRecord {
   const app = db.prepare(`SELECT * FROM apps WHERE slug = ?`).get(slug) as AppRecord | undefined;
   if (!app || !isAppOwner(app, ctx)) {
     throw new AgentToolError('not_found', 'App not found.', 404);
   }
   return app;
+}
+
+function loadOwnedRun(ctx: SessionContext, runId: string): RunRecord {
+  const row = getRun(runId);
+  const workspaceId = row?.workspace_id || DEFAULT_WORKSPACE_ID;
+  const runUserId = row?.user_id || DEFAULT_USER_ID;
+  if (!row || workspaceId !== ctx.workspace_id || runUserId !== ctx.user_id) {
+    throw new AgentToolError('not_found', 'Run not found.', 404);
+  }
+  return row;
+}
+
+function ensureOwnedJob(ctx: SessionContext, slug: string, jobId: string): JobRecord {
+  const job = getJobBySlug(slug, jobId);
+  const workspaceId = job?.workspace_id || DEFAULT_WORKSPACE_ID;
+  const jobUserId = job?.user_id || DEFAULT_USER_ID;
+  if (!job || workspaceId !== ctx.workspace_id || jobUserId !== ctx.user_id) {
+    throw new AgentToolError('not_found', 'Job not found.', 404);
+  }
+  return job;
+}
+
+function mcpJobUrls(baseUrl: string, slug: string, jobId: string): Record<string, string> {
+  const encodedSlug = encodeURIComponent(slug);
+  const encodedJobId = encodeURIComponent(jobId);
+  const pollUrl = `${baseUrl}/api/${encodedSlug}/jobs/${encodedJobId}`;
+  return {
+    poll_url: pollUrl,
+    cancel_url: `${pollUrl}/cancel`,
+  };
 }
 
 function parseStudioManifest(app: AppRecord): NormalizedManifest {
@@ -1367,7 +1458,7 @@ function serializeAgentToken(row: AgentTokenRecord): Record<string, unknown> {
     label: row.label,
     scope: row.scope,
     workspace_id: row.workspace_id,
-    issued_by_user_id: row.issued_by_user_id || row.user_id,
+    issued_by_user_id: row.user_id,
     created_at: row.created_at,
     last_used_at: row.last_used_at,
     revoked: row.revoked_at !== null,
@@ -1389,11 +1480,93 @@ function serializeInviteForMcp(invite: AppInviteRow): Record<string, unknown> {
   };
 }
 
+function serializeShareUserForMcp(user: { id: string; email: string | null; name: string | null }): Record<string, unknown> {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+  };
+}
+
+function publicInviteUrl(baseUrl: string, inviteId: string): string {
+  return `${baseUrl}/login?invite_id=${encodeURIComponent(inviteId)}`;
+}
+
+function serializeWorkspaceForMcp(workspace: WorkspaceRecord): Record<string, unknown> {
+  return {
+    id: workspace.id,
+    slug: workspace.slug,
+    name: workspace.name,
+    plan: workspace.plan,
+    created_at: workspace.created_at,
+  };
+}
+
+function triggerAppSlug(appId: string): string | undefined {
+  const row = db.prepare('SELECT slug FROM apps WHERE id = ?').get(appId) as
+    | { slug: string }
+    | undefined;
+  return row?.slug;
+}
+
+function buildWebhookUrl(baseUrl: string, path: string | null): string | null {
+  if (!path) return null;
+  return `${baseUrl}/hook/${path}`;
+}
+
+function hashFeedbackIp(c: Context): string {
+  const raw =
+    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+    c.req.header('x-real-ip') ||
+    'unknown';
+  const salt = process.env.FLOOM_FEEDBACK_SALT || 'floom-feedback-v1';
+  return createHash('sha256').update(`${salt}:${raw}`).digest('hex').slice(0, 32);
+}
+
 function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
   const server = new McpServer({
     name: 'floom-agent',
     version: '0.6.0',
   });
+
+  if (ctx.agent_token_id) {
+    server.registerTool(
+      'feedback_submit',
+      {
+        title: 'Submit product feedback',
+        description:
+          'Submit product feedback from a headless agent. Stores the feedback with the current workspace/user context.',
+        inputSchema: {
+          text: z.string().min(1).max(4000),
+          email: z.string().email().max(320).optional(),
+          url: z.string().max(2000).optional(),
+        },
+      },
+      async ({ text, email, url }) => {
+        recordMcpToolCall('feedback_submit');
+        try {
+          const id = `fb_${randomUUID().replace(/-/g, '').slice(0, 24)}`;
+          db.prepare(
+            `INSERT INTO feedback
+               (id, workspace_id, user_id, device_id, email, url, text, ip_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          ).run(
+            id,
+            ctx.workspace_id || null,
+            ctx.user_id || null,
+            ctx.device_id || null,
+            email || null,
+            url || null,
+            text,
+            hashFeedbackIp(c),
+          );
+          return mcpJson({ ok: true, id });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+  }
 
   if (canUseRunTools(ctx)) {
     server.registerTool(
@@ -1412,6 +1585,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       async ({ category, q, limit, cursor }) => {
         recordMcpToolCall('discover_apps');
         try {
+          requireRunScope(ctx);
           return mcpJson(discoverApps(c, ctx, { category, q, limit, cursor }));
         } catch (err) {
           return mcpError(err);
@@ -1432,6 +1606,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       async ({ slug }) => {
         recordMcpToolCall('get_app_skill');
         try {
+          requireRunScope(ctx);
           return mcpJson(getAppSkill(c, ctx, slug));
         } catch (err) {
           return mcpError(err);
@@ -1453,6 +1628,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       async ({ slug, link_key }) => {
         recordMcpToolCall('get_app_details');
         try {
+          requireRunScope(ctx);
           const app = loadAccessibleAgentApp(ctx, slug, link_key);
           return mcpJson(serializeAgentAppDetail(app, getPublicBaseUrl(c)));
         } catch (err) {
@@ -1475,6 +1651,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       async ({ slug, link_key }) => {
         recordMcpToolCall('get_app_about');
         try {
+          requireRunScope(ctx);
           const app = loadAccessibleAgentApp(ctx, slug, link_key);
           const manifest = safeParseManifest(app.manifest);
           const baseUrl = getPublicBaseUrl(c);
@@ -1521,6 +1698,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       async ({ slug, link_key, include_openapi_spec }) => {
         recordMcpToolCall('get_app_source');
         try {
+          requireRunScope(ctx);
           const app = loadAccessibleAgentApp(ctx, slug, link_key);
           const payload: Record<string, unknown> = {
             source: buildAppSourceInfo(app, safeParseManifest(app.manifest), getPublicBaseUrl(c)),
@@ -1550,6 +1728,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       async ({ slug, link_key, limit }) => {
         recordMcpToolCall('list_app_reviews');
         try {
+          requireRunScope(ctx);
           loadAccessibleAgentApp(ctx, slug, link_key);
           return mcpJson(getReviewBundle(slug, limit ?? 20));
         } catch (err) {
@@ -1573,6 +1752,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       async ({ slug, action, inputs }) => {
         recordMcpToolCall('run_app');
         try {
+          requireRunScope(ctx);
           return mcpJson(
             await runApp(c, ctx, {
               slug,
@@ -1599,6 +1779,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       async ({ run_id }) => {
         recordMcpToolCall('get_run');
         try {
+          requireRunScope(ctx);
           return mcpJson(getAgentRun(ctx, run_id));
         } catch (err) {
           return mcpError(err);
@@ -1622,7 +1803,260 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       async ({ slug, limit, cursor, since_ts }) => {
         recordMcpToolCall('list_my_runs');
         try {
+          requireRunScope(ctx);
           return mcpJson(listMyRuns(ctx, { slug, limit, cursor, since_ts }));
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    if (canUseAccountTools(ctx)) {
+      server.registerTool(
+        'share_run',
+        {
+          title: 'Share run',
+          description:
+            'Make one owned run publicly viewable through the redacted /r/:id output page.',
+          inputSchema: {
+            run_id: z.string().min(1).max(128),
+          },
+        },
+        async ({ run_id }) => {
+          recordMcpToolCall('share_run');
+          try {
+            const run = loadOwnedRun(ctx, run_id);
+            const app = db.prepare('SELECT slug FROM apps WHERE id = ?').get(run.app_id) as
+              | { slug: string }
+              | undefined;
+            db.prepare(`UPDATE runs SET is_public = 1 WHERE id = ?`).run(run.id);
+            const encodedRunId = encodeURIComponent(run.id);
+            return mcpJson({
+              ok: true,
+              run_id: run.id,
+              is_public: true,
+              app_slug: app?.slug ?? null,
+              share_url: `${getPublicBaseUrl(c)}/r/${encodedRunId}`,
+              public_view_url: `${getPublicBaseUrl(c)}/api/run/${encodedRunId}`,
+            });
+          } catch (err) {
+            return mcpError(err);
+          }
+        },
+      );
+
+      server.registerTool(
+        'delete_run',
+        {
+          title: 'Delete run',
+          description: 'Delete one owned run from this workspace.',
+          inputSchema: {
+            run_id: z.string().min(1).max(128),
+          },
+        },
+        async ({ run_id }) => {
+          recordMcpToolCall('delete_run');
+          try {
+            const result = deleteRunForOwner(ctx, run_id);
+            return mcpJson({ ok: true, run_id, ...result });
+          } catch (err) {
+            if (err instanceof RunDeleteNotFoundError) {
+              return mcpError(new AgentToolError('not_found', 'Run not found.', 404));
+            }
+            if (err instanceof RunDeleteForbiddenError) {
+              return mcpError(new AgentToolError('forbidden_scope', 'Forbidden.', 403));
+            }
+            return mcpError(err);
+          }
+        },
+      );
+    }
+
+    server.registerTool(
+      'create_job',
+      {
+        title: 'Create async job',
+        description:
+          'Queue an async app job through the same validation path as POST /api/:slug/jobs.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          action: z.string().min(1).max(120).optional(),
+          inputs: z.record(z.unknown()).optional(),
+          webhook_url: z.string().url().max(2048).optional(),
+          timeout_ms: z.number().int().min(1).max(24 * 60 * 60 * 1000).optional(),
+          max_retries: z.number().int().min(0).max(10).optional(),
+          _auth: z.record(z.string()).optional(),
+        },
+      },
+      async ({ slug, action, inputs, webhook_url, timeout_ms, max_retries, _auth }) => {
+        recordMcpToolCall('create_job');
+        try {
+          requireRunScope(ctx);
+          const gate = runGate(c, ctx, { slug });
+          if (!gate.ok) {
+            throw new AgentToolError(
+              'rate_limit_exceeded',
+              typeof gate.body.error === 'string' ? gate.body.error : 'Run gate rejected this job.',
+              gate.status,
+              gate.body,
+            );
+          }
+          const app = loadAccessibleAgentApp(ctx, slug);
+          if (!app.is_async) {
+            throw new AgentToolError(
+              'invalid_input',
+              `App ${slug} is not async. Use run_app instead.`,
+              400,
+            );
+          }
+          const manifest = parseStudioManifest(app);
+          const actionNames = Object.keys(manifest.actions);
+          const actionName = action || (manifest.actions.run ? 'run' : actionNames[0]);
+          const actionSpec = manifest.actions[actionName];
+          if (!actionSpec) {
+            throw new AgentToolError(
+              'invalid_input',
+              `Action "${actionName}" not found.`,
+              400,
+              { valid_actions: actionNames },
+            );
+          }
+          let validated: Record<string, unknown>;
+          try {
+            validated = validateInputs(actionSpec, (inputs as Record<string, unknown>) ?? {});
+          } catch (err) {
+            const e = err as ManifestError;
+            throw new AgentToolError('invalid_input', e.message, 400, { field: e.field });
+          }
+          const jobId = newJobId();
+          const job = createJob(jobId, {
+            app,
+            action: actionName,
+            inputs: validated,
+            workspaceId: ctx.workspace_id,
+            userId: ctx.user_id,
+            deviceId: ctx.device_id,
+            webhookUrlOverride: webhook_url || null,
+            timeoutMsOverride: timeout_ms ?? null,
+            maxRetriesOverride: max_retries ?? null,
+            perCallSecrets: _auth || null,
+          });
+          return mcpJson({
+            ok: true,
+            job: formatJob(job),
+            job_id: job.id,
+            status: job.status,
+            slug: job.slug,
+            action: job.action,
+            ...mcpJobUrls(getPublicBaseUrl(c), slug, job.id),
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'get_job',
+      {
+        title: 'Get async job',
+        description: 'Return the current state of one owned async job.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          job_id: z.string().min(1).max(128),
+        },
+      },
+      async ({ slug, job_id }) => {
+        recordMcpToolCall('get_job');
+        try {
+          requireRunScope(ctx);
+          loadAccessibleAgentApp(ctx, slug);
+          const job = ensureOwnedJob(ctx, slug, job_id);
+          return mcpJson({
+            ...formatJob(job),
+            ...mcpJobUrls(getPublicBaseUrl(c), slug, job.id),
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    if (canUseAccountTools(ctx)) {
+      server.registerTool(
+        'cancel_job',
+        {
+          title: 'Cancel async job',
+          description: 'Cancel one queued or running owned async job.',
+          inputSchema: {
+            slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+            job_id: z.string().min(1).max(128),
+          },
+        },
+        async ({ slug, job_id }) => {
+          recordMcpToolCall('cancel_job');
+          try {
+            loadAccessibleAgentApp(ctx, slug);
+            const job = ensureOwnedJob(ctx, slug, job_id);
+            const updated = cancelJob(job.id) || job;
+            return mcpJson({
+              ...formatJob(updated),
+              ...mcpJobUrls(getPublicBaseUrl(c), slug, job.id),
+            });
+          } catch (err) {
+            return mcpError(err);
+          }
+        },
+      );
+    }
+
+    server.registerTool(
+      'get_app_quota',
+      {
+        title: 'Get app quota',
+        description:
+          'Return the same read-only BYOK/free-run quota counter shown on the app page.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+        },
+      },
+      async ({ slug }) => {
+        recordMcpToolCall('get_app_quota');
+        try {
+          requireRunScope(ctx);
+          loadAccessibleAgentApp(ctx, slug);
+          if (!isByokGated(slug)) {
+            return mcpJson({
+              gated: false,
+              byok_required: false,
+              slug,
+              rate_limit: { enforced: false },
+            });
+          }
+          const decision = decideByok(
+            extractIp(c),
+            slug,
+            extractUserApiKey(c) !== null,
+            undefined,
+            hashUserAgent(c.req.header('user-agent')),
+          );
+          return mcpJson({
+            gated: true,
+            byok_required: true,
+            slug,
+            usage: decision.usage,
+            limit: decision.limit,
+            remaining: Math.max(0, decision.limit - decision.usage),
+            window_ms: 24 * 60 * 60 * 1000,
+            has_user_key_hint: extractUserApiKey(c) !== null,
+            rate_limit: {
+              enforced: true,
+              usage: decision.usage,
+              limit: decision.limit,
+              remaining: Math.max(0, decision.limit - decision.usage),
+              window_ms: 24 * 60 * 60 * 1000,
+            },
+          });
         } catch (err) {
           return mcpError(err);
         }
@@ -2370,6 +2804,175 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
     );
 
     server.registerTool(
+      'studio_search_app_share_users',
+      {
+        title: 'Search app share users',
+        description:
+          'Search registered users by name or email for owner-only app sharing. Mirrors the Studio sharing user-search endpoint.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          q: z.string().min(1).max(120),
+          limit: z.number().int().min(1).max(10).optional(),
+        },
+      },
+      async ({ slug, q, limit }) => {
+        recordMcpToolCall('studio_search_app_share_users');
+        try {
+          requireStudioScope(ctx);
+          loadOwnedStudioApp(ctx, slug);
+          const needle = q.trim().toLowerCase();
+          if (needle.length < 2) return mcpJson({ users: [] });
+          const users = db
+            .prepare(
+              `SELECT id, email, name
+                 FROM users
+                WHERE LOWER(COALESCE(name, '')) LIKE ?
+                   OR LOWER(COALESCE(email, '')) LIKE ?
+                ORDER BY name, email
+                LIMIT ?`,
+            )
+            .all(`%${needle}%`, `%${needle}%`, limit || 10) as Array<{
+            id: string;
+            email: string | null;
+            name: string | null;
+          }>;
+          return mcpJson({ users: users.map(serializeShareUserForMcp) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_invite_app_user',
+      {
+        title: 'Invite app user',
+        description:
+          'Invite one registered username or email address to an owned app. Existing users get a pending accept invite; unknown emails get an email invite.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          username: z.string().min(1).max(120).optional(),
+          email: z.string().email().max(320).optional(),
+        },
+      },
+      async ({ slug, username, email }) => {
+        recordMcpToolCall('studio_invite_app_user');
+        try {
+          requireStudioScope(ctx);
+          if (Boolean(username) === Boolean(email)) {
+            throw new AgentToolError(
+              'invalid_input',
+              'Provide exactly one of username or email.',
+              400,
+            );
+          }
+          const app = loadOwnedStudioApp(ctx, slug);
+          let invite: AppInviteRow;
+          let delivery: Record<string, unknown> | null = null;
+
+          if (username) {
+            const user = findUserByUsername(username);
+            if (!user) {
+              throw new AgentToolError('not_found', 'User not found.', 404, {
+                code: 'user_not_found',
+              });
+            }
+            invite = upsertInvite({
+              appId: app.id,
+              invitedByUserId: ctx.user_id,
+              invitedUserId: user.id,
+              invitedEmail: user.email,
+              state: 'pending_accept',
+            });
+          } else {
+            const normalizedEmail = email!.trim().toLowerCase();
+            const user = findUserByEmail(normalizedEmail);
+            invite = upsertInvite({
+              appId: app.id,
+              invitedByUserId: ctx.user_id,
+              invitedUserId: user?.id || null,
+              invitedEmail: normalizedEmail,
+              state: user ? 'pending_accept' : 'pending_email',
+            });
+            if (!user) {
+              const inviter = db
+                .prepare(`SELECT name, email FROM users WHERE id = ?`)
+                .get(ctx.user_id) as { name: string | null; email: string | null } | undefined;
+              const rendered = renderAppInviteEmail({
+                appName: app.name,
+                inviterName: inviter?.name || inviter?.email || null,
+                acceptUrl: publicInviteUrl(baseUrl, invite.id),
+              });
+              const emailResult = await sendEmail({ to: normalizedEmail, ...rendered });
+              delivery = {
+                email_sent: emailResult.ok,
+                email_delivery: emailResult.id ? { id: emailResult.id } : { reason: emailResult.reason || null },
+              };
+            }
+          }
+
+          let visibility = canonicalVisibility(app.visibility);
+          if (visibility === 'private') {
+            try {
+              const next = transitionVisibility(app, 'invited', {
+                actorUserId: ctx.user_id,
+                actorTokenId: ctx.agent_token_id,
+                actorIp: ip,
+                reason: 'owner_set_invited',
+                metadata: { invite_id: invite.id },
+              });
+              invalidateHubCache();
+              visibility = canonicalVisibility(next.visibility);
+            } catch {
+              visibility = canonicalVisibility(app.visibility);
+            }
+          }
+
+          return mcpJson({
+            ok: true,
+            slug,
+            visibility,
+            invite: serializeInviteForMcp(invite),
+            ...(delivery || {}),
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'studio_revoke_app_invite',
+      {
+        title: 'Revoke app invite',
+        description: 'Revoke one invite for an owned app.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          invite_id: z.string().min(1).max(128),
+        },
+      },
+      async ({ slug, invite_id }) => {
+        recordMcpToolCall('studio_revoke_app_invite');
+        try {
+          requireStudioScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const invite = revokeInvite(invite_id, app.id);
+          if (!invite) {
+            throw new AgentToolError('not_found', 'Invite not found.', 404);
+          }
+          return mcpJson({
+            ok: true,
+            slug,
+            invite: serializeInviteForMcp(invite),
+            revoked: invite.state === 'revoked',
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
       'studio_submit_app_review',
       {
         title: 'Submit app for Store review',
@@ -2634,7 +3237,475 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_list_secrets');
         try {
           requireAccountScope(ctx);
-          return mcpJson({ entries: userSecrets.listWorkspaceMasked(ctx) });
+          return mcpJson({ entries: userSecrets.listMasked(ctx) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'trigger_list',
+      {
+        title: 'List triggers',
+        description:
+          'List this token user\'s schedule and webhook triggers.',
+        inputSchema: {},
+      },
+      async () => {
+        recordMcpToolCall('trigger_list');
+        try {
+          requireAccountScope(ctx);
+          const triggers = listTriggersForWorkspaceUser(
+            ctx.workspace_id,
+            ctx.user_id,
+          ).map((trigger) =>
+            serializeTrigger(trigger, { app_slug: triggerAppSlug(trigger.app_id) }),
+          );
+          return mcpJson({ triggers });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'trigger_create',
+      {
+        title: 'Create trigger',
+        description:
+          'Create a schedule or webhook trigger for an app owned by this workspace. Webhook creation returns the plaintext secret once.',
+        inputSchema: {
+          slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
+          action: z.string().min(1).max(128),
+          trigger_type: z.enum(['schedule', 'webhook']),
+          cron_expression: z.string().min(1).max(256).optional(),
+          tz: z.string().min(1).max(64).optional(),
+          inputs: z.record(z.unknown()).optional(),
+        },
+      },
+      async ({ slug, action, trigger_type, cron_expression, tz, inputs }) => {
+        recordMcpToolCall('trigger_create');
+        try {
+          requireAccountScope(ctx);
+          const app = loadOwnedStudioApp(ctx, slug);
+          const manifest = safeParseManifest(app.manifest);
+          if (!manifest?.actions[action]) {
+            throw new AgentToolError(
+              'invalid_input',
+              `Action "${action}" is not declared on this app.`,
+              400,
+              manifest ? { valid_actions: Object.keys(manifest.actions) } : undefined,
+            );
+          }
+          if (trigger_type === 'schedule') {
+            if (!cron_expression) {
+              throw new AgentToolError('invalid_input', 'cron_expression is required for schedule triggers.', 400);
+            }
+            const check = validateCronExpression(cron_expression, tz);
+            if (!check.ok) {
+              throw new AgentToolError('invalid_input', `Invalid cron expression: ${check.error}`, 400);
+            }
+          }
+          const trigger = createTrigger({
+            app_id: app.id,
+            user_id: ctx.user_id,
+            workspace_id: ctx.workspace_id,
+            action,
+            inputs: inputs || {},
+            trigger_type,
+            cron_expression: cron_expression || null,
+            tz: tz || null,
+          });
+          return mcpJson({
+            trigger: serializeTrigger(trigger, { app_slug: app.slug }),
+            webhook_url: trigger.trigger_type === 'webhook' ? buildWebhookUrl(getPublicBaseUrl(c), trigger.webhook_url_path) : null,
+            webhook_secret: trigger.trigger_type === 'webhook' ? trigger.webhook_secret : null,
+            webhook_url_path: trigger.webhook_url_path,
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'trigger_update',
+      {
+        title: 'Update trigger',
+        description:
+          'Enable/disable or edit an owned trigger. For schedule triggers, cron changes recompute the next run.',
+        inputSchema: {
+          trigger_id: z.string().min(1).max(128),
+          enabled: z.boolean().optional(),
+          action: z.string().min(1).max(128).optional(),
+          cron_expression: z.string().min(1).max(256).optional(),
+          tz: z.string().min(1).max(64).optional(),
+          inputs: z.record(z.unknown()).optional(),
+        },
+      },
+      async ({ trigger_id, enabled, action, cron_expression, tz, inputs }) => {
+        recordMcpToolCall('trigger_update');
+        try {
+          requireAccountScope(ctx);
+          const existing = getTrigger(trigger_id);
+          if (!existing || existing.workspace_id !== ctx.workspace_id || existing.user_id !== ctx.user_id) {
+            throw new AgentToolError('not_found', 'Trigger not found.', 404);
+          }
+          if (action) {
+            const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(existing.app_id) as AppRecord | undefined;
+            const manifest = app ? safeParseManifest(app.manifest) : null;
+            if (!manifest?.actions[action]) {
+              throw new AgentToolError(
+                'invalid_input',
+                `Action "${action}" is not declared on this trigger app.`,
+                400,
+                manifest ? { valid_actions: Object.keys(manifest.actions) } : undefined,
+              );
+            }
+          }
+          const updated = updateTrigger(trigger_id, { enabled, action, cron_expression, tz, inputs });
+          if (!updated) throw new AgentToolError('not_found', 'Trigger not found.', 404);
+          return mcpJson({ trigger: serializeTrigger(updated, { app_slug: triggerAppSlug(updated.app_id) }) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'trigger_delete',
+      {
+        title: 'Delete trigger',
+        description: 'Delete an owned schedule or webhook trigger.',
+        inputSchema: {
+          trigger_id: z.string().min(1).max(128),
+        },
+      },
+      async ({ trigger_id }) => {
+        recordMcpToolCall('trigger_delete');
+        try {
+          requireAccountScope(ctx);
+          const existing = getTrigger(trigger_id);
+          if (!existing || existing.workspace_id !== ctx.workspace_id || existing.user_id !== ctx.user_id) {
+            throw new AgentToolError('not_found', 'Trigger not found.', 404);
+          }
+          return mcpJson({ ok: true, trigger_id, deleted: deleteTrigger(trigger_id) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_get',
+      {
+        title: 'Get workspace',
+        description: 'Return a workspace by id without exposing wrapped encryption material.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+        },
+      },
+      async ({ workspace_id }) => {
+        recordMcpToolCall('workspace_get');
+        try {
+          requireAccountScope(ctx);
+          const workspace = workspaces.getById(ctx, workspace_id);
+          return mcpJson({ workspace: serializeWorkspaceForMcp(workspace) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_list',
+      {
+        title: 'List workspaces',
+        description: 'List workspaces this token user belongs to.',
+        inputSchema: {},
+      },
+      async () => {
+        recordMcpToolCall('workspace_list');
+        try {
+          requireAccountScope(ctx);
+          return mcpJson({
+            workspaces: workspaces.listMine(ctx).map((entry) => ({
+              ...serializeWorkspaceForMcp(entry.workspace),
+              role: entry.role,
+            })),
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_create',
+      {
+        title: 'Create workspace',
+        description: 'Create a workspace and make this token user its admin.',
+        inputSchema: {
+          name: z.string().min(1).max(120),
+          slug: z.string().min(1).max(64).optional(),
+        },
+      },
+      async ({ name, slug }) => {
+        recordMcpToolCall('workspace_create');
+        try {
+          requireAccountScope(ctx);
+          const workspace = workspaces.create(ctx, { name, slug });
+          return mcpJson({ workspace: serializeWorkspaceForMcp(workspace) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_update',
+      {
+        title: 'Update workspace',
+        description: 'Update workspace name and/or slug. Admin-only.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+          name: z.string().min(1).max(120).optional(),
+          slug: z.string().min(1).max(64).optional(),
+        },
+      },
+      async ({ workspace_id, name, slug }) => {
+        recordMcpToolCall('workspace_update');
+        try {
+          requireAccountScope(ctx);
+          if (name === undefined && slug === undefined) {
+            throw new AgentToolError('invalid_input', 'Provide name or slug.', 400);
+          }
+          const workspace = workspaces.update(ctx, workspace_id, { name, slug });
+          return mcpJson({ workspace: serializeWorkspaceForMcp(workspace) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_delete',
+      {
+        title: 'Delete workspace',
+        description: 'Delete a workspace. Destructive and admin-only; confirm must be true.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+          confirm: z.boolean(),
+        },
+      },
+      async ({ workspace_id, confirm }) => {
+        recordMcpToolCall('workspace_delete');
+        try {
+          requireAccountScope(ctx);
+          if (confirm !== true) {
+            throw new AgentToolError('invalid_input', 'Set confirm=true to delete a workspace.', 400);
+          }
+          workspaces.remove(ctx, workspace_id);
+          return mcpJson({ ok: true, workspace_id, deleted: true });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_switch',
+      {
+        title: 'Switch active workspace',
+        description:
+          'Set the current user active workspace pointer. Existing agent tokens remain bound to the workspace they were minted for.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+        },
+      },
+      async ({ workspace_id }) => {
+        recordMcpToolCall('workspace_switch');
+        try {
+          requireAccountScope(ctx);
+          workspaces.switchActiveWorkspace(ctx, workspace_id);
+          return mcpJson({ ok: true, active_workspace_id: workspace_id });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_list_members',
+      {
+        title: 'List workspace members',
+        description: 'List members of a workspace.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+        },
+      },
+      async ({ workspace_id }) => {
+        recordMcpToolCall('workspace_list_members');
+        try {
+          requireAccountScope(ctx);
+          return mcpJson({ members: workspaces.listMembers(ctx, workspace_id) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_set_member_role',
+      {
+        title: 'Set workspace member role',
+        description: 'Change a workspace member role. Admin-only.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+          user_id: z.string().min(1).max(160),
+          role: z.enum(['admin', 'editor', 'viewer']),
+        },
+      },
+      async ({ workspace_id, user_id, role }) => {
+        recordMcpToolCall('workspace_set_member_role');
+        try {
+          requireAccountScope(ctx);
+          const member = workspaces.changeRole(ctx, workspace_id, user_id, role as WorkspaceMemberRole);
+          return mcpJson({ member });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_remove_member',
+      {
+        title: 'Remove workspace member',
+        description: 'Remove a workspace member. Admin-only.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+          user_id: z.string().min(1).max(160),
+        },
+      },
+      async ({ workspace_id, user_id }) => {
+        recordMcpToolCall('workspace_remove_member');
+        try {
+          requireAccountScope(ctx);
+          workspaces.removeMember(ctx, workspace_id, user_id);
+          return mcpJson({ ok: true, workspace_id, user_id, removed: true });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_list_invites',
+      {
+        title: 'List workspace invites',
+        description: 'List workspace invites. Admin-only.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+        },
+      },
+      async ({ workspace_id }) => {
+        recordMcpToolCall('workspace_list_invites');
+        try {
+          requireAccountScope(ctx);
+          return mcpJson({ invites: workspaces.listInvites(ctx, workspace_id) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_create_invite',
+      {
+        title: 'Create workspace invite',
+        description: 'Create an email invite for a workspace. Admin-only.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+          email: z.string().email().max(320),
+          role: z.enum(['admin', 'editor', 'viewer']).optional(),
+        },
+      },
+      async ({ workspace_id, email, role }) => {
+        recordMcpToolCall('workspace_create_invite');
+        try {
+          requireAccountScope(ctx);
+          const result = workspaces.inviteByEmail(ctx, workspace_id, email, (role || 'editor') as WorkspaceMemberRole);
+          return mcpJson(result);
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_revoke_invite',
+      {
+        title: 'Revoke workspace invite',
+        description: 'Revoke a pending workspace invite. Admin-only.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+          invite_id: z.string().min(1).max(128),
+        },
+      },
+      async ({ workspace_id, invite_id }) => {
+        recordMcpToolCall('workspace_revoke_invite');
+        try {
+          requireAccountScope(ctx);
+          workspaces.revokeInvite(ctx, workspace_id, invite_id);
+          return mcpJson({ ok: true, workspace_id, invite_id, revoked: true });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_accept_invite',
+      {
+        title: 'Accept workspace invite',
+        description: 'Accept a workspace invite token for the current user.',
+        inputSchema: {
+          token: z.string().min(8).max(128),
+        },
+      },
+      async ({ token }) => {
+        recordMcpToolCall('workspace_accept_invite');
+        try {
+          requireAccountScope(ctx);
+          const member = workspaces.acceptInvite(ctx, token);
+          return mcpJson({ member });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'workspace_delete_runs',
+      {
+        title: 'Delete workspace runs',
+        description: 'Bulk-delete runs for apps owned by a workspace. Admin-only and destructive; confirm must be true.',
+        inputSchema: {
+          workspace_id: z.string().min(1).max(128),
+          confirm: z.boolean(),
+        },
+      },
+      async ({ workspace_id, confirm }) => {
+        recordMcpToolCall('workspace_delete_runs');
+        try {
+          requireAccountScope(ctx);
+          if (confirm !== true) {
+            throw new AgentToolError('invalid_input', 'Set confirm=true to delete workspace runs.', 400);
+          }
+          workspaces.assertRole(ctx, workspace_id, 'admin');
+          return mcpJson({ ok: true, workspace_id, ...deleteWorkspaceRuns(ctx, workspace_id) });
         } catch (err) {
           return mcpError(err);
         }
@@ -2656,7 +3727,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_set_secret');
         try {
           requireAccountScope(ctx);
-          userSecrets.setWorkspaceSecret(ctx.workspace_id, key, value);
+          userSecrets.set(ctx, key, value);
           auditLog({
             actor: getAuditActor(c, ctx),
             action: 'secret.updated',
@@ -2686,7 +3757,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_delete_secret');
         try {
           requireAccountScope(ctx);
-          const removed = userSecrets.delWorkspaceSecret(ctx.workspace_id, key);
+          const removed = userSecrets.del(ctx, key);
           auditLog({
             actor: getAuditActor(c, ctx),
             action: 'secret.deleted',
@@ -2844,11 +3915,118 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
   return server;
 }
 
-async function handleMcp(server: McpServer, rawRequest: Request): Promise<Response> {
+function filterMcpToolListPayload(payload: unknown, hiddenToolNames: Set<string>): unknown {
+  if (!payload || typeof payload !== 'object') return payload;
+  const maybeResult = payload as {
+    result?: { tools?: Array<{ name?: unknown }> };
+  };
+  if (Array.isArray(maybeResult.result?.tools)) {
+    maybeResult.result.tools = maybeResult.result.tools.filter(
+      (tool) => typeof tool.name !== 'string' || !hiddenToolNames.has(tool.name),
+    );
+  }
+  return payload;
+}
+
+async function parseMcpInteraction(rawRequest: Request): Promise<{
+  method: string | null;
+  tool_name: string | null;
+  request_id: string | number | null;
+}> {
+  if (rawRequest.method !== 'POST') {
+    return { method: rawRequest.method, tool_name: null, request_id: null };
+  }
+  try {
+    const body = await rawRequest.clone().json() as {
+      method?: unknown;
+      id?: unknown;
+      params?: { name?: unknown };
+    };
+    return {
+      method: typeof body.method === 'string' ? body.method : null,
+      tool_name:
+        body.method === 'tools/call' && typeof body.params?.name === 'string'
+          ? body.params.name
+          : null,
+      request_id:
+        typeof body.id === 'string' || typeof body.id === 'number'
+          ? body.id
+          : null,
+    };
+  } catch {
+    return { method: null, tool_name: null, request_id: null };
+  }
+}
+
+async function parseMcpResponse(response: Response): Promise<{
+  is_error: boolean | null;
+  error_code: string | number | null;
+}> {
+  try {
+    const body = await response.clone().json() as {
+      error?: { code?: unknown };
+      result?: { isError?: unknown };
+    };
+    return {
+      is_error: Boolean(body.error) || body.result?.isError === true,
+      error_code:
+        typeof body.error?.code === 'string' || typeof body.error?.code === 'number'
+          ? body.error.code
+          : null,
+    };
+  } catch {
+    return { is_error: null, error_code: null };
+  }
+}
+
+async function auditMcpInteraction(
+  c: Context,
+  ctx: SessionContext,
+  surface: string,
+  rawRequest: Request,
+  request: {
+    method: string | null;
+    tool_name: string | null;
+    request_id: string | number | null;
+  },
+  response: Response,
+  extra: Record<string, unknown> = {},
+): Promise<void> {
+  const result = await parseMcpResponse(response);
+  auditLog({
+    actor: getAuditActor(c, ctx),
+    action: 'mcp.interaction',
+    target: { type: 'mcp', id: request.tool_name || request.method || surface },
+    metadata: {
+      via: 'mcp',
+      surface,
+      http_method: rawRequest.method,
+      rpc_method: request.method,
+      tool_name: request.tool_name,
+      request_id: request.request_id,
+      status: response.status,
+      is_error: result.is_error,
+      error_code: result.error_code,
+      workspace_id: ctx.workspace_id,
+      token_scope: ctx.agent_token_scope || null,
+      ...extra,
+    },
+  });
+}
+
+async function handleMcp(
+  server: McpServer,
+  c: Context,
+  ctx: SessionContext,
+  surface: string,
+  rawRequest: Request,
+  options: { hiddenListToolNames?: Set<string> } = {},
+): Promise<Response> {
   const transport = new WebStandardStreamableHTTPServerTransport({
     enableJsonResponse: true,
   });
   await server.connect(transport);
+  const interaction = await parseMcpInteraction(rawRequest);
 
   // GH #850 / #856 — The MCP SDK hardcodes a check that the Accept header
   // contains BOTH "application/json" AND "text/event-stream". Standard
@@ -2878,7 +4056,43 @@ async function handleMcp(server: McpServer, rawRequest: Request): Promise<Respon
     }
   }
 
-  return transport.handleRequest(request);
+  const shouldFilterToolsList = async () => {
+    if (!options.hiddenListToolNames || options.hiddenListToolNames.size === 0) return false;
+    if (rawRequest.method !== 'POST') return false;
+    try {
+      const body = await rawRequest.clone().json() as { method?: unknown };
+      return body?.method === 'tools/list';
+    } catch {
+      return false;
+    }
+  };
+
+  const filterToolsList = await shouldFilterToolsList();
+  const response = await transport.handleRequest(request);
+  if (!filterToolsList || !options.hiddenListToolNames) {
+    await auditMcpInteraction(c, ctx, surface, rawRequest, interaction, response);
+    return response;
+  }
+
+  try {
+    const text = await response.text();
+    const json = JSON.parse(text) as unknown;
+    filterMcpToolListPayload(json, options.hiddenListToolNames);
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    const filteredResponse = new Response(JSON.stringify(json), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+    await auditMcpInteraction(c, ctx, surface, rawRequest, interaction, filteredResponse, {
+      tools_list_filtered: true,
+    });
+    return filteredResponse;
+  } catch {
+    await auditMcpInteraction(c, ctx, surface, rawRequest, interaction, response);
+    return response;
+  }
 }
 
 // /mcp — admin surface (ingest_app, list_apps, search_apps, get_app).
@@ -2887,19 +4101,23 @@ async function handleMcp(server: McpServer, rawRequest: Request): Promise<Respon
 mcpRouter.all('/', async (c: Context) => {
   const ctx = await resolveUserContext(c);
   if (ctx.agent_token_id) {
-    return handleMcp(createAgentMcpServer(c, ctx), c.req.raw);
+    return handleMcp(createAgentMcpServer(c, ctx), c, ctx, 'agent', c.req.raw, {
+      hiddenListToolNames:
+        ctx.agent_token_scope === 'publish-only' ? PUBLISH_ONLY_HIDDEN_TOOL_NAMES : undefined,
+    });
   }
   const ip = extractIp(c);
   const baseUrl = getPublicBaseUrl(c);
   const server = createAdminMcpServer({ ctx, ip, baseUrl });
-  return handleMcp(server, c.req.raw);
+  return handleMcp(server, c, ctx, 'admin', c.req.raw);
 });
 
 // /mcp/search — gallery-wide search
 mcpRouter.all('/search', async (c) => {
+  const ctx = await resolveUserContext(c);
   const baseUrl = getPublicBaseUrl(c);
   const server = createSearchMcpServer(baseUrl);
-  return handleMcp(server, c.req.raw);
+  return handleMcp(server, c, ctx, 'search', c.req.raw);
 });
 
 // /mcp/app/:slug — per-app MCP
@@ -2934,5 +4152,5 @@ mcpRouter.all('/app/:slug', async (c) => {
   // tool handler forwards it to dispatchRun so per-user vault secrets
   // reach the runner, matching POST /api/run + POST /api/:slug/run.
   const server = createPerAppMcpServer(c, row, ctx);
-  return handleMcp(server, c.req.raw);
+  return handleMcp(server, c, ctx, 'app', c.req.raw, { hiddenListToolNames: undefined });
 });

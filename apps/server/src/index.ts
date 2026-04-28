@@ -73,6 +73,7 @@ import { startRunRetentionSweeper } from './services/run-retention-sweeper.js';
 import { startAuditLogRetentionSweeper } from './services/audit-log.js';
 import { securityHeaders, noIndexPreview, isPreviewEnv } from './middleware/security.js';
 import { runBodyLimit } from './middleware/body-size.js';
+import { emergencyRunSurfaceGuard } from './middleware/emergency.js';
 import { meTriggersRouter, hubTriggersRouter } from './routes/triggers.js';
 import { webhookRouter } from './routes/webhook.js';
 import { isDeployEnabled } from './services/workspaces.js';
@@ -254,6 +255,12 @@ app.use('/p/*', agentTokenAuthMiddleware);
 if (process.env.FLOOM_AUTH_TOKEN) {
   console.log('[auth] FLOOM_AUTH_TOKEN is set — bearer auth required on all /api, /mcp, /p routes');
 }
+
+// Launch emergency brake: if abuse or an upstream-cost incident starts,
+// ops can disable expensive action surfaces while health/admin/static stay
+// reachable for recovery:
+//   FLOOM_EMERGENCY_DISABLE_RUN_SURFACES=true
+app.use('*', emergencyRunSurfaceGuard);
 
 // Rate limiting for run surfaces. Direct run handlers call the shared
 // runGate helper after they know the target slug; queued jobs and HTTP ingest

@@ -5,6 +5,13 @@
 #   init      scaffold floom.yaml in the current directory
 #   deploy    validate + publish the current app
 #   account   manage workspace secrets and agent tokens
+#   store     browse public Store apps
+#   runs      list, inspect, share, and delete runs
+#   jobs      create, inspect, and cancel async jobs
+#   quota     inspect app run quota
+#   triggers  manage schedule and webhook triggers
+#   workspaces manage workspace tenancy and members
+#   feedback  submit product feedback
 #   status    list your apps and recent runs
 #   auth      save an Agent token to ~/.floom/config.json
 #   --help    show this help
@@ -30,6 +37,13 @@ commands:
   account             manage workspace secrets and agent tokens
   apps list           list your workspace apps
   apps update         update, share, or delete workspace apps
+  store               browse public Store apps
+  runs                list, inspect, share, or delete runs
+  jobs                create, inspect, or cancel async jobs
+  quota               inspect app run quota
+  triggers            manage schedule and webhook triggers
+  workspaces          manage workspace tenancy and members
+  feedback            submit product feedback
   run <slug> [json]   run a Floom app by slug
   init                scaffold a floom.yaml in the current directory
   deploy              validate + publish the current app (use --dry-run to preview)
@@ -76,6 +90,16 @@ case "$CMD" in
     exec bash "$LIB_DIR/floom-account.sh" "$@" ;;
   apps)
     exec bash "$LIB_DIR/floom-apps.sh" "$@" ;;
+  store)
+    exec bash "$LIB_DIR/floom-store.sh" "$@" ;;
+  runs|jobs|quota)
+    exec bash "$LIB_DIR/floom-runs.sh" "$CMD" "$@" ;;
+  triggers)
+    exec bash "$LIB_DIR/floom-triggers.sh" "$@" ;;
+  workspaces|workspace)
+    exec bash "$LIB_DIR/floom-workspaces.sh" "$@" ;;
+  feedback)
+    exec bash "$LIB_DIR/floom-feedback.sh" "$@" ;;
   run)
     exec bash "$LIB_DIR/floom-run.sh" "$@" ;;
   validate)

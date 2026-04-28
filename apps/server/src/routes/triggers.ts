@@ -13,7 +13,7 @@ import {
   createTrigger,
   deleteTrigger,
   getTrigger,
-  listTriggersForUser,
+  listTriggersForWorkspaceUser,
   serializeTrigger,
   updateTrigger,
   validateCronExpression,
@@ -172,7 +172,7 @@ meTriggersRouter.get('/', async (c) => {
   const gate = requireAuthenticatedInCloud(c, ctx);
   if (gate) return gate;
 
-  const rows = listTriggersForUser(ctx.user_id);
+  const rows = listTriggersForWorkspaceUser(ctx.workspace_id, ctx.user_id);
   return c.json({
     triggers: rows.map((r) =>
       serializeTrigger(r, { app_slug: slugFor(r.app_id) }),
@@ -200,7 +200,7 @@ meTriggersRouter.patch('/:id', async (c) => {
   if (!existing) {
     return c.json({ error: 'Trigger not found', code: 'not_found' }, 404);
   }
-  if (existing.user_id !== ctx.user_id) {
+  if (existing.workspace_id !== ctx.workspace_id || existing.user_id !== ctx.user_id) {
     return c.json(
       { error: 'Not the owner of this trigger', code: 'not_owner' },
       403,
@@ -282,7 +282,7 @@ meTriggersRouter.delete('/:id', async (c) => {
   if (!existing) {
     return c.json({ error: 'Trigger not found', code: 'not_found' }, 404);
   }
-  if (existing.user_id !== ctx.user_id) {
+  if (existing.workspace_id !== ctx.workspace_id || existing.user_id !== ctx.user_id) {
     return c.json(
       { error: 'Not the owner of this trigger', code: 'not_owner' },
       403,

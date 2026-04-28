@@ -24,7 +24,8 @@
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const tmp = mkdtempSync(join(tmpdir(), 'floom-378-'));
 process.env.DATA_DIR = tmp;
@@ -34,6 +35,7 @@ process.env.FLOOM_FAST_APPS = 'false';
 const { fetchSpec } = await import(
   '../../apps/server/dist/services/openapi-ingest.js'
 );
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let passed = 0;
 let failed = 0;
@@ -166,7 +168,7 @@ okServer.close();
 console.log('\n/detect route calls requireAuthenticatedInCloud (static check)');
 const { readFileSync } = await import('node:fs');
 const hubCompiled = readFileSync(
-  '../../apps/server/dist/routes/hub.js',
+  join(__dirname, '../../apps/server/dist/routes/hub.js'),
   'utf-8',
 );
 // Locate the detect handler and assert the auth gate is wired in.

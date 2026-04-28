@@ -234,6 +234,141 @@ try {
 
   const row = db.prepare('SELECT * FROM apps WHERE slug = ?').get('cli-host-publish');
   log('floom deploy persisted app in token workspace', Boolean(row) && row.workspace_id === 'local' && row.author === 'local', JSON.stringify(row));
+
+  writeFileSync(
+    join(projectDir, 'floom.yaml'),
+    [
+      'name: CLI OpenAPI URL Alias',
+      'slug: cli-openapi-url-alias',
+      'description: Publish using openapi_url instead of openapi_spec_url',
+      'type: proxied',
+      `openapi_url: http://127.0.0.1:${upstreamPort}/openapi.json`,
+      'visibility: private',
+      'manifest_version: "2.0"',
+      '',
+    ].join('\n'),
+  );
+  const aliasDeploy = await runCmd('bash', [join(REPO_ROOT, 'cli/floom/bin/floom'), 'deploy'], {
+    cwd: projectDir,
+    env,
+  });
+  log('floom deploy accepts openapi_url alias', aliasDeploy.code === 0, `${aliasDeploy.stdout}\n${aliasDeploy.stderr}`);
+  const aliasRow = db.prepare('SELECT * FROM apps WHERE slug = ?').get('cli-openapi-url-alias');
+  log(
+    'openapi_url alias persists through REST ingest',
+    Boolean(aliasRow) && aliasRow.openapi_spec_url === `http://127.0.0.1:${upstreamPort}/openapi.json`,
+    JSON.stringify(aliasRow),
+  );
+
+  writeFileSync(
+    join(projectDir, 'floom.yaml'),
+    [
+      'name: CLI Inline Spec',
+      'slug: cli-inline-spec',
+      'description: Inline spec REST parity fixture',
+      'type: proxied',
+      'openapi_spec: ./openapi.yaml',
+      'visibility: private',
+      'manifest_version: "2.0"',
+      '',
+    ].join('\n'),
+  );
+  writeFileSync(
+    join(projectDir, 'openapi.yaml'),
+    [
+      'openapi: 3.0.0',
+      'info:',
+      '  title: CLI Inline Spec',
+      '  version: 1.0.0',
+      'servers:',
+      `  - url: http://127.0.0.1:${upstreamPort}`,
+      'paths:',
+      '  /echo:',
+      '    get:',
+      '      operationId: inline_echo',
+      '      parameters:',
+      '        - name: message',
+      '          in: query',
+      '          schema:',
+      '            type: string',
+      '      responses:',
+      '        "200":',
+      '          description: ok',
+      '',
+    ].join('\n'),
+  );
+  const inlineDeploy = await runCmd('bash', [join(REPO_ROOT, 'cli/floom/bin/floom'), 'deploy'], {
+    cwd: projectDir,
+    env,
+  });
+  log(
+    'floom deploy publishes inline openapi_spec through REST ingest',
+    inlineDeploy.code === 0 && inlineDeploy.stdout.includes(`${apiUrl}/p/cli-inline-spec`),
+    `${inlineDeploy.stdout}\n${inlineDeploy.stderr}`,
+  );
+  const inlineRow = db.prepare('SELECT * FROM apps WHERE slug = ?').get('cli-inline-spec');
+  log(
+    'inline openapi_spec persists cached spec through REST ingest',
+    Boolean(inlineRow) && inlineRow.openapi_spec_url === null && inlineRow.openapi_spec_cached?.includes('"CLI Inline Spec"'),
+    JSON.stringify(inlineRow),
+  );
+
+  const invalidMixed = await fetch(`${apiUrl}/api/hub/ingest`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      openapi_url: `http://127.0.0.1:${upstreamPort}/openapi.json`,
+      openapi_spec: {
+        openapi: '3.0.0',
+        info: { title: 'CLI Mixed Source', version: '1.0.0' },
+        paths: {},
+      },
+      slug: 'cli-mixed-source',
+      name: 'CLI Mixed Source',
+      description: 'Invalid mixed source',
+    }),
+  });
+  const invalidMixedText = await invalidMixed.text();
+  log(
+    'REST ingest rejects multiple publish sources',
+    invalidMixed.status === 400 && invalidMixedText.includes('publish_source'),
+    invalidMixedText,
+  );
+
+  writeFileSync(
+    join(projectDir, 'floom.yaml'),
+    [
+      'name: CLI Docker Image',
+      'slug: cli-docker-image',
+      'description: Docker image parity gap fixture',
+      'type: docker',
+      'docker_image_ref: ghcr.io/floomhq/ig-nano-scout:latest',
+      'visibility: private',
+      'manifest_version: "2.0"',
+      '',
+    ].join('\n'),
+  );
+  const dockerDeploy = await runCmd('bash', [join(REPO_ROOT, 'cli/floom/bin/floom'), 'deploy', '--dry-run'], {
+    cwd: projectDir,
+    env,
+  });
+  log(
+    'floom deploy dry-run sends docker_image_ref body',
+    dockerDeploy.code === 0 && dockerDeploy.stdout.includes('"docker_image_ref": "ghcr.io/floomhq/ig-nano-scout:latest"'),
+    `${dockerDeploy.stdout}\n${dockerDeploy.stderr}`,
+  );
+  const dockerDisabledDeploy = await runCmd('bash', [join(REPO_ROOT, 'cli/floom/bin/floom'), 'deploy'], {
+    cwd: projectDir,
+    env,
+  });
+  log(
+    'REST ingest rejects docker_image_ref while Docker publish flag is off',
+    dockerDisabledDeploy.code === 2 && dockerDisabledDeploy.stdout.includes('"code":"docker_publish_disabled"'),
+    `${dockerDisabledDeploy.stdout}\n${dockerDisabledDeploy.stderr}`,
+  );
 } finally {
   await stopServer(server);
   upstream.close();

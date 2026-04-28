@@ -20,10 +20,17 @@ import {
   buildIngestHint,
   detectAppFromInlineSpec,
   detectAppFromUrl,
+  ingestAppFromSpec,
   ingestAppFromUrl,
   SlugTakenError,
   SpecNotFoundError,
 } from '../services/openapi-ingest.js';
+import {
+  DOCKER_PUBLISH_FLAG,
+  DockerPublishDisabledError,
+  ingestAppFromDockerImage,
+  isDockerPublishEnabled,
+} from '../services/docker-image-ingest.js';
 import { auditLog, getAuditActor } from '../services/audit-log.js';
 import {
   bundleRenderer,
@@ -136,22 +143,35 @@ const DetectBody = z.object({
     .optional(),
 });
 
-const IngestBody = z.object({
-  openapi_url: z.string().url().max(2048),
-  name: z.string().min(1).max(120).optional(),
-  description: z.string().max(5000).optional(),
-  slug: z
-    .string()
-    .min(1)
-    .max(48)
-    .regex(/^[a-z0-9][a-z0-9-]*$/)
-    .optional(),
-  category: z.string().max(48).optional(),
-  visibility: z.enum(['public', 'private', 'link', 'auth-required']).optional(),
-  link_share_requires_auth: z.boolean().optional(),
-  auth_required: z.boolean().optional(),
-  max_run_retention_days: z.number().int().min(1).max(3650).optional(),
-});
+const IngestBody = z
+  .object({
+    openapi_url: z.string().url().max(2048).optional(),
+    openapi_spec: z.record(z.any()).optional(),
+    docker_image_ref: z.string().min(1).max(512).optional(),
+    manifest: z.record(z.any()).optional(),
+    secret_bindings: z.record(z.string()).optional(),
+    name: z.string().min(1).max(120).optional(),
+    description: z.string().max(5000).optional(),
+    slug: z
+      .string()
+      .min(1)
+      .max(48)
+      .regex(/^[a-z0-9][a-z0-9-]*$/)
+      .optional(),
+    category: z.string().max(48).optional(),
+    visibility: z.enum(['public', 'private', 'link', 'auth-required']).optional(),
+    link_share_requires_auth: z.boolean().optional(),
+    auth_required: z.boolean().optional(),
+    max_run_retention_days: z.number().int().min(1).max(3650).optional(),
+  })
+  .refine(
+    (body) =>
+      [body.openapi_url, body.openapi_spec, body.docker_image_ref].filter(Boolean).length === 1,
+    {
+      message: 'Supply exactly one of: openapi_url, openapi_spec, docker_image_ref.',
+      path: ['publish_source'],
+    },
+  );
 
 // SECURITY (issue #378, pentest 2026-04-22): /detect fetches a user-supplied
 // URL server-side, which is a classic SSRF primitive. Two hardenings:
@@ -344,22 +364,56 @@ hubRouter.post('/ingest', async (c) => {
     );
   }
   try {
-    const result = await ingestAppFromUrl({
-      openapi_url: parsed.data.openapi_url,
+    const common = {
       name: parsed.data.name,
       description: parsed.data.description,
       slug: parsed.data.slug,
       category: parsed.data.category,
-      visibility: parsed.data.visibility,
-      link_share_requires_auth: parsed.data.link_share_requires_auth,
-      auth_required: parsed.data.auth_required,
       max_run_retention_days: parsed.data.max_run_retention_days,
       workspace_id: ctx.workspace_id,
       author_user_id: ctx.user_id,
       actor_token_id: ctx.agent_token_id,
       actor_ip: getAuditActor(c, ctx).ip,
-      allowPrivateNetwork: ctx.workspace_id === 'local' && ctx.user_id === 'local',
-    });
+    };
+    let result: { slug: string; name: string; created: boolean };
+    if (parsed.data.docker_image_ref) {
+      if (!isDockerPublishEnabled()) {
+        return c.json(
+          {
+            error: `Docker-image ingest is disabled on this Floom instance. Set ${DOCKER_PUBLISH_FLAG}=true to enable.`,
+            code: 'docker_publish_disabled',
+          },
+          403,
+        );
+      }
+      result = await ingestAppFromDockerImage({
+        ...common,
+        docker_image_ref: parsed.data.docker_image_ref,
+        manifest: parsed.data.manifest,
+        secret_bindings: parsed.data.secret_bindings,
+        visibility: parsed.data.visibility,
+        link_share_requires_auth: parsed.data.link_share_requires_auth,
+        auth_required: parsed.data.auth_required,
+        ctx,
+      });
+    } else if (parsed.data.openapi_url) {
+      result = await ingestAppFromUrl({
+        ...common,
+        openapi_url: parsed.data.openapi_url,
+        visibility: parsed.data.visibility,
+        link_share_requires_auth: parsed.data.link_share_requires_auth,
+        auth_required: parsed.data.auth_required,
+        allowPrivateNetwork: ctx.workspace_id === 'local' && ctx.user_id === 'local',
+      });
+    } else {
+      result = await ingestAppFromSpec({
+        ...common,
+        spec: parsed.data.openapi_spec as Parameters<typeof ingestAppFromSpec>[0]['spec'],
+        visibility: parsed.data.visibility,
+        link_share_requires_auth: parsed.data.link_share_requires_auth,
+        auth_required: parsed.data.auth_required,
+      });
+    }
     // Perf fix (2026-04-20): bust the /api/hub 5s cache so the newly
     // ingested (or re-ingested) app shows up in the public directory
     // immediately for the creator.
@@ -379,8 +433,17 @@ hubRouter.post('/ingest', async (c) => {
         409,
       );
     }
+    if (err instanceof DockerPublishDisabledError) {
+      return c.json({ error: err.message, code: err.code }, 403);
+    }
     return c.json(
-      { error: (err as Error).message || 'ingest_failed', code: 'ingest_failed' },
+      {
+        error: (err as Error).message || 'ingest_failed',
+        code:
+          typeof (err as { code?: unknown }).code === 'string'
+            ? ((err as { code: string }).code)
+            : 'ingest_failed',
+      },
       400,
     );
   }

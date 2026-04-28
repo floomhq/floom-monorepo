@@ -3,7 +3,7 @@
 # attaches the auth header. Used by the floom CLI subcommands.
 #
 # Auth resolution order:
-#   1. FLOOM_API_KEY env var (+ FLOOM_API_URL env var, default https://floom.dev)
+#   1. FLOOM_API_KEY env var (+ FLOOM_API_URL env var, default install host / https://floom.dev)
 #   2. ~/.floom/config.json with {"api_key": "...", "api_url": "..."}
 #   3. Legacy ~/.claude/floom-skill-config.json with {"base_url", "token", "token_type"}
 #
@@ -36,7 +36,19 @@ fi
 
 CONFIG="${FLOOM_CONFIG:-$HOME/.floom/config.json}"
 LEGACY_CONFIG="$HOME/.claude/floom-skill-config.json"
-API_URL="${FLOOM_API_URL:-https://floom.dev}"
+DEFAULT_HOST_FILE="${HOME}/.floom/default-host"
+
+default_host() {
+  if [[ -n "${FLOOM_API_URL:-}" ]]; then
+    echo "$FLOOM_API_URL"
+  elif [[ -f "$DEFAULT_HOST_FILE" ]]; then
+    cat "$DEFAULT_HOST_FILE"
+  else
+    echo "https://floom.dev"
+  fi
+}
+
+API_URL="$(default_host)"
 
 # Dry-run: print request details and exit 0 without requiring auth.
 if [[ "${FLOOM_DRY_RUN:-}" == "1" ]]; then

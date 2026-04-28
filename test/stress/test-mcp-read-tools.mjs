@@ -393,6 +393,22 @@ try {
   const otherDiscover = await callMcp(server.port, otherToken, 'discover_apps', {});
   const otherSlugs = (otherDiscover.payload?.apps || []).map((app) => app.slug);
   log('manually inserted non-owner token can discover public app', otherSlugs.includes('agent-read-public'), JSON.stringify(otherSlugs));
+
+  const auditRows = db
+    .prepare(`SELECT action, actor_token_id, metadata FROM audit_log WHERE action = 'mcp.interaction'`)
+    .all();
+  const toolNames = auditRows
+    .map((row) => {
+      try {
+        return JSON.parse(row.metadata || '{}').tool_name;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+  log('MCP interactions are audit logged', auditRows.length >= 8, JSON.stringify(auditRows.slice(0, 2)));
+  log('MCP audit log captures tool names without inputs', toolNames.includes('run_app') && toolNames.includes('discover_apps'), JSON.stringify(toolNames));
+  log('MCP audit log ties rows to agent token id', auditRows.some((row) => row.actor_token_id === minted.json?.id), JSON.stringify(auditRows.slice(0, 2)));
 } finally {
   await stopServer(server);
   upstream.close();
