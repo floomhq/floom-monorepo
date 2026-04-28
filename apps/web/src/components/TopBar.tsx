@@ -339,9 +339,11 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
         )}
 
         {/* Centre nav — branches on auth state (project_floom_nav_ia.md).
-            Anonymous: Apps · Docs · Pricing (discovery surfaces).
+            Anonymous: Apps · Docs · Pricing · Changelog (discovery surfaces).
             Authenticated: Studio · My runs (work surfaces). Pricing/Docs
-            move to the avatar dropdown — 1 click away when needed. */}
+            move to the avatar dropdown — 1 click away when needed.
+            R10 (2026-04-28): wireframe v17 store.html parity —
+            Pricing + Changelog added as nav-level affordances. */}
         <nav
           className="topbar-links topbar-links-desktop topbar-centre-nav"
           aria-label="Primary"
@@ -400,6 +402,13 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
                 style={navLinkStyle(isPricing)}
               >
                 Pricing
+              </Link>
+              <Link
+                to="/changelog"
+                data-testid="topbar-changelog"
+                style={navLinkStyle(false)}
+              >
+                Changelog
               </Link>
             </>
           )}
