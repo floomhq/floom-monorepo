@@ -113,19 +113,6 @@ function InputLabel({
           <span style={{ fontWeight: 400, color: 'var(--muted)' }}> (optional)</span>
         )}
       </label>
-      {hasDescription && (
-        <p
-          id={descriptionId}
-          style={{
-            margin: inline ? '4px 0 0' : '0 0 6px',
-            fontSize: 11,
-            color: 'var(--muted)',
-            lineHeight: 1.4,
-          }}
-        >
-          {description}
-        </p>
-      )}
     </>
   );
 }
