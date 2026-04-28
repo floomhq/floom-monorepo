@@ -80,8 +80,17 @@ export function RunRail() {
           Runs
         </RailItem>
 
-        {/* v26 §12.3/12.4: "+ New app" in Run mode → browse store (overlay in v1.1) */}
-        <div style={{ marginTop: 'auto', paddingTop: 12 }}>
+        {/* v26 §12.3/12.4: "+ New app" in Run mode → browse store (overlay in v1.1).
+            Sticky so it stays visible at standard (900px) viewport heights. */}
+        <div
+          style={{
+            position: 'sticky',
+            bottom: 0,
+            paddingTop: 8,
+            paddingBottom: 4,
+            background: 'var(--bg)',
+          }}
+        >
           <Link
             to="/apps"
             data-testid="run-rail-new-app"
