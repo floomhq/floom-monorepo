@@ -774,7 +774,7 @@ export function AppPermalinkPage() {
 
       <main
         id="main"
-        style={{ padding: '20px 24px 80px', maxWidth: 1040, margin: '0 auto' }}
+        style={{ padding: '14px 24px 64px', maxWidth: 1200, margin: '0 auto' }}
         data-testid="permalink-page"
       >
         {/* v17 breadcrumb: quiet Apps / app-name. Lives OUTSIDE the
@@ -838,23 +838,26 @@ export function AppPermalinkPage() {
           }}
         >
 
-          {/* F2 (2026-04-28): /p/:slug top chrome cleanup. */}
+          {/* F2 (2026-04-28): /p/:slug top chrome cleanup.
+              R10.1 (2026-04-29): tightened gap + padding so the run-card
+              comes into the viewport faster (Federico flagged "have to
+              scroll so much to get to input output"). Icon shrunk 52→44. */}
           <section
             data-testid="permalink-hero"
             className="permalink-hero-row"
             style={{
               display: 'flex',
               alignItems: 'flex-start',
-              gap: 14,
-              padding: '8px 0 18px',
+              gap: 12,
+              padding: '4px 0 12px',
               flexWrap: 'wrap',
             }}
           >
             <div
               style={{
-                width: 52,
-                height: 52,
-                borderRadius: 14,
+                width: 44,
+                height: 44,
+                borderRadius: 12,
                 background: 'var(--bg)',
                 border: '1px solid var(--line)',
                 display: 'flex',
@@ -864,7 +867,7 @@ export function AppPermalinkPage() {
                 flexShrink: 0,
               }}
             >
-              <AppIcon slug={app.slug} size={26} />
+              <AppIcon slug={app.slug} size={22} />
             </div>
             <div className="permalink-hero-title" style={{ flex: 1, minWidth: 0 }}>
               <h1

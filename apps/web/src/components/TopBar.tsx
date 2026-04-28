@@ -379,13 +379,10 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
             >
               Changelog
             </Link>
-            <Link
-              to="/help"
-              data-testid="topbar-help"
-              style={navLinkStyle(false)}
-            >
-              Help
-            </Link>
+            {/* Help removed from centered nav 2026-04-29: caused
+                overlap with the right cluster (GH stars + auth buttons)
+                at 1200px TopBar width. Help still accessible via footer +
+                /help direct link. Matches floom.dev nav (4 items). */}
           </nav>
         )}
 
