@@ -1,13 +1,12 @@
 apps:
   - slug: tos-red-flag
+    type: proxied
+    openapi_spec_url: http://127.0.0.1:4360/openapi/tos-red-flag.json
     display_name: TOS Red Flag Scanner
     category: productivity
     description: >
-      Paste any Terms of Service — get the 5 scariest clauses explained in plain English.
+      Paste any Terms of Service - get the 5 scariest clauses explained in plain English.
       No lawyer needed.
-    runtime: python
-    entrypoint: examples/tos-red-flag/main.py
-    port: null
     visibility: public
     env:
       - GEMINI_API_KEY
