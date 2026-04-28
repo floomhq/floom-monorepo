@@ -2103,6 +2103,23 @@ export type IngestHintStatus =
   | 'not_a_github_repo'
   | 'unreachable';
 
+/**
+ * Branches `probeIngestHint` checks when it walks a public GitHub repo.
+ * `main` is by far the most common; `master` is still alive in older
+ * Python/FastAPI repos (e.g. some pre-2020 projects). Probing both
+ * keeps the agent UX honest — the alternative is returning
+ * `repo_no_spec` for a repo that DOES have a spec on `master`.
+ */
+const INGEST_HINT_PROBE_BRANCHES = ['main', 'master'];
+
+/**
+ * Per-probe HTTP timeout. Six filenames × two branches = 12 HEAD calls
+ * worst case. With a 2.5s budget per call and parallel issuance, the
+ * overall p95 stays well under 5s for cold caches and sub-second for
+ * warm ones.
+ */
+const INGEST_HINT_PROBE_TIMEOUT_MS = 2500;
+
 export interface IngestHintInput {
   /** The exact URL or `owner/repo` ref the user pasted. */
   input_url: string;
@@ -2130,8 +2147,16 @@ export interface IngestHint {
     /** At least one path with one operation. */
     paths_example: string;
   };
-  /** Raw paths we probed (if the caller reported any). */
+  /** Raw paths we probed (if the caller reported any, OR we walked the repo). */
   paths_tried: string[];
+  /**
+   * When `status === 'spec_found'`, the raw URL of the OpenAPI spec the
+   * server resolved. Pass this directly to `studio_publish_app`'s
+   * `openapi_url` and Floom will fetch + ingest it. Omitted on every
+   * other status. Only populated by `probeIngestHint`; the synchronous
+   * `buildIngestHint` never sets it (it doesn't probe).
+   */
+  spec_found_url?: string;
   /**
    * A prompt the user can paste into Claude/Cursor in their repo. The
    * coding agent reads their API, writes an openapi.yaml, and commits.
@@ -2277,6 +2302,104 @@ export function buildIngestHint(input: IngestHintInput): IngestHint {
     upload_url: `${base}/api/hub/detect/inline`,
     detect_url: `${base}/api/hub/detect`,
     message,
+  };
+}
+
+/**
+ * Build a `raw.githubusercontent.com` URL for one (branch, filename)
+ * pair. The HEAD-probe checks against this exact URL so that a positive
+ * hit can be passed straight to `studio_publish_app` as an
+ * `openapi_url`.
+ */
+function ingestHintRawUrl(
+  repo: { owner: string; repo: string },
+  branch: string,
+  filename: string,
+): string {
+  return `https://raw.githubusercontent.com/${repo.owner}/${repo.repo}/${branch}/${filename}`;
+}
+
+/**
+ * HEAD a single candidate URL with a hard timeout. Returns the URL if
+ * the server responds with a 2xx, otherwise null. Never throws — every
+ * failure path just returns null so the caller's Promise.all stays
+ * predictable.
+ */
+async function ingestHintHeadProbe(url: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), INGEST_HINT_PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      redirect: 'follow',
+    });
+    if (res.ok) return url;
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Async sibling of `buildIngestHint` that actually walks the standard
+ * filenames on `main` and `master` for GitHub inputs. Why a separate
+ * function instead of folding the probe into `buildIngestHint`: three
+ * existing call sites are sync handlers and bumping the body up to
+ * async ripples into request lifecycle changes we don't need here. The
+ * studio MCP tool — which is the agent UX — gets the upgrade by
+ * calling this version.
+ *
+ * Behavior:
+ *   - For non-GitHub inputs, returns the same shape as
+ *     `buildIngestHint` (no probing). The hint helps the user
+ *     understand what Floom needs.
+ *   - For GitHub inputs, probes 6 filenames × 2 branches in parallel.
+ *     Returns `status: 'spec_found'` + `spec_found_url` when one
+ *     resolves; falls back to `repo_no_spec` with the actually-tried
+ *     paths populated when nothing resolves.
+ */
+export async function probeIngestHint(input: IngestHintInput): Promise<IngestHint> {
+  const baseHint = buildIngestHint(input);
+  if (!baseHint.repo) return baseHint;
+
+  // Build the candidate matrix: each filename × each branch. Six × two
+  // = twelve probes. Worst-case ~30s if every probe hits the timeout,
+  // but in practice GitHub answers HEAD < 200ms and the parallel
+  // gather caps wall time at ~250ms for warm caches.
+  const candidates: string[] = [];
+  for (const branch of INGEST_HINT_PROBE_BRANCHES) {
+    for (const filename of INGEST_HINT_REQUIRED_FILES) {
+      candidates.push(ingestHintRawUrl(baseHint.repo, branch, filename));
+    }
+  }
+
+  const results = await Promise.all(candidates.map((url) => ingestHintHeadProbe(url)));
+  const found = results.find((r): r is string => r !== null);
+  // De-dupe with whatever the caller already tried so the response
+  // names every distinct path once. This makes `paths_tried` a true
+  // record of "what Floom looked at" instead of either-or.
+  const callerTried = new Set(baseHint.paths_tried);
+  const merged = [...baseHint.paths_tried, ...candidates.filter((c) => !callerTried.has(c))];
+
+  if (found) {
+    return {
+      ...baseHint,
+      status: 'spec_found',
+      paths_tried: merged,
+      spec_found_url: found,
+      message:
+        `Found an OpenAPI spec in ${baseHint.repo.owner}/${baseHint.repo.repo}. ` +
+        `Pass this URL to studio_publish_app's openapi_url to ingest it.`,
+    };
+  }
+
+  return {
+    ...baseHint,
+    status: 'repo_no_spec',
+    paths_tried: merged,
   };
 }
 
