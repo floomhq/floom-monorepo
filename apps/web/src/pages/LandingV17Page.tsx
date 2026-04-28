@@ -28,7 +28,7 @@ import { ArrowRight, Code2, Rocket, Share2 } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { AppStripe } from '../components/public/AppStripe';
-import { AppShowcaseCard } from '../components/public/AppShowcaseCard';
+import { AppGrid } from '../components/public/AppGrid';
 import { FeedbackButton } from '../components/FeedbackButton';
 
 import { WorksWithBelt } from '../components/home/WorksWithBelt';
@@ -51,100 +51,95 @@ import { readDeployEnabled, useDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
 import { useSession } from '../hooks/useSession';
 
-// MVP hero install snippet — generic MCP config, no per-app slug.
-// IMPORTANT: use the current origin so tokens minted on mvp.floom.dev /
-// v26.floom.dev / floom.dev (post-flip) point at the SAME host they were
-// minted on. Hardcoding floom.dev breaks the 401-on-cross-host case.
-const MCP_HOST = typeof window !== 'undefined' ? window.location.origin : 'https://floom.dev';
-const MVP_MCP_SNIPPET = `{
-  "mcpServers": {
-    "floom": {
-      "url": "${MCP_HOST}/mcp",
-      "headers": {
-        "Authorization": "Bearer floom_agent_<your_token>"
-      }
+// MVP hero install — R7.6 (2026-04-28): hero composition cut to 4 elements
+// (eyebrow, H1, sub, npx command). Caption + MCP/CLI popover removed —
+// Federico's "the landing page hero header still looks a bit overwhelming".
+// Advanced install paths (MCP config, CLI snippet) live on /home and /docs.
+const NPX_SETUP_COMMAND = 'npx @floomhq/cli@latest setup';
+
+async function copyText(text: string) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
     }
-  }
-}`;
+  } catch { /* fall through */ }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+}
 
 function MvpHeroInstall() {
   const [copied, setCopied] = useState(false);
+
   async function handleCopy() {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(MVP_MCP_SNIPPET);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = MVP_MCP_SNIPPET;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch { /* silent */ }
+    await copyText(NPX_SETUP_COMMAND);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
   }
+
+  // R7.6 (2026-04-28): MCP/CLI snippet popover removed from hero.
+  // Federico's brief: cut hero to 4 elements. Advanced install paths
+  // (MCP config, CLI snippet) live on /home and /docs — not in the
+  // first viewport.
+
   return (
-    <div style={{ maxWidth: 480, margin: '20px auto 0', textAlign: 'left' }}>
-      <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 8px', textAlign: 'center' }}>
-        Paste in your MCP client config:
-      </p>
+    <div style={{ maxWidth: 540, margin: '20px auto 0', textAlign: 'left' }}>
+      {/* R7.6 (2026-04-28): caption "One command. Sets up MCP, mints a token,
+          you're live." removed — redundant with the npx command beneath it.
+          Federico's brief: cut hero to 4 elements (eyebrow, H1, sub, command). */}
       <div style={{ position: 'relative' }}>
-        {/* F7 (2026-04-28): copy boxes use light tinted bg (var(--studio)),
-            not dark. Federico-locked global rule. */}
         <pre
-          data-testid="hero-mcp-snippet"
+          data-testid="hero-npx-command"
           style={{
             fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-            fontSize: 11,
+            fontSize: 14,
             background: 'var(--studio, #f5f4f0)',
             color: 'var(--ink)',
             border: '1px solid var(--line)',
-            borderRadius: 8,
-            padding: '10px 12px',
-            paddingRight: 64,
+            borderRadius: 10,
+            padding: '14px 90px 14px 18px',
             overflowX: 'auto',
             whiteSpace: 'pre',
             lineHeight: 1.5,
             margin: 0,
+            display: 'flex',
+            alignItems: 'center',
           }}
         >
-          {MVP_MCP_SNIPPET}
+          <span style={{ color: 'var(--muted)', userSelect: 'none', marginRight: 10 }}>$</span>
+          {NPX_SETUP_COMMAND}
         </pre>
         <button
           type="button"
-          data-testid="install-copy-btn"
+          data-testid="hero-npx-copy-btn"
           onClick={() => void handleCopy()}
           style={{
             position: 'absolute',
-            top: 10,
+            top: '50%',
+            transform: 'translateY(-50%)',
             right: 10,
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 600,
-            color: copied ? 'var(--muted)' : 'var(--accent)',
-            background: 'var(--card)',
-            border: `1px solid ${copied ? 'var(--line)' : 'rgba(4,120,87,0.35)'}`,
+            color: copied ? '#fff' : 'var(--accent)',
+            background: copied ? 'var(--accent)' : 'var(--card)',
+            border: `1px solid ${copied ? 'var(--accent)' : 'rgba(4,120,87,0.35)'}`,
             borderRadius: 6,
-            padding: '3px 10px',
+            padding: '6px 14px',
             cursor: 'pointer',
             fontFamily: 'inherit',
             letterSpacing: '0.03em',
           }}
-          aria-label={copied ? 'Copied' : 'Copy MCP config'}
+          aria-label={copied ? 'Copied' : 'Copy command'}
         >
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '10px 0 0', textAlign: 'center' }}>
-        Need a token?{' '}
-        <Link to="/signup" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
-          Sign up to get one
-        </Link>
-        {' '}→
-      </p>
     </div>
   );
 }
@@ -202,11 +197,16 @@ interface LandingV17PageProps {
 export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
   const isMvp = variant === 'mvp';
   const [stripes, setStripes] = useState<Stripe[]>(FALLBACK_STRIPES);
+  // R8 #25 (2026-04-28): full HubApp[] for the AppGrid card variant.
+  // AppShowcaseCard didn't render the sample-output preview chip;
+  // AppGrid does (matches floom.dev's richer card style).
+  const [showcaseHubApps, setShowcaseHubApps] = useState<HubApp[]>([]);
   // G9 (2026-04-28): inline directory grid on MVP landing. Next 6 apps
   // after the 3 curated showcase slugs, plus a "Browse all <N> apps" CTA.
   // Federico: "we should still, on the MVP Floom, have the app store
   // visible, right?"
   const [directoryApps, setDirectoryApps] = useState<Stripe[]>([]);
+  const [directoryHubApps, setDirectoryHubApps] = useState<HubApp[]>([]);
   const [totalAppsCount, setTotalAppsCount] = useState<number>(0);
   const deployEnabledFlag = useDeployEnabled();
   const deployEnabled = deployEnabledFlag ?? readDeployEnabled();
@@ -230,8 +230,17 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
         if (visible.length > 0) {
           setStripes(pickStripes(visible));
           setTotalAppsCount(visible.length);
-          // Pick the next 6 apps that aren't already in the curated showcase.
+          // R8 #25: keep full HubApp shape for AppGrid (sample-output
+          // preview chip needs thumbnail + manifest + sample data).
           const curatedSlugs = new Set<string>(PREFERRED_SLUGS as readonly string[]);
+          const showcaseFull = visible.filter((a) => curatedSlugs.has(a.slug));
+          setShowcaseHubApps(
+            // Order to match PREFERRED_SLUGS so the editorial pick stays stable.
+            PREFERRED_SLUGS.map((slug) => showcaseFull.find((a) => a.slug === slug)).filter(
+              (a): a is HubApp => Boolean(a),
+            ),
+          );
+          // Pick the next 6 apps that aren't already in the curated showcase.
           const rest = visible
             .filter((app) => !curatedSlugs.has(app.slug))
             .slice(0, 6)
@@ -242,6 +251,9 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               category: app.category ?? undefined,
             }));
           setDirectoryApps(rest);
+          setDirectoryHubApps(
+            visible.filter((app) => !curatedSlugs.has(app.slug)).slice(0, 6),
+          );
         }
       })
       .catch(() => {
@@ -330,37 +342,16 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 - Add vertical breathing room around H1 + sub
                 - Demote WorksWithBelt to a soft caption under the snippet
                 - Resume banner slimmed to a 1-line stripe (above) */}
+            {/* MVP eyebrow: WorksWithBelt above H1 — agent-agnostic
+                positioning ("Works with any MCP client" + 3 logos) is
+                more useful than a Founders Inc credential here. Founders
+                Inc cohort credit stays in footer + WhosBehind. Federico
+                2026-04-28: hero eyebrow should be product positioning,
+                not investor proof. */}
             {isMvp && (
-              <p
-                data-testid="hero-backed-by"
-                style={{
-                  // R7 U3: gap from BACKED-BY → H1 widened 28 → 32 for more
-                  // vertical breathing room. Hero is calmer with the H1
-                  // sitting on its own line of breath.
-                  margin: '0 auto 32px',
-                  fontSize: 11.5,
-                  color: 'var(--muted)',
-                  letterSpacing: '0.10em',
-                  textTransform: 'uppercase',
-                  fontWeight: 600,
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                  textAlign: 'center',
-                }}
-              >
-                Backed by{' '}
-                <a
-                  href="https://f.inc"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    color: 'var(--ink)',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                  }}
-                >
-                  Founders Inc
-                </a>
-              </p>
+              <div data-testid="hero-eyebrow-belt" style={{ marginBottom: 32 }}>
+                <WorksWithBelt />
+              </div>
             )}
             {!isMvp && (
               <div style={{ marginTop: 24 }}>
@@ -414,15 +405,9 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
             {isMvp ? (
               <>
                 <MvpHeroInstall />
-                {/* G1 (2026-04-28): WorksWithBelt as a soft caption under
-                    the snippet — visually subdued.
-                    R7 U3 (2026-04-28): pushed further into the background
-                    (opacity 0.85 → 0.7, marginTop 28 → 32) so the lead
-                    promise reads as a quiet caption, not a second hero
-                    element competing with H1+snippet. */}
-                <div style={{ marginTop: 32, opacity: 0.7 }}>
-                  <WorksWithBelt />
-                </div>
+                {/* WorksWithBelt moved to the eyebrow above H1 (Federico
+                    2026-04-28). No longer rendered under the snippet — it
+                    was a second hero element competing with H1+snippet. */}
               </>
             ) : (
             <div
@@ -502,14 +487,13 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
             )}
           </div>
 
-          {/* Hero demo — interactive 3-state build/deploy/use loop.
-              Sits directly under the CTAs. Sized to 580px (Cursor-style,
-              Federico 2026-04-23): top ~120-150px is visible above the fold
-              at 1440x900, rest scrolls into view. Bigger canvas = more
-              cinematic, no squishing to fit the viewport.
-              MVP variant: KEEP (Federico 2026-04-28 — visual hero asset
-              is essential, install snippet sits below it not instead). */}
-          <HeroDemo />
+          {/* R7.6 (2026-04-28): HeroDemo moved out of hero section.
+              Federico's brief: hero is too overwhelming with 7 elements
+              pre-fold. HeroDemo now plays as a "show me" element after
+              the 3-step explanation (see below "From idea to shipped app
+              in 3 steps"). First viewport = eyebrow + H1 + sub + npx.
+              Full variant keeps the demo here; MVP variant moves it. */}
+          {!isMvp && <HeroDemo />}
         </section>
 
         {/* Compact CLI reference strip below the hero — smaller than the
@@ -628,6 +612,19 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
           </div>
         </section>
 
+        {/* R7.6 (2026-04-28): HeroDemo moved here for MVP variant.
+            Federico's brief: hero pre-fold composition was overwhelming.
+            HeroDemo now plays as a "show me" element AFTER the 3-step
+            explanation reads it aloud. */}
+        {isMvp && (
+          <section
+            data-testid="mvp-hero-demo-section"
+            style={{ padding: '0 28px 64px', maxWidth: 1240, margin: '0 auto' }}
+          >
+            <HeroDemo />
+          </section>
+        )}
+
         {/* WORKED EXAMPLE — MVP variant: dropped (heavy). */}
         {!isMvp && <WorkedExample />}
 
@@ -673,40 +670,54 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
           >
             Real AI doing real work. All three deploy from a single GitHub repo.
           </p>
-          {/* G3 (2026-04-28): app-store-style cards. Federico: "the apps
-              on the landing page should be cards, like on the app store.
-              Right now they are just small boxes." Replaces horizontal
-              AppStripe (icon-text-arrow row) with vertical AppShowcaseCard
-              for the MVP showcase: prominent icon tile, bold name, tagline,
-              category pill + Try CTA. 3-up desktop, 2-up tablet, 1-up mobile. */}
-          <div className="mvp-showcase-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, maxWidth: 1100, margin: '0 auto' }}>
-            {isMvp
-              ? stripes.map((s) => (
-                  <AppShowcaseCard
-                    key={s.slug}
-                    slug={s.slug}
-                    name={s.name}
-                    description={s.description}
-                    category={s.category}
-                  />
-                ))
-              : stripes.map((s) => (
-                  <AppStripe
-                    key={s.slug}
-                    slug={s.slug}
-                    name={s.name}
-                    description={s.description}
-                    category={s.category}
-                    variant="landing"
-                  />
-                ))}
-          </div>
+          {/* R8 #25 (2026-04-28): switched MVP showcase to AppGrid (the
+              same component /apps + floom.dev use), so the cards render
+              the sample-output preview chip per app — matches floom.dev
+              visual style instead of the simpler icon+name+tagline cards. */}
+          {isMvp ? (
+            <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+              {showcaseHubApps.length > 0 ? (
+                <AppGrid apps={showcaseHubApps} variant="featured" />
+              ) : (
+                // Fallback while /api/hub is in-flight: render simpler
+                // stripe row from FALLBACK_STRIPES so the slot doesn't
+                // collapse on cold load.
+                <div className="mvp-showcase-grid-fallback" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+                  {stripes.map((s) => (
+                    <AppStripe
+                      key={s.slug}
+                      slug={s.slug}
+                      name={s.name}
+                      description={s.description}
+                      category={s.category}
+                      variant="landing"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mvp-showcase-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, maxWidth: 1100, margin: '0 auto' }}>
+              {stripes.map((s) => (
+                <AppStripe
+                  key={s.slug}
+                  slug={s.slug}
+                  name={s.name}
+                  description={s.description}
+                  category={s.category}
+                  variant="landing"
+                />
+              ))}
+            </div>
+          )}
           <style>{`
             @media (max-width: 880px) {
               .mvp-showcase-grid { grid-template-columns: repeat(2, 1fr) !important; }
+              .mvp-showcase-grid-fallback { grid-template-columns: repeat(2, 1fr) !important; }
             }
             @media (max-width: 640px) {
               .mvp-showcase-grid { grid-template-columns: 1fr !important; }
+              .mvp-showcase-grid-fallback { grid-template-columns: 1fr !important; }
             }
           `}</style>
         </section>
@@ -752,25 +763,30 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 : "Free to run on Floom's Gemini key."}
             </p>
             <div
-              className="mvp-directory-grid"
               data-testid="mvp-directory-grid"
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 16,
-                maxWidth: 1100,
+                maxWidth: 1240,
                 margin: '0 auto 28px',
               }}
             >
-              {directoryApps.map((app) => (
-                <AppShowcaseCard
-                  key={app.slug}
-                  slug={app.slug}
-                  name={app.name}
-                  description={app.description}
-                  category={app.category}
-                />
-              ))}
+              {directoryHubApps.length > 0 ? (
+                <AppGrid apps={directoryHubApps} />
+              ) : (
+                directoryApps.length > 0 && (
+                  <div className="mvp-directory-grid-fallback" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                    {directoryApps.map((app) => (
+                      <AppStripe
+                        key={app.slug}
+                        slug={app.slug}
+                        name={app.name}
+                        description={app.description}
+                        category={app.category}
+                        variant="landing"
+                      />
+                    ))}
+                  </div>
+                )
+              )}
             </div>
             <div style={{ textAlign: 'center' }}>
               <Link
