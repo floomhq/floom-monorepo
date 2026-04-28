@@ -241,7 +241,7 @@ ${c.bold('usage:')}
   floom deploy                 ${c.dim('# validate + publish current floom.yaml')}
   floom init                   ${c.dim('# scaffold floom.yaml in current dir')}
   floom status                 ${c.dim('# list apps and recent runs')}
-  floom account                ${c.dim('# manage workspace secrets and tokens')}
+  floom account                ${c.dim('# manage context, workspace secrets, and tokens')}
 
 ${c.bold('options:')}
   --help, -h                   show this help

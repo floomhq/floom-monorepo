@@ -26,7 +26,9 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { auditLog, getAuditActor } from '../services/audit-log.js';
 import { resolveUserContext } from '../services/session.js';
+import * as contextProfiles from '../services/context_profiles.js';
 import * as ws from '../services/workspaces.js';
+import { ProfileValidationError } from '../services/context_profiles.js';
 import {
   CannotRemoveLastAdminError,
   DuplicateMemberError,
@@ -56,13 +58,13 @@ export const sessionRouter = new Hono();
 // catastrophic. This helper is the one chokepoint every workspace
 // response flows through.
 // --------------------------------------------------------------------
-type PublicWorkspace = Omit<WorkspaceRecord, 'wrapped_dek'>;
+type PublicWorkspace = Omit<WorkspaceRecord, 'wrapped_dek' | 'profile_json'>;
 
 function toPublicWorkspace(w: WorkspaceRecord): PublicWorkspace {
   // Intentionally exhaustive destructure so a new sensitive column added
   // to WorkspaceRecord fails the type-check here instead of silently
   // leaking.
-  const { wrapped_dek: _wrapped_dek, ...pub } = w;
+  const { wrapped_dek: _wrapped_dek, profile_json: _profile_json, ...pub } = w;
   return pub;
 }
 
@@ -103,6 +105,18 @@ const SwitchWorkspaceBody = z.object({
   workspace_id: z.string().min(1).max(64),
 });
 
+const ProfileModeEnum = z.enum(['merge', 'replace']).optional().default('merge');
+
+const ContextPatchBody = z
+  .object({
+    user_profile: z.record(z.unknown()).optional(),
+    workspace_profile: z.record(z.unknown()).optional(),
+    mode: ProfileModeEnum,
+  })
+  .refine((v) => v.user_profile !== undefined || v.workspace_profile !== undefined, {
+    message: 'must include user_profile or workspace_profile',
+  });
+
 // --------------------------------------------------------------------
 // Error envelope helper
 // --------------------------------------------------------------------
@@ -128,6 +142,9 @@ function mapError(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 500; bo
   }
   if (err instanceof CannotRemoveLastAdminError) {
     return { status: 409, body: { error: err.message, code: 'last_admin' } };
+  }
+  if (err instanceof ProfileValidationError) {
+    return { status: 400, body: { error: err.message, code: 'invalid_profile' } };
   }
   return {
     status: 500,
@@ -548,6 +565,79 @@ sessionRouter.post('/switch-workspace', async (c) => {
   try {
     ws.switchActiveWorkspace(ctx, parsed.data.workspace_id);
     return c.json({ ok: true, active_workspace_id: parsed.data.workspace_id });
+  } catch (err) {
+    const m = mapError(err);
+    return c.json(m.body, m.status);
+  }
+});
+
+/**
+ * GET /api/session/context
+ * Returns the current caller's JSON user profile and active workspace profile.
+ */
+sessionRouter.get('/context', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
+  try {
+    const context = contextProfiles.getContextProfile(ctx);
+    return c.json({
+      user: {
+        id: ctx.user_id,
+        email: ctx.email || null,
+      },
+      workspace: {
+        ...toPublicWorkspace(context.workspace),
+        role: context.role,
+      },
+      user_profile: context.user_profile,
+      workspace_profile: context.workspace_profile,
+    });
+  } catch (err) {
+    const m = mapError(err);
+    return c.json(m.body, m.status);
+  }
+});
+
+/**
+ * PATCH /api/session/context
+ * Body: { user_profile?, workspace_profile?, mode?: "merge"|"replace" }
+ *
+ * User profile updates affect only the current user. Workspace profile
+ * updates require admin role on the active workspace.
+ */
+sessionRouter.patch('/context', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Body must be JSON', code: 'invalid_body' }, 400);
+  }
+  const parsed = ContextPatchBody.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: 'Invalid body shape',
+        code: 'invalid_body',
+        details: parsed.error.flatten(),
+      },
+      400,
+    );
+  }
+  try {
+    const context = contextProfiles.setContextProfile(ctx, parsed.data);
+    return c.json({
+      ok: true,
+      user_profile: context.user_profile,
+      workspace_profile: context.workspace_profile,
+      workspace: {
+        ...toPublicWorkspace(context.workspace),
+        role: context.role,
+      },
+    });
   } catch (err) {
     const m = mapError(err);
     return c.json(m.body, m.status);

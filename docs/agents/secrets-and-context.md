@@ -1,6 +1,6 @@
 # Secrets and Context
 
-This document describes the launch-grade behavior for saved secrets and the planned context layer for filling app inputs.
+This document describes the launch-grade behavior for saved secrets and the JSON profile context layer for filling app inputs.
 
 ## Secret Storage Model
 
@@ -66,11 +66,19 @@ The current workspace model stores:
 - slug
 - name
 - plan
+- JSON workspace profile
 - wrapped encryption key
 - created timestamp
 - workspace members and roles
 
-That is enough for authorization and ownership, but not enough for rich app input autofill such as:
+The current user model stores:
+
+- user id
+- email
+- name
+- JSON user profile
+
+The JSON profiles are intentionally flexible and can hold nested data such as:
 
 - company legal name
 - billing address
@@ -81,22 +89,50 @@ That is enough for authorization and ownership, but not enough for rich app inpu
 - preferred currency
 - sender identity
 
-## Proposed Product Model
+## Implemented Profile Model
 
-Add two explicit context stores:
+Floom stores two JSON objects:
 
-1. `workspace_profile`
+1. `user_profile`
+   - user-level fields such as sender name, personal preferences, default locale, personal signature, and preferred contact details.
+
+2. `workspace_profile`
    - workspace-level fields such as company name, legal address, billing email, VAT/tax id, default currency, website, and brand instructions.
    - Shared by workspace members according to role.
 
-2. `workspace_entities`
-   - reusable structured records such as clients, contacts, vendors, projects, and billing recipients.
-   - Each row has a type, display name, structured JSON data, and audit metadata.
+Profile updates support:
 
-Then expose context through UI, MCP, and CLI:
+- `merge`: deep-merge object fields, replace arrays/scalars, and delete keys by setting them to `null`.
+- `replace`: replace the full profile object.
+
+Root values must be JSON objects. The maximum serialized profile size is 64 KB.
+
+Profiles are exposed through MCP:
 
 - `account_get_context`
-- `account_update_workspace_profile`
+- `account_set_user_profile`
+- `account_set_workspace_profile`
+
+And through CLI:
+
+```bash
+floom account context get
+floom account context set-user --json '{"person":{"name":"Ada"}}'
+floom account context set-workspace --json-file ./workspace-profile.json --mode replace
+floom account context set-workspace --json-stdin
+```
+
+REST:
+
+- `GET /api/session/context`
+- `PATCH /api/session/context`
+
+## Next Context Layer: Entities
+
+The remaining follow-up is `workspace_entities`: reusable structured records such as clients, contacts, vendors, projects, and billing recipients.
+
+Entity tools can build on the profile layer:
+
 - `account_list_entities`
 - `account_upsert_entity`
 - `account_delete_entity`
@@ -133,19 +169,4 @@ The runner can resolve this to a typed context object before validation/autofill
 }
 ```
 
-## Implementation Difficulty
-
-For a minimal launch-followup version:
-
-- Database tables: small.
-- REST/MCP/CLI CRUD: straightforward.
-- UI settings form: straightforward.
-- App input autofill: moderate, because each app needs a clear schema for which context fields it accepts.
-- Security review: required, because context can contain PII and billing details.
-
-Recommended order:
-
-1. Store and expose `workspace_profile`.
-2. Add MCP/CLI read/update tools.
-3. Let apps request context fields explicitly in their manifest.
-4. Add typed entities like clients/projects after the profile flow is proven.
+App input autofill remains a separate step: apps need an explicit manifest-level declaration for which context fields they accept.

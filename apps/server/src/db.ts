@@ -608,11 +608,19 @@ db.exec(`
     slug TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     plan TEXT NOT NULL DEFAULT 'oss',
+    profile_json TEXT NOT NULL DEFAULT '{}',
     wrapped_dek TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_workspaces_slug ON workspaces(slug);
 `);
+
+const workspaceCols = (db.prepare(`PRAGMA table_info(workspaces)`).all() as {
+  name: string;
+}[]).map((r) => r.name);
+if (!workspaceCols.includes('profile_json')) {
+  db.exec(`ALTER TABLE workspaces ADD COLUMN profile_json TEXT NOT NULL DEFAULT '{}'`);
+}
 
 // ---------- users (global identity, shared across workspaces) ----------
 db.exec(`
@@ -621,6 +629,7 @@ db.exec(`
     workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
     email TEXT,
     name TEXT,
+    profile_json TEXT NOT NULL DEFAULT '{}',
     auth_provider TEXT NOT NULL DEFAULT 'local',
     auth_subject TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -646,6 +655,9 @@ if (!userCols2.includes('deleted_at')) {
 }
 if (!userCols2.includes('delete_at')) {
   db.exec(`ALTER TABLE users ADD COLUMN delete_at TEXT`);
+}
+if (!userCols2.includes('profile_json')) {
+  db.exec(`ALTER TABLE users ADD COLUMN profile_json TEXT NOT NULL DEFAULT '{}'`);
 }
 db.exec(`CREATE INDEX IF NOT EXISTS idx_users_pending_delete ON users(delete_at) WHERE deleted_at IS NOT NULL`);
 

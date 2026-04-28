@@ -104,19 +104,21 @@ async function stopServer(server) {
   await new Promise((resolve) => setTimeout(resolve, 150));
 }
 
-function createToken(scope = 'read-write') {
+function createToken(scope = 'read-write', userId = 'local', workspaceId = 'local') {
   const raw = agentTokens.generateAgentToken();
   db.prepare(
     `INSERT INTO agent_tokens
        (id, prefix, hash, label, scope, workspace_id, user_id, created_at,
         last_used_at, revoked_at, rate_limit_per_minute)
-     VALUES (?, ?, ?, ?, ?, 'local', 'local', ?, NULL, NULL, 1000)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1000)`,
   ).run(
     `agtok_${scope}_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     agentTokens.extractAgentTokenPrefix(raw),
     agentTokens.hashAgentToken(raw),
     `test-${scope}`,
     scope,
+    workspaceId,
+    userId,
     new Date().toISOString(),
   );
   db.pragma('wal_checkpoint(TRUNCATE)');
@@ -156,6 +158,13 @@ console.log('MCP agent read server');
 const readToken = createToken('read');
 const writeToken = createToken('read-write');
 const publishToken = createToken('publish-only');
+db.prepare(
+  `INSERT INTO users (id, workspace_id, email, auth_provider) VALUES (?, 'local', ?, 'test')`,
+).run('viewer_user', 'viewer@floom.dev');
+db.prepare(
+  `INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ('local', ?, 'viewer')`,
+).run('viewer_user');
+const viewerWriteToken = createToken('read-write', 'viewer_user', 'local');
 const server = await bootServer();
 
 try {
@@ -168,6 +177,7 @@ try {
   const readTools = readList.json?.result?.tools || [];
   const readNames = readTools.map((tool) => tool.name).sort();
   const readExpected = [
+    'account_get_context',
     'create_job',
     'discover_apps',
     'feedback_submit',
@@ -196,8 +206,11 @@ try {
   const writeExpected = [
     'account_delete_secret',
     'account_get',
+    'account_get_context',
     'account_list_secrets',
+    'account_set_user_profile',
     'account_set_secret',
+    'account_set_workspace_profile',
     'cancel_job',
     'create_job',
     'delete_run',
@@ -313,6 +326,9 @@ try {
   const feedbackSubmit = tools.find((tool) => tool.name === 'feedback_submit');
   const triggerCreate = tools.find((tool) => tool.name === 'trigger_create');
   const workspaceCreate = tools.find((tool) => tool.name === 'workspace_create');
+  const getContext = tools.find((tool) => tool.name === 'account_get_context');
+  const setUserProfileTool = tools.find((tool) => tool.name === 'account_set_user_profile');
+  const setWorkspaceProfile = tools.find((tool) => tool.name === 'account_set_workspace_profile');
   const publish = tools.find((tool) => tool.name === 'studio_publish_app');
   const appShareSearch = tools.find((tool) => tool.name === 'studio_search_app_share_users');
   const appInvite = tools.find((tool) => tool.name === 'studio_invite_app_user');
@@ -334,6 +350,9 @@ try {
   log('feedback_submit requires text', Array.isArray(feedbackSubmit?.inputSchema?.required) && feedbackSubmit.inputSchema.required.includes('text'));
   log('trigger_create schema exposes slug + type + action', Boolean(triggerCreate?.inputSchema?.properties?.slug) && Boolean(triggerCreate?.inputSchema?.properties?.trigger_type) && Boolean(triggerCreate?.inputSchema?.properties?.action));
   log('workspace_create schema exposes name + slug', Boolean(workspaceCreate?.inputSchema?.properties?.name) && Boolean(workspaceCreate?.inputSchema?.properties?.slug));
+  log('account_get_context exposes no-arg context profile read', Boolean(getContext));
+  log('account_set_user_profile schema exposes nested profile object', Boolean(setUserProfileTool?.inputSchema?.properties?.profile));
+  log('account_set_workspace_profile schema exposes nested profile object', Boolean(setWorkspaceProfile?.inputSchema?.properties?.profile));
   log('studio_publish_app schema exposes OpenAPI publish args', Boolean(publish?.inputSchema?.properties?.openapi_url) && Boolean(publish?.inputSchema?.properties?.openapi_spec) && Boolean(publish?.inputSchema?.properties?.visibility));
   log('studio_search_app_share_users requires slug + q', Array.isArray(appShareSearch?.inputSchema?.required) && appShareSearch.inputSchema.required.includes('slug') && appShareSearch.inputSchema.required.includes('q'));
   log('studio_invite_app_user exposes username/email invite inputs', Boolean(appInvite?.inputSchema?.properties?.username) && Boolean(appInvite?.inputSchema?.properties?.email));
@@ -740,6 +759,21 @@ try {
   });
   log('read token cannot call account tools because they are not exposed', Boolean(readAccountCall.json?.error) || readAccountCall.json?.result?.isError === true, readAccountCall.text);
 
+  const readContextCall = await callMcp(server.port, readToken, {
+    jsonrpc: '2.0',
+    id: 2201,
+    method: 'tools/call',
+    params: { name: 'account_get_context', arguments: {} },
+  });
+  const readContextPayload = parseToolText(readContextCall);
+  log(
+    'read token can read account context profiles',
+    readContextPayload?.user_profile &&
+      readContextPayload?.workspace_profile &&
+      readContextPayload?.workspace?.id === 'local',
+    readContextCall.text,
+  );
+
   const accountSetSecret = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',
     id: 23,
@@ -767,9 +801,123 @@ try {
   const accountDeleteSecretPayload = parseToolText(accountDeleteSecret);
   log('account_delete_secret removes workspace secret', accountDeleteSecretPayload?.ok === true && accountDeleteSecretPayload?.removed === true, accountDeleteSecret.text);
 
-  const accountCreateToken = await callMcp(server.port, writeToken, {
+  const initialContext = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',
     id: 26,
+    method: 'tools/call',
+    params: { name: 'account_get_context', arguments: {} },
+  });
+  const initialContextPayload = parseToolText(initialContext);
+  log('account_get_context returns empty default JSON profiles', initialContextPayload?.user_profile && Object.keys(initialContextPayload.user_profile).length === 0 && initialContextPayload?.workspace_profile && Object.keys(initialContextPayload.workspace_profile).length === 0, initialContext.text);
+
+  const setUserProfile = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 27,
+    method: 'tools/call',
+    params: {
+      name: 'account_set_user_profile',
+      arguments: {
+        mode: 'replace',
+        profile: {
+          person: {
+            full_name: 'Local User',
+            defaults: { locale: 'en-US', currency: 'USD' },
+          },
+        },
+      },
+    },
+  });
+  const setUserProfilePayload = parseToolText(setUserProfile);
+  log('account_set_user_profile stores nested JSON profile', setUserProfilePayload?.user_profile?.person?.defaults?.currency === 'USD', setUserProfile.text);
+
+  const mergeUserProfile = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 28,
+    method: 'tools/call',
+    params: {
+      name: 'account_set_user_profile',
+      arguments: {
+        profile: {
+          person: {
+            defaults: { currency: 'EUR' },
+          },
+        },
+      },
+    },
+  });
+  const mergeUserProfilePayload = parseToolText(mergeUserProfile);
+  log('account_set_user_profile deep-merges nested JSON profile', mergeUserProfilePayload?.user_profile?.person?.full_name === 'Local User' && mergeUserProfilePayload?.user_profile?.person?.defaults?.currency === 'EUR', mergeUserProfile.text);
+
+  const setWorkspaceProfileCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 29,
+    method: 'tools/call',
+    params: {
+      name: 'account_set_workspace_profile',
+      arguments: {
+        profile: {
+          company: {
+            legal_name: 'Floom Local GmbH',
+            billing_address: {
+              city: 'Hamburg',
+              country: 'DE',
+            },
+          },
+        },
+      },
+    },
+  });
+  const setWorkspaceProfilePayload = parseToolText(setWorkspaceProfileCall);
+  log('account_set_workspace_profile stores nested workspace JSON profile', setWorkspaceProfilePayload?.workspace_profile?.company?.billing_address?.country === 'DE', setWorkspaceProfileCall.text);
+
+  const finalContext = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 30,
+    method: 'tools/call',
+    params: { name: 'account_get_context', arguments: {} },
+  });
+  const finalContextPayload = parseToolText(finalContext);
+  log('account_get_context returns stored user + workspace profiles', finalContextPayload?.user_profile?.person?.defaults?.currency === 'EUR' && finalContextPayload?.workspace_profile?.company?.legal_name === 'Floom Local GmbH', finalContext.text);
+
+  const tooLargeProfile = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 3001,
+    method: 'tools/call',
+    params: {
+      name: 'account_set_user_profile',
+      arguments: { profile: { bio: 'x'.repeat(70 * 1024) } },
+    },
+  });
+  const tooLargePayload = parseToolText(tooLargeProfile);
+  log(
+    'account_set_user_profile rejects profiles over 64KB',
+    tooLargeProfile.json?.result?.isError === true &&
+      tooLargePayload?.error === 'invalid_input' &&
+      tooLargePayload?.status === 400,
+    tooLargeProfile.text,
+  );
+
+  const viewerWorkspaceProfile = await callMcp(server.port, viewerWriteToken, {
+    jsonrpc: '2.0',
+    id: 3002,
+    method: 'tools/call',
+    params: {
+      name: 'account_set_workspace_profile',
+      arguments: { profile: { forbidden: true } },
+    },
+  });
+  const viewerWorkspacePayload = parseToolText(viewerWorkspaceProfile);
+  log(
+    'account_set_workspace_profile rejects non-admin workspace writers',
+    viewerWorkspaceProfile.json?.result?.isError === true &&
+      viewerWorkspacePayload?.status === 403 &&
+      viewerWorkspacePayload?.code === 'insufficient_role',
+    viewerWorkspaceProfile.text,
+  );
+
+  const accountCreateToken = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 31,
     method: 'tools/call',
     params: {
       name: 'account_create_agent_token',

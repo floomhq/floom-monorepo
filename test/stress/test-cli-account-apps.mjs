@@ -90,6 +90,28 @@ console.log('CLI account/apps management dry-run routing');
 }
 
 {
+  const res = await run(['account', 'context', 'get']);
+  log('account context get uses GET /api/session/context', res.code === 0 && includes(res.stdout, `GET ${API_URL}/api/session/context`), res.stdout + res.stderr);
+}
+
+{
+  const res = await run(['account', 'context', 'set-user', '--json', '{"person":{"name":"Ada","prefs":{"currency":"EUR"}}}']);
+  const body = bodyOf(res.stdout);
+  log('account context set-user patches nested user profile JSON', res.code === 0 && includes(res.stdout, `PATCH ${API_URL}/api/session/context`) && body?.mode === 'merge' && body?.user_profile?.person?.prefs?.currency === 'EUR', res.stdout + res.stderr);
+}
+
+{
+  const res = await run(['account', 'context', 'set-workspace', '--replace', '--json-stdin'], { input: '{"company":{"legal_name":"Acme GmbH","address":{"city":"Hamburg"}}}' });
+  const body = bodyOf(res.stdout);
+  log('account context set-workspace patches nested workspace profile JSON', res.code === 0 && body?.mode === 'replace' && body?.workspace_profile?.company?.address?.city === 'Hamburg', res.stdout + res.stderr);
+}
+
+{
+  const res = await run(['account', 'context', 'set-user', '--json', '[]']);
+  log('account context set-user rejects non-object JSON before curl', res.code === 1 && res.stderr.includes('profile JSON must be an object'), res.stdout + res.stderr);
+}
+
+{
   const res = await run(['account', 'agent-tokens', 'create', '--label', 'Local Agent', '--scope', 'read-write', '--workspace-id', 'ws_123', '--rate-limit-per-minute', '120']);
   const body = bodyOf(res.stdout);
   log('agent-tokens create posts typed body', res.code === 0 && includes(res.stdout, `POST ${API_URL}/api/me/agent-keys`) && body?.label === 'Local Agent' && body?.scope === 'read-write' && body?.workspace_id === 'ws_123' && body?.rate_limit_per_minute === 120, res.stdout + res.stderr);

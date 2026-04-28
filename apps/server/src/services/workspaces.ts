@@ -235,7 +235,7 @@ export function listMine(
 ): Array<{ workspace: WorkspaceRecord; role: WorkspaceRole }> {
   const rows = db
     .prepare(
-      `SELECT w.id, w.slug, w.name, w.plan, w.wrapped_dek, w.created_at, m.role
+      `SELECT w.id, w.slug, w.name, w.plan, w.profile_json, w.wrapped_dek, w.created_at, m.role
          FROM workspace_members m
          JOIN workspaces w ON w.id = m.workspace_id
         WHERE m.user_id = ?
@@ -248,6 +248,7 @@ export function listMine(
       slug: r.slug,
       name: r.name,
       plan: r.plan,
+      profile_json: r.profile_json,
       wrapped_dek: r.wrapped_dek,
       created_at: r.created_at,
     },

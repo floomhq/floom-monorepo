@@ -11,6 +11,10 @@ usage() {
 floom account - manage workspace secrets and agent tokens.
 
 usage:
+  floom account context get
+  floom account context set-user (--json <json>|--json-file <path>|--json-stdin) [--mode <merge|replace>]
+  floom account context set-workspace (--json <json>|--json-file <path>|--json-stdin) [--mode <merge|replace>]
+
   floom account secrets list
   floom account secrets set <key> <value>
   floom account secrets set <key> --value <value>
@@ -47,6 +51,120 @@ if os.environ["RATE_LIMIT"]:
     body["rate_limit_per_minute"] = int(os.environ["RATE_LIMIT"])
 print(json.dumps(body, separators=(",", ":")))
 PY
+}
+
+json_context_body() {
+  KIND="$1" MODE="$2" PROFILE_JSON="$3" python3 - <<'PY'
+import json
+import os
+import sys
+
+kind = os.environ["KIND"]
+mode = os.environ["MODE"]
+try:
+    profile = json.loads(os.environ["PROFILE_JSON"])
+except json.JSONDecodeError as exc:
+    print(f"invalid JSON profile: {exc}", file=sys.stderr)
+    sys.exit(1)
+if not isinstance(profile, dict):
+    print("profile JSON must be an object", file=sys.stderr)
+    sys.exit(1)
+body = {"mode": mode}
+if kind == "user":
+    body["user_profile"] = profile
+elif kind == "workspace":
+    body["workspace_profile"] = profile
+else:
+    print(f"invalid profile kind: {kind}", file=sys.stderr)
+    sys.exit(1)
+print(json.dumps(body, separators=(",", ":")))
+PY
+}
+
+context_cmd() {
+  local subcmd="${1:-get}"
+  case "$subcmd" in
+    ""|-h|--help|help)
+      usage
+      exit 0
+      ;;
+    get)
+      shift || true
+      exec bash "$LIB_DIR/floom-api.sh" GET /api/session/context
+      ;;
+    set-user|set-workspace)
+      shift || true
+      local kind="user"
+      [[ "$subcmd" == "set-workspace" ]] && kind="workspace"
+      local mode="merge"
+      local profile_json=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --mode)
+            mode="${2:-}"
+            shift 2
+            ;;
+          --mode=*)
+            mode="${1#--mode=}"
+            shift
+            ;;
+          --replace)
+            mode="replace"
+            shift
+            ;;
+          --merge)
+            mode="merge"
+            shift
+            ;;
+          --json)
+            profile_json="${2:-}"
+            shift 2
+            ;;
+          --json=*)
+            profile_json="${1#--json=}"
+            shift
+            ;;
+          --json-file)
+            profile_json="$(cat "${2:-}")"
+            shift 2
+            ;;
+          --json-file=*)
+            profile_json="$(cat "${1#--json-file=}")"
+            shift
+            ;;
+          --json-stdin)
+            profile_json="$(cat)"
+            shift
+            ;;
+          *)
+            echo "floom account context $subcmd: unknown option '$1'" >&2
+            exit 1
+            ;;
+        esac
+      done
+      case "$mode" in
+        merge|replace) ;;
+        *)
+          echo "floom account context $subcmd: --mode must be merge or replace" >&2
+          exit 1
+          ;;
+      esac
+      if [[ -z "$profile_json" ]]; then
+        echo "floom account context $subcmd: provide --json, --json-file, or --json-stdin" >&2
+        exit 1
+      fi
+      local body
+      if ! body="$(json_context_body "$kind" "$mode" "$profile_json")"; then
+        exit 1
+      fi
+      exec bash "$LIB_DIR/floom-api.sh" PATCH /api/session/context "$body"
+      ;;
+    *)
+      echo "floom account context: unknown subcommand '$subcmd'" >&2
+      echo "run 'floom account --help' for usage." >&2
+      exit 1
+      ;;
+  esac
 }
 
 secrets_cmd() {
@@ -211,6 +329,10 @@ case "$RESOURCE" in
   secrets|secret)
     shift || true
     secrets_cmd "$@"
+    ;;
+  context|profile|profiles)
+    shift || true
+    context_cmd "$@"
     ;;
   agent-tokens|agent-token|tokens)
     shift || true

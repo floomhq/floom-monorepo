@@ -130,6 +130,13 @@ const userCols = db
   .all()
   .map((r) => r.name);
 log('users.image column present', userCols.includes('image'));
+log('users.profile_json column present', userCols.includes('profile_json'));
+
+const workspaceCols = db
+  .prepare(`PRAGMA table_info(workspaces)`)
+  .all()
+  .map((r) => r.name);
+log('workspaces.profile_json column present', workspaceCols.includes('profile_json'));
 
 // ---- pragma user_version ----
 const uv = db.prepare('PRAGMA user_version').get().user_version;

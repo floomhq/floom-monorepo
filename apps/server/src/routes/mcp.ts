@@ -34,6 +34,7 @@ import {
 import { resolveUserContext } from '../services/session.js';
 import * as userSecrets from '../services/user_secrets.js';
 import * as creatorSecrets from '../services/app_creator_secrets.js';
+import * as contextProfiles from '../services/context_profiles.js';
 import * as workspaces from '../services/workspaces.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import {
@@ -1305,6 +1306,18 @@ function mcpError(err: unknown) {
             : 'invalid_input';
     return mcpError(new AgentToolError(code, err.message, err.status, { code: err.code }));
   }
+  if (err instanceof contextProfiles.ProfileValidationError) {
+    return mcpError(new AgentToolError('invalid_input', err.message, 400));
+  }
+  if (err instanceof workspaces.WorkspaceNotFoundError) {
+    return mcpError(new AgentToolError('not_found', err.message, 404, { code: 'workspace_not_found' }));
+  }
+  if (err instanceof workspaces.NotAMemberError) {
+    return mcpError(new AgentToolError('forbidden_scope', err.message, 403, { code: 'not_a_member' }));
+  }
+  if (err instanceof workspaces.InsufficientRoleError) {
+    return mcpError(new AgentToolError('forbidden_scope', err.message, 403, { code: 'insufficient_role' }));
+  }
   const { status, body } = agentToolErrorBody(err);
   return {
     isError: true,
@@ -1353,6 +1366,24 @@ function requireAccountScope(ctx: SessionContext): void {
   );
 }
 
+function requireContextReadScope(ctx: SessionContext): void {
+  if (!ctx.agent_token_id || !ctx.agent_token_scope) {
+    throw new AgentToolError(
+      'auth_required',
+      'Authorization: Bearer floom_agent_<token> is required.',
+      401,
+    );
+  }
+  if (ctx.agent_token_scope === 'read' || ctx.agent_token_scope === 'read-write') {
+    return;
+  }
+  throw new AgentToolError(
+    'forbidden_scope',
+    'This tool requires read or read-write agent-token scope.',
+    403,
+  );
+}
+
 function requireRunScope(ctx: SessionContext): void {
   if (!ctx.agent_token_id || !ctx.agent_token_scope) {
     throw new AgentToolError(
@@ -1381,6 +1412,10 @@ function canUseStudioTools(ctx: SessionContext): boolean {
 
 function canUseAccountTools(ctx: SessionContext): boolean {
   return ctx.agent_token_scope === 'read-write';
+}
+
+function canUseContextProfileTools(ctx: SessionContext): boolean {
+  return ctx.agent_token_scope === 'read' || ctx.agent_token_scope === 'read-write';
 }
 
 const PUBLISH_ONLY_HIDDEN_TOOL_NAMES = new Set([
@@ -3185,6 +3220,39 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
     );
   }
 
+  if (canUseContextProfileTools(ctx)) {
+    server.registerTool(
+      'account_get_context',
+      {
+        title: 'Get account context profiles',
+        description:
+          'Return the current user JSON profile and active workspace JSON profile for app input autofill.',
+        inputSchema: {},
+      },
+      async () => {
+        recordMcpToolCall('account_get_context');
+        try {
+          requireContextReadScope(ctx);
+          const context = contextProfiles.getContextProfile(ctx);
+          return mcpJson({
+            user: {
+              id: ctx.user_id,
+              email: ctx.email || null,
+            },
+            workspace: {
+              ...serializeWorkspaceForMcp(context.workspace),
+              role: context.role,
+            },
+            user_profile: context.user_profile,
+            workspace_profile: context.workspace_profile,
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+  }
+
   if (canUseAccountTools(ctx)) {
     server.registerTool(
       'account_get',
@@ -3204,6 +3272,66 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             agent_token_id: ctx.agent_token_id,
             agent_token_scope: ctx.agent_token_scope,
             agent_token_rate_limit_per_minute: ctx.agent_token_rate_limit_per_minute,
+          });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_set_user_profile',
+      {
+        title: 'Set user JSON profile',
+        description:
+          'Merge or replace the current user JSON profile. The profile is used as reusable context for app input autofill.',
+        inputSchema: {
+          profile: z.record(z.unknown()),
+          mode: z.enum(['merge', 'replace']).optional(),
+        },
+      },
+      async ({ profile, mode }) => {
+        recordMcpToolCall('account_set_user_profile');
+        try {
+          requireAccountScope(ctx);
+          const userProfile = contextProfiles.setUserProfile(
+            ctx,
+            profile,
+            mode || 'merge',
+          );
+          return mcpJson({ ok: true, user_profile: userProfile });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_set_workspace_profile',
+      {
+        title: 'Set workspace JSON profile',
+        description:
+          'Merge or replace a workspace JSON profile. Requires admin role on the target workspace.',
+        inputSchema: {
+          profile: z.record(z.unknown()),
+          mode: z.enum(['merge', 'replace']).optional(),
+          workspace_id: z.string().min(1).max(128).optional(),
+        },
+      },
+      async ({ profile, mode, workspace_id }) => {
+        recordMcpToolCall('account_set_workspace_profile');
+        try {
+          requireAccountScope(ctx);
+          const result = contextProfiles.setWorkspaceProfile(
+            ctx,
+            profile,
+            mode || 'merge',
+            workspace_id || ctx.workspace_id,
+          );
+          return mcpJson({
+            ok: true,
+            workspace: serializeWorkspaceForMcp(result.workspace),
+            workspace_profile: result.profile,
           });
         } catch (err) {
           return mcpError(err);

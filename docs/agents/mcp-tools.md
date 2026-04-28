@@ -73,9 +73,12 @@ Studio:
 Account, workspace, triggers, feedback:
 
 - `account_get`
+- `account_get_context`
 - `account_list_secrets`
 - `account_set_secret`
 - `account_delete_secret`
+- `account_set_user_profile`
+- `account_set_workspace_profile`
 - `workspace_get`
 - `workspace_list`
 - `workspace_create`

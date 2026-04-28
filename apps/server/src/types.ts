@@ -402,6 +402,7 @@ export interface WorkspaceRecord {
   slug: string;
   name: string;
   plan: string;
+  profile_json: string;
   wrapped_dek: string | null;
   created_at: string;
 }
@@ -411,6 +412,7 @@ export interface UserRecord {
   workspace_id: string | null;
   email: string | null;
   name: string | null;
+  profile_json: string;
   auth_provider: string;
   auth_subject: string | null;
   created_at: string;

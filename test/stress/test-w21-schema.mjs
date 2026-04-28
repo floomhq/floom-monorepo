@@ -83,6 +83,7 @@ log("default 'local' workspace exists", !!ws);
 log("default workspace slug='local'", ws && ws.slug === 'local');
 log("default workspace name='Local'", ws && ws.name === 'Local');
 log("default workspace plan='oss'", ws && ws.plan === 'oss');
+log("default workspace profile_json='{}'", ws && ws.profile_json === '{}');
 
 // ---- 5. default user bootstrap ----
 const user = db.prepare('SELECT * FROM users WHERE id = ?').get(DEFAULT_USER_ID);
@@ -92,6 +93,7 @@ log(
   user && user.workspace_id === DEFAULT_WORKSPACE_ID,
 );
 log("default user.auth_provider='local'", user && user.auth_provider === 'local');
+log("default user profile_json='{}'", user && user.profile_json === '{}');
 
 // ---- 6. default membership bootstrap ----
 const member = db

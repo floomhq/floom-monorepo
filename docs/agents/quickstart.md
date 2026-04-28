@@ -108,3 +108,15 @@ This quota stacks on top of existing IP and user limits. A limited request retur
 ## Secrets
 
 Stored workspace secrets are encrypted at rest and write-only from the API/MCP/CLI point of view. Floom can decrypt them server-side at run time to inject only the keys declared by the app manifest. See `docs/agents/secrets-and-context.md`.
+
+## Context Profiles
+
+Agents and CLI users can store nested JSON user/workspace profiles for app input autofill:
+
+```bash
+floom account context get
+floom account context set-user --json '{"person":{"name":"Ada","defaults":{"currency":"EUR"}}}'
+floom account context set-workspace --json-file ./workspace-profile.json --mode replace
+```
+
+MCP exposes the same surface as `account_get_context`, `account_set_user_profile`, and `account_set_workspace_profile`.

@@ -42,6 +42,9 @@ const { db, DEFAULT_WORKSPACE_ID } = await import(
 const { workspacesRouter, sessionRouter } = await import(
   '../../apps/server/dist/routes/workspaces.js'
 );
+const contextProfiles = await import(
+  '../../apps/server/dist/services/context_profiles.js'
+);
 
 let passed = 0;
 let failed = 0;
@@ -94,6 +97,10 @@ log(
   'POST /: response does NOT include wrapped_dek',
   !('wrapped_dek' in (r.json?.workspace || {})),
 );
+log(
+  'POST /: response does NOT include raw profile_json',
+  !('profile_json' in (r.json?.workspace || {})),
+);
 
 // capture session cookie for follow-up requests
 const setCookie = r.headers.get('set-cookie') || '';
@@ -130,6 +137,10 @@ log('GET /: includes acme-inc', slugs.includes('acme-inc'));
 log(
   'GET /: no workspace exposes wrapped_dek',
   r.json.workspaces.every((w) => !('wrapped_dek' in w)),
+);
+log(
+  'GET /: no workspace exposes raw profile_json',
+  r.json.workspaces.every((w) => !('profile_json' in w)),
 );
 
 // ---- 5. GET /:id happy path ----
@@ -364,7 +375,112 @@ r = await fetchRoute(
 log('POST /switch-workspace non-member: 403', r.status === 403);
 log("POST /switch-workspace non-member: code='not_a_member'", r.json?.code === 'not_a_member');
 
-// ---- 24. session cookie attributes ----
+// ---- 24. GET /api/session/context — empty defaults ----
+r = await fetchRoute(sessionRouter, 'GET', '/context', undefined, cookie);
+log('GET /context: 200', r.status === 200);
+log('GET /context: user_profile default object', r.json?.user_profile && Object.keys(r.json.user_profile).length === 0);
+log('GET /context: workspace_profile default object', r.json?.workspace_profile && Object.keys(r.json.workspace_profile).length === 0);
+log('GET /context: no wrapped_dek leak', !('wrapped_dek' in (r.json?.workspace || {})));
+log('GET /context: no raw profile_json leak', !('profile_json' in (r.json?.workspace || {})));
+
+// ---- 25. PATCH /api/session/context — nested user + workspace profiles ----
+r = await fetchRoute(
+  sessionRouter,
+  'PATCH',
+  '/context',
+  {
+    user_profile: {
+      person: {
+        name: 'Local User',
+        defaults: { locale: 'en-US', currency: 'USD' },
+      },
+    },
+    workspace_profile: {
+      company: {
+        legal_name: 'Acme GmbH',
+        address: { city: 'Hamburg', country: 'DE' },
+      },
+    },
+    mode: 'replace',
+  },
+  cookie,
+);
+log('PATCH /context replace: 200', r.status === 200, `got ${r.status}`);
+log('PATCH /context: nested user profile stored', r.json?.user_profile?.person?.defaults?.currency === 'USD');
+log('PATCH /context: nested workspace profile stored', r.json?.workspace_profile?.company?.address?.city === 'Hamburg');
+
+// ---- 26. PATCH /api/session/context — merge keeps sibling nested fields ----
+r = await fetchRoute(
+  sessionRouter,
+  'PATCH',
+  '/context',
+  {
+    user_profile: {
+      person: {
+        defaults: { currency: 'EUR' },
+      },
+    },
+  },
+  cookie,
+);
+log('PATCH /context merge: 200', r.status === 200);
+log(
+  'PATCH /context merge: preserves nested siblings',
+  r.json?.user_profile?.person?.name === 'Local User' &&
+    r.json?.user_profile?.person?.defaults?.locale === 'en-US' &&
+    r.json?.user_profile?.person?.defaults?.currency === 'EUR',
+);
+
+// ---- 27. PATCH /api/session/context — root must be object ----
+r = await fetchRoute(
+  sessionRouter,
+  'PATCH',
+  '/context',
+  { user_profile: [], mode: 'merge' },
+  cookie,
+);
+log('PATCH /context invalid profile: 400', r.status === 400);
+log("PATCH /context invalid profile: code='invalid_body'", r.json?.code === 'invalid_body');
+
+// ---- 28. context profile service — mixed user/workspace update is atomic ----
+db.prepare(
+  `INSERT INTO users (id, workspace_id, email, auth_provider) VALUES (?, ?, ?, 'test')`,
+).run('context_viewer', DEFAULT_WORKSPACE_ID, 'context-viewer@floom.dev');
+db.prepare(
+  `INSERT INTO workspace_members (workspace_id, user_id, role) VALUES (?, ?, 'viewer')`,
+).run(DEFAULT_WORKSPACE_ID, 'context_viewer');
+const viewerCtx = {
+  workspace_id: DEFAULT_WORKSPACE_ID,
+  user_id: 'context_viewer',
+  device_id: 'test-device-context-viewer',
+  is_authenticated: true,
+};
+let atomicError = null;
+try {
+  contextProfiles.setContextProfile(viewerCtx, {
+    user_profile: { partial: { wrote: true } },
+    workspace_profile: { forbidden: true },
+  });
+} catch (err) {
+  atomicError = err;
+}
+const viewerProfile = JSON.parse(
+  db.prepare(`SELECT profile_json FROM users WHERE id = ?`).get('context_viewer').profile_json,
+);
+log('PATCH /context service rejects non-admin workspace profile writes', atomicError?.name === 'InsufficientRoleError');
+log('PATCH /context service rolls back paired user profile write', !viewerProfile.partial);
+
+let sizeError = null;
+try {
+  contextProfiles.setContextProfile(viewerCtx, {
+    user_profile: { too_big: 'x'.repeat(70 * 1024) },
+  });
+} catch (err) {
+  sizeError = err;
+}
+log('PATCH /context service rejects profiles over 64KB', sizeError?.name === 'ProfileValidationError');
+
+// ---- 29. session cookie attributes ----
 log('cookie: HttpOnly', setCookie.includes('HttpOnly'));
 log('cookie: SameSite=Lax', setCookie.includes('SameSite=Lax'));
 
