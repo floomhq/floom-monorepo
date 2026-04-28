@@ -1,6 +1,6 @@
-# MCP Read/Run Tools
+# MCP Agent Tools
 
-Phase 2B adds an agent-token MCP server at `POST /mcp`. When the request uses `Authorization: Bearer floom_agent_<token>`, `tools/list` exposes these read/run tools instead of the legacy unauthenticated admin toolset.
+When a request to `POST /mcp` uses `Authorization: Bearer floom_agent_<token>`, `tools/list` exposes the agent-token tool surface instead of the unauthenticated admin toolset.
 
 All examples use Streamable HTTP JSON-RPC:
 
@@ -15,10 +15,86 @@ curl -sS https://floom.dev/mcp \
 ## Scope Rules
 
 - `read`: discovery, app skill reads, run reads, run history, and running `public_live` apps.
-- `read-write`: all `read` access plus running apps owned by the token user, including private apps.
-- `publish-only`: run history listing only in Phase 2B. Read and run tools return `forbidden_scope`.
+- `read-write`: all `read` access plus owned/private app runs, studio lifecycle tools, account secrets, triggers, workspaces, feedback, and owned run management.
+- `publish-only`: studio publish/update/share/secret-policy tools without run/read tools.
 
 `public_live` means `status=active`, `visibility=public`, and `publish_status=published`. Private or auth-required apps are visible to the token user only when the app is owned by that user.
+
+Agent-token management is intentionally excluded from MCP agent-token auth. A read-write agent token can manage workspace secrets, but it cannot list, create, or revoke other agent tokens. Token mint/revoke stays behind a user session.
+
+## Current Tool Groups
+
+The exact list is contract-tested in `test/stress/test-mcp-server.mjs`.
+
+Read/run:
+
+- `discover_apps`
+- `get_app_skill`
+- `get_app_details`
+- `get_app_about`
+- `get_app_source`
+- `list_app_reviews`
+- `run_app`
+- `get_run`
+- `list_my_runs`
+- `share_run`
+- `delete_run`
+- `create_job`
+- `get_job`
+- `cancel_job`
+- `get_app_quota`
+
+Studio:
+
+- `studio_detect_app`
+- `studio_ingest_hint`
+- `studio_publish_app`
+- `studio_list_my_apps`
+- `studio_fork_app`
+- `studio_claim_app`
+- `studio_install_app`
+- `studio_uninstall_app`
+- `studio_update_app`
+- `studio_delete_app`
+- `studio_get_app_rate_limit`
+- `studio_set_app_rate_limit`
+- `studio_get_app_sharing`
+- `studio_set_app_sharing`
+- `studio_search_app_share_users`
+- `studio_invite_app_user`
+- `studio_revoke_app_invite`
+- `studio_submit_app_review`
+- `studio_withdraw_app_review`
+- `studio_list_secret_policies`
+- `studio_set_secret_policy`
+- `studio_set_creator_secret`
+- `studio_delete_creator_secret`
+
+Account, workspace, triggers, feedback:
+
+- `account_get`
+- `account_list_secrets`
+- `account_set_secret`
+- `account_delete_secret`
+- `workspace_get`
+- `workspace_list`
+- `workspace_create`
+- `workspace_update`
+- `workspace_delete`
+- `workspace_switch`
+- `workspace_list_members`
+- `workspace_set_member_role`
+- `workspace_remove_member`
+- `workspace_create_invite`
+- `workspace_list_invites`
+- `workspace_revoke_invite`
+- `workspace_accept_invite`
+- `workspace_delete_runs`
+- `trigger_create`
+- `trigger_list`
+- `trigger_update`
+- `trigger_delete`
+- `feedback_submit`
 
 ## `discover_apps`
 
@@ -200,7 +276,14 @@ Error codes:
 - `invalid_input` (`400`)
 - `rate_limit_exceeded` (`429`)
 - `runtime_error` (`500`)
+- `illegal_transition` (`409`, returned as `invalid_input` with `code: "illegal_transition"`)
 
-## Deferred To Phase 2D
+## Secrets
 
-Write tools are not part of Phase 2B. `create_app`, `publish_app`, visibility updates, secret writes, delete, and token rotation remain deferred to Phase 2D.
+Agents can manage reusable workspace BYOK/API keys through:
+
+- `account_list_secrets`
+- `account_set_secret`
+- `account_delete_secret`
+
+Secret values are write-only: Floom stores encrypted ciphertext and never returns plaintext from list/get-style surfaces. See [Secrets and Context](./secrets-and-context.md).

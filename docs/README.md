@@ -8,6 +8,8 @@
 - [Roadmap](./ROADMAP.md) — pre-1.0 priorities and what's shipped.
 - [Rollback](./ROLLBACK.md) — rolling a deploy back to a previous tag.
 - [Agent tokens quickstart](./agents/quickstart.md) — mint, use, revoke, scope, and rate-limit headless agent tokens.
+- [Agent MCP tools](./agents/mcp-tools.md) — current MCP tool groups and scope rules.
+- [Secrets and context](./agents/secrets-and-context.md) — encrypted saved secrets and the planned user/workspace context layer.
 
 ## Product
 

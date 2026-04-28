@@ -1,7 +1,13 @@
-# Agents-Native Floom Architecture (Phase 1 Proposal)
+# Agents-Native Floom Architecture
 
 Date: 2026-04-26
-Status: Investigation proposal for review (no implementation in this phase)
+Status: Historical design note. Current implemented behavior is documented in:
+
+- `docs/agents/quickstart.md`
+- `docs/agents/mcp-tools.md`
+- `docs/agents/secrets-and-context.md`
+
+The implementation has moved beyond the original phase map below. Treat target-tool lists in this file as design background, not the launch contract.
 
 ## Goal
 
@@ -11,7 +17,7 @@ Enable any AI agent (Clawdbot, Codex, Claude Code, Cursor, ChatGPT plugin, etc.)
 - Run apps
 - Create apps from repo or spec
 - Publish apps
-- Mint and rotate its own agent credentials (within owner policy)
+- Use user-session-minted agent credentials
 - Manage secrets
 
 ## Existing Baseline (Verified)
@@ -89,7 +95,7 @@ This order preserves backward compatibility while adding a clear machine princip
 - `update_app_visibility`
 - `set_secret`
 - `delete_app`
-- `mint_agent_token` (gated bootstrap path)
+Agent-token mint/list/revoke is intentionally kept behind user-session auth and is not exposed to agent-token MCP auth.
 
 Each tool must define stable input/output schemas and explicit error codes (`unauthorized`, `forbidden_scope`, `not_found`, `validation_error`, `rate_limited`).
 
@@ -109,7 +115,7 @@ Add an explicit machine API namespace:
 - `PATCH /api/agent/apps/:slug/visibility`
 - `PUT /api/agent/secrets`
 - `DELETE /api/agent/apps/:slug`
-- `POST /api/agent/tokens` (gated)
+Token mint/list/revoke remains under the user-session account API.
 
 Auth header:
 
@@ -143,7 +149,7 @@ Adopt one canonical Node/TS CLI surface (`floom`) that mirrors MCP/REST capabili
 - `floom publish <slug>`
 - `floom apps`
 - `floom runs`
-- `floom keys list|mint|revoke|rotate`
+- token mint/list/revoke through user-session account flows
 - `floom secrets set|get|list|delete`
 - `floom logs <run_id>`
 

@@ -1,6 +1,6 @@
-# Agent tokens quickstart
+# Agent Tokens Quickstart
 
-Phase 2A adds the backend primitive for headless Floom agents: one token, one workspace, one coarse scope, one per-token rate limit.
+Agent tokens are the backend primitive for headless Floom agents: one token, one workspace, one coarse scope, one per-token rate limit.
 
 ## Mint a token
 
@@ -38,7 +38,7 @@ If `workspace_id` is omitted, Floom binds the token to the user's active workspa
 
 Store `raw_token` immediately. Floom persists only the SHA-256 hash and the display prefix.
 
-After phase 2A-UI lands, mint tokens from `/me/agent-keys` instead of using curl.
+In the hosted product, mint tokens from the account/home UI. The curl flow is useful for local development and operator testing.
 
 ## Use a token
 
@@ -51,17 +51,9 @@ curl -sS https://floom.dev/api/hub \
 
 Authenticated request context includes the token's `user_id`, `workspace_id`, `scope`, and `agent_token_id` for downstream enforcement.
 
-## Use the MCP read/run tools
+## Use the MCP Tools
 
-Phase 2B adds five MCP tools for agent-native discovery and execution:
-
-- `discover_apps`
-- `get_app_skill`
-- `run_app`
-- `get_run`
-- `list_my_runs`
-
-Point an MCP client at `https://floom.dev/mcp` and include the bearer token header. With an agent token, `tools/list` returns the Phase 2B read/run toolset:
+Point an MCP client at the same host where the token was minted, for example `https://mvp.floom.dev/mcp` for tokens minted on `mvp.floom.dev`. With an agent token, `tools/list` returns the scoped agent toolset:
 
 ```bash
 curl -sS https://floom.dev/mcp \
@@ -102,10 +94,10 @@ Revocation sets `revoked_at`. Reusing that bearer token returns `401 {"error":"i
 ## Scopes
 
 - `read`: discovery and read contexts.
-- `read-write`: read plus run/write surfaces as those endpoints land.
-- `publish-only`: publish and review operations.
+- `read-write`: discovery, run, studio, account secrets, workspaces, triggers, feedback, and owned run management.
+- `publish-only`: studio publish/update/share/secret-policy operations without run/read tools.
 
-Phase 2A stores and authenticates the scope. Endpoint-level enforcement lands with the phase that introduces each agent-native surface.
+Agent-token management is not exposed to agent-token MCP auth. A read-write agent token can set encrypted workspace secrets, but creating/revoking other agent tokens remains a user-session operation.
 
 ## Rate limits
 
@@ -113,11 +105,6 @@ Agent tokens carry a per-minute quota. The default is `60` requests/minute and c
 
 This quota stacks on top of existing IP and user limits. A limited request returns `429`, `Retry-After`, and the standard `X-RateLimit-*` headers.
 
-## Phase map
+## Secrets
 
-- 2A backend: token primitive, mint/list/revoke, bearer auth, per-token rate limit.
-- 2A UI: `/me/agent-keys`, deferred until v18 wireframes lock.
-- 2B: MCP read/run plus REST parity routes for the same read/run contract.
-- 2C: additional REST parity hardening.
-- 2D: write tools, including create/publish/secrets/delete under moderated publish policy.
-- 2E: official CLI.
+Stored workspace secrets are encrypted at rest and write-only from the API/MCP/CLI point of view. Floom can decrypt them server-side at run time to inject only the keys declared by the app manifest. See `docs/agents/secrets-and-context.md`.
