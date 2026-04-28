@@ -591,6 +591,21 @@ body:has(.topbar-mobile-menu) {
 
 .run-surface-input, .run-surface-output { min-width: 0; }
 
+/* v26 About tab 2-column grid */
+@media (max-width: 900px) {
+  .about-body-grid { grid-template-columns: 1fr !important; }
+}
+
+/* v26 Source tab 2-column grid */
+@media (max-width: 900px) {
+  .source-cards-grid { grid-template-columns: 1fr !important; }
+}
+
+/* v26 footer 3-card grid */
+@media (max-width: 768px) {
+  .ap-foot-grid-responsive { grid-template-columns: 1fr !important; }
+}
+
 .run-surface-card {
   background: var(--card);
   border: 1px solid var(--line);

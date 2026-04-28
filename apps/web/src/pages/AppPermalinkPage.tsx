@@ -1253,40 +1253,68 @@ export function AppPermalinkPage() {
                   data-testid="ap-foot-grid"
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                    gap: 12,
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 14,
                     marginTop: 32,
                     paddingTop: 24,
                     borderTop: '1px solid var(--line)',
                   }}
+                  className="ap-foot-grid-responsive"
                 >
-                  {(['about', 'install', 'source'] as const).map((tabId) => (
+                  {([
+                    {
+                      id: 'about' as const,
+                      title: 'About this app',
+                      desc: 'How it works, who built it, license, changelog. Read the full README.',
+                      cta: 'Read about',
+                    },
+                    {
+                      id: 'install' as const,
+                      title: 'Install in Claude / Cursor / API',
+                      desc: 'One command for Claude Desktop. A single endpoint for Cursor. Plain HTTP for everything else.',
+                      cta: 'Install',
+                    },
+                    {
+                      id: 'source' as const,
+                      title: 'Source on GitHub',
+                      desc: githubRepo
+                        ? `${githubRepo.replace('https://github.com/', '')} · ${app.manifest?.license?.trim() ?? 'MIT'}`
+                        : 'OpenAPI spec, floom manifest, and self-host instructions.',
+                      cta: 'View source',
+                    },
+                  ]).map((card) => (
                     <button
-                      key={tabId}
+                      key={card.id}
                       type="button"
                       onClick={() => {
-                        setActiveTab(tabId);
+                        setActiveTab(card.id);
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev);
-                          next.set('tab', tabId);
+                          next.set('tab', card.id);
                           return next;
                         }, { replace: true });
                       }}
                       style={{
-                        background: 'var(--bg)',
+                        background: 'var(--card)',
                         border: '1px solid var(--line)',
                         borderRadius: 12,
-                        padding: '16px 18px',
+                        padding: '18px 20px',
                         textAlign: 'left',
                         cursor: 'pointer',
                         fontFamily: 'inherit',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
                       }}
                     >
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>
-                        {tabId === 'about' ? 'About' : tabId === 'install' ? 'Install' : 'Source'}
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>
+                        {card.title}
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
-                        {tabId === 'about' ? 'Learn how this app works' : tabId === 'install' ? 'Add to your AI tool' : 'View source & OpenAPI spec'}
+                      <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5, flex: 1 }}>
+                        {card.desc}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, marginTop: 4 }}>
+                        {card.cta} &rarr;
                       </div>
                     </button>
                   ))}
@@ -1331,341 +1359,338 @@ export function AppPermalinkPage() {
           </section>
         )}
 
-        {/* About tab */}
+        {/* About tab. v26 parity: two-column layout (main prose + aside meta panel). */}
         {activeTab === 'about' && (
         <>
-        {/* How it works strip */}
-        {howItWorks.length > 0 && (
-          <section
-            data-testid="how-it-works"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: 16,
-              marginBottom: 40,
-            }}
-          >
-            {howItWorks.map((step, idx) => (
-              <div
-                key={idx}
-                style={{
-                  background: 'var(--card)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 14,
-                  padding: 20,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 12,
-                  minHeight: 180,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: 'var(--muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.07em',
-                  }}
-                >
-                  How it works · {idx + 1} of {howItWorks.length}
-                </div>
-                <div
-                  style={{
-                    background: 'var(--bg)',
-                    border: '1px solid var(--line)',
-                    borderRadius: 10,
-                    padding: 16,
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
-                    {step.label}
-                  </div>
-                  {step.description && (
-                    <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55 }}>
-                      {step.description}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </section>
-        )}
-
-        {/* About + reviews. v17 restructure: sits inside the frame body
-            so no own border/radius. The hero shows a one-line truncated
-            description; this section renders the full markdown prose
-            when there's meaningfully more to say than the hero line.
-            2026-04-24 (P1 polish): on utility apps (jwt-decode,
-            password, uuid, json-format) the description is a single
-            short sentence. The hero already shows it in full, so
-            rendering "About this app" below was a literal duplication
-            of the exact same sentence. Suppress About when the
-            full description equals the (plain-text) hero line AND it's
-            short — the full markdown still renders for real prose. */}
-        {(() => {
-          const trimmed = (app.description ?? '').trim();
-          const isDuplicateOfHero =
-            trimmed.length > 0 &&
-            trimmed === headerDescription &&
-            trimmed.length <= 160;
-          const showAboutProse = !!trimmed && !isDuplicateOfHero;
-          const hasReviews = summary && summary.count > 0;
-          if (!showAboutProse && !hasReviews) {
-            // Nothing to render in the About block — don't emit an
-            // empty bordered section. AppReviews still ships the
-            // "write a review" affordance, so we render it standalone.
-            return (
+        {/* v26 two-column about body */}
+        <div
+          data-testid="about-body"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) 280px',
+            gap: 32,
+          }}
+          className="about-body-grid"
+        >
+          {/* Left: prose + how-it-works + reviews */}
+          <main>
+            {/* How it works strip (inline in left column) */}
+            {howItWorks.length > 0 && (
               <section
+                data-testid="how-it-works"
                 style={{
-                  paddingBottom: 24,
-                  marginBottom: 24,
-                  borderBottom: '1px solid var(--line)',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: 12,
+                  marginBottom: 28,
                 }}
               >
-                <AppReviews slug={app.slug} />
+                {howItWorks.map((step, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: 'var(--bg)',
+                      border: '1px solid var(--line)',
+                      borderRadius: 10,
+                      padding: 16,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      Step {idx + 1}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{step.label}</div>
+                    {step.description && (
+                      <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55 }}>{step.description}</div>
+                    )}
+                  </div>
+                ))}
               </section>
-            );
-          }
-          return (
-            <section
+            )}
+
+            {/* About prose — suppress if description equals hero subhead (short utility apps) */}
+            {(() => {
+              const trimmed = (app.description ?? '').trim();
+              const isDuplicateOfHero =
+                trimmed.length > 0 &&
+                trimmed === headerDescription &&
+                trimmed.length <= 160;
+              const showAboutProse = !!trimmed && !isDuplicateOfHero;
+              const hasReviews = summary && summary.count > 0;
+              if (!showAboutProse && !hasReviews) {
+                return (
+                  <section style={{ paddingBottom: 24, marginBottom: 24, borderBottom: '1px solid var(--line)' }}>
+                    <AppReviews slug={app.slug} />
+                  </section>
+                );
+              }
+              return (
+                <section style={{ paddingBottom: 24, marginBottom: 24, borderBottom: '1px solid var(--line)' }}>
+                  {showAboutProse && (
+                    <>
+                      <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 14px', color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+                        About this app
+                      </h2>
+                      <DescriptionMarkdown
+                        description={app.description!}
+                        testId="about-description"
+                        style={{ fontSize: 14, color: 'var(--text-2, var(--muted))', margin: 0, lineHeight: 1.65, marginBottom: 24 }}
+                      />
+                    </>
+                  )}
+                  {hasReviews && <RatingsWidget summary={summary} />}
+                  <AppReviews slug={app.slug} />
+                </section>
+              );
+            })()}
+          </main>
+
+          {/* Right: aside meta panels */}
+          <aside data-testid="about-aside">
+            {/* App meta panel */}
+            <div
+              data-testid="details-card"
               style={{
-                paddingBottom: 24,
-                marginBottom: 24,
-                borderBottom: '1px solid var(--line)',
+                background: 'var(--bg)',
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+                padding: '16px 18px',
+                marginBottom: 14,
               }}
             >
-              {showAboutProse && (
-                <>
-                  <h2
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 600,
-                      margin: '0 0 14px',
-                      color: 'var(--ink)',
-                      letterSpacing: '-0.01em',
-                    }}
-                  >
-                    About this app
-                  </h2>
-                  {/* Upgrade 3 (2026-04-19): markdown-enabled About copy. */}
-                  <DescriptionMarkdown
-                    description={app.description!}
-                    testId="about-description"
-                    style={{
-                      fontSize: 14,
-                      color: 'var(--text-2, var(--muted))',
-                      margin: 0,
-                      lineHeight: 1.65,
-                      marginBottom: 24,
-                    }}
-                  />
-                </>
+              <h4 style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 10px' }}>
+                App meta
+              </h4>
+              <AboutMetaRow label="Slug" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.slug}</code>} />
+              {app.version && <AboutMetaRow label="Version" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>v{app.version}</code>} />}
+              {app.manifest?.license?.trim() && (
+                <AboutMetaRow
+                  label="License"
+                  value={
+                    githubRepo ? (
+                      <a href={`${githubRepo}/blob/main/LICENSE`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>
+                        {app.manifest.license.trim()}
+                      </a>
+                    ) : (
+                      <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.manifest.license.trim()}</code>
+                    )
+                  }
+                />
               )}
+              {app.runtime && (
+                <AboutMetaRow label="Runtime" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.runtime}</code>} />
+              )}
+              {app.category && <AboutMetaRow label="Category" value={app.category} />}
+              {createdByLabel && <AboutMetaRow label="Created by" value={createdByLabel} />}
+            </div>
 
-              {hasReviews && <RatingsWidget summary={summary} />}
-
-              <AppReviews slug={app.slug} />
-            </section>
-          );
-        })()}
-
-        {/* Details block. v17: sits inside the frame body with a subtle
-            surface-2 card to differentiate from the About prose above. */}
-        <section
-          data-testid="details-card"
-          style={{
-            background: 'var(--bg)',
-            border: '1px solid var(--line)',
-            borderRadius: 12,
-            padding: '20px 22px',
-          }}
-        >
-          <h2
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              margin: '0 0 14px',
-              color: 'var(--ink)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.07em',
-            }}
-          >
-            Details
-          </h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '10px 28px',
-              fontSize: 13,
-              color: 'var(--muted)',
-            }}
-          >
-            {createdByLabel && <MetaRow label="Created by" value={createdByLabel} />}
-            {app.category && <MetaRow label="Category" value={app.category} />}
-            {app.runtime && (
-              <MetaRow
-                label="Runtime"
-                value={
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--ink)' }}>
-                    {app.runtime}
-                  </span>
-                }
-              />
+            {/* Stats panel */}
+            {(summary || app.runs_7d != null) && (
+              <div
+                data-testid="about-stats"
+                style={{
+                  background: 'var(--bg)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                  padding: '16px 18px',
+                }}
+              >
+                <h4 style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 10px' }}>
+                  Stats
+                </h4>
+                {app.runs_7d != null && app.runs_7d > 0 && (
+                  <AboutMetaRow label="Runs (7d)" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.runs_7d.toLocaleString()}</code>} />
+                )}
+                {summary && summary.count > 0 && (
+                  <>
+                    <AboutMetaRow label="Ratings" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{summary.count}</code>} />
+                    <AboutMetaRow label="Avg rating" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5, color: 'var(--accent)' }}>{summary.avg.toFixed(1)}/5</code>} />
+                  </>
+                )}
+              </div>
             )}
-            {summary && summary.count > 0 && (
-              <MetaRow label="Rating" value={`${summary.avg.toFixed(1)} / 5`} />
-            )}
-            <MetaRow
-              label="License"
-              value={
-                githubRepo ? (
-                  <a
-                    href={`${githubRepo}/blob/main/LICENSE`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      color: 'var(--accent)',
-                      textDecoration: 'none',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {app.manifest?.license?.trim() || 'View LICENSE'}
-                  </a>
-                ) : app.manifest?.license?.trim() ? (
-                  app.manifest.license.trim()
-                ) : (
-                  'See project documentation'
-                )
-              }
-            />
-            {githubRepo && (
-              <MetaRow
-                label="Source"
-                value={
-                  <a
-                    href={githubRepo}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      color: 'var(--accent)',
-                      textDecoration: 'none',
-                      fontWeight: 500,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <GithubIcon /> GitHub
-                  </a>
-                }
-              />
-            )}
-          </div>
-        </section>
+          </aside>
+        </div>
         </>
         )}
 
-        {/* Install tab. Round 2 polish: only Claude is live on day one.
-            Previously we rendered a 4-card grid with 3 "COMING SOON"
-            tiles (ChatGPT, Notion, Terminal), which made the page feel
-            amateur. Keep one full card for Claude; below it, a single
-            thin waitlist link consolidates the upcoming connectors so
-            the live option does not compete with dead weight. */}
+        {/* Install tab. v26 parity: 3 install cards — Claude Desktop/Code,
+            Cursor/MCP, cURL. Code blocks use warm-dark --code background. */}
         {activeTab === 'install' && (
         <section id="connectors" data-testid="connectors">
-          <h2
-            style={{
-              fontSize: 18,
-              fontWeight: 600,
-              margin: '0 0 14px',
-              color: 'var(--ink)',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            MCP connection
-          </h2>
           <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr)',
-              gap: 16,
-              maxWidth: 560,
-            }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 880 }}
             data-testid="connectors-grid"
           >
-            <ConnectorCard
-              label="MCP"
-              title="Add to your AI tool"
-              desc="Use this app as an MCP tool in any agent."
+            <InstallCard
               testId="connector-claude"
-              href="https://docs.anthropic.com/en/docs/claude-desktop"
-              badge="MCP"
-              copyValue={mcpEndpoint}
+              title="Claude Desktop / Claude Code"
+              desc={`Adds ${app.name} as a Skill. Run via natural language. MCP-installable via Skill add command.`}
+              snippetValue={`claude skill add ${window.location.origin}/p/${app.slug}`}
+              copyLabel="Copy command"
+            />
+            <InstallCard
+              testId="connector-cursor"
+              title="Cursor / ChatGPT / any MCP client"
+              desc="Add to your MCP config. The endpoint is the same; only the config file differs per client."
+              snippetValue={mcpEndpoint}
+              copyLabel="Copy MCP URL"
+            />
+            <InstallCard
+              testId="connector-curl"
+              title="cURL / JSON API"
+              desc="Bearer-token auth with an Agent token. Same endpoint as the public page, just hit it programmatically."
+              snippetValue={`curl -X POST ${window.location.origin}/api/${app.slug}/run \\\n  -H "Authorization: Bearer floom_agent_••••••" \\\n  -d '{}'`}
+              copyLabel="Copy cURL"
+              copySnippet={`curl -X POST ${window.location.origin}/api/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  -d '{}'`}
             />
           </div>
           <p
             data-testid="connectors-more"
-            style={{
-              marginTop: 14,
-              fontSize: 13,
-              color: 'var(--muted)',
-              lineHeight: 1.55,
-            }}
+            style={{ marginTop: 10, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}
           >
-            More clients (ChatGPT, Notion, Terminal) coming.{' '}
+            Need help?{' '}
             <a
-              href="/#waitlist"
-              data-testid="connectors-waitlist"
-              style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none' }}
+              href="/docs"
+              data-testid="connectors-docs"
+              style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
             >
-              Join the waitlist &rarr;
+              Read the full install guide &rarr;
             </a>
           </p>
         </section>
         )}
 
-        {/* Source tab: OpenAPI + manifest viewer (v1.1 stub). v17: dashed
-            panel on --bg surface, rests inside the frame body. */}
+        {/* Source tab. v26 parity: repo card + spec card (2-col grid) + self-host card. */}
         {activeTab === 'source' && (
-          <section
-            data-testid="tab-content-source"
-            style={{
-              background: 'var(--bg)',
-              border: '1px dashed var(--line)',
-              borderRadius: 14,
-              padding: '32px 28px',
-              textAlign: 'center',
-            }}
-          >
+          <section data-testid="tab-content-source">
+            {/* 2-column grid: repo + spec */}
             <div
               style={{
-                display: 'inline-block',
-                padding: '3px 8px',
-                borderRadius: 4,
-                background: 'var(--accent-soft)',
-                color: 'var(--accent)',
-                fontSize: 10,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                marginBottom: 12,
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 14,
+                marginBottom: 14,
+              }}
+              className="source-cards-grid"
+            >
+              {/* Repo card */}
+              <div
+                data-testid="source-repo-card"
+                style={{
+                  background: 'var(--card)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                  padding: '18px 20px',
+                }}
+              >
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                  Repository
+                </div>
+                {githubRepo ? (
+                  <>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <GithubIcon /> {githubRepo.replace('https://github.com/', '')}
+                    </h3>
+                    {app.manifest?.license && (
+                      <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.5 }}>
+                        {app.manifest.license} licensed
+                        {app.version ? ` · v${app.version}` : ''}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <a
+                        href={githubRepo}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          padding: '6px 12px',
+                          border: '1px solid var(--line)',
+                          borderRadius: 8,
+                          color: 'var(--ink)',
+                          textDecoration: 'none',
+                          background: 'var(--bg)',
+                        }}
+                      >
+                        View on GitHub &rarr;
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>{app.slug}</h3>
+                    {app.manifest?.license && (
+                      <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.5 }}>
+                        {app.manifest.license} licensed
+                        {app.version ? ` · v${app.version}` : ''}
+                      </p>
+                    )}
+                    <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.55 }}>
+                      Source not publicly linked. Check with the app creator.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* Spec card */}
+              <div
+                data-testid="source-spec-card"
+                style={{
+                  background: 'var(--card)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                  padding: '18px 20px',
+                }}
+              >
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                  Spec (floom.json)
+                </div>
+                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
+                  Deterministic JSON schema for actions and inputs.
+                </p>
+                <SourceSnippet
+                  value={JSON.stringify({
+                    slug: app.slug,
+                    version: app.version ?? '0.1.0',
+                    actions: Object.keys(app.manifest?.actions ?? {}).slice(0, 2),
+                  }, null, 2)}
+                />
+                <a
+                  href={`${window.location.origin}/api/hub/${app.slug}/openapi.json`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ marginTop: 10, display: 'inline-block', fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+                >
+                  View raw spec &rarr;
+                </a>
+              </div>
+            </div>
+
+            {/* Self-host card (full width) */}
+            <div
+              data-testid="source-selfhost-card"
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+                padding: '18px 20px',
               }}
             >
-              Coming soon
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                Self-host
+              </div>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Run this app on your own infra.</h3>
+              <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
+                MIT-licensed. One Docker command, free forever. Bring your own API key.
+              </p>
+              <SourceSnippet
+                value={`docker run -e GEMINI_BYOK=$KEY -p 3000:3000 ghcr.io/floomhq/${app.slug}:latest`}
+              />
             </div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)', margin: '0 0 6px' }}>
-              Inspect the source
-            </h2>
-            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 auto', maxWidth: 520, lineHeight: 1.55 }}>
-              Browsable OpenAPI spec + floom manifest. Until this ships,
-              grab the spec from <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>/api/hub/{app.slug}/openapi.json</code>.
-            </p>
           </section>
         )}
           </div>
@@ -1699,6 +1724,171 @@ export function AppPermalinkPage() {
 }
 
 /* ----------------- small components ----------------- */
+
+/**
+ * InstallCard — one of the 3 v26 install tab cards.
+ * Shows a warm-dark code snippet + copy button.
+ */
+function InstallCard({
+  testId,
+  title,
+  desc,
+  snippetValue,
+  copyLabel,
+  copySnippet,
+}: {
+  testId: string;
+  title: string;
+  desc: string;
+  snippetValue: string;
+  copyLabel: string;
+  copySnippet?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    try {
+      void navigator.clipboard.writeText(copySnippet ?? snippetValue).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    } catch { /* ignore */ }
+  };
+  return (
+    <div
+      data-testid={testId}
+      style={{
+        background: 'var(--card)',
+        border: '1px solid var(--line)',
+        borderRadius: 14,
+        padding: '18px 20px',
+      }}
+    >
+      <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--ink)' }}>{title}</h3>
+      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>{desc}</p>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          background: 'var(--code, #1b1a17)',
+          borderRadius: 8,
+          padding: '8px 10px',
+        }}
+      >
+        <span
+          style={{
+            flex: 1,
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontSize: 12,
+            color: 'var(--code-text, #e2e0d9)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+          }}
+          dangerouslySetInnerHTML={{ __html: snippetValue.replace(/\n/g, '<br/>') }}
+        />
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{
+            background: 'rgba(255,255,255,0.08)',
+            color: copied ? '#a7f3d0' : 'var(--code-text, #e2e0d9)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 6,
+            padding: '5px 10px',
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          {copied ? 'Copied' : copyLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * SourceSnippet — warm-dark code block with a copy button for the Source tab.
+ */
+function SourceSnippet({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    try {
+      void navigator.clipboard.writeText(value).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    } catch { /* ignore */ }
+  };
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 8,
+        background: 'var(--code, #1b1a17)',
+        borderRadius: 8,
+        padding: '8px 10px',
+        marginTop: 8,
+      }}
+    >
+      <pre
+        style={{
+          flex: 1,
+          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontSize: 11.5,
+          color: 'var(--code-text, #e2e0d9)',
+          margin: 0,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all',
+          lineHeight: 1.55,
+        }}
+      >
+        {value}
+      </pre>
+      <button
+        type="button"
+        onClick={handleCopy}
+        style={{
+          background: 'rgba(255,255,255,0.08)',
+          color: copied ? '#a7f3d0' : 'var(--code-text, #e2e0d9)',
+          border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: 6,
+          padding: '5px 10px',
+          fontSize: 11,
+          fontWeight: 600,
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * AboutMetaRow — key/value row for the About tab aside panels.
+ */
+function AboutMetaRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        padding: '6px 0',
+        borderBottom: '1px solid var(--line)',
+        fontSize: 12.5,
+      }}
+    >
+      <span style={{ color: 'var(--muted)' }}>{label}</span>
+      <span style={{ color: 'var(--ink)', fontWeight: 500, textAlign: 'right' }}>{value}</span>
+    </div>
+  );
+}
 
 function ArrowRight() {
   return (
@@ -1762,15 +1952,6 @@ function StarsRow({ value, size = 14 }: { value: number; size?: number }) {
   );
 }
 
-function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-      <span style={{ color: 'var(--muted)' }}>{label}</span>
-      <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{value}</span>
-    </div>
-  );
-}
-
 function RatingsWidget({ summary }: { summary: ReviewSummary }) {
   return (
     <div
@@ -1803,145 +1984,6 @@ function RatingsWidget({ summary }: { summary: ReviewSummary }) {
           {summary.count} rating{summary.count === 1 ? '' : 's'}
         </div>
       </div>
-    </div>
-  );
-}
-
-function ConnectorCard({
-  label,
-  title,
-  desc,
-  testId,
-  href,
-  onClick,
-  badge,
-  copyValue,
-  comingSoon,
-}: {
-  label: string;
-  title: string;
-  desc: string;
-  testId: string;
-  href?: string;
-  onClick?: () => void;
-  badge?: React.ReactNode;
-  copyValue?: string;
-  comingSoon?: boolean;
-}) {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    if (!copyValue) return;
-    try {
-      void navigator.clipboard.writeText(copyValue).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      });
-    } catch {
-      /* ignore */
-    }
-  };
-  const commonStyle: React.CSSProperties = {
-    background: 'var(--card)',
-    border: '1px solid var(--line)',
-    borderRadius: 14,
-    padding: '18px 20px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-    color: 'var(--ink)',
-    textDecoration: 'none',
-    textAlign: 'left',
-    cursor: href || onClick ? 'pointer' : 'default',
-    fontFamily: 'inherit',
-    minHeight: 140,
-  };
-  const inner = (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: 'var(--muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.07em',
-          }}
-        >
-          {label}
-        </span>
-        {(badge || comingSoon) && (
-          <span
-            style={{
-              padding: '3px 8px',
-              borderRadius: 999,
-              background: 'var(--accent-soft)',
-              color: 'var(--accent)',
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-            }}
-          >
-            {comingSoon ? 'Coming soon' : badge}
-          </span>
-        )}
-      </div>
-      <div style={{ fontSize: 15, fontWeight: 600 }}>{title}</div>
-      <div style={{ fontSize: 13, color: 'var(--muted)', flex: 1 }}>{desc}</div>
-      {copyValue && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            copy();
-          }}
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            padding: '6px 10px',
-            border: '1px solid var(--line)',
-            background: 'var(--bg)',
-            borderRadius: 6,
-            cursor: 'pointer',
-            alignSelf: 'flex-start',
-            color: copied ? 'var(--accent)' : 'var(--muted)',
-            fontFamily: 'inherit',
-          }}
-        >
-          {copied ? 'Copied' : 'Copy MCP URL'}
-        </button>
-      )}
-    </>
-  );
-  if (href) {
-    return (
-      <a
-        data-testid={testId}
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        style={commonStyle}
-      >
-        {inner}
-      </a>
-    );
-  }
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        data-testid={testId}
-        onClick={onClick}
-        style={commonStyle}
-      >
-        {inner}
-      </button>
-    );
-  }
-  return (
-    <div data-testid={testId} style={commonStyle}>
-      {inner}
     </div>
   );
 }

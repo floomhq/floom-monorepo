@@ -25,6 +25,9 @@ Full vision: ONE PAGE post-auth = your agent token + MCP install snippet + CLI i
 | MVP-R12 | Book-a-call form next to feedback button | OPEN | needs Federico's cal.com link |
 | MVP-R13 | GitHub OAuth setup — Federico needs to create OAuth app + provide creds | OPEN | Federico |
 | MVP-R14 | Test stack: claude + codex + kimi cli for cross-validation | OPEN | next round |
+| MVP-R-FOOTER | Footer visual density — tighter column spacing, larger/colored social icons, tagline, verify v26 tokens | OPEN | a3fc585cecf411cb7 (item 10) |
+| MVP-R-SHARE-OWNER | Share modal visibility section hidden from non-owners (real bug: disabled radio buttons + misleading "PRIVATE" pill) | OPEN | a3fc585cecf411cb7 (item 11) |
+| MVP-R-OG | OG image enriched with app name + description + sample output preview + branding (currently flat geometric) | OPEN | a3fc585cecf411cb7 (item 12) |
 
 ## v26 track (defer fixes, just document — MVP is P0 today)
 
@@ -89,6 +92,20 @@ Documented separately:
 - **V10** (ai-readiness-audit `floom_internal_error`): Root cause: `prepareDockerNetworkPolicy` called `server.listen(0, gateway)` where `gateway` (e.g., `172.25.0.1`) is a Docker bridge gateway on the HOST, not inside the server container. Fix: detect container mode via `HOSTNAME` env var (12-char hex), connect server container to run network, listen on `0.0.0.0`, expose container's IP on the run network as proxy URL. Verified: `run_jry5mxd5cgg8` succeeded (status=success). Commit: `cfc2d085`. Files: `apps/server/src/services/network-policy.ts`.
 - **MVP-R2-v2** (trim V17 landing to 7 sections): Added `variant?: 'full' | 'mvp'` prop to `LandingV17Page`. MVP variant wraps all 8 dropped sections with `{!isMvp && ...}`. `LandingMVPPage` is now a thin re-export wrapper (`<LandingV17Page variant="mvp" />`). Route `/` still uses `LandingMVPPage`; `/marketing` still shows full V17. typecheck + build both pass. Files: `apps/web/src/pages/LandingV17Page.tsx`, `apps/web/src/pages/LandingMVPPage.tsx`.
 - **MVP-R3** (one subtitle on landing): "Vibe-coding speed. Production-grade safety." kicker hidden in MVP variant via `{!isMvp && ...}`. Same commit as MVP-R2-v2.
+
+## launch-mvp branch — Items 1-9 (2026-04-27, sole-owner pass)
+
+| # | Item | Status | Commit |
+|---|---|---|---|
+| 1 | Email-verify regression: `autoSignIn=true` restored (env-gated via `FLOOM_REQUIRE_EMAIL_VERIFY`) | FIXED | 42e0992e |
+| 2 | Install snippets auto-update after minting token (state lifted to MvpHomePage) | FIXED | 42e0992e |
+| 3 | Sign-out redirects to `/` (already correct — confirmed in TopBar, RunRail, MePage, StudioLayout) | VERIFIED | N/A |
+| 4 | `floom apps list` + `floom run <slug>` CLI commands implemented | FIXED | 42e0992e |
+| 5 | `--device` flag removed from CLI hints and docs | FIXED | 42e0992e |
+| 6 | `floom auth login --help` crash fixed | FIXED | 42e0992e |
+| 7 | Invalid `floom_agent_*` tokens now return 401 (not silent 200) | FIXED | 42e0992e |
+| 8 | Email signup auto-login verified correct (Item 1 fix covers this) | VERIFIED | 42e0992e |
+| 9 | `/p/:slug` v26 parity: Install (3 cards), Source (repo+spec+self-host), About (2-col + aside meta), footer cards (descriptions + CTAs) | FIXED | pending |
 
 ## How to use this log
 - Update on every Federico screenshot/feedback.
