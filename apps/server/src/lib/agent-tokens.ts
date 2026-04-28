@@ -21,11 +21,22 @@ const agentTokenContext = new WeakMap<Context, AgentTokenAuthContext>();
 
 export function getPresentedAgentToken(c: Context): string | null {
   const header = c.req.header('authorization') || c.req.header('Authorization');
-  if (!header) return null;
-  const match = /^Bearer\s+(.+)$/.exec(header);
-  if (!match) return null;
-  const token = match[1].trim();
-  return token.startsWith(TOKEN_PREFIX) ? token : null;
+  if (header) {
+    const match = /^Bearer\s+(.+)$/.exec(header);
+    if (match) {
+      const token = match[1].trim();
+      if (token.startsWith(TOKEN_PREFIX)) return token;
+    }
+  }
+
+  // Fall back to query param ?token=floom_agent_... for CLI clients like
+  // Claude Code that don't easily support custom Authorization headers.
+  const queryToken = c.req.query('token');
+  if (queryToken && queryToken.startsWith(TOKEN_PREFIX)) {
+    return queryToken;
+  }
+
+  return null;
 }
 
 export function isAgentTokenString(value: string): boolean {
