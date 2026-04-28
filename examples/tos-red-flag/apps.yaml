@@ -1,0 +1,18 @@
+apps:
+  - slug: tos-red-flag
+    display_name: TOS Red Flag Scanner
+    category: productivity
+    description: >
+      Paste any Terms of Service — get the 5 scariest clauses explained in plain English.
+      No lawyer needed.
+    runtime: python
+    entrypoint: examples/tos-red-flag/main.py
+    port: null
+    visibility: public
+    env:
+      - GEMINI_API_KEY
+    icon: tos-red-flag
+    tags:
+      - privacy
+      - legal
+      - productivity
