@@ -1,0 +1,19 @@
+apps:
+  - slug: aeo-audit
+    display_name: AEO Audit
+    category: marketing
+    description: >
+      Check how visible your brand is in AI-generated answers vs competitors.
+      Get a visibility score, mention count, and top 3 recommendations.
+    runtime: node
+    entrypoint: examples/aeo-audit/server.mjs
+    port: 4320
+    visibility: public
+    env:
+      - UPSTREAM_URL
+    icon: aeo-audit
+    tags:
+      - seo
+      - aeo
+      - marketing
+      - ai-visibility
