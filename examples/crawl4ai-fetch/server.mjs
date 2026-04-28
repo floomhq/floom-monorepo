@@ -12,6 +12,7 @@
 // Env: CRAWL4AI_FETCH_PORT=4330 (default), UPSTREAM_URL=http://127.0.0.1:11235 (crawl4ai default)
 
 import { createServer } from 'node:http';
+import { safeFetch } from '../../lib/ssrf-guard.mjs';
 
 const PORT = Number(process.env.CRAWL4AI_FETCH_PORT || 4330);
 const HOST = process.env.CRAWL4AI_FETCH_HOST || '127.0.0.1';
@@ -51,11 +52,18 @@ async function readJsonBody(req) {
   });
 }
 
-function httpError(status, message, code) {
+function httpError(status, message, code, extra = {}) {
   const err = new Error(message);
   err.statusCode = status;
   err.code = code || 'bad_request';
+  Object.assign(err, extra);
   return err;
+}
+
+function ssrfError(err) {
+  return httpError(400, 'ssrf_blocked', 'ssrf_blocked', {
+    host: err.message.split(':').slice(1).join(':').trim(),
+  });
 }
 
 // ---------- simple HTML → Markdown fallback ----------
@@ -136,13 +144,12 @@ async function callCrawl4ai(url, waitFor, includeLinks) {
 // ---------- simple fetch fallback ----------
 
 async function simpleFetch(url, includeLinks) {
-  const res = await fetch(url, {
+  const res = await safeFetch(url, {
     headers: {
       'User-Agent': 'Floom-Crawl4AI-Fetch/0.1 (compatible; simple-fetch-fallback)',
       'Accept': 'text/html,*/*',
     },
-    signal: AbortSignal.timeout(10000),
-    redirect: 'follow',
+    timeoutMs: 10000,
   });
 
   if (!res.ok) {
@@ -190,10 +197,25 @@ async function handleRun(body) {
     throw httpError(400, 'wait_for must be a CSS selector string (max 200 chars)');
   }
 
+  try {
+    await safeFetch(url.trim(), {
+      method: 'HEAD',
+      headers: { 'User-Agent': 'Floom-Crawl4AI-Fetch/0.1 (ssrf-preflight)' },
+      timeoutMs: 5000,
+      maxBodyBytes: 0,
+    });
+  } catch (err) {
+    if (err.message?.startsWith('ssrf_blocked:')) throw ssrfError(err);
+    if (err.message !== 'response_too_large') {
+      throw httpError(502, `Failed to validate URL: ${err.message}`);
+    }
+  }
+
   // Try crawl4ai upstream first; fall back to simple fetch
   try {
     return await callCrawl4ai(url.trim(), wait_for, include_links);
   } catch (err) {
+    if (err.message?.startsWith('ssrf_blocked:')) throw ssrfError(err);
     if (
       err.statusCode === 502 ||
       err.name === 'TimeoutError' ||
@@ -295,6 +317,7 @@ const server = createServer(async (req, res) => {
     } catch (err) {
       return sendJson(res, err.statusCode || 500, {
         error: err.message,
+        ...(err.host ? { host: err.host } : {}),
         code: err.code || 'internal_error',
       });
     }
