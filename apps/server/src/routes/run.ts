@@ -191,6 +191,25 @@ function formatPublicShareView(
   };
 }
 
+/**
+ * Extract inputs from the request body, supporting both nested and flat shapes.
+ * If `body.inputs` is present and is an object, it is used directly.
+ * Otherwise, the top-level body is used as the inputs source, excluding
+ * any known control keys (app_slug, action, thread_id).
+ */
+function extractInputs(body: any, excludeKeys: string[] = []): Record<string, unknown> {
+  if (body.inputs && typeof body.inputs === 'object' && !Array.isArray(body.inputs)) {
+    return body.inputs;
+  }
+  const inputs = { ...body };
+  // Always exclude 'inputs' itself if it was e.g. a string or null
+  const toExclude = [...excludeKeys, 'inputs'];
+  for (const key of toExclude) {
+    delete (inputs as any)[key];
+  }
+  return inputs;
+}
+
 runRouter.post('/', async (c) => {
   const ctx = await resolveUserContext(c);
   const bodyGate = runGate(c, ctx, { checkRate: false });
@@ -252,7 +271,7 @@ runRouter.post('/', async (c) => {
   try {
     validated = validateInputs(
       actionSpec,
-      (body.inputs as Record<string, unknown>) ?? {},
+      extractInputs(body, ['app_slug', 'action', 'thread_id']),
     );
   } catch (err) {
     const e = err as ManifestError;
@@ -606,7 +625,7 @@ slugRunRouter.post('/', async (c) => {
   try {
     validated = validateInputs(
       actionSpec,
-      (body.inputs as Record<string, unknown>) ?? {},
+      extractInputs(body, ['action']),
     );
   } catch (err) {
     const e = err as ManifestError;
