@@ -295,6 +295,8 @@ const countStyle: CSSProperties = {
   marginLeft: 'auto',
 };
 
+// Wireframe spec: .rail-item.active { background: var(--card); color: var(--ink);
+//   font-weight: 600; box-shadow: var(--shadow-1); } — NO border.
 function itemStyle(active: boolean): CSSProperties {
   return {
     display: 'flex',
@@ -304,10 +306,11 @@ function itemStyle(active: boolean): CSSProperties {
     borderRadius: 8,
     color: active ? 'var(--ink)' : 'var(--muted)',
     background: active ? 'var(--card)' : 'transparent',
-    border: active ? '1px solid var(--line)' : '1px solid transparent',
+    border: '1px solid transparent',
+    boxShadow: active ? 'var(--shadow-1)' : undefined,
     textDecoration: 'none',
     fontSize: 13,
-    fontWeight: active ? 700 : 600,
+    fontWeight: active ? 600 : 500,
   };
 }
 

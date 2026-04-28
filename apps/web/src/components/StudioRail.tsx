@@ -156,9 +156,10 @@ function appItemStyle(active: boolean): CSSProperties {
     textDecoration: 'none',
     color: active ? 'var(--ink)' : 'var(--muted)',
     background: active ? 'var(--card)' : 'transparent',
-    border: active ? '1px solid var(--line)' : '1px solid transparent',
+    border: '1px solid transparent',
+    boxShadow: active ? 'var(--shadow-1)' : undefined,
     fontSize: 13,
-    fontWeight: active ? 700 : 600,
+    fontWeight: active ? 600 : 500,
   };
 }
 
