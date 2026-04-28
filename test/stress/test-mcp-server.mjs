@@ -141,6 +141,16 @@ async function callMcp(port, token, body) {
   return { res, text, json };
 }
 
+function parseToolText(resp) {
+  const raw = resp.json?.result?.content?.[0]?.text;
+  if (typeof raw !== 'string') return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 console.log('MCP agent read server');
 
 const readToken = createToken('read');
@@ -176,17 +186,40 @@ try {
   });
   const writeNames = (writeList.json?.result?.tools || []).map((tool) => tool.name).sort();
   const writeExpected = [
+    'account_create_agent_token',
+    'account_delete_secret',
+    'account_get',
+    'account_list_agent_tokens',
+    'account_list_secrets',
+    'account_revoke_agent_token',
+    'account_set_secret',
     'discover_apps',
     'get_app_skill',
     'get_run',
     'list_my_runs',
     'run_app',
+    'studio_claim_app',
+    'studio_delete_app',
+    'studio_delete_creator_secret',
     'studio_detect_app',
+    'studio_fork_app',
+    'studio_get_app_rate_limit',
+    'studio_get_app_sharing',
     'studio_ingest_hint',
+    'studio_install_app',
     'studio_list_my_apps',
+    'studio_list_secret_policies',
     'studio_publish_app',
+    'studio_set_app_rate_limit',
+    'studio_set_app_sharing',
+    'studio_set_creator_secret',
+    'studio_set_secret_policy',
+    'studio_submit_app_review',
+    'studio_uninstall_app',
+    'studio_update_app',
+    'studio_withdraw_app_review',
   ];
-  log('read-write token exposes run + studio tools', JSON.stringify(writeNames) === JSON.stringify(writeExpected), JSON.stringify(writeNames));
+  log('read-write token exposes run + studio + account tools', JSON.stringify(writeNames) === JSON.stringify(writeExpected), JSON.stringify(writeNames));
 
   const publishList = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',
@@ -196,10 +229,26 @@ try {
   });
   const publishNames = (publishList.json?.result?.tools || []).map((tool) => tool.name).sort();
   const publishExpected = [
+    'studio_claim_app',
+    'studio_delete_app',
+    'studio_delete_creator_secret',
     'studio_detect_app',
+    'studio_fork_app',
+    'studio_get_app_rate_limit',
+    'studio_get_app_sharing',
     'studio_ingest_hint',
+    'studio_install_app',
     'studio_list_my_apps',
+    'studio_list_secret_policies',
     'studio_publish_app',
+    'studio_set_app_rate_limit',
+    'studio_set_app_sharing',
+    'studio_set_creator_secret',
+    'studio_set_secret_policy',
+    'studio_submit_app_review',
+    'studio_uninstall_app',
+    'studio_update_app',
+    'studio_withdraw_app_review',
   ];
   log('publish-only token exposes studio tools without run tools', JSON.stringify(publishNames) === JSON.stringify(publishExpected), JSON.stringify(publishNames));
 
@@ -246,10 +295,16 @@ try {
           openapi: '3.0.0',
           info: { title: 'Agent Studio Publish', version: '1.0.0' },
           servers: [{ url: `http://localhost:${server.port}` }],
+          components: {
+            securitySchemes: {
+              api_key: { type: 'apiKey', in: 'header', name: 'X-API-Key' },
+            },
+          },
           paths: {
             '/echo': {
               post: {
                 operationId: 'echo',
+                security: [{ api_key: [] }],
                 requestBody: {
                   content: {
                     'application/json': {
@@ -288,6 +343,285 @@ try {
     studioListPayload = JSON.parse(studioList.json?.result?.content?.[0]?.text);
   } catch {}
   log('studio_list_my_apps includes pending private app', Boolean((studioListPayload?.apps || []).find((app) => app.slug === 'agent-studio-publish' && app.visibility === 'private')), studioList.text);
+
+  const forkCall = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 44,
+    method: 'tools/call',
+    params: {
+      name: 'studio_fork_app',
+      arguments: { source_slug: 'agent-studio-publish', slug: 'agent-studio-fork', name: 'Agent Studio Fork' },
+    },
+  });
+  const forkPayload = parseToolText(forkCall);
+  const forkRow = db.prepare(`SELECT * FROM apps WHERE slug = 'agent-studio-fork'`).get();
+  log('studio_fork_app creates private editable copy', forkPayload?.ok === true && forkRow?.visibility === 'private' && forkRow?.forked_from_app_id === publishedRow.id, forkCall.text);
+
+  db.prepare(
+    `INSERT INTO apps (id, slug, name, description, manifest, status, code_path, author, workspace_id, visibility, publish_status)
+     VALUES ('app_claim_fixture', 'agent-claim-fixture', 'Claim Fixture', 'Claim me', ?, 'active', 'proxied:agent-claim-fixture', NULL, 'local', 'public', 'published')`,
+  ).run(publishedRow.manifest);
+  const claimCall = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 45,
+    method: 'tools/call',
+    params: { name: 'studio_claim_app', arguments: { slug: 'agent-claim-fixture' } },
+  });
+  const claimPayload = parseToolText(claimCall);
+  const claimRow = db.prepare(`SELECT * FROM apps WHERE slug = 'agent-claim-fixture'`).get();
+  log('studio_claim_app claims unowned local app and makes it private', claimPayload?.claimed === true && claimRow?.author === 'local' && claimRow?.visibility === 'private' && typeof claimRow?.claimed_at === 'string', claimCall.text);
+
+  db.prepare(
+    `INSERT INTO apps (id, slug, name, description, manifest, status, code_path, author, workspace_id, visibility, publish_status)
+     VALUES ('app_install_fixture', 'agent-install-fixture', 'Install Fixture', 'Install me', ?, 'active', 'proxied:agent-install-fixture', 'alice', 'ws_alice', 'public_live', 'published')`,
+  ).run(publishedRow.manifest);
+  const installCall = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 46,
+    method: 'tools/call',
+    params: { name: 'studio_install_app', arguments: { slug: 'agent-install-fixture' } },
+  });
+  const installPayload = parseToolText(installCall);
+  const installRowCount = db.prepare(`SELECT COUNT(*) AS n FROM app_installs WHERE app_id = 'app_install_fixture' AND workspace_id = 'local'`).get().n;
+  log('studio_install_app pins public app without ownership', installPayload?.installed === true && installRowCount === 1, installCall.text);
+
+  const uninstallCall = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 47,
+    method: 'tools/call',
+    params: { name: 'studio_uninstall_app', arguments: { slug: 'agent-install-fixture' } },
+  });
+  const uninstallPayload = parseToolText(uninstallCall);
+  const installRowCountAfter = db.prepare(`SELECT COUNT(*) AS n FROM app_installs WHERE app_id = 'app_install_fixture' AND workspace_id = 'local'`).get().n;
+  log('studio_uninstall_app removes only install pin', uninstallPayload?.removed === true && installRowCountAfter === 0 && db.prepare(`SELECT 1 FROM apps WHERE id = 'app_install_fixture'`).get(), uninstallCall.text);
+
+  const setRateLimit = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 48,
+    method: 'tools/call',
+    params: { name: 'studio_set_app_rate_limit', arguments: { slug: 'agent-studio-publish', run_rate_limit_per_hour: 12 } },
+  });
+  const setRateLimitPayload = parseToolText(setRateLimit);
+  log('studio_set_app_rate_limit stores per-app cap', setRateLimitPayload?.ok === true && db.prepare(`SELECT run_rate_limit_per_hour FROM apps WHERE slug = 'agent-studio-publish'`).get().run_rate_limit_per_hour === 12, setRateLimit.text);
+
+  const getRateLimit = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 49,
+    method: 'tools/call',
+    params: { name: 'studio_get_app_rate_limit', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const getRateLimitPayload = parseToolText(getRateLimit);
+  log('studio_get_app_rate_limit returns stored cap', getRateLimitPayload?.run_rate_limit_per_hour === 12, getRateLimit.text);
+
+  const readAccountCall = await callMcp(server.port, readToken, {
+    jsonrpc: '2.0',
+    id: 22,
+    method: 'tools/call',
+    params: { name: 'account_get', arguments: {} },
+  });
+  log('read token cannot call account tools because they are not exposed', Boolean(readAccountCall.json?.error) || readAccountCall.json?.result?.isError === true, readAccountCall.text);
+
+  const accountSetSecret = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 23,
+    method: 'tools/call',
+    params: { name: 'account_set_secret', arguments: { key: 'TEST_API_KEY', value: 'secret-value' } },
+  });
+  const accountSetSecretPayload = parseToolText(accountSetSecret);
+  log('account_set_secret stores workspace secret without echoing value', accountSetSecretPayload?.ok === true && !accountSetSecret.text.includes('secret-value'), accountSetSecret.text);
+
+  const accountListSecrets = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 24,
+    method: 'tools/call',
+    params: { name: 'account_list_secrets', arguments: {} },
+  });
+  const accountListSecretsPayload = parseToolText(accountListSecrets);
+  log('account_list_secrets returns masked key inventory', Boolean((accountListSecretsPayload?.entries || []).find((entry) => entry.key === 'TEST_API_KEY')), accountListSecrets.text);
+
+  const accountDeleteSecret = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 25,
+    method: 'tools/call',
+    params: { name: 'account_delete_secret', arguments: { key: 'TEST_API_KEY' } },
+  });
+  const accountDeleteSecretPayload = parseToolText(accountDeleteSecret);
+  log('account_delete_secret removes workspace secret', accountDeleteSecretPayload?.ok === true && accountDeleteSecretPayload?.removed === true, accountDeleteSecret.text);
+
+  const accountCreateToken = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 26,
+    method: 'tools/call',
+    params: {
+      name: 'account_create_agent_token',
+      arguments: { label: 'mcp child token', scope: 'read', rate_limit_per_minute: 77 },
+    },
+  });
+  const accountCreateTokenPayload = parseToolText(accountCreateToken);
+  log('account_create_agent_token returns raw token once', typeof accountCreateTokenPayload?.raw_token === 'string' && accountCreateTokenPayload.raw_token.startsWith('floom_agent_'), accountCreateToken.text);
+  log('account_create_agent_token does not leak hash material', accountCreateTokenPayload && !('hash' in accountCreateTokenPayload) && !accountCreateToken.text.includes(agentTokens.hashAgentToken(accountCreateTokenPayload.raw_token || '')), accountCreateToken.text);
+
+  const accountListTokens = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 27,
+    method: 'tools/call',
+    params: { name: 'account_list_agent_tokens', arguments: {} },
+  });
+  const accountListTokensPayload = parseToolText(accountListTokens);
+  const childTokenListRow = (accountListTokensPayload?.tokens || []).find((token) => token.id === accountCreateTokenPayload?.id);
+  log('account_list_agent_tokens returns child token metadata', Boolean(childTokenListRow) && childTokenListRow.rate_limit_per_minute === 77, accountListTokens.text);
+  log('account_list_agent_tokens never returns raw token or hash', Boolean(childTokenListRow) && !('raw_token' in childTokenListRow) && !('hash' in childTokenListRow), accountListTokens.text);
+
+  const accountRevokeToken = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 28,
+    method: 'tools/call',
+    params: { name: 'account_revoke_agent_token', arguments: { token_id: accountCreateTokenPayload?.id } },
+  });
+  const accountRevokeTokenPayload = parseToolText(accountRevokeToken);
+  log('account_revoke_agent_token revokes workspace child token', accountRevokeTokenPayload?.ok === true && accountRevokeTokenPayload?.revoked === true, accountRevokeToken.text);
+
+  const initialSharing = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 29,
+    method: 'tools/call',
+    params: { name: 'studio_get_app_sharing', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const initialSharingPayload = parseToolText(initialSharing);
+  log('studio_get_app_sharing starts private without link token', initialSharingPayload?.visibility === 'private' && initialSharingPayload?.link_share_token === null, initialSharing.text);
+
+  const linkSharing = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 30,
+    method: 'tools/call',
+    params: { name: 'studio_set_app_sharing', arguments: { slug: 'agent-studio-publish', state: 'link' } },
+  });
+  const linkSharingPayload = parseToolText(linkSharing);
+  log('studio_set_app_sharing enables link sharing with link URL', linkSharingPayload?.visibility === 'link' && typeof linkSharingPayload?.link_share_token === 'string' && linkSharingPayload?.link_url?.includes('/p/agent-studio-publish?key='), linkSharing.text);
+
+  const rotatedSharing = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 31,
+    method: 'tools/call',
+    params: { name: 'studio_set_app_sharing', arguments: { slug: 'agent-studio-publish', state: 'link', rotate_link_token: true } },
+  });
+  const rotatedSharingPayload = parseToolText(rotatedSharing);
+  log('studio_set_app_sharing rotates link token', rotatedSharingPayload?.visibility === 'link' && rotatedSharingPayload?.link_share_token !== linkSharingPayload?.link_share_token, rotatedSharing.text);
+
+  const privateSharing = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 32,
+    method: 'tools/call',
+    params: { name: 'studio_set_app_sharing', arguments: { slug: 'agent-studio-publish', state: 'private' } },
+  });
+  const privateSharingPayload = parseToolText(privateSharing);
+  log('studio_set_app_sharing returns app to private', privateSharingPayload?.visibility === 'private' && privateSharingPayload?.link_share_token === null, privateSharing.text);
+
+  const submitReview = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 33,
+    method: 'tools/call',
+    params: { name: 'studio_submit_app_review', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const submitReviewPayload = parseToolText(submitReview);
+  log('studio_submit_app_review moves private app to pending_review', submitReviewPayload?.ok === true && submitReviewPayload?.visibility === 'pending_review', submitReview.text);
+
+  const withdrawReview = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 34,
+    method: 'tools/call',
+    params: { name: 'studio_withdraw_app_review', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const withdrawReviewPayload = parseToolText(withdrawReview);
+  log('studio_withdraw_app_review returns pending app to private', withdrawReviewPayload?.ok === true && withdrawReviewPayload?.visibility === 'private', withdrawReview.text);
+
+  const secretPolicies = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 35,
+    method: 'tools/call',
+    params: { name: 'studio_list_secret_policies', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const secretPoliciesPayload = parseToolText(secretPolicies);
+  log('studio_list_secret_policies includes declared api_key', Boolean((secretPoliciesPayload?.policies || []).find((policy) => policy.key === 'api_key' && policy.policy === 'user_vault')), secretPolicies.text);
+
+  const setPolicy = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 36,
+    method: 'tools/call',
+    params: { name: 'studio_set_secret_policy', arguments: { slug: 'agent-studio-publish', key: 'api_key', policy: 'creator_override' } },
+  });
+  const setPolicyPayload = parseToolText(setPolicy);
+  log('studio_set_secret_policy enables creator override', setPolicyPayload?.ok === true && setPolicyPayload?.policy === 'creator_override', setPolicy.text);
+
+  const setCreatorSecret = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 37,
+    method: 'tools/call',
+    params: { name: 'studio_set_creator_secret', arguments: { slug: 'agent-studio-publish', key: 'api_key', value: 'creator-secret-value' } },
+  });
+  const setCreatorSecretPayload = parseToolText(setCreatorSecret);
+  log('studio_set_creator_secret stores write-only creator secret', setCreatorSecretPayload?.ok === true && !setCreatorSecret.text.includes('creator-secret-value'), setCreatorSecret.text);
+
+  db.prepare(
+    `INSERT INTO app_secret_policies (app_id, key, policy, updated_at)
+     VALUES (?, 'stale_key', 'creator_override', datetime('now'))`,
+  ).run(publishedRow.id);
+  const staleCreatorSecret = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 38,
+    method: 'tools/call',
+    params: { name: 'studio_set_creator_secret', arguments: { slug: 'agent-studio-publish', key: 'stale_key', value: 'stale-secret' } },
+  });
+  const staleCreatorSecretPayload = parseToolText(staleCreatorSecret);
+  log('studio_set_creator_secret rejects stale undeclared policy keys', staleCreatorSecret.json?.result?.isError === true && staleCreatorSecretPayload?.error === 'invalid_input' && !staleCreatorSecret.text.includes('stale-secret'), staleCreatorSecret.text);
+
+  const deleteCreatorSecret = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 39,
+    method: 'tools/call',
+    params: { name: 'studio_delete_creator_secret', arguments: { slug: 'agent-studio-publish', key: 'api_key' } },
+  });
+  const deleteCreatorSecretPayload = parseToolText(deleteCreatorSecret);
+  log('studio_delete_creator_secret removes creator secret', deleteCreatorSecretPayload?.ok === true && deleteCreatorSecretPayload?.removed === true, deleteCreatorSecret.text);
+
+  const updateApp = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 40,
+    method: 'tools/call',
+    params: { name: 'studio_update_app', arguments: { slug: 'agent-studio-publish', primary_action: 'echo' } },
+  });
+  const updateAppPayload = parseToolText(updateApp);
+  const updatedManifest = JSON.parse(db.prepare('SELECT manifest FROM apps WHERE slug = ?').get('agent-studio-publish').manifest);
+  log('studio_update_app pins a valid primary action', updateAppPayload?.ok === true && updatedManifest.primary_action === 'echo', updateApp.text);
+
+  const invalidUpdateApp = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 41,
+    method: 'tools/call',
+    params: { name: 'studio_update_app', arguments: { slug: 'agent-studio-publish', primary_action: 'missingAction' } },
+  });
+  const invalidUpdateAppPayload = parseToolText(invalidUpdateApp);
+  log('studio_update_app rejects invalid primary action', invalidUpdateApp.json?.result?.isError === true && invalidUpdateAppPayload?.error === 'invalid_input', invalidUpdateApp.text);
+
+  const deleteAppWithoutConfirm = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 42,
+    method: 'tools/call',
+    params: { name: 'studio_delete_app', arguments: { slug: 'agent-studio-publish', confirm: false } },
+  });
+  log('studio_delete_app rejects missing confirm=true at schema layer', Boolean(deleteAppWithoutConfirm.json?.error) || deleteAppWithoutConfirm.json?.result?.isError === true, deleteAppWithoutConfirm.text);
+
+  const deleteApp = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 43,
+    method: 'tools/call',
+    params: { name: 'studio_delete_app', arguments: { slug: 'agent-studio-publish', confirm: true } },
+  });
+  const deleteAppPayload = parseToolText(deleteApp);
+  const deletedRow = db.prepare('SELECT * FROM apps WHERE slug = ?').get('agent-studio-publish');
+  const deleteAudit = db.prepare(`SELECT * FROM audit_log WHERE action = 'app.deleted' AND target_id = ?`).get(publishedRow.id);
+  log('studio_delete_app deletes owned app with confirm=true', deleteAppPayload?.ok === true && !deletedRow, deleteApp.text);
+  log('studio_delete_app writes app.deleted audit log', Boolean(deleteAudit), JSON.stringify(deleteAudit));
 } finally {
   await stopServer(server);
   rmSync(tmp, { recursive: true, force: true });

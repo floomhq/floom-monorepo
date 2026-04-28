@@ -4,6 +4,7 @@
 # Subcommands:
 #   init      scaffold floom.yaml in the current directory
 #   deploy    validate + publish the current app
+#   account   manage workspace secrets and agent tokens
 #   status    list your apps and recent runs
 #   auth      save an Agent token to ~/.floom/config.json
 #   --help    show this help
@@ -26,7 +27,9 @@ usage:
 
 commands:
   auth <agent-token>  save an Agent token to ~/.floom/config.json
+  account             manage workspace secrets and agent tokens
   apps list           list your workspace apps
+  apps update         update, share, or delete workspace apps
   run <slug> [json]   run a Floom app by slug
   init                scaffold a floom.yaml in the current directory
   deploy              validate + publish the current app (use --dry-run to preview)
@@ -69,6 +72,8 @@ case "$CMD" in
     exec bash "$LIB_DIR/floom-status.sh" "$@" ;;
   auth)
     exec bash "$LIB_DIR/floom-auth.sh" "$@" ;;
+  account)
+    exec bash "$LIB_DIR/floom-account.sh" "$@" ;;
   apps)
     exec bash "$LIB_DIR/floom-apps.sh" "$@" ;;
   run)
