@@ -384,7 +384,7 @@ function RecentRunsPanel({ runs }: { runs: MeRunSummary[] }) {
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 12,
-        padding: '16px 18px 6px',
+        padding: '18px 20px 6px',
         marginBottom: 16,
       }}
     >
@@ -435,7 +435,7 @@ function RecentRunsPanel({ runs }: { runs: MeRunSummary[] }) {
           View all →
         </Link>
       </div>
-      <div style={{ borderTop: '1px solid var(--line)', margin: '0 -18px' }}>
+      <div style={{ borderTop: '1px solid var(--line)', margin: '0 -20px' }}>
         {visible.map((run) => {
           const failed =
             run.status === 'error' || run.status === 'timeout';
@@ -450,10 +450,10 @@ function RecentRunsPanel({ runs }: { runs: MeRunSummary[] }) {
               to={`/run/runs/${run.id}`}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '12px minmax(0,1fr) auto auto auto',
-                gap: 10,
+                gridTemplateColumns: '32px minmax(0,1fr) auto auto auto',
+                gap: 14,
                 alignItems: 'center',
-                padding: '10px 18px',
+                padding: '12px 16px',
                 borderBottom: '1px solid var(--line)',
                 fontSize: 12.5,
                 textDecoration: 'none',
@@ -468,7 +468,8 @@ function RecentRunsPanel({ runs }: { runs: MeRunSummary[] }) {
                   borderRadius: 999,
                   background: dotColor,
                   boxShadow: `0 0 0 3px ${dotHalo}`,
-                  display: 'inline-block',
+                  display: 'block',
+                  margin: '0 auto',
                 }}
               />
               <div
