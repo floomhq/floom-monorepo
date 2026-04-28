@@ -27,6 +27,8 @@ export function WorkspacePageShell({
   const rail = mode === 'studio' ? <StudioRail /> : mode === 'settings' ? <SettingsRail /> : <RunRail />;
   // v26: settings pages render a tab bar at top of main area (V26-IA-SPEC §/settings)
   const showSettingsTabs = mode === 'settings';
+  // v26 wireframe: studio mode uses var(--studio) warm bg; run/settings use var(--bg)
+  const studioBg = mode === 'studio' ? 'var(--studio)' : undefined;
 
   return (
     <PageShell
@@ -36,12 +38,13 @@ export function WorkspacePageShell({
       noIndex
       contentStyle={{ padding: 0, maxWidth: 'none', minHeight: 'auto' }}
     >
-      <div style={shellStyle}>
+      <div style={{ ...shellStyle, ...(studioBg ? { background: studioBg } : {}) }}>
         {rail}
         <div
           role="region"
           style={{
             ...mainStyle,
+            ...(studioBg ? { background: studioBg } : {}),
             maxWidth: mainMaxWidth,
             ...contentStyle,
           }}
