@@ -7,10 +7,9 @@
  * Routes: /home (post-login redirect target on launch-mvp)
  */
 
-import { useEffect, useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useSession, clearSession } from '../hooks/useSession';
-import { Logo } from '../components/Logo';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSession } from '../hooks/useSession';
 import { TopBar } from '../components/TopBar';
 import { PublicFooter } from '../components/public/PublicFooter';
 import * as api from '../api/client';
