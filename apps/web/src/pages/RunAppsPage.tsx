@@ -164,6 +164,7 @@ function FilterChipBar({
             type="button"
             data-testid={`run-apps-chip-${f}`}
             onClick={() => onChange(f)}
+            className="filter-chip"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -181,9 +182,7 @@ function FilterChipBar({
             }}
           >
             {RUN_APP_FILTER_LABELS[f]}
-            {f === 'all' && (
-              <span style={{ opacity: 0.7 }}>{counts.all}</span>
-            )}
+            <span style={{ opacity: 0.7, marginLeft: 2 }}>{counts[f]}</span>
           </button>
         );
       })}

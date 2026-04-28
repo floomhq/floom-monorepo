@@ -57,11 +57,11 @@ function filterStudioApps(apps: CreatorApp[], filter: StudioAppFilter): CreatorA
 
 function StudioFilterChipBar({
   active,
-  totalCount,
+  counts,
   onChange,
 }: {
   active: StudioAppFilter;
-  totalCount: number;
+  counts: Record<StudioAppFilter, number>;
   onChange: (f: StudioAppFilter) => void;
 }) {
   const filters: StudioAppFilter[] = ['all', 'active', 'drafts', 'pending'];
@@ -83,6 +83,7 @@ function StudioFilterChipBar({
             type="button"
             data-testid={`studio-apps-chip-${f}`}
             onClick={() => onChange(f)}
+            className="filter-chip"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -100,9 +101,7 @@ function StudioFilterChipBar({
             }}
           >
             {STUDIO_APP_FILTER_LABELS[f]}
-            {f === 'all' && (
-              <span style={{ opacity: 0.7 }}>{totalCount}</span>
-            )}
+            <span style={{ opacity: 0.7, marginLeft: 2 }}>{counts[f]}</span>
           </button>
         );
       })}
@@ -628,6 +627,16 @@ export function StudioAppsV26Page() {
     [apps, activeFilter],
   );
 
+  const filterCounts = useMemo(
+    (): Record<StudioAppFilter, number> => ({
+      all: apps ? apps.length : 0,
+      active: apps ? filterStudioApps(apps, 'active').length : 0,
+      drafts: apps ? filterStudioApps(apps, 'drafts').length : 0,
+      pending: apps ? filterStudioApps(apps, 'pending').length : 0,
+    }),
+    [apps],
+  );
+
   // Fetch recent runs scoped to owned app slugs.
   //
   // Scoping caveat: BOTH /me/runs AND /api/hub/:slug/runs filter by the
@@ -750,7 +759,7 @@ export function StudioAppsV26Page() {
             {!appsLoading && apps && apps.length > 0 && (
               <StudioFilterChipBar
                 active={activeFilter}
-                totalCount={apps.length}
+                counts={filterCounts}
                 onChange={handleFilterChange}
               />
             )}
