@@ -263,7 +263,7 @@ function InstallTabs({ token }: { token: string }) {
 
 // ---------- TokenCard ----------
 
-function TokenCard() {
+function TokenCard({ onTokenReady }: { onTokenReady?: (rawToken: string) => void }) {
   const { data: session } = useSession();
   const workspace = session?.active_workspace;
   const [tokens, setTokens] = useState<api.AgentTokenRecord[] | null>(null);
@@ -292,6 +292,8 @@ function TokenCard() {
     try {
       const created = await api.createWorkspaceAgentToken(workspace.id, { label: 'default', scope: 'read-write' });
       setMinted(created);
+      // Notify parent so install snippets update immediately with the real token
+      if (created.raw_token) onTokenReady?.(created.raw_token);
       await load();
     } catch (err) {
       setError((err as Error).message || 'Failed to mint token');
@@ -311,6 +313,8 @@ function TokenCard() {
       }
       const created = await api.createWorkspaceAgentToken(workspace.id, { label: 'default', scope: 'read-write' });
       setMinted(created);
+      // Notify parent so install snippets update immediately with the real token
+      if (created.raw_token) onTokenReady?.(created.raw_token);
       await load();
     } catch (err) {
       setError((err as Error).message || 'Failed to rotate token');
@@ -553,8 +557,11 @@ export function MvpHomePage() {
   const workspace = session?.active_workspace;
   const navigate = useNavigate();
   const [tokens, setTokens] = useState<api.AgentTokenRecord[] | null>(null);
+  // Holds the most recently minted raw token so InstallTabs shows real value
+  // immediately on mint without requiring a page refresh (#911).
+  const [liveRawToken, setLiveRawToken] = useState<string | null>(null);
 
-  // Load tokens to know which snippet to seed install tabs with
+  // Load tokens to know whether any token exists (to show/hide InstallTabs)
   useEffect(() => {
     if (!workspace) return;
     api.listWorkspaceAgentTokens(workspace.id)
@@ -568,18 +575,28 @@ export function MvpHomePage() {
   }, [isAuthenticated, navigate]);
 
   const hasToken = tokens !== null && tokens.length > 0;
-  // Use masked placeholder once token exists (actual raw token is only shown on mint in TokenCard)
-  const installToken = hasToken ? 'floom_agent_••••••••' : '';
+  // After minting, use the live raw token in snippets. Fall back to masked
+  // placeholder once token exists but the raw value is no longer in state
+  // (e.g. after page reload — the user has to rotate to see a new raw token).
+  const installToken = liveRawToken ?? (hasToken ? 'floom_agent_••••••••' : '');
 
   return (
     <MvpAuthShell>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '48px 24px 64px' }}>
-        <TokenCard />
+        <TokenCard onTokenReady={(raw) => {
+          setLiveRawToken(raw);
+          // Ensure token list reflects the newly minted token
+          if (workspace) {
+            api.listWorkspaceAgentTokens(workspace.id)
+              .then(list => setTokens(list.filter(t => !t.revoked)))
+              .catch(() => {});
+          }
+        }} />
 
         <h2 style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: INK, margin: '36px 0 12px' }}>
           Install
         </h2>
-        {hasToken ? (
+        {hasToken || liveRawToken ? (
           <InstallTabs token={installToken} />
         ) : (
           <div

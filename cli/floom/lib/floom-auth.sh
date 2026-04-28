@@ -6,8 +6,9 @@
 #   floom auth <agent-token> <api-url>      save token + custom URL (for self-host)
 #   floom auth login --token=<agent-token>  alternate form used by CLI snippets
 #   floom auth whoami                       print identity for current token
+#   floom auth logout                       clear saved token
 #   floom auth --show                       print redacted current config
-#   floom auth --clear                      delete config file
+#   floom auth --clear                      delete config file (alias: logout)
 
 set -euo pipefail
 
@@ -30,7 +31,7 @@ print(f"api_url: {c.get('api_url', 'https://floom.dev')}")
 print(f"agent_token: {red}")
 PY
     exit 0 ;;
-  --clear)
+  --clear|logout)
     rm -f "$CONFIG"
     echo "cleared $CONFIG"
     exit 0 ;;
@@ -72,6 +73,19 @@ PY
     shift
     for arg in "$@"; do
       case "$arg" in
+        -h|--help)
+          cat <<EOF
+floom auth login — save an Agent token.
+
+usage:
+  floom auth login --token=<agent_token> [--url=<api_url>]
+
+options:
+  --token=<token>   Agent token (required). Get yours at https://floom.dev/home
+  --url=<url>       Override API base URL (default: https://floom.dev)
+
+EOF
+          exit 0 ;;
         --token=*) AGENT_TOKEN="${arg#--token=}" ;;
         --url=*)   API_URL="${arg#--url=}" ;;
         *)         echo "floom auth login: unknown option: $arg" >&2; exit 1 ;;
@@ -92,18 +106,18 @@ PY
     exit 0 ;;
   -h|--help|"")
     cat <<EOF
-floom auth — save Agent token.
+floom auth — manage Agent token authentication.
 
 usage:
   floom auth <agent-token>                     save token (defaults to https://floom.dev)
   floom auth <agent-token> <api-url>           save token + custom URL (self-host)
-  floom auth login --token=<agent-token>       alternate login form
+  floom auth login --token=<agent-token>       save token (recommended form)
   floom auth whoami                            show identity for current token
+  floom auth logout                            clear saved token
   floom auth --show                            print redacted config
-  floom auth --clear                           delete config
 
-Create an Agent token in Workspace settings:
-  https://floom.dev/settings/agent-tokens
+Get your Agent token:
+  https://floom.dev/home
 
 Agent tokens look like:
   floom_agent_...
