@@ -1,0 +1,117 @@
+{
+  "ranked": [
+    {
+      "name": "rocketflow",
+      "score": 7,
+      "score_breakdown": {
+        "memorability": 8,
+        "brand_fit": 7,
+        "typeability": 7,
+        "search": 6
+      },
+      "tlds": [
+        {
+          "tld": ".com",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        },
+        {
+          "tld": ".io",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        },
+        {
+          "tld": ".dev",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        },
+        {
+          "tld": ".ai",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        }
+      ],
+      "best_buyable": null
+    },
+    {
+      "name": "baseloop",
+      "score": 7,
+      "score_breakdown": {
+        "memorability": 7,
+        "brand_fit": 8,
+        "typeability": 8,
+        "search": 5
+      },
+      "tlds": [
+        {
+          "tld": ".com",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        },
+        {
+          "tld": ".io",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        },
+        {
+          "tld": ".dev",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        },
+        {
+          "tld": ".ai",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        }
+      ],
+      "best_buyable": null
+    },
+    {
+      "name": "acmehub",
+      "score": 6,
+      "score_breakdown": {
+        "memorability": 7,
+        "brand_fit": 6,
+        "typeability": 8,
+        "search": 3
+      },
+      "tlds": [
+        {
+          "tld": ".com",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        },
+        {
+          "tld": ".io",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        },
+        {
+          "tld": ".dev",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        },
+        {
+          "tld": ".ai",
+          "available": null,
+          "price": null,
+          "availability": "key_missing"
+        }
+      ],
+      "best_buyable": null
+    }
+  ],
+  "top_pick": null,
+  "screenshot_card_summary": "rocketflow scored highest at 7/10 but no buyable TLD was found across 4 extensions checked."
+}
