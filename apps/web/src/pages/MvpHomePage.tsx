@@ -24,13 +24,18 @@ const CARD = '#fff';
 const LINE = 'rgba(14,14,12,0.1)';
 const MONO = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 
-const MCP_URL = 'https://floom.dev/mcp';
+// Use the current origin — tokens minted on mvp.floom.dev / v26.floom.dev /
+// floom.dev (post-flip) are bound to that host's DB. Hardcoding floom.dev
+// breaks the 401-on-cross-host case (Federico hit this 2026-04-28: paste
+// from mvp.floom.dev → snippet hardcoded floom.dev → 401 invalid_token).
+const HOST_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://floom.dev';
 
 function buildMcpConfig(token: string) {
+  // Claude Desktop / Cursor JSON shape (Codex TOML variant in followup).
   return `{
   "mcpServers": {
     "floom": {
-      "url": "${MCP_URL}",
+      "url": "${HOST_ORIGIN}/mcp",
       "headers": {
         "Authorization": "Bearer ${token}"
       }
@@ -40,7 +45,7 @@ function buildMcpConfig(token: string) {
 }
 
 function buildCliSnippet(token: string) {
-  return `curl -fsSL https://floom.dev/install.sh | bash\nfloom auth login --token=${token}`;
+  return `curl -fsSL ${HOST_ORIGIN}/install.sh | bash\nfloom auth login --token=${token}`;
 }
 
 // ---------- MvpAuthShell ----------

@@ -18,8 +18,12 @@ interface TabSpec {
   snippet: string;
 }
 
-const MCP_JSON = '{ "mcpServers": { "floom": { "url": "https://floom.dev/mcp" } } }';
-const CLI_SNIPPET = 'curl -fsSL https://floom.dev/install.sh | bash\nfloom auth login --token=floom_agent_••••••';
+// Use current origin so the snippet matches the host the user is on.
+// Tokens minted on mvp.floom.dev are bound to mvp's DB — pasting a snippet
+// hardcoded to floom.dev would 401. (Federico hit this 2026-04-28.)
+const HOST_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://floom.dev';
+const MCP_JSON = `{ "mcpServers": { "floom": { "url": "${HOST_ORIGIN}/mcp" } } }`;
+const CLI_SNIPPET = `curl -fsSL ${HOST_ORIGIN}/install.sh | bash\nfloom auth login --token=floom_agent_••••••`;
 
 const TABS: TabSpec[] = [
   {
