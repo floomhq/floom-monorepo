@@ -1,17 +1,15 @@
 // /me/agent-keys — Agent tokens.
 //
-// v23 vocabulary lock: this page is "Agent tokens" everywhere
-// user-visible. NOT "API keys" — the URL, headings, callouts, and
-// labels all say "Agent tokens" / "agent token". Routes:
+// This page uses one credential type for REST API, MCP, CLI, and agents.
+// The stored token prefix remains `floom_agent_...`. Routes:
 //
 //   /me/agent-keys           canonical
-//   /me/api-keys             redirect → /me/agent-keys
+//   /me/api-keys             legacy redirect → /me/agent-keys
 //   /me/settings/tokens      redirect → /me/agent-keys
 //
 // Wired to Better Auth's api-key plugin via the React `api.*` client.
-// Backend rename `/auth/api-key/*` → `/api/me/agent-keys/*` is a v1.1
-// follow-up (see keys-decision.md FLAG #6); the React layer keeps
-// existing endpoint bindings.
+// The React client calls `/api/me/agent-keys/*`; legacy `/auth/api-key/*`
+// is blocked server-side so we have one credential system.
 //
 // Display-once flow: when the user mints a token, the cleartext value
 // only exists in this component's state for the lifetime of the open
@@ -558,8 +556,8 @@ export function MeAgentKeysPage() {
           </div>
           <h1 style={styles.h1}>Agent tokens</h1>
           <p style={styles.subhead}>
-            Let Claude/Cursor/CLI act as you. One token works across MCP,
-            REST, CLI.
+            One token works across the REST API, MCP, CLI, Claude Code,
+            Cursor, Codex, and CI.
           </p>
         </div>
 
@@ -1013,4 +1011,3 @@ function formatDate(iso: string): string {
     return iso;
   }
 }
-

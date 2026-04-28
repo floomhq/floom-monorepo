@@ -57,7 +57,7 @@ options:
 
 docs:     https://floom.dev/docs
 examples: https://github.com/floomhq/floom/tree/main/examples
-agent tokens: https://floom.dev/home
+agent tokens: https://floom.dev/me/agent-keys
 EOF
 }
 

@@ -13,7 +13,7 @@ Authenticated REST and MCP endpoints accept Agent tokens:
 Authorization: Bearer floom_agent_...
 ```
 
-Mint tokens at `https://floom.dev/home`. Public catalog reads and public app runs also work without a token.
+Mint tokens at `https://floom.dev/me/agent-keys`. Public catalog reads and public app runs also work without a token.
 
 ## Health
 

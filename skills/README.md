@@ -20,7 +20,7 @@ curl -fsSL https://floom.dev/install.sh | bash
 floom login
 ```
 
-Mint an Agent token at https://floom.dev/home, then run the command printed by
+Mint an Agent token at https://floom.dev/me/agent-keys, then run the command printed by
 `floom login`. Agent tokens look like `floom_agent_...`.
 
 ## Any other agent

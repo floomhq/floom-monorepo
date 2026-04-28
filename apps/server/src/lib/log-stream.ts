@@ -12,6 +12,7 @@ interface LogStreamState {
 }
 
 const streams = new Map<string, LogStreamState>();
+const MAX_HISTORY_LINES = 500;
 
 export interface LogStreamHandle {
   append(text: string, stream: 'stdout' | 'stderr'): void;
@@ -31,6 +32,9 @@ export function getOrCreateStream(runId: string): LogStreamHandle {
       if (s.done) return;
       const line: LogLine = { stream, text, ts: Date.now() };
       s.lines.push(line);
+      if (s.lines.length > MAX_HISTORY_LINES) {
+        s.lines.splice(0, s.lines.length - MAX_HISTORY_LINES);
+      }
       for (const l of s.listeners) {
         try {
           l(line);

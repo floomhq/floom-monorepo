@@ -54,7 +54,7 @@ Run once after installing:
 floom login
 ```
 
-Mint an Agent token at https://floom.dev/home, then run the command printed by
+Mint an Agent token at https://floom.dev/me/agent-keys, then run the command printed by
 `floom login`.
 
 ```bash

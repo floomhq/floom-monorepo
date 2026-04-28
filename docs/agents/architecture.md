@@ -34,7 +34,7 @@ Enable any AI agent (Clawdbot, Codex, Claude Code, Cursor, ChatGPT plugin, etc.)
   - `/mcp` admin toolset
   - `/mcp/app/:slug` dynamic per-app tools
 - Better Auth API key plugin exists and resolves bearer keys in API context.
-- First key bootstrap is still user-session dependent (`/auth/api-key/create` unauthenticated returns 401).
+- First token bootstrap is user-session dependent (`/api/me/agent-keys` rejects unauthenticated callers).
 
 ## Problem Statement
 

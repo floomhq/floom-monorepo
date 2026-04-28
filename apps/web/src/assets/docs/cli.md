@@ -23,7 +23,7 @@ floom --help
 floom login
 ```
 
-Mint an Agent token at `https://floom.dev/home`, then run the command printed by the CLI:
+Mint an Agent token at `https://floom.dev/me/agent-keys`, then run the command printed by the CLI:
 
 ```bash
 floom auth login --token=floom_agent_...

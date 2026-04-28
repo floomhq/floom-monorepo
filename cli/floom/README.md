@@ -97,7 +97,7 @@ Order of resolution:
 2. `~/.floom/config.json` with `{"api_key": "...", "api_url": "https://floom.dev"}`
 3. Legacy `~/.claude/floom-skill-config.json` (from the old Claude Code skill)
 
-Get your Agent token at https://floom.dev/home, then:
+Get your Agent token at https://floom.dev/me/agent-keys, then:
 
 ```bash
 floom login

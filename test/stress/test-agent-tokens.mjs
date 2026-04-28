@@ -281,6 +281,39 @@ try {
   });
   log('unknown token returns 401', invalid.res.status === 401, invalid.text);
   log('unknown token error is invalid_agent_token', invalid.json?.error === 'invalid_agent_token');
+
+  const wsBoundRaw = agentTokens.generateAgentToken();
+  db.prepare(
+    `INSERT INTO workspaces (id, slug, name, plan, wrapped_dek)
+     VALUES ('ws_token_eviction', 'token-eviction', 'Token Eviction', 'free', 'dek')`,
+  ).run();
+  db.prepare(
+    `INSERT INTO users (id, workspace_id, email, name, auth_provider)
+     VALUES ('usr_token_eviction', 'ws_token_eviction', 'token-eviction@example.com', 'Token Eviction', 'test')`,
+  ).run();
+  db.prepare(
+    `INSERT INTO workspace_members (workspace_id, user_id, role)
+     VALUES ('ws_token_eviction', 'usr_token_eviction', 'admin')`,
+  ).run();
+  db.prepare(
+    `INSERT INTO agent_tokens
+       (id, prefix, hash, label, scope, workspace_id, user_id, created_at, last_used_at, revoked_at, rate_limit_per_minute)
+     VALUES (?, ?, ?, 'eviction-test', 'read-write', 'ws_token_eviction', 'usr_token_eviction', datetime('now'), NULL, NULL, 60)`,
+  ).run(
+    'agtok_token_eviction',
+    agentTokens.extractAgentTokenPrefix(wsBoundRaw),
+    agentTokens.hashAgentToken(wsBoundRaw),
+  );
+  const beforeEviction = await jsonFetch(server.port, '/api/session/me', { token: wsBoundRaw });
+  log('workspace-bound token authenticates while user is a member', beforeEviction.res.status === 200, beforeEviction.text);
+  db.prepare(
+    `DELETE FROM workspace_members
+      WHERE workspace_id = 'ws_token_eviction'
+        AND user_id = 'usr_token_eviction'`,
+  ).run();
+  const afterEviction = await jsonFetch(server.port, '/api/session/me', { token: wsBoundRaw });
+  log('workspace-bound token is rejected after membership removal', afterEviction.res.status === 401, afterEviction.text);
+  log('evicted token error is invalid_agent_token', afterEviction.json?.error === 'invalid_agent_token', afterEviction.text);
 } finally {
   await stopServer(server);
   rmSync(tmp, { recursive: true, force: true });

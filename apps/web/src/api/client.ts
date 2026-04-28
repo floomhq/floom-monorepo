@@ -1127,7 +1127,7 @@ export interface AgentTokenRecord {
   label: string;
   scope: AgentTokenScope;
   workspace_id: string;
-  issued_by_user_id: string | null;
+  issued_by_user_id?: string | null;
   created_at: string;
   last_used_at: string | null;
   revoked: boolean;
@@ -1138,9 +1138,8 @@ export interface CreatedAgentToken extends AgentTokenRecord {
 }
 
 export async function listWorkspaceAgentTokens(workspaceId: string): Promise<AgentTokenRecord[]> {
-  return request<AgentTokenRecord[]>(
-    `/api/workspaces/${encodeURIComponent(workspaceId)}/agent-tokens`,
-  );
+  const tokens = await request<AgentTokenRecord[]>('/api/me/agent-keys');
+  return tokens.filter((token) => token.workspace_id === workspaceId);
 }
 
 export function createWorkspaceAgentToken(
@@ -1152,20 +1151,20 @@ export function createWorkspaceAgentToken(
   },
 ): Promise<CreatedAgentToken> {
   return request<CreatedAgentToken>(
-    `/api/workspaces/${encodeURIComponent(workspaceId)}/agent-tokens`,
+    '/api/me/agent-keys',
     {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, workspace_id: workspaceId }),
     },
   );
 }
 
 export function revokeWorkspaceAgentToken(
-  workspaceId: string,
+  _workspaceId: string,
   tokenId: string,
 ): Promise<void> {
   return request<void>(
-    `/api/workspaces/${encodeURIComponent(workspaceId)}/agent-tokens/${encodeURIComponent(tokenId)}/revoke`,
+    `/api/me/agent-keys/${encodeURIComponent(tokenId)}/revoke`,
     { method: 'POST' },
   );
 }
@@ -1242,17 +1241,16 @@ export function postFeedback(body: { text: string; email?: string; url?: string 
   });
 }
 
-// ---------- Personal API keys (Better Auth api-key plugin) ----------
+// ---------- Agent token compatibility wrappers ----------
 //
 // Used for headless integrations: Claude Code skill, CLI, scripts, MCP
 // clients. Keys are shown once at create time, then hashed server-side —
 // the list endpoint never returns the full value again. Sent as
-// `Authorization: Bearer <key>` (or `x-api-key: <key>`) on subsequent
-// calls; the server's custom getter (lib/better-auth.ts) strips the
-// Bearer prefix and feeds the raw key to Better Auth.
+// `Authorization: Bearer floom_agent_...` on subsequent calls.
 
-/** Shape returned by `/auth/api-key/list` and `/auth/api-key/get`. The full
- *  `key` field is intentionally omitted — it's only returned on create. */
+/** Compatibility shape used by the legacy Agent-token UI. Backed by
+ *  `/api/me/agent-keys`; the full token is intentionally omitted from list
+ *  responses and only returned on create. */
 export interface ApiKeyRecord {
   id: string;
   name: string | null;
@@ -1265,33 +1263,49 @@ export interface ApiKeyRecord {
   expiresAt: string | null;
 }
 
-/** Shape returned by `/auth/api-key/create`. `key` is the full cleartext
- *  value — we show it once in a copy-to-clipboard callout and never fetch
- *  it again. */
+/** Create response. `key` is the full cleartext Agent token — we show it once
+ *  in a copy-to-clipboard callout and never fetch it again. */
 export interface CreatedApiKey extends ApiKeyRecord {
   key: string;
 }
 
 export async function listApiKeys(): Promise<ApiKeyRecord[]> {
-  // Better Auth v1.6 wraps the list in { apiKeys, total }; older callers
-  // (and some envs) returned a bare array. Handle both.
-  const res = await request<
-    ApiKeyRecord[] | { apiKeys: ApiKeyRecord[]; total?: number }
-  >('/auth/api-key/list');
-  if (Array.isArray(res)) return res;
-  return res?.apiKeys ?? [];
+  const tokens = await request<AgentTokenRecord[]>('/api/me/agent-keys');
+  return tokens.map((token) => ({
+    id: token.id,
+    name: token.label,
+    start: token.prefix?.replace(/^floom_agent_/, '') ?? null,
+    prefix: token.prefix,
+    enabled: !token.revoked,
+    createdAt: token.created_at,
+    updatedAt: token.created_at,
+    lastRequest: token.last_used_at,
+    expiresAt: null,
+  }));
 }
 
-export function createApiKey(name: string): Promise<CreatedApiKey> {
-  return request<CreatedApiKey>('/auth/api-key/create', {
+export async function createApiKey(name: string): Promise<CreatedApiKey> {
+  const token = await request<CreatedAgentToken>('/api/me/agent-keys', {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ label: name, scope: 'read-write' }),
   });
+  return {
+    id: token.id,
+    name: token.label,
+    start: token.prefix?.replace(/^floom_agent_/, '') ?? null,
+    prefix: token.prefix,
+    enabled: true,
+    createdAt: token.created_at || new Date().toISOString(),
+    updatedAt: token.created_at || new Date().toISOString(),
+    lastRequest: null,
+    expiresAt: null,
+    key: token.raw_token,
+  };
 }
 
-export function deleteApiKey(keyId: string): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>('/auth/api-key/delete', {
+export async function deleteApiKey(keyId: string): Promise<{ success: boolean }> {
+  await request<void>(`/api/me/agent-keys/${encodeURIComponent(keyId)}/revoke`, {
     method: 'POST',
-    body: JSON.stringify({ keyId }),
   });
+  return { success: true };
 }

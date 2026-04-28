@@ -19,6 +19,28 @@ import {
 // collide with a body field called `authorization`.
 const HEADER_PREFIX = 'header_';
 const COOKIE_PREFIX = 'cookie_';
+const DEFAULT_MAX_UPSTREAM_RESPONSE_BYTES = 4 * 1024 * 1024;
+const DEFAULT_MAX_PROXIED_TIMEOUT_MS = 120_000;
+
+function configuredMaxUpstreamResponseBytes(): number {
+  const raw = process.env.FLOOM_MAX_UPSTREAM_RESPONSE_BYTES;
+  if (!raw) return DEFAULT_MAX_UPSTREAM_RESPONSE_BYTES;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_MAX_UPSTREAM_RESPONSE_BYTES;
+  return Math.floor(n);
+}
+
+export const MAX_UPSTREAM_RESPONSE_BYTES = configuredMaxUpstreamResponseBytes();
+
+function configuredMaxProxiedTimeoutMs(): number {
+  const raw = process.env.FLOOM_MAX_PROXIED_TIMEOUT_MS;
+  if (!raw) return DEFAULT_MAX_PROXIED_TIMEOUT_MS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 30_000) return DEFAULT_MAX_PROXIED_TIMEOUT_MS;
+  return Math.floor(n);
+}
+
+export const MAX_PROXIED_TIMEOUT_MS = configuredMaxProxiedTimeoutMs();
 
 export interface ProxiedRunInput {
   app: AppRecord;
@@ -74,6 +96,81 @@ export class MissingSecretsError extends Error {
     this.name = 'MissingSecretsError';
     this.required = required;
     this.help = help;
+  }
+}
+
+class UpstreamResponseTooLargeError extends Error {
+  constructor(
+    readonly limitBytes: number,
+    readonly observedBytes: number,
+  ) {
+    super(
+      `Upstream response exceeded ${limitBytes} bytes (received at least ${observedBytes} bytes)`,
+    );
+    this.name = 'UpstreamResponseTooLargeError';
+  }
+}
+
+async function readUpstreamResponseText(
+  res: Response,
+  options: {
+    isStreaming: boolean;
+    logs: string[];
+  },
+): Promise<string> {
+  const declared = Number(res.headers.get('content-length') || '0');
+  if (Number.isFinite(declared) && declared > MAX_UPSTREAM_RESPONSE_BYTES) {
+    await res.body?.cancel().catch(() => undefined);
+    throw new UpstreamResponseTooLargeError(MAX_UPSTREAM_RESPONSE_BYTES, declared);
+  }
+
+  if (!res.body) {
+    const text = await res.text();
+    const observed = Buffer.byteLength(text, 'utf-8');
+    if (observed > MAX_UPSTREAM_RESPONSE_BYTES) {
+      throw new UpstreamResponseTooLargeError(MAX_UPSTREAM_RESPONSE_BYTES, observed);
+    }
+    return text;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  let received = 0;
+  let buffered = '';
+
+  try {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > MAX_UPSTREAM_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new UpstreamResponseTooLargeError(
+          MAX_UPSTREAM_RESPONSE_BYTES,
+          received,
+        );
+      }
+      const text = decoder.decode(value, { stream: true });
+      chunks.push(text);
+      if (options.isStreaming) {
+        buffered += text;
+        const lines = buffered.split('\n');
+        buffered = lines.pop() || '';
+        for (const line of lines) {
+          if (line.trim()) options.logs.push(`[stream] ${line}`);
+        }
+      }
+    }
+    const tail = decoder.decode();
+    if (tail) chunks.push(tail);
+    if (options.isStreaming && buffered.trim()) {
+      options.logs.push(`[stream] ${buffered}`);
+    }
+    return chunks.join('');
+  } finally {
+    reader.releaseLock();
   }
 }
 
@@ -232,8 +329,13 @@ async function fetchOAuth2ClientCredentialsToken(
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
-    const errorText = await res.text();
-    const redactedText = errorText.substring(0, 256).replace(clientSecret, '[redacted]');
+    const errorText = await readUpstreamResponseText(res, {
+      isStreaming: false,
+      logs: [],
+    });
+    const redactedText = redactSensitiveText(errorText, {
+      secrets: [clientId, clientSecret],
+    }).substring(0, 256);
     throw new Error(
       `OAuth2 token endpoint returned HTTP ${res.status}: ${redactedText}${errorText.length > 256 ? '...' : ''}`,
     );
@@ -244,7 +346,7 @@ async function fetchOAuth2ClientCredentialsToken(
   };
   if (!json.access_token) {
     throw new Error(
-      `OAuth2 token endpoint response missing access_token: ${JSON.stringify(json)}`,
+      `OAuth2 token endpoint response missing access_token: ${redactSensitiveText(JSON.stringify(json), { secrets: [clientId, clientSecret] })}`,
     );
   }
   const expires_at = Date.now() + (json.expires_in ?? 3600) * 1000;
@@ -328,6 +430,7 @@ async function buildAuthHeaders(
 export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResult> {
   const start = Date.now();
   const logs: string[] = [];
+  const redaction = { secrets: Object.values(input.secrets).filter(Boolean) };
 
   try {
     const { app, manifest, action, inputs, secrets } = input;
@@ -506,7 +609,7 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
       body = JSON.stringify(inputs);
     }
 
-    logs.push(`[proxied] ${method} ${url}`);
+    logs.push(`[proxied] ${method} ${redactUrlForLogs(url)}`);
 
     // Parse the auth_config blob (apikey_header, oauth2 config, etc.).
     let authConfig: AuthConfig | null = null;
@@ -533,7 +636,7 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
 
     const requestTimeoutMs =
       app.timeout_ms && app.timeout_ms > 0
-        ? Math.max(30_000, app.timeout_ms)
+        ? Math.min(MAX_PROXIED_TIMEOUT_MS, Math.max(30_000, app.timeout_ms))
         : 30_000;
 
     const fetchInit: RequestInit = {
@@ -562,26 +665,11 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
       logs.push(
         `[proxied] streaming response (${responseContentType}) — reading chunks`,
       );
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      const chunks: string[] = [];
-      let buffered = '';
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value, { stream: true });
-        chunks.push(text);
-        buffered += text;
-        // Emit any complete newline-delimited chunks.
-        const lines = buffered.split('\n');
-        buffered = lines.pop() || '';
-        for (const line of lines) {
-          if (line.trim()) logs.push(`[stream] ${line}`);
-        }
-      }
-      if (buffered.trim()) logs.push(`[stream] ${buffered}`);
-      responseText = chunks.join('');
+      responseText = await readUpstreamResponseText(res, {
+        isStreaming: true,
+        logs,
+      });
+      responseText = redactSensitiveText(responseText, redaction);
 
       // NDJSON: parse each line as JSON and return an array.
       // SSE: leave as text (clients already know the format).
@@ -600,7 +688,11 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
         parsed = responseText;
       }
     } else {
-      responseText = await res.text();
+      responseText = await readUpstreamResponseText(res, {
+        isStreaming: false,
+        logs,
+      });
+      responseText = redactSensitiveText(responseText, redaction);
       parsed = responseText;
       try {
         parsed = JSON.parse(responseText);
@@ -616,9 +708,9 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
     if (res.ok) {
       return {
         status: 'success',
-        outputs: parsed,
+        outputs: redactSensitivePayload(parsed, redaction),
         duration_ms,
-        logs: logs.join('\n'),
+        logs: redactSensitiveText(logs.join('\n'), redaction),
       };
     }
 
@@ -649,19 +741,19 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
     }
     return {
       status: 'error',
-      outputs: parsed,
+      outputs: redactSensitivePayload(parsed, redaction),
       error: upstreamMessage
         ? `HTTP ${res.status}: ${upstreamMessage}`
         : `HTTP ${res.status}: ${res.statusText || 'error'}`,
       upstream_status: res.status,
       error_type: errorType,
       duration_ms,
-      logs: logs.join('\n'),
+      logs: redactSensitiveText(logs.join('\n'), redaction),
     };
   } catch (err) {
     const e = err as Error;
     const duration_ms = Date.now() - start;
-    logs.push(`[proxied] error: ${e.message}`);
+    logs.push(`[proxied] error: ${redactSensitiveText(e.message, redaction)}`);
     // Special-case missing_secrets so callers can surface a structured error.
     if (e instanceof MissingSecretsError) {
       return {
@@ -674,7 +766,20 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
         error: e.message,
         error_type: 'missing_secret',
         duration_ms,
-        logs: logs.join('\n'),
+        logs: redactSensitiveText(logs.join('\n'), redaction),
+      };
+    }
+    if (e instanceof UpstreamResponseTooLargeError) {
+      return {
+        status: 'error',
+        outputs: {
+          error: 'upstream_response_too_large',
+          limit_bytes: e.limitBytes,
+        },
+        error: 'Upstream response was too large',
+        error_type: 'upstream_outage',
+        duration_ms,
+        logs: redactSensitiveText(logs.join('\n'), redaction),
       };
     }
     // Classify pre-response failures. `AbortSignal.timeout` raises a
@@ -687,12 +792,68 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
     return {
       status: 'error',
       outputs: null,
-      error: e.message || 'Unknown error',
+      error: redactSensitiveText(e.message || 'Unknown error', redaction),
       error_type: preResponse,
       duration_ms,
-      logs: logs.join('\n'),
+      logs: redactSensitiveText(logs.join('\n'), redaction),
     };
   }
+}
+
+function redactUrlForLogs(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    for (const key of Array.from(url.searchParams.keys())) {
+      if (isSensitiveKey(key)) url.searchParams.set(key, '[redacted]');
+    }
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+function isSensitiveKey(key: string): boolean {
+  return /api[-_]?key|token|secret|authorization|cookie|credential/i.test(
+    key,
+  );
+}
+
+function redactSensitiveText(
+  text: string,
+  options: { secrets: string[] },
+): string {
+  let out = text;
+  for (const secret of options.secrets) {
+    if (secret.length < 4) continue;
+    out = out.split(secret).join('[redacted]');
+  }
+  out = out.replace(
+    /((?:api[-_]?key|token|secret|authorization|cookie|credential)["'\s:=]+(?:Bearer\s+|Basic\s+)?)([^"',\s}]{4,})/gi,
+    '$1[redacted]',
+  );
+  out = out.replace(
+    /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,}\b/g,
+    '$1 [redacted]',
+  );
+  return out;
+}
+
+function redactSensitivePayload(
+  value: unknown,
+  options: { secrets: string[] },
+): unknown {
+  if (typeof value === 'string') return redactSensitiveText(value, options);
+  if (Array.isArray(value)) return value.map((item) => redactSensitivePayload(item, options));
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = isSensitiveKey(key)
+        ? '[redacted]'
+        : redactSensitivePayload(entry, options);
+    }
+    return out;
+  }
+  return value;
 }
 
 // ---------- error taxonomy helpers ----------

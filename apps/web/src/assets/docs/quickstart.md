@@ -15,7 +15,7 @@ floom --version
 floom login
 ```
 
-Mint an Agent token at `https://floom.dev/home`, then run the printed command:
+Mint an Agent token at `https://floom.dev/me/agent-keys`, then run the printed command:
 
 ```bash
 floom auth login --token=floom_agent_...

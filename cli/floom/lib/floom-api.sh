@@ -86,7 +86,7 @@ if [[ -z "$API_KEY" ]]; then
   cat >&2 <<EOF
 floom: not authenticated.
 
-Mint an Agent token at https://floom.dev/home, then:
+Mint an Agent token at https://floom.dev/me/agent-keys, then:
 
   floom auth login --token=floom_agent_...
 

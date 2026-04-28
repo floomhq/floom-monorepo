@@ -264,6 +264,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             and /build unreachable on floom.dev (waitlist-only) while
             leaving the public landing, /apps, /p/:slug, and /docs open. */}
         <Route path="/me" element={<WaitlistGuard source="me"><MePage /></WaitlistGuard>} />
+        <Route path="/home" element={<Navigate to="/me/agent-keys" replace />} />
         <Route path="/me/install" element={<WaitlistGuard source="me"><MeInstallPage /></WaitlistGuard>} />
         {/* Studio-tabbed dashboard tab pages (issue #547). Each tab is
             its own URL so deep links + browser back/forward behave

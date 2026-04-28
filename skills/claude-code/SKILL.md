@@ -32,7 +32,7 @@ floom auth --show 2>/dev/null || echo "NOT_CONFIGURED"
 If not configured, prompt the user for an Agent token:
 
 ```
-Get your Floom Agent token at https://floom.dev/home, then run:
+Get your Floom Agent token at https://floom.dev/me/agent-keys, then run:
 
   floom auth login --token=floom_agent_...
 

@@ -28,7 +28,7 @@ import { friendlyAuthError } from '../lib/authErrors';
  *
  * Three tabs:
  *   - Account: profile + password (the original /me/settings content)
- *   - Studio: creator API keys + billing stubs (was /studio/settings)
+ *   - Studio: Agent tokens + billing stubs (was /studio/settings)
  *   - Danger zone: delete account (was mid-page on /me/settings)
  */
 type SettingsTab = 'account' | 'studio' | 'danger';
@@ -233,7 +233,7 @@ export function MeSettingsPage() {
 
   const tabSubtitle: Record<SettingsTab, string> = {
     account: 'Update your profile, change your password, or sign out.',
-    studio: 'Creator API keys and billing. Account basics live in the Account tab.',
+    studio: 'Agent tokens and billing. Account basics live in the Account tab.',
     danger: 'Permanently delete your account. Read carefully, this cannot be undone.',
   };
 
@@ -509,13 +509,13 @@ export function MeSettingsPage() {
         )}
 
         {/* ---------- Studio tab ---------- */}
-        {/* 2026-04-23 IA shift: API keys moved out of this tab to /me/api-keys
-            (account-scoped, used for both building and running). Studio tab
-            now only holds billing + a link to Studio itself. */}
+        {/* 2026-04-28 IA shift: account tokens live at /me/agent-keys
+            (account-scoped, used for REST API, MCP, CLI, and CI). Studio tab
+            keeps only billing + a pointer to the canonical token page. */}
         {activeTab === 'studio' && (
           <>
             <SettingsCard id="settings-card-studio-keys">
-              <SectionHeading>API keys</SectionHeading>
+              <SectionHeading>Agent tokens</SectionHeading>
               <p
                 style={{
                   fontSize: 13,
@@ -524,12 +524,12 @@ export function MeSettingsPage() {
                   lineHeight: 1.55,
                 }}
               >
-                API keys now live at their own page because they&rsquo;re
-                account-scoped: you use them both to deploy from the CLI
-                and to call running apps from scripts / Claude Code.
+                Agent tokens now live at their own page because they&rsquo;re
+                account-scoped: use one token for the REST API, MCP, CLI,
+                Claude Code, Cursor, Codex, and CI.
               </p>
               <Link
-                to="/me/api-keys"
+                to="/me/agent-keys"
                 data-testid="settings-tokens-link"
                 style={{
                   display: 'inline-flex',
@@ -543,7 +543,7 @@ export function MeSettingsPage() {
                   textDecoration: 'none',
                 }}
               >
-                Manage API keys →
+                Manage Agent tokens →
               </Link>
             </SettingsCard>
 
@@ -721,7 +721,7 @@ export function MeSettingsPage() {
 }
 
 /**
- * "Coming v1.1" placeholder used inside the Studio tab (Creator API keys,
+ * "Coming v1.1" placeholder used inside the Studio tab (Agent tokens,
  * Billing). Same visual treatment as the old StudioSettingsPage used so
  * the content feels unchanged, just re-grouped into a tab.
  */

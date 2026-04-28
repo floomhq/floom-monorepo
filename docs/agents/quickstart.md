@@ -38,7 +38,7 @@ If `workspace_id` is omitted, Floom binds the token to the user's active workspa
 
 Store `raw_token` immediately. Floom persists only the SHA-256 hash and the display prefix.
 
-In the hosted product, mint tokens from the account/home UI. The curl flow is useful for local development and operator testing.
+In the hosted product, mint tokens from `/me/agent-keys`. The curl flow is useful for local development and operator testing.
 
 ## Use a token
 

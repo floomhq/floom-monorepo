@@ -417,6 +417,16 @@ if (isCloudMode()) {
     app.use('/auth/*', async (c, next) => {
       const method = c.req.method;
       const pathname = new URL(c.req.url).pathname;
+      if (/^\/auth\/api-key(?:\/|$)/.test(pathname)) {
+        return c.json(
+          {
+            error: 'Legacy API keys are disabled. Use Agent tokens.',
+            code: 'agent_tokens_required',
+            token_url: '/me/agent-keys',
+          },
+          410,
+        );
+      }
       const isSignupPath = /^\/auth\/(?:sign-up|signup)(?:\/|$)/.test(pathname);
       if (method === 'POST' && isSignupPath && !isDeployEnabled()) {
         return c.json({ error: 'sign-up disabled — join the waitlist' }, 403);
@@ -1008,6 +1018,7 @@ if (webDist) {
     '/forgot-password',
     '/reset-password',
     '/me',
+    '/home',
     '/me/install',
     '/me/runs',
     '/me/settings',

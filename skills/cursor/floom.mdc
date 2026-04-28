@@ -24,7 +24,7 @@ export PATH="$HOME/.floom/repo/cli/floom/bin:$PATH"
 
 ```bash
 floom login
-# token page: https://floom.dev/home
+# token page: https://floom.dev/me/agent-keys
 # non-interactive: floom auth login --token=floom_agent_...
 ```
 

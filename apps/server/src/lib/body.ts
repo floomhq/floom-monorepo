@@ -18,16 +18,35 @@
 // primitives, and null all 400 because every route in this codebase
 // destructures fields off the parsed value.
 import type { Context } from 'hono';
+import {
+  readRequestTextWithLimit,
+  RequestBodyTooLargeError,
+} from '../middleware/body-size.js';
 
 export type ParsedBody =
   | { kind: 'ok'; value: Record<string, unknown> }
-  | { kind: 'error'; reason: 'malformed_json' | 'wrong_shape'; raw?: string; parseMessage?: string };
+  | {
+      kind: 'error';
+      reason: 'malformed_json' | 'wrong_shape' | 'body_too_large';
+      raw?: string;
+      parseMessage?: string;
+      limitBytes?: number;
+      observedBytes?: number;
+    };
 
 export async function parseJsonBody(c: Context): Promise<ParsedBody> {
   let raw: string;
   try {
-    raw = await c.req.text();
-  } catch {
+    raw = await readRequestTextWithLimit(c.req.raw);
+  } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return {
+        kind: 'error',
+        reason: 'body_too_large',
+        limitBytes: err.limitBytes,
+        observedBytes: err.observedBytes,
+      };
+    }
     // Body stream errored mid-read. Treat as malformed.
     return { kind: 'error', reason: 'malformed_json' };
   }
@@ -68,6 +87,16 @@ export async function parseJsonBody(c: Context): Promise<ParsedBody> {
  * so every caller returns the same { error, code, details } shape.
  */
 export function bodyParseError(c: Context, err: Extract<ParsedBody, { kind: 'error' }>) {
+  if (err.reason === 'body_too_large') {
+    return c.json(
+      {
+        error: 'request_body_too_large',
+        message: `Request body is ${err.observedBytes} bytes; max allowed for run endpoints is ${err.limitBytes}.`,
+        limit_bytes: err.limitBytes,
+      },
+      413,
+    );
+  }
   const message =
     err.reason === 'wrong_shape'
       ? 'Request body must be a JSON object'

@@ -95,9 +95,15 @@ export function lookupAgentToken(rawToken: string): AgentTokenRecord | null {
   const hash = hashAgentToken(rawToken);
   const row = db
     .prepare(
-      `SELECT * FROM agent_tokens
-        WHERE hash = ?
-          AND revoked_at IS NULL
+      `SELECT t.* FROM agent_tokens t
+        WHERE t.hash = ?
+          AND t.revoked_at IS NULL
+          AND EXISTS (
+            SELECT 1
+              FROM workspace_members wm
+             WHERE wm.workspace_id = t.workspace_id
+               AND wm.user_id = t.user_id
+          )
         LIMIT 1`,
     )
     .get(hash) as AgentTokenRecord | undefined;

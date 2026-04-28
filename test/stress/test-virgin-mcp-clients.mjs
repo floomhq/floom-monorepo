@@ -326,7 +326,7 @@ async function testFloomCliDefaultHost(baseUrl, token) {
   log(
     'Floom CLI login opens token flow without requiring token inline',
     loginUx.code === 0 &&
-      loginUx.stdout.includes(`${baseUrl}/home`) &&
+      loginUx.stdout.includes(`${baseUrl}/me/agent-keys`) &&
       loginUx.stdout.includes(`floom auth login --token=<agent_token> --api-url=${baseUrl}`),
     `${loginUx.stdout}\n${loginUx.stderr}`,
   );
