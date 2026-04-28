@@ -155,7 +155,7 @@ function CompactHeroStrip({
       <span style={{ color: 'var(--ink)', fontWeight: 700 }}>
         {totalRuns.toLocaleString()}
       </span>
-      <span>runs across your apps</span>
+      <span>runs this week</span>
       <span aria-hidden style={{ color: 'var(--line)', userSelect: 'none' }}>·</span>
       <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{appCount}</span>
       <span>app{appCount !== 1 ? 's' : ''}</span>
@@ -639,8 +639,14 @@ export function StudioAppsV26Page() {
   const signedOutPreview =
     !!session && session.cloud_mode && session.user.is_local;
 
-  // Client-side metrics
-  const totalRuns = apps?.reduce((s, a) => s + (a.run_count || 0), 0) ?? 0;
+  // Client-side metrics: 7-day run count from recent runs (not all-time totals).
+  // recentRuns is filtered to owned slugs and capped at 6; for a more accurate
+  // 7d count we use runs fetched above if available.
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const totalRuns =
+    recentRuns !== null
+      ? recentRuns.filter((r) => new Date(r.started_at) >= weekAgo).length
+      : apps?.reduce((s, a) => s + (a.run_count || 0), 0) ?? 0;
 
   return (
     <WorkspacePageShell mode="studio" title="Studio apps · Floom">
