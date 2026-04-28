@@ -710,10 +710,37 @@ slugQuotaRouter.get('/', async (c) => {
   // helpers (isByokGated, decideByok) receive a guaranteed string.
   const slug = c.req.param('slug');
   if (!slug) return c.json({ error: 'slug is required' }, 400);
-  const row = db.prepare('SELECT slug FROM apps WHERE slug = ?').get(slug) as
-    | { slug: string }
+  const row = db
+    .prepare(
+      `SELECT id, slug, visibility, author, workspace_id, link_share_token, link_share_requires_auth
+         FROM apps
+        WHERE slug = ?`,
+    )
+    .get(slug) as
+    | {
+        id: string;
+        slug: string;
+        visibility: string | null;
+        author: string | null;
+        workspace_id: string;
+        link_share_token: string | null;
+        link_share_requires_auth: number;
+      }
     | undefined;
   if (!row) return c.json({ error: `App not found: ${slug}` }, 404);
+  const ctx = await resolveUserContext(c);
+  const blocked = checkAppVisibility(c, row.visibility || 'public', {
+    app_id: row.id,
+    slug: row.slug,
+    author: row.author,
+    workspace_id: row.workspace_id,
+    link_share_token: row.link_share_token,
+    link_share_requires_auth: row.link_share_requires_auth,
+    ctx,
+  });
+  if (blocked) {
+    return c.json({ error: `App not found: ${slug}`, code: 'not_found' }, 404);
+  }
 
   if (!isByokGated(slug)) {
     // Non-gated apps don't have a per-IP free budget; the UI should hide

@@ -2552,6 +2552,7 @@ export async function ingestAppFromSpec(args: {
   link_share_requires_auth?: boolean;
   auth_required?: boolean;
   max_run_retention_days?: number | null;
+  allowPrivateNetwork?: boolean;
 }): Promise<{ slug: string; name: string; created: boolean }> {
   const openapi_url = args.openapi_url || '';
   const derefed = await dereferenceSpec(args.spec);
@@ -2601,6 +2602,14 @@ export async function ingestAppFromSpec(args: {
 
   const manifest = specToManifest(derefed, appSpec, deriveSecretsFromSpec(derefed));
   const resolvedBaseUrl = resolveBaseUrl(derefed, appSpec, openapi_url || undefined);
+  if (
+    resolvedBaseUrl &&
+    !(await isSafeUrl(resolvedBaseUrl, {
+      allowPrivateNetwork: args.allowPrivateNetwork,
+    }))
+  ) {
+    throw new Error(`Invalid or disallowed OpenAPI server URL: ${resolvedBaseUrl}`);
+  }
 
   if (existing) {
     db.prepare(

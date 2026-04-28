@@ -1,18 +1,16 @@
 # Install Floom in an MCP client
 
-Every Floom app exposes itself as an MCP server. Wire it up in Claude Desktop, Claude Code, Cursor, Codex CLI, or any MCP-compliant client, and the agent can run the app like any other tool.
+Every public Floom app exposes an MCP server. Add the endpoint to Claude Desktop, Claude Code, Cursor, Codex CLI, or any MCP client, and the agent can run the app as a tool.
 
-## Three surfaces
-
-Floom surfaces three URLs that matter to an MCP client. Pick the one that matches what you're doing.
+## MCP URLs
 
 | Surface | URL | What it does | Auth |
 |---|---|---|---|
-| **Run an app** | `https://mcp.floom.dev/app/<slug>` | One MCP endpoint per published app. Invoke with JSON input, get structured JSON back. | None for public apps. Bearer token for private / paid apps. |
-| **Discover apps** | `https://mcp.floom.dev/search` | List and search every public app. The agent can pick a tool at runtime. | None. |
-| **Manage your apps** | `https://floom.dev/studio` | Web UI to create, update, redeploy, rotate secrets. **Not** an MCP endpoint. | Your Floom account. |
+| **Run one app** | `https://floom.dev/mcp/app/<slug>` | One MCP server per published app. | Public apps work without auth. Private/workspace apps require an Agent token. |
+| **Discover apps** | `https://floom.dev/mcp/search` | Search public apps from an agent. | None. |
+| **Account + Studio tools** | `https://floom.dev/mcp` | Discover, run, inspect runs, manage Studio apps, secrets, profile context, sharing, and rate limits. | `Authorization: Bearer floom_agent_...` |
 
-Most users wire `/search` plus one or two `/app/<slug>` endpoints and do everything else from the Studio.
+Mint Agent tokens at `https://floom.dev/home`.
 
 ## Claude Desktop
 
@@ -24,92 +22,78 @@ Open the config file and add entries under `mcpServers`.
 ```json
 {
   "mcpServers": {
-    "floom-search":       { "url": "https://mcp.floom.dev/search" },
-    "floom-lead-scorer":  { "url": "https://mcp.floom.dev/app/lead-scorer" },
-    "floom-resume-screener": {
-      "url": "https://mcp.floom.dev/app/resume-screener",
-      "headers": { "Authorization": "Bearer flm_live_..." }
+    "floom-search": { "url": "https://floom.dev/mcp/search" },
+    "floom-lead-scorer": { "url": "https://floom.dev/mcp/app/lead-scorer" },
+    "floom-account": {
+      "url": "https://floom.dev/mcp",
+      "headers": { "Authorization": "Bearer floom_agent_..." }
     }
   }
 }
 ```
 
-Quit Claude Desktop (Cmd+Q on Mac), reopen it, then ask: *"What Floom apps exist for lead scoring?"* Claude will call `floom-search`, then hit `floom-lead-scorer` on the one you pick. Add the `Authorization` header only on apps that require a key.
+Quit Claude Desktop, reopen it, then ask it to list Floom tools.
 
 ## Claude Code
 
-Claude Code reads `~/.config/claude-code/mcp.json` (Mac / Linux) or the equivalent `%APPDATA%` path on Windows. The schema is identical to Claude Desktop.
-
-```json
-{
-  "mcpServers": {
-    "floom-lead-scorer": { "url": "https://mcp.floom.dev/app/lead-scorer" }
-  }
-}
+```bash
+claude mcp add --transport http floom-lead-scorer https://floom.dev/mcp/app/lead-scorer
+claude mcp add --transport http floom-account https://floom.dev/mcp \
+  --header "Authorization: Bearer floom_agent_..."
 ```
 
-Restart Claude Code after editing. The app appears as a tool in the next session.
+The verified argument order is:
+
+```bash
+claude mcp add --transport http <name> <url>
+```
 
 ## Cursor
 
-Cursor reads `~/.cursor/mcp.json`. Same shape as Claude Desktop.
+Cursor reads `~/.cursor/mcp.json`.
 
 ```json
 {
   "mcpServers": {
-    "floom-lead-scorer": { "url": "https://mcp.floom.dev/app/lead-scorer" },
-    "floom-competitor":  { "url": "https://mcp.floom.dev/app/competitor-analyzer" }
+    "floom-lead-scorer": { "url": "https://floom.dev/mcp/app/lead-scorer" },
+    "floom-account": {
+      "url": "https://floom.dev/mcp",
+      "transport": "http",
+      "headers": { "Authorization": "Bearer floom_agent_..." }
+    }
   }
 }
 ```
 
-Reload Cursor after editing (Cmd+Shift+P → "Reload Window").
+Reload Cursor after editing.
 
 ## Codex CLI
 
-Codex CLI reads `~/.codex/mcp.json`. Same schema.
+Codex uses TOML:
 
-```json
-{
-  "mcpServers": {
-    "floom-search":     { "url": "https://mcp.floom.dev/search" },
-    "floom-competitor": { "url": "https://mcp.floom.dev/app/competitor-analyzer" }
-  }
-}
+```toml
+[mcp_servers.floom]
+url = "https://floom.dev/mcp"
+http_headers = { Authorization = "Bearer floom_agent_..." }
+```
+
+For a single public app:
+
+```toml
+[mcp_servers.floom_lead_scorer]
+url = "https://floom.dev/mcp/app/lead-scorer"
 ```
 
 ## Any other MCP client
 
-Anything that speaks the MCP spec works: VS Code Continue, Zed, OpenAI ChatGPT's MCP bridge. The URL shape never changes:
+- Specific app: `https://floom.dev/mcp/app/<slug>`
+- Discovery: `https://floom.dev/mcp/search`
+- Account/Studio: `https://floom.dev/mcp` with `Authorization: Bearer floom_agent_...`
 
-- Specific app: `https://mcp.floom.dev/app/<slug>`
-- Discovery: `https://mcp.floom.dev/search`
-
-If your client requires a different transport (stdio instead of HTTP), run the self-hosted Floom image locally and point the client at `http://localhost:3051/mcp/app/<slug>`.
-
-## Authenticated apps
-
-Private apps and paid apps require a bearer token. Get one from `floom.dev/me/settings` and add it to the `headers` block for that specific server:
-
-```json
-{
-  "mcpServers": {
-    "floom-private-app": {
-      "url": "https://mcp.floom.dev/app/my-private-app",
-      "headers": { "Authorization": "Bearer flm_live_..." }
-    }
-  }
-}
-```
-
-Public apps need no auth. The token is per-account; rotate it from the same settings page.
-
-## Per-app install flow
-
-Every app page on floom.dev has an **Install in Claude** button that opens a dedicated page at `floom.dev/install/<slug>` with the JSON already filled in for that app. Copy, paste, done.
+Floom uses Streamable HTTP. Clients must send `Accept: application/json, text/event-stream`.
 
 ## Related pages
 
-- [/docs/self-host](/docs/self-host)
-- [/docs/runtime-specs](/docs/runtime-specs)
+- [/docs/cli](/docs/cli)
 - [/docs/api-reference](/docs/api-reference)
+- [/docs/self-host](/docs/self-host)

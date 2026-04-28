@@ -16,12 +16,12 @@ shell out to `floom` directly.
 All packages call the `floom` CLI. Install it once:
 
 ```bash
-git clone --depth 1 https://github.com/floomhq/floom.git ~/.floom/repo
-export PATH="$HOME/.floom/repo/cli/floom/bin:$PATH"
-floom auth <your-api-key>
+curl -fsSL https://floom.dev/install.sh | bash
+floom login
 ```
 
-Key at https://floom.dev/me/api-keys.
+Mint an Agent token at https://floom.dev/home, then run the command printed by
+`floom login`. Agent tokens look like `floom_agent_...`.
 
 ## Any other agent
 
@@ -32,6 +32,8 @@ floom init
 floom deploy --dry-run
 floom deploy
 floom status
+floom account context get
+floom account secrets list
 ```
 
 Works with Codex CLI, Aider, Continue, or any agent that can run bash.

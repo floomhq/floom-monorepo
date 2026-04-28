@@ -93,26 +93,28 @@ floom --version                      print version
 
 Order of resolution:
 
-1. `FLOOM_API_KEY` env var (+ optional `FLOOM_API_URL`, default `https://floom.dev`)
+1. `FLOOM_API_KEY` env var containing a `floom_agent_...` token (+ optional `FLOOM_API_URL`, default `https://floom.dev`)
 2. `~/.floom/config.json` with `{"api_key": "...", "api_url": "https://floom.dev"}`
 3. Legacy `~/.claude/floom-skill-config.json` (from the old Claude Code skill)
 
 Get your Agent token at https://floom.dev/home, then:
 
 ```bash
-floom auth sk_live_xxx
+floom login
+# then paste the printed command:
+floom auth login --token=floom_agent_...
 ```
 
 Self-host:
 
 ```bash
-floom auth sk_live_xxx http://localhost:3051
+floom auth login --token=floom_agent_... --api-url=http://localhost:3051
 ```
 
 Env-only (CI):
 
 ```bash
-export FLOOM_API_KEY=sk_live_xxx
+export FLOOM_API_KEY=floom_agent_...
 export FLOOM_API_URL=https://floom.dev
 floom status
 ```

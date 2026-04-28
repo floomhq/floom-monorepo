@@ -23,8 +23,9 @@ export PATH="$HOME/.floom/repo/cli/floom/bin:$PATH"
 ## Auth
 
 ```bash
-floom auth <your-api-key>
-# key at https://floom.dev/me/api-keys
+floom login
+# token page: https://floom.dev/home
+# non-interactive: floom auth login --token=floom_agent_...
 ```
 
 Or set `FLOOM_API_KEY` as an env var.
@@ -89,10 +90,23 @@ manifest_version: "2.0"
 2. `~/.floom/config.json` written by `floom auth`
 3. Legacy `~/.claude/floom-skill-config.json`
 
+## Account context and secrets
+
+```bash
+floom account context get
+floom account context set-user --json '{"name":"Federico"}'
+floom account context set-workspace --json '{"company":{"name":"Floom"}}'
+floom run <slug> '<inputs-json>' --use-context
+floom account secrets list
+floom account secrets set GEMINI_API_KEY --value "$GEMINI_API_KEY"
+```
+
+Never print secret values. `secrets list` returns metadata, not plaintext.
+
 ## Error codes
 
 | HTTP | Meaning | Action |
 |------|---------|--------|
-| 401 | bad key | `floom auth --clear` then `floom auth <key>` |
+| 401 | bad token | `floom auth logout` then `floom login` |
 | 409 | slug taken | pick a different slug, update floom.yaml |
 | 5xx | server error | retry once; check https://floom.dev/status |

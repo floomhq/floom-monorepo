@@ -58,8 +58,8 @@ function insertApp(slug) {
   const id = `app_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
   db.prepare(
     `INSERT INTO apps
-       (id, slug, name, description, manifest, status, code_path, workspace_id, author, app_type)
-     VALUES (?, ?, ?, ?, ?, 'active', 'proxied:test', 'ws-t', 'u-t', 'proxied')`,
+       (id, slug, name, description, manifest, status, code_path, workspace_id, author, app_type, visibility, publish_status)
+     VALUES (?, ?, ?, ?, ?, 'active', 'proxied:test', 'ws-t', 'u-t', 'proxied', 'public', 'published')`,
   ).run(id, slug, slug, 'test', makeManifest(slug));
   return id;
 }

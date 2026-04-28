@@ -86,9 +86,9 @@ if [[ -z "$API_KEY" ]]; then
   cat >&2 <<EOF
 floom: not authenticated.
 
-Create an API key at https://floom.dev/me/api-keys, then:
+Mint an Agent token at https://floom.dev/home, then:
 
-  floom auth <your-api-key>
+  floom auth login --token=floom_agent_...
 
 Or set the FLOOM_API_KEY env var directly.
 EOF

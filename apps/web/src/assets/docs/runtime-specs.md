@@ -158,12 +158,12 @@ Long-running work: use async jobs.
 
 ```bash
 # Enqueue
-curl -X POST https://api.floom.dev/api/openpaper/jobs \
-  -H "Authorization: Bearer $FLOOM_KEY" \
+curl -X POST https://floom.dev/api/openpaper/jobs \
+  -H "Authorization: Bearer floom_agent_..." \
   -d '{"action":"generate_paper","inputs":{...}}'
 
 # Poll
-curl https://api.floom.dev/api/openpaper/jobs/<job_id>
+curl https://floom.dev/api/openpaper/jobs/<job_id>
 ```
 
 Default async timeout: 30 minutes. Optional webhook delivery on completion.

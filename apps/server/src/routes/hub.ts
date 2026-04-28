@@ -412,6 +412,7 @@ hubRouter.post('/ingest', async (c) => {
         visibility: parsed.data.visibility,
         link_share_requires_auth: parsed.data.link_share_requires_auth,
         auth_required: parsed.data.auth_required,
+        allowPrivateNetwork: ctx.workspace_id === 'local' && ctx.user_id === 'local',
       });
     }
     // Perf fix (2026-04-20): bust the /api/hub 5s cache so the newly

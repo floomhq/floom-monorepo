@@ -1,30 +1,30 @@
 #!/usr/bin/env node
 // Live regression: X-Forwarded-For spoofing MUST NOT bypass the anon
-// rate limit (issue #142). Hits a public app 70 times from the same
-// TCP peer with a fresh fake XFF each call; asserts at least some
-// calls 429 once we exceed the anon cap.
+// rate limit (issue #142). Hits a public app more times than the current
+// anon cap from the same TCP peer with a changing fake XFF; asserts at
+// least some calls 429 once we exceed the anon cap.
 //
 // Run:  node test/stress/test-rate-limit-xff.mjs [url]
 //   default url: https://preview.floom.dev/api/uuid/run
 //
 // Why this test exists: PRR v2 confirmed 30/30 calls passed with
 // rotating XFF. The fix reads x-real-ip (nginx-set, non-spoofable)
-// first, then falls back to the LAST entry of XFF. After the fix,
-// ~60 should pass + ~10 should 429 against the 60/hr anon cap.
-
-import { randomBytes } from 'node:crypto';
+// first, then falls back to the LAST entry of XFF. The launch default is
+// 150/hr anon, so the default probe sends 170 requests and expects at least
+// one 429. nginx/CDN may emit its own HTML 429 first; that still proves the
+// abuse path is blocked, while JSON Floom responses carry X-RateLimit-*.
 
 const URL_ = process.argv[2] || 'https://preview.floom.dev/api/uuid/run';
-const N = 70;
+const N = Number(process.env.XFF_RATE_LIMIT_PROBE_N || 170);
 const BODY = JSON.stringify({ version: 'v4', count: 1 });
 
-function randomIp() {
-  const b = randomBytes(4);
-  return `${b[0]}.${b[1]}.${b[2]}.${b[3]}`;
+function spoofIp(i) {
+  const host = (i % 250) + 1;
+  return `203.0.113.${host}`;
 }
 
 async function hit(i) {
-  const xff = randomIp();
+  const xff = spoofIp(i);
   const res = await fetch(URL_, {
     method: 'POST',
     headers: {
@@ -33,9 +33,11 @@ async function hit(i) {
     },
     body: BODY,
   });
+  const body = await res.text();
   return {
     status: res.status,
     xff,
+    body,
     headers: {
       limit: res.headers.get('x-ratelimit-limit'),
       remaining: res.headers.get('x-ratelimit-remaining'),
@@ -63,16 +65,19 @@ for (const [k, v] of Object.entries(counts)) {
   console.log(`  ${k} × ${v}`);
 }
 
-// Headers audit: every response (pass or 429) should carry the
-// X-RateLimit-* set.
-const missingHeaders = results.filter(
+// Headers audit: every Floom JSON response should carry X-RateLimit-*.
+// Edge/nginx 429 HTML responses are accepted as an outer abuse gate.
+const floomResponses = results.filter((r) => r.body.trim().startsWith('{'));
+const missingHeaders = floomResponses.filter(
   (r) =>
     !r.headers.limit ||
     !r.headers.remaining ||
     !r.headers.reset ||
     !r.headers.scope,
 );
-console.log(`\nResponses missing X-RateLimit-* headers: ${missingHeaders.length} / ${N}`);
+console.log(
+  `\nFloom JSON responses missing X-RateLimit-* headers: ${missingHeaders.length} / ${floomResponses.length}`,
+);
 
 let failed = 0;
 const assert = (label, ok, detail) => {
@@ -86,17 +91,17 @@ const assert = (label, ok, detail) => {
 
 // Primary assertion: at least one 429. If zero 429s, the XFF spoof still
 // works and #142 is not fixed. We don't pin an exact count because the
-// anon cap (60/hr) bucket state depends on prior traffic — we just want
+// anon cap bucket state depends on prior traffic — we just want
 // to see the rate limiter engage.
 assert(
-  'at least one 429 in 70 XFF-spoofed requests',
+  `at least one 429 in ${N} XFF-spoofed requests`,
   (counts[429] || 0) >= 1,
   `got ${JSON.stringify(counts)}`,
 );
 
-// Secondary: every response has X-RateLimit-* headers.
+// Secondary: every Floom app response has X-RateLimit-* headers.
 assert(
-  'every response carries X-RateLimit-* headers',
+  'every Floom JSON response carries X-RateLimit-* headers',
   missingHeaders.length === 0,
   `missing on ${missingHeaders.length} responses`,
 );

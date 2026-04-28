@@ -22,10 +22,15 @@ Deploy AI apps to Floom from Cursor using the `floom` CLI.
 ## Auth
 
 ```bash
-floom auth <your-api-key>
+floom login
 ```
 
-Get your key at https://floom.dev/me/api-keys.
+Mint an Agent token at https://floom.dev/home, then run the command printed by
+`floom login`.
+
+```bash
+floom auth login --token=floom_agent_...
+```
 
 ## Usage
 

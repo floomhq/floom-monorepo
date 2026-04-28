@@ -1,6 +1,6 @@
 // v17 /install-in-claude — public landing with 4-tab install flow.
 // Tab order: Claude Desktop · Claude Code · Cursor · Other MCP client.
-// No slug: shows generic install snippets pointing at mcp.floom.dev/search.
+// No slug: shows generic install snippets pointing at floom.dev/mcp/search.
 // With slug (via InstallAppPage wrapper): pre-fills snippets for that app.
 //
 // Each tab renders 4 steps + a copy-to-clipboard code block + a
@@ -32,7 +32,7 @@ interface InstallInClaudePageProps {
 
 // ── Snippet builders ─────────────────────────────────────────────────────────
 
-const MCP_BASE = 'https://mcp.floom.dev';
+const MCP_BASE = 'https://floom.dev/mcp';
 
 // Launch MCP slugs (copy-paste audit): lead-scorer, competitor-analyzer,
 // resume-screener → `${MCP_BASE}/app/<slug>` in every tab snippet.
@@ -56,10 +56,9 @@ function desktopSnippet(slug: string | null): string {
 function claudeCodeSnippet(slug: string | null): string {
   const serverName = slug ?? 'floom';
   const url = slug ? `${MCP_BASE}/app/${slug}` : `${MCP_BASE}/search`;
-  // `claude mcp add <name> --transport http <url>` — the <name> positional
-  // is required; without it Claude Code fails with "missing required
-  // argument 'commandOrUrl'".
-  return `claude mcp add ${serverName} --transport http ${url}`;
+  // Claude Code expects flags before the positional name/url pair:
+  // `claude mcp add --transport http <name> <url>`.
+  return `claude mcp add --transport http ${serverName} ${url}`;
 }
 
 function cursorSnippet(slug: string | null): string {
@@ -745,13 +744,13 @@ const TABS: Array<{ id: ClientTab; label: string; sub: string; icon: React.React
 
 export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
   const [activeTab, setActiveTab] = useState<ClientTab>('desktop');
-  // Waitlist mode (floom.dev): /me/apps is WaitlistGuard'd and redirects
+  // Waitlist mode (floom.dev): /studio is gated and redirects
   // to /waitlist, which would loop users back from this finish CTA. In
   // that mode, send them to /apps (public, always accessible) instead.
   const deployEnabled = useDeployEnabled();
-  const finishHref = deployEnabled === false ? '/apps' : '/me/apps';
+  const finishHref = deployEnabled === false ? '/apps' : '/studio';
   const finishLabel =
-    deployEnabled === false ? 'Browse all apps →' : 'Done, open My apps →';
+    deployEnabled === false ? 'Browse all apps →' : 'Done, open Studio →';
   // Simulated connection detection. Each tab tracks its own state so
   // switching tabs doesn't incorrectly claim a different client is
   // connected. Real MCP probes land once each client exposes a

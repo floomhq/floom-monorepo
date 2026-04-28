@@ -1,106 +1,123 @@
 # Floom CLI
 
-The Floom CLI scaffolds, validates, and deploys apps from the terminal.
-
-- Install script: [`cli/floom/install.sh`](https://github.com/floomhq/floom/blob/main/cli/floom/install.sh)
-- Source: [`cli/floom/`](https://github.com/floomhq/floom/tree/main/cli/floom)
+The Floom CLI scaffolds, validates, publishes, runs, and manages apps from the terminal.
 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/floomhq/floom/main/cli/floom/install.sh | bash
-```
-
-The script installs the `floom` binary to `~/.local/bin/floom`. Add that to your `$PATH` if it isn't already.
-
-Verify:
-
-```bash
+curl -fsSL https://floom.dev/install.sh | bash
 floom --version
 ```
 
-## `floom init`
-
-Scaffold a new hosted app in the current directory.
+Manual install:
 
 ```bash
-floom init my-app
-cd my-app
-ls
-# floom.yaml  main.py  requirements.txt  README.md
+git clone https://github.com/floomhq/floom.git ~/.floom/repo
+export PATH="$HOME/.floom/repo/cli/floom/bin:$PATH"
+floom --help
 ```
 
-The generated `floom.yaml` has a single `run` action with a text input and a text output. Edit it before your first deploy.
-
-## `floom deploy`
-
-Deploy the current directory's app to Floom Cloud, or to a self-hosted instance.
+## Auth
 
 ```bash
-# Deploy to Floom Cloud (default)
+floom login
+```
+
+Mint an Agent token at `https://floom.dev/home`, then run the command printed by the CLI:
+
+```bash
+floom auth login --token=floom_agent_...
+floom auth whoami
+```
+
+Self-host:
+
+```bash
+floom auth login --token=floom_agent_... --api-url=http://localhost:3051
+```
+
+The CLI stores config at `~/.floom/config.json` with mode `0600`.
+
+## Core commands
+
+```bash
+floom init
+floom deploy --dry-run
 floom deploy
-
-# Deploy to a self-hosted instance
-floom deploy --endpoint https://floom.mycompany.com
-```
-
-The CLI:
-
-1. Validates `floom.yaml` against the manifest schema.
-2. Builds a tarball of the working directory.
-3. Uploads via `POST /api/hub/ingest`.
-4. Prints the live app URL: `https://floom.dev/p/<slug>`.
-
-First deploy can take up to 10 minutes (container image build). Subsequent deploys reuse cached layers.
-
-## `floom status`
-
-Check the status of the current app or a specific slug.
-
-```bash
-# Status of the app in the current directory
 floom status
-
-# Status of any app by slug
-floom status --slug lead-scorer
+floom run <slug> '{"input":"hello"}'
+floom run <slug> '{"invoice_id":"INV-1"}' --use-context
 ```
 
-Prints: last deploy time, run count (last 24h), last run status, error rate.
+`floom deploy` publishes one of these manifest sources:
 
-## `floom auth`
+- `openapi_spec_url` or `openapi_url`
+- inline/file-backed `openapi_spec`
+- gated `docker_image_ref` when the target instance enables Docker publish
 
-Sign in to the CLI. Opens a browser to `floom.dev/me/settings` and pastes back the API key you create there.
+Successful deploy output includes the app page, MCP URL, Studio owner URL, and Claude Desktop MCP JSON.
+
+## Account context
 
 ```bash
-floom auth login
-floom auth status
-floom auth logout
+floom account context get
+floom account context set-user --json '{"name":"Federico"}'
+floom account context set-workspace --json '{"company":{"name":"Floom"}}'
 ```
 
-The API key lives in `~/.config/floom/credentials`. Don't commit it.
+Apps can mark inputs with profile context paths. `floom run --use-context` fills missing inputs from the user/workspace JSON profile and still lets explicit CLI inputs win.
 
-## Use with CI/CD
+## Secrets and tokens
 
-For GitHub Actions or any CI runner:
+```bash
+floom account secrets list
+floom account secrets set GEMINI_API_KEY --value "$GEMINI_API_KEY"
+floom account secrets delete GEMINI_API_KEY
 
-```yaml
-# .github/workflows/deploy.yml
-- name: Deploy to Floom
-  env:
-    FLOOM_API_KEY: ${{ secrets.FLOOM_API_KEY }}
-  run: |
-    curl -fsSL https://raw.githubusercontent.com/floomhq/floom/main/cli/floom/install.sh | bash
-    ~/.local/bin/floom deploy
+floom account agent-tokens list
+floom account agent-tokens create --label "CI" --scope read-write
+floom account agent-tokens revoke <token-id>
 ```
 
-`FLOOM_API_KEY` takes precedence over `~/.config/floom/credentials` when both are present.
+Secret values are write-only. List commands return metadata, not plaintext.
 
-## Claude Code skill
+## Apps, runs, jobs
 
-There's also a Claude Code skill that wraps the CLI and adds a narrative wrapper: see [`skills/claude-code/`](https://github.com/floomhq/floom/tree/main/skills/claude-code) in the repo. Point Claude Code at a directory and it will scaffold, deploy, and iterate on an app conversationally.
+```bash
+floom apps list
+floom apps get <slug>
+floom apps update <slug> --visibility private
+floom apps update <slug> --primary-action run
+floom apps update <slug> --run-rate-limit-per-hour 120
+floom apps sharing get <slug>
+floom apps rate-limit set <slug> --per-hour 120
+
+floom runs list
+floom runs get <run-id>
+floom runs share <run-id>
+floom runs delete <run-id>
+
+floom jobs create <slug> '{"input":"hello"}'
+floom jobs get <slug> <job-id>
+floom jobs cancel <slug> <job-id>
+```
+
+## CI
+
+```bash
+export FLOOM_API_KEY=floom_agent_...
+export FLOOM_API_URL=https://floom.dev
+floom deploy
+```
+
+## Agent packages
+
+- Claude Code: `skills/claude-code/`
+- Cursor: `skills/cursor/`
+- Codex, Aider, Continue, and other terminal agents can shell out to `floom`.
 
 ## Related pages
 
-- [/docs/runtime-specs](/docs/runtime-specs) — `floom.yaml` reference
-- [/docs/self-host](/docs/self-host) — where `--endpoint` points
-- [/docs/api-reference](/docs/api-reference) — the HTTP surface the CLI uses
+- [/docs/mcp-install](/docs/mcp-install)
+- [/docs/api-reference](/docs/api-reference)
+- [/docs/runtime-specs](/docs/runtime-specs)
