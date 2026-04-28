@@ -13,7 +13,7 @@ interface Props {
   title?: string;
   allowSignedOutShell?: boolean;
   contentStyle?: CSSProperties;
-  mainMaxWidth?: number;
+  mainMaxWidth?: number | string;
 }
 
 export function WorkspacePageShell({
@@ -22,7 +22,9 @@ export function WorkspacePageShell({
   title,
   allowSignedOutShell = false,
   contentStyle,
-  mainMaxWidth = 1040,
+  // No max-width cap: content fills the available space next to the rail.
+  // Callers that need a narrower layout can pass mainMaxWidth explicitly.
+  mainMaxWidth = 'none',
 }: Props) {
   const rail = mode === 'studio' ? <StudioRail /> : mode === 'settings' ? <SettingsRail /> : <RunRail />;
   // v26: settings pages render a tab bar at top of main area (V26-IA-SPEC §/settings)
