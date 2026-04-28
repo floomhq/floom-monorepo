@@ -83,8 +83,12 @@ test('rows_field hint prefers that table when multiple json/table outputs exist'
   };
   const result = pickRenderer({ app, action: 'go', runOutput: out });
   assert.equal(result.kind, 'auto');
-  const children = result.element?.props?.children;
-  const rowTable = Array.isArray(children) ? children[0] : null;
+  // R7.7 (2026-04-28): multi-section composite is now wrapped in a
+  // <CompositeOutputCard/> component that handles the master sticky
+  // toolbar (Done badge + Copy/Download/Expand). Sections are passed
+  // through the `children` prop directly.
+  const sections = result.element?.props?.children;
+  const rowTable = Array.isArray(sections) ? sections[0] : null;
   assert.equal(rowTable?.type, OUTPUT_LIBRARY.RowTable);
   assert.equal(rowTable?.props?.rows.length, 1);
   assert.equal(rowTable?.props?.rows[0].a, 'one');
