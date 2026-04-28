@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { readDeployEnabled } from '../../lib/flags';
 import { waitlistHref } from '../../lib/waitlistCta';
+import { Logo } from '../Logo';
 
 function IconDiscordFooter() {
   return (
@@ -156,23 +157,7 @@ export function PublicFooter() {
               gap: 8,
             }}
           >
-            <span
-              aria-hidden="true"
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 6,
-                background: 'var(--accent)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 800,
-              }}
-            >
-              F
-            </span>
+            <Logo size={22} withWordmark={false} variant="plain" />
             Floom
           </Link>
           <p
