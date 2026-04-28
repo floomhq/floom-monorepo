@@ -11,6 +11,8 @@ import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession, clearSession } from '../hooks/useSession';
 import { Logo } from '../components/Logo';
+import { TopBar } from '../components/TopBar';
+import { PublicFooter } from '../components/public/PublicFooter';
 import * as api from '../api/client';
 import type { CreatedAgentToken } from '../api/client';
 
@@ -714,7 +716,9 @@ export function MvpHomePage() {
   const greetingName = (user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'builder');
 
   return (
-    <MvpAuthShell>
+    <div style={{ minHeight: '100vh', background: BG, display: 'flex', flexDirection: 'column', fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <TopBar />
+      <main style={{ flex: 1 }}>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '48px 24px 64px' }}>
         <HomeHero name={greetingName} hasToken={hasToken || liveRawToken !== null} />
         <AmbientStatus
@@ -769,6 +773,8 @@ export function MvpHomePage() {
           <TestItSection />
         </div>
       </div>
-    </MvpAuthShell>
+      </main>
+      <PublicFooter />
+    </div>
   );
 }
