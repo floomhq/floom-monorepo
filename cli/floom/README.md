@@ -35,6 +35,8 @@ floom --help
 
 ```text
 floom auth <agent-token> [url]       save an Agent token to ~/.floom/config.json
+floom login                          open the token page + print login command
+floom auth login                     open the token page + print login command
 floom auth login --token=<token>     save an Agent token with explicit flags
 floom auth whoami                    print identity for the current token
 floom auth logout                    clear saved auth

@@ -830,6 +830,38 @@ try {
   const rotatedSharingPayload = parseToolText(rotatedSharing);
   log('studio_set_app_sharing rotates link token', rotatedSharingPayload?.visibility === 'link' && rotatedSharingPayload?.link_share_token !== linkSharingPayload?.link_share_token, rotatedSharing.text);
 
+  const invalidInvitedSharing = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 310,
+    method: 'tools/call',
+    params: { name: 'studio_set_app_sharing', arguments: { slug: 'agent-studio-publish', state: 'invited' } },
+  });
+  const invalidInvitedSharingPayload = parseToolText(invalidInvitedSharing);
+  log(
+    'studio_set_app_sharing invalid invited transition returns 409 not runtime_error',
+    invalidInvitedSharing.json?.result?.isError === true &&
+      invalidInvitedSharingPayload?.status === 409 &&
+      invalidInvitedSharingPayload?.code === 'illegal_transition' &&
+      invalidInvitedSharingPayload?.error === 'invalid_input',
+    invalidInvitedSharing.text,
+  );
+
+  const invalidSubmitReview = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 311,
+    method: 'tools/call',
+    params: { name: 'studio_submit_app_review', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const invalidSubmitReviewPayload = parseToolText(invalidSubmitReview);
+  log(
+    'studio_submit_app_review invalid transition returns 409 not runtime_error',
+    invalidSubmitReview.json?.result?.isError === true &&
+      invalidSubmitReviewPayload?.status === 409 &&
+      invalidSubmitReviewPayload?.code === 'illegal_transition' &&
+      invalidSubmitReviewPayload?.error === 'invalid_input',
+    invalidSubmitReview.text,
+  );
+
   const privateSharing = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',
     id: 32,
@@ -907,6 +939,22 @@ try {
   });
   const withdrawReviewPayload = parseToolText(withdrawReview);
   log('studio_withdraw_app_review returns pending app to private', withdrawReviewPayload?.ok === true && withdrawReviewPayload?.visibility === 'private', withdrawReview.text);
+
+  const invalidWithdrawReview = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 312,
+    method: 'tools/call',
+    params: { name: 'studio_withdraw_app_review', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const invalidWithdrawReviewPayload = parseToolText(invalidWithdrawReview);
+  log(
+    'studio_withdraw_app_review invalid transition returns 409 not runtime_error',
+    invalidWithdrawReview.json?.result?.isError === true &&
+      invalidWithdrawReviewPayload?.status === 409 &&
+      invalidWithdrawReviewPayload?.code === 'illegal_transition' &&
+      invalidWithdrawReviewPayload?.error === 'invalid_input',
+    invalidWithdrawReview.text,
+  );
 
   const secretPolicies = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',

@@ -13,6 +13,7 @@
 #   workspaces manage workspace tenancy and members
 #   feedback  submit product feedback
 #   status    list your apps and recent runs
+#   login     open the token page and print login instructions
 #   auth      save an Agent token to ~/.floom/config.json
 #   --help    show this help
 #   --version print version
@@ -33,6 +34,7 @@ usage:
   floom <command> [options]
 
 commands:
+  login               open the token page and print login instructions
   auth <agent-token>  save an Agent token to ~/.floom/config.json
   account             manage workspace secrets and agent tokens
   apps list           list your workspace apps
@@ -84,6 +86,8 @@ case "$CMD" in
     exec bash "$LIB_DIR/floom-deploy.sh" "$@" ;;
   status)
     exec bash "$LIB_DIR/floom-status.sh" "$@" ;;
+  login|setup)
+    exec bash "$LIB_DIR/floom-auth.sh" login "$@" ;;
   auth)
     exec bash "$LIB_DIR/floom-auth.sh" "$@" ;;
   account)

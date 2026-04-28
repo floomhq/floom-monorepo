@@ -320,6 +320,17 @@ async function testFloomCliDefaultHost(baseUrl, token) {
     `${localDryRun.stdout}\n${localDryRun.stderr}`,
   );
 
+  const loginUx = await runCmd('bash', [floom, 'login', `--api-url=${baseUrl}`], {
+    env: { ...env, FLOOM_CLI_NO_BROWSER: '1' },
+  });
+  log(
+    'Floom CLI login opens token flow without requiring token inline',
+    loginUx.code === 0 &&
+      loginUx.stdout.includes(`${baseUrl}/home`) &&
+      loginUx.stdout.includes(`floom auth login --token=<agent_token> --api-url=${baseUrl}`),
+    `${loginUx.stdout}\n${loginUx.stderr}`,
+  );
+
   const auth = await runCmd('bash', [floom, 'auth', 'login', `--token=${token}`], { env });
   const configPath = join(home, '.floom', 'config.json');
   const cfg = existsSync(configPath) ? parseJson(readFileSync(configPath, 'utf8')) : null;

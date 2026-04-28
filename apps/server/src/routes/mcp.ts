@@ -1293,6 +1293,16 @@ function mcpJson(payload: unknown) {
 }
 
 function mcpError(err: unknown) {
+  if (err instanceof Error && err.message === 'illegal_transition') {
+    return mcpError(
+      new AgentToolError(
+        'invalid_input',
+        'Illegal visibility transition.',
+        409,
+        { code: 'illegal_transition' },
+      ),
+    );
+  }
   if (err instanceof AppLibraryError) {
     const code =
       err.status === 404
