@@ -1,11 +1,14 @@
 // /studio/:slug/renderer — custom renderer upload/management. Reuses
 // the existing CustomRendererPanel (see components/CustomRendererPanel.tsx)
 // which handles upload, test-render, and delete.
+//
+// Wave-3b: migrated from StudioLayout to WorkspacePageShell mode="studio"
+// + StudioAppTabs activeTab="source" to match the v26 shell.
 
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { StudioLayout } from '../components/studio/StudioLayout';
-import { AppHeader } from './MeAppPage';
+import { WorkspacePageShell } from '../components/WorkspacePageShell';
+import { StudioAppTabs } from '../components/StudioAppTabs';
 import { CustomRendererPanel } from '../components/CustomRendererPanel';
 import * as api from '../api/client';
 import type { AppDetail, CreatorRun, RendererMeta } from '../lib/types';
@@ -48,11 +51,11 @@ export function StudioAppRendererPage() {
   }, [slug, nav]);
 
   return (
-    <StudioLayout
-      title={app ? `${app.name} · Renderer · Studio` : 'Renderer · Studio'}
-      activeAppSlug={slug}
-      activeSubsection="renderer"
+    <WorkspacePageShell
+      mode="studio"
+      title={app ? `${app.name} · Source · Studio` : 'Source · Studio'}
     >
+      <StudioAppTabs slug={slug ?? ''} activeTab="source" />
       {error && (
         <div
           style={{
@@ -70,13 +73,12 @@ export function StudioAppRendererPage() {
       )}
       {app && (
         <>
-          <AppHeader app={app} />
           <h2
             style={{
               fontSize: 14,
               fontWeight: 700,
               color: 'var(--ink)',
-              margin: '20px 0 6px',
+              margin: '0 0 6px',
             }}
           >
             Custom renderer
@@ -116,6 +118,6 @@ export function StudioAppRendererPage() {
           </div>
         </>
       )}
-    </StudioLayout>
+    </WorkspacePageShell>
   );
 }
