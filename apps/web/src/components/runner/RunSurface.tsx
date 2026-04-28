@@ -813,6 +813,19 @@ export function RunSurface({
     submittedPayloadRef.current = { inputs, spec: actionSpec };
 
     if (app.is_async) {
+      // R11 (2026-04-28): Gemini audit — output panel stayed on
+      // "Positioning will appear here" for the duration of the network
+      // round-trip to startJob (could be 200-800ms). Flip the phase to
+      // 'job' synchronously so JobProgress with a "Connecting..."
+      // placeholder paints within the first frame. We patch in the
+      // real job_id below once startJob resolves.
+      setState((s) => ({
+        ...s,
+        phase: 'job',
+        jobId: undefined,
+        job: null,
+        errorMessage: undefined,
+      }));
       try {
         const { job_id } = await api.startJob(app.slug, inputs, action);
         let stopPoll: (() => void) | null = null;
@@ -893,9 +906,23 @@ export function RunSurface({
       return;
     }
 
+    // R11 (2026-04-28): Gemini audit — output panel stayed on the
+    // "Positioning will appear here" placeholder during the network
+    // round-trip to startRun (could be 200-800ms on cold start), making
+    // the click feel unresponsive. Flip phase to 'streaming' with an
+    // empty log buffer SYNCHRONOUSLY so StreamingTerminal's "Running..."
+    // state paints within the first frame. We patch in the real
+    // run_id once startRun resolves.
+    setState((s) => ({
+      ...s,
+      phase: 'streaming',
+      runId: undefined,
+      logs: [],
+      errorMessage: undefined,
+    }));
     try {
       const { run_id } = await api.startRun(app.slug, inputs, undefined, action);
-      setState((s) => ({ ...s, phase: 'streaming', runId: run_id, logs: [] }));
+      setState((s) => ({ ...s, phase: 'streaming', runId: run_id, logs: s.logs ?? [] }));
 
       const close = api.streamRun(run_id, {
         onLog: (line) => {
@@ -1671,61 +1698,6 @@ interface InputCardProps {
   onEditRerun: () => void;
 }
 
-function InputOutputGuide({ actionSpec }: { actionSpec: ActionSpec }) {
-  return (
-    <details
-      data-testid="run-surface-io-guide"
-      style={{
-        marginBottom: 12,
-        border: '1px solid var(--line)',
-        borderRadius: 10,
-        background: 'var(--bg)',
-      }}
-    >
-      <summary
-        style={{
-          cursor: 'pointer',
-          padding: '10px 12px',
-          fontSize: 12.5,
-          fontWeight: 600,
-          color: 'var(--ink)',
-          listStyle: 'none',
-        }}
-      >
-        Input & output
-      </summary>
-      <div style={{ padding: '0 12px 12px' }}>
-        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Input
-        </div>
-        <ul style={{ margin: '6px 0 10px', paddingLeft: 16 }}>
-          {actionSpec.inputs.map((inp) => (
-            <li key={inp.name} style={{ fontSize: 12.5, color: 'var(--ink)', marginBottom: 4 }}>
-              {(inp.label || inp.name) + (inp.required ? '' : ' (optional)')}
-              {inp.description ? (
-                <span style={{ color: 'var(--muted)' }}> — {inp.description}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Output
-        </div>
-        <ul style={{ margin: '6px 0 0', paddingLeft: 16 }}>
-          {actionSpec.outputs.map((out) => (
-            <li key={out.name} style={{ fontSize: 12.5, color: 'var(--ink)', marginBottom: 4 }}>
-              {out.label || out.name}
-              {out.description ? (
-                <span style={{ color: 'var(--muted)' }}> — {out.description}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </details>
-  );
-}
-
 function InputCard({
   app,
   actionSpec,
@@ -1908,7 +1880,6 @@ function InputCard({
           <RunningEyebrowTimer startedAt={runStartedAt} />
         )}
       </div>
-      <InputOutputGuide actionSpec={actionSpec} />
       {hasInputs ? (
         <form
           style={dimWrapStyle}

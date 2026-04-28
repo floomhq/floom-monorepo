@@ -409,23 +409,28 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               Ship AI apps <span style={{ color: 'var(--accent)' }}>fast</span>.
             </h1>
 
-            {/* Sub-positioning — locked copy. NO KICKER (dropped 2026-04-22). */}
-            <p
-              className="hero-sub"
-              data-testid="hero-sub-positioning"
-              style={{
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 19,
-                // R7 U3: tightened from 1.5 to 1.45 — sub was reading airy.
-                lineHeight: 1.45,
-                fontWeight: 400,
-                color: 'var(--muted)',
-                maxWidth: 640,
-                margin: isMvp ? '0 auto 36px' : '0 auto 28px',
-              }}
-            >
-              The protocol + runtime for agentic work.
-            </p>
+            {/* Sub-positioning — full variant only. R7.6 followup
+                (2026-04-28): MVP variant drops the sub for now; H1 +
+                npx command stand alone. Federico: "The protocol +
+                runtime for agentic work. can be removed from hero
+                for now". */}
+            {!isMvp && (
+              <p
+                className="hero-sub"
+                data-testid="hero-sub-positioning"
+                style={{
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  fontSize: 19,
+                  lineHeight: 1.45,
+                  fontWeight: 400,
+                  color: 'var(--muted)',
+                  maxWidth: 640,
+                  margin: '0 auto 28px',
+                }}
+              >
+                The protocol + runtime for agentic work.
+              </p>
+            )}
             {!isMvp && (
               <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)', margin: '-14px 0 28px' }}>
                 Vibe-coding speed. Production-grade safety.
@@ -579,13 +584,32 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 key={s.num}
                 className="step"
                 style={{
-                  background: 'var(--card)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 12,
-                  padding: '24px 22px',
+                  // R11 (2026-04-28): Gemini audit — the card-shaped
+                  // border + bg made these read as text inputs. Drop the
+                  // card chrome and lean on the explicit "STEP 0X" label
+                  // and accent number to make narrative obvious.
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 0,
+                  padding: '6px 4px 0',
                   position: 'relative',
                 }}
               >
+                {/* R11: explicit "STEP 0X" eyebrow tells the visitor this
+                    is a narrative step, not an input field. */}
+                <div
+                  style={{
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: 'var(--accent, #047857)',
+                    marginBottom: 10,
+                  }}
+                >
+                  Step {s.num}
+                </div>
                 <div
                   style={{
                     width: 44,
@@ -612,12 +636,12 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                     marginBottom: 12,
                   }}
                 >
-                  {s.num} &middot; {s.kicker}
+                  {s.kicker}
                 </div>
                 <h3
                   style={{
-                    fontSize: 16,
-                    fontWeight: 600,
+                    fontSize: 17,
+                    fontWeight: 700,
                     margin: '0 0 8px',
                     lineHeight: 1.3,
                   }}
@@ -630,8 +654,6 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 <div
                   style={{
                     marginTop: 14,
-                    paddingTop: 14,
-                    borderTop: '1px solid var(--line)',
                     fontFamily: "'JetBrains Mono', ui-monospace, monospace",
                     fontSize: 11.5,
                     color: 'var(--muted)',

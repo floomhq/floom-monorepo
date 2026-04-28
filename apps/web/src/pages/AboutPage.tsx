@@ -30,8 +30,14 @@ import { waitlistHref } from '../lib/waitlistCta';
 
 // ── Shared styles ─────────────────────────────────────────────────────────
 
+// R11 (2026-04-28): Gemini audit — at 1440px the 820px column read as
+// a narrow letter-format page floating in the centre. Widened to 1080
+// to match the /apps directory's main container (1180 minus padding)
+// so the page feels purposeful at full desktop width. Body copy still
+// caps at ~720px via the BODY_STYLE max-width chain so reading line
+// length stays comfortable; only structural spacing widens.
 const SECTION_STYLE: React.CSSProperties = {
-  maxWidth: 820,
+  maxWidth: 1080,
   margin: '0 auto',
   padding: '56px 0',
 };
@@ -83,12 +89,18 @@ export function AboutPage() {
     <PageShell
       title="About · Floom"
       description="Floom is the protocol and runtime for agentic work — built so vibecoders and business users can ship AI apps without wiring auth, rate limits, sandboxing, or MCP tooling themselves."
-      contentStyle={{ padding: '24px 24px 80px', maxWidth: 960 }}
+      contentStyle={{ padding: '24px 24px 80px', maxWidth: 1180 }}
     >
-      {/* 1. Hero */}
+      {/* 1. Hero
+          R11b (2026-04-28): Gemini scored hero at 4/10 ("extremely sparse,
+          unfinished on a wider screen, no CTA"). Added a primary CTA row
+          + a 3-fact strip directly under the sub so the hero earns its
+          screen real estate at 1440px. The CTA matches the footer band
+          (deploy mode vs waitlist mode) so visitors get one consistent
+          path. */}
       <section
         data-testid="about-hero"
-        style={{ ...SECTION_STYLE, padding: '72px 0 56px', textAlign: 'center' }}
+        style={{ ...SECTION_STYLE, padding: '72px 0 48px', textAlign: 'center' }}
       >
         <p style={{ ...EYEBROW_STYLE, textAlign: 'center' }}>About Floom</p>
         <h1
@@ -110,7 +122,7 @@ export function AboutPage() {
             fontSize: 19,
             lineHeight: 1.55,
             color: 'var(--muted)',
-            margin: '0 auto',
+            margin: '0 auto 28px',
             maxWidth: 640,
             textWrap: 'balance' as unknown as 'balance',
           }}
@@ -118,6 +130,82 @@ export function AboutPage() {
           Floom exists for one reason: to turn your code into a real app
           with a real URL so other people can actually use it.
         </p>
+
+        {/* R11b: explicit primary CTA in the hero so the page tells you
+            what to do next without scrolling. */}
+        <div
+          style={{
+            display: 'inline-flex',
+            gap: 10,
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            margin: '0 auto 36px',
+          }}
+        >
+          <Link
+            to="/apps"
+            data-testid="about-hero-cta-primary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '12px 22px',
+              background: 'var(--accent)',
+              color: '#fff',
+              borderRadius: 9,
+              fontSize: 14.5,
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            Browse the apps
+            <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M5 3l6 5-6 5V3z" fill="currentColor" />
+            </svg>
+          </Link>
+          <a
+            href="https://github.com/floomhq/floom"
+            target="_blank"
+            rel="noreferrer"
+            data-testid="about-hero-cta-github"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '12px 22px',
+              background: 'var(--card)',
+              color: 'var(--ink)',
+              border: '1px solid var(--line)',
+              borderRadius: 9,
+              fontSize: 14.5,
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            See it on GitHub
+          </a>
+        </div>
+
+        {/* R11b: 3-fact strip — concrete, scannable proof points so the
+            hero isn't just two paragraphs of copy floating in space. */}
+        <div
+          data-testid="about-hero-stats"
+          style={{
+            display: 'inline-flex',
+            gap: 28,
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            padding: '20px 28px',
+            background: 'var(--card)',
+            border: '1px solid var(--line)',
+            borderRadius: 14,
+            margin: '0 auto',
+          }}
+        >
+          <HeroStat number="10" label="apps live today" />
+          <HeroStat number="1" label="protocol, not bespoke" />
+          <HeroStat number="0" label="vendor lock-in" />
+        </div>
       </section>
 
       {/* 2. Who Floom is for */}
@@ -237,7 +325,12 @@ export function AboutPage() {
         </div>
       </section>
 
-      {/* 5. Who's behind it */}
+      {/* 5. Who's behind it
+          R11 (2026-04-28): Gemini audit — dense prose paragraphs lost
+          the key facts. Switched to a fact-callout grid (5 scannable
+          items) above a one-line lead so visitors can grok founder +
+          status + stack at a glance, then dive into prose if they
+          want. */}
       <section data-testid="about-who-behind" style={SECTION_BORDERED}>
         <p style={EYEBROW_STYLE}>Who's behind it</p>
         <h2 style={H2_STYLE}>One founder, open source by default.</h2>
@@ -251,21 +344,50 @@ export function AboutPage() {
           >
             Federico De Ponte
           </a>
-          . Before Floom, he ran SCAILE for three years. He's building
-          this one solo, moving to San Francisco, and shipping in public.
-        </p>
-        <p style={BODY_STYLE}>
-          Floom, Inc. is a Delaware C-Corp. The runtime and the protocol
-          spec are open source and self-hostable. No VC funding yet. If
-          you want the hosted version, it's{' '}
-          <Link to="/" style={{ color: 'var(--accent)' }}>floom.dev</Link>.
-          If you want to run it on your own box, clone the repo.
+          . Solo. From San Francisco. In public.
         </p>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, margin: '20px 0 0' }}>
+        <div
+          data-testid="about-facts-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 12,
+            margin: '24px 0 0',
+          }}
+        >
+          <FactCallout
+            label="Founder"
+            value="Federico De Ponte"
+            note="ex-SCAILE, $600K ARR, team of 10"
+          />
+          <FactCallout
+            label="Company"
+            value="Floom, Inc."
+            note="Delaware C-Corp"
+          />
+          <FactCallout
+            label="License"
+            value="Open core"
+            note="Runtime + protocol spec are self-hostable"
+          />
+          <FactCallout
+            label="Cohort"
+            value="Founders Inc"
+            note="2026 (San Francisco)"
+          />
+          <FactCallout
+            label="Funding"
+            value="None yet"
+            note="Hosted version is at floom.dev"
+          />
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, margin: '24px 0 0' }}>
           <PillLink href="https://github.com/floomhq/floom">GitHub repo</PillLink>
           <PillLink href="https://discord.gg/8fXGXjxcRz">Discord community</PillLink>
           <PillLink to="/protocol">The Floom protocol</PillLink>
+          <PillLink to="/">floom.dev (hosted)</PillLink>
         </div>
       </section>
 
@@ -311,7 +433,7 @@ export function AboutPage() {
           ) : (
             <>
               Point Floom at an OpenAPI spec or a GitHub repo to publish when
-              your account has access on floom.dev, or run without limits on
+              the workspace has access on floom.dev, or run without limits on
               your own hardware. Until publish opens for you here, run catalog
               apps, use MCP, and self-host your own.
             </>
@@ -483,6 +605,91 @@ function NotRow({ lead, body }: { lead: string; body: string }) {
       <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--muted)', margin: 0 }}>
         {body}
       </p>
+    </div>
+  );
+}
+
+function HeroStat({ number, label }: { number: string; label: string }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 4,
+        textAlign: 'left',
+      }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 28,
+          fontWeight: 800,
+          letterSpacing: '-0.02em',
+          color: 'var(--accent)',
+          lineHeight: 1,
+        }}
+      >
+        {number}
+      </span>
+      <span
+        style={{
+          fontSize: 12.5,
+          color: 'var(--muted)',
+          lineHeight: 1.3,
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function FactCallout({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div
+      style={{
+        padding: '14px 16px',
+        background: 'var(--card)',
+        border: '1px solid var(--line)',
+        borderRadius: 12,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontSize: 10.5,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          color: 'var(--accent)',
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 15,
+          fontWeight: 600,
+          color: 'var(--ink)',
+          lineHeight: 1.3,
+          marginBottom: 4,
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.45 }}>
+        {note}
+      </div>
     </div>
   );
 }

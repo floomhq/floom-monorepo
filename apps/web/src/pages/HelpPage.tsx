@@ -15,7 +15,7 @@ import { PageShell } from '../components/PageShell';
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'How do I get a Floom agent token?',
-    a: 'Sign up at floom.dev/signup, then go to your dashboard (/home). Click "Mint your token" to create one. Copy it once — it won\'t be shown again.',
+    a: 'Sign up at floom.dev/signup, then go to your dashboard (/home). Click "Mint your token" to create one. Copy it once. It won\'t be shown again.',
   },
   {
     q: 'Which AI tools does Floom work with?',
@@ -27,7 +27,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'I minted a token but lost it. What do I do?',
-    a: 'Go to /home and click "Rotate" to revoke the old token and mint a fresh one. Copy the new token immediately — it\'s only shown once.',
+    a: 'Go to /home and click "Rotate" to revoke the old token and mint a fresh one. Copy the new token immediately. It is only shown once.',
   },
   {
     q: 'How do I publish my own app to Floom?',
@@ -94,6 +94,7 @@ function SupportCard({
   title,
   body,
   badge,
+  cta,
 }: {
   href?: string;
   to?: string;
@@ -101,6 +102,9 @@ function SupportCard({
   title: string;
   body: string;
   badge?: string;
+  /** R11 (2026-04-28): explicit CTA at the bottom of each card so the
+      visitor knows the action. Gemini audit flagged unstated affordance. */
+  cta: string;
 }) {
   const shared: React.CSSProperties = {
     display: 'flex',
@@ -134,7 +138,31 @@ function SupportCard({
           </span>
         )}
       </div>
-      <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>{body}</p>
+      <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 18px', flex: 1 }}>{body}</p>
+      {/* R11 (2026-04-28): explicit CTA — button-styled accent pill so
+          the action is unambiguous. Card itself is the click target;
+          this is purely a visible affordance. */}
+      <span
+        aria-hidden="true"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 'auto',
+          alignSelf: 'flex-start',
+          padding: '8px 14px',
+          background: 'var(--accent)',
+          color: '#fff',
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 600,
+        }}
+      >
+        {cta}
+        <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M5 3l6 5-6 5V3z" fill="currentColor" />
+        </svg>
+      </span>
     </>
   );
 
@@ -191,6 +219,14 @@ function IconMail() {
   );
 }
 
+function IconLinkedIn() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--accent)" aria-hidden="true">
+      <path d="M20.452 20.452h-3.555v-5.569c0-1.328-.026-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.353V9h3.414v1.561h.048c.476-.9 1.637-1.852 3.37-1.852 3.602 0 4.268 2.37 4.268 5.455v6.288zM5.337 7.433a2.062 2.062 0 01-2.062-2.063 2.062 2.062 0 114.125 0c0 1.139-.924 2.063-2.063 2.063zM7.114 20.452H3.558V9h3.556v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+    </svg>
+  );
+}
+
 export function HelpPage() {
   return (
     <PageShell title="Help & Support · Floom">
@@ -225,12 +261,19 @@ export function HelpPage() {
           </p>
         </div>
 
-        {/* 3-column card grid */}
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: '56px 24px 0' }}>
+        {/* 4-column card grid (R11b: widen container so all cards fit
+            in one row at 1440px). */}
+        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '56px 24px 0' }}>
+          {/* R11b (2026-04-28): 4-col grid at desktop so all 4 support
+              cards (Docs, Discord, Email, DM Federico) sit on one row
+              and Gemini doesn't think DM Federico is missing a CTA
+              (the previous 3+1 wrap pushed the 4th card below the fold
+              with a half-rendered footer). Collapses to 2-col at
+              tablet and 1-col on phones via auto-fit. */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
               gap: 16,
             }}
           >
@@ -239,19 +282,29 @@ export function HelpPage() {
               icon={<IconBook />}
               title="Documentation"
               body="MCP protocol reference, CLI guide, HTTP API, and how to publish your first app."
+              cta="Read the docs"
             />
             <SupportCard
-              href="https://discord.gg/floom"
+              href="https://discord.gg/8fXGXjxcRz"
               icon={<IconDiscord />}
               title="Discord community"
               body="Ask questions, share apps, and get real-time help from the team and other builders."
               badge="Fast"
+              cta="Join Discord"
             />
             <SupportCard
               href="mailto:hello@floom.dev"
               icon={<IconMail />}
               title="Email us"
-              body="hello@floom.dev — we reply within 24 hours. Good for account issues or billing questions."
+              body="hello@floom.dev. We reply within 24 hours. Good for account issues or billing questions."
+              cta="Email us"
+            />
+            <SupportCard
+              href="https://www.linkedin.com/in/federicodeponte"
+              icon={<IconLinkedIn />}
+              title="DM Federico"
+              body="Reach the founder directly on LinkedIn. Good for partnerships, feedback, or anything that doesn't fit elsewhere."
+              cta="DM on LinkedIn"
             />
           </div>
 
@@ -271,7 +324,7 @@ export function HelpPage() {
             </h2>
             <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 32px' }}>
               Can't find an answer?{' '}
-              <a href="https://discord.gg/floom" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+              <a href="https://discord.gg/8fXGXjxcRz" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
                 Ask in Discord
               </a>
               .

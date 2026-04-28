@@ -414,7 +414,7 @@ export function ShareModal({
             }}
           >
             <img
-              src={`/api/og?slug=${encodeURIComponent(slug)}`}
+              src={`/og/${encodeURIComponent(slug)}.svg`}
               alt={`Social preview for ${appName}`}
               data-testid="share-modal-og-image"
               loading="lazy"

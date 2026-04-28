@@ -7,6 +7,12 @@
 }
 
 @media (max-width: 640px) {
+  .public-footer-columns {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+    max-width: 320px !important;
+  }
+
   .about-triad { grid-template-columns: 1fr !important; gap: 6px !important; }
 }
 
@@ -208,12 +214,20 @@
 }
 
 /* Showcase row responsive breakpoints (apps-v23.html lines 46-47).
-   3 -> 2 -> 1 across the same widths. */
+   R11 (2026-04-28): hero variant uses a 4-col grid where the first
+   card spans 2 cols at >=1025px (floom.dev pattern). The inline
+   `gridColumn: 'span 2'` on the first card stays in effect on
+   desktop; on tablet/mobile we override to `span 1` so the cards
+   stack evenly without one becoming a giant block. */
 @media (max-width: 1024px) {
   .apps-showcase-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .apps-showcase-grid-hero { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .apps-showcase-grid-hero > * { grid-column: span 1 !important; }
 }
 @media (max-width: 640px) {
   .apps-showcase-grid { grid-template-columns: 1fr !important; }
+  .apps-showcase-grid-hero { grid-template-columns: 1fr !important; }
+  .apps-showcase-grid-hero > * { grid-column: span 1 !important; }
 }
 /* Keyboard-focus ring on cards (hover is already wired via JS).
    Uses the brand accent so it reads clearly against the card. */
@@ -354,4 +368,20 @@
   0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
   70%  { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0); }
   100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* R8 #25 (2026-04-28): MVP landing showcase + directory responsive
+   breakpoints. Originally inline <style> in LandingV17Page.tsx but CSP
+   style-src-elem blocks inline style elements. Moved here so the rules
+   actually apply at narrow viewports — without this, the showcase
+   stayed at 3 columns even on mobile. */
+@media (max-width: 880px) {
+  .mvp-showcase-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .mvp-showcase-grid-fallback { grid-template-columns: repeat(2, 1fr) !important; }
+  .mvp-directory-grid-fallback { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 640px) {
+  .mvp-showcase-grid { grid-template-columns: 1fr !important; }
+  .mvp-showcase-grid-fallback { grid-template-columns: 1fr !important; }
+  .mvp-directory-grid-fallback { grid-template-columns: 1fr !important; }
 }
