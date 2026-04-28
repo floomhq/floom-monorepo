@@ -69,14 +69,12 @@ function InputLabel({
   label,
   required,
   description,
-  descriptionId,
   inline = false,
 }: {
   id: string;
   label: string;
   required?: boolean;
   description?: string;
-  descriptionId?: string;
   inline?: boolean;
 }) {
   const hasDescription = Boolean(description && description.trim().length > 0);
@@ -159,7 +157,6 @@ export function InputField({
           label={cleanLabel}
           required={spec.required}
           description={spec.description}
-          descriptionId={descriptionId}
         />
         <textarea
           id={id}
@@ -206,7 +203,6 @@ export function InputField({
           label={cleanLabel}
           required={spec.required}
           description={spec.description}
-          descriptionId={descriptionId}
         />
         <select
           id={id}
@@ -237,7 +233,6 @@ export function InputField({
           label={cleanLabel}
           required={spec.required}
           description={spec.description}
-          descriptionId={descriptionId}
         />
         <input
           id={id}
@@ -273,7 +268,6 @@ export function InputField({
           label={cleanLabel}
           required={spec.required}
           description={spec.description}
-          descriptionId={descriptionId}
           inline
         />
       </div>
@@ -298,7 +292,6 @@ export function InputField({
         error={error}
         appSlug={appSlug}
         description={spec.description}
-        descriptionId={descriptionId}
       />
     );
   }
@@ -315,7 +308,6 @@ export function InputField({
           label={cleanLabel}
           required={spec.required}
           description={spec.description}
-          descriptionId={descriptionId}
         />
         <input
           id={id}
@@ -370,7 +362,6 @@ export function InputField({
         label={cleanLabel}
         required={spec.required}
         description={spec.description}
-        descriptionId={descriptionId}
       />
       {textControl}
       {error && <FieldError id={errorId!} text={error} />}
@@ -456,7 +447,6 @@ function FileInputControl({
         label={label}
         required={spec.required}
         description={description}
-        descriptionId={descriptionId}
       />
       <div
         data-testid={`file-drop-${spec.name}`}
