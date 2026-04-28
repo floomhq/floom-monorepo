@@ -303,9 +303,9 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
               fontSize: 10,
               fontWeight: 700,
               letterSpacing: '0.04em',
-              background: '#fef3c7',
-              color: '#92400e',
-              border: '1px solid #fde68a',
+              background: 'var(--bg)',
+              color: 'var(--muted)',
+              border: '1px solid var(--line-hover)',
               flexShrink: 0,
             }}
           >
