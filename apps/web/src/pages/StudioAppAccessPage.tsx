@@ -11,10 +11,9 @@
 //
 // API wiring:
 //   - Visibility → PATCH /api/hub/:slug via api.updateAppVisibility (exists)
-//   - Rate limit  → TODO: no backend endpoint yet; local state only
+//   - Rate limit  → backend config is not in main yet; render as coming soon.
 
 import { useEffect, useState } from 'react';
-import type { ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { StudioLayout } from '../components/studio/StudioLayout';
 import { AppHeader } from './MeAppPage';
@@ -22,7 +21,6 @@ import * as api from '../api/client';
 import type { AppDetail } from '../lib/types';
 
 type Visibility = 'private' | 'public';
-type RateLimitUnit = 'req/min' | 'req/hour' | 'req/day';
 
 export function StudioAppAccessPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -35,17 +33,9 @@ export function StudioAppAccessPage() {
   const [visibility, setVisibility] = useState<Visibility>('private');
   const [visibilitySaving, setVisibilitySaving] = useState(false);
 
-  // Rate limit form state — local only (TODO: wire to API)
-  const [rateLimitEnabled, setRateLimitEnabled] = useState(false);
-  const [rateLimitValue, setRateLimitValue] = useState<string>('1000');
-  const [rateLimitUnit, setRateLimitUnit] = useState<RateLimitUnit>('req/day');
-  const [rateLimitSaving, setRateLimitSaving] = useState(false);
-
   // Per-section feedback
   const [visibilityNotice, setVisibilityNotice] = useState<string | null>(null);
   const [visibilityError, setVisibilityError] = useState<string | null>(null);
-  const [rateLimitNotice, setRateLimitNotice] = useState<string | null>(null);
-  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -88,21 +78,6 @@ export function StudioAppAccessPage() {
       setVisibilitySaving(false);
     }
   }
-
-  function handleRateLimitSave() {
-    // TODO: wire to backend endpoint once API ships (v1 deferred to backend).
-    // For now, persist locally and surface a confirmation.
-    setRateLimitSaving(true);
-    setRateLimitError(null);
-    setRateLimitNotice(null);
-    setTimeout(() => {
-      setRateLimitSaving(false);
-      setRateLimitNotice('Rate limit saved locally. (Backend endpoint pending.)');
-    }, 300);
-  }
-
-  const rateLimitNum = parseInt(rateLimitValue, 10);
-  const rateLimitValid = !rateLimitEnabled || (!isNaN(rateLimitNum) && rateLimitNum > 0);
 
   return (
     <StudioLayout
@@ -190,93 +165,9 @@ export function StudioAppAccessPage() {
               callers regardless of identity.
             </p>
 
-            <div style={{ marginBottom: 14 }}>
-              <label style={styles.checkRow}>
-                <input
-                  type="checkbox"
-                  checked={rateLimitEnabled}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    setRateLimitEnabled(e.target.checked);
-                    setRateLimitNotice(null);
-                    setRateLimitError(null);
-                  }}
-                  data-testid="studio-access-rate-limit-toggle"
-                  style={{ accentColor: 'var(--accent)', margin: 0, cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
-                  Enable global rate limit
-                </span>
-              </label>
-            </div>
-
-            {rateLimitEnabled && (
-              <div style={styles.rateLimitInputRow}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <label
-                    htmlFor="studio-access-rate-limit-value"
-                    style={styles.inputLabel}
-                  >
-                    Global rate limit
-                  </label>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <input
-                      id="studio-access-rate-limit-value"
-                      type="number"
-                      min={1}
-                      value={rateLimitValue}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        setRateLimitValue(e.target.value)
-                      }
-                      data-testid="studio-access-rate-limit-value"
-                      style={styles.numberInput}
-                      placeholder="e.g. 1000"
-                    />
-                    <select
-                      value={rateLimitUnit}
-                      onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                        setRateLimitUnit(e.target.value as RateLimitUnit)
-                      }
-                      data-testid="studio-access-rate-limit-unit"
-                      style={styles.unitSelect}
-                      aria-label="Rate limit unit"
-                    >
-                      <option value="req/min">req / min</option>
-                      <option value="req/hour">req / hour</option>
-                      <option value="req/day">req / day</option>
-                    </select>
-                  </div>
-                  <p style={styles.inputHint}>
-                    Applies to all callers regardless of identity.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {rateLimitNotice && (
-              <div style={styles.noticeBanner} data-testid="studio-access-rate-limit-notice">
-                {rateLimitNotice}
-              </div>
-            )}
-            {rateLimitError && (
-              <div style={styles.errorBanner} data-testid="studio-access-rate-limit-error">
-                {rateLimitError}
-              </div>
-            )}
-
-            <div style={styles.saveRow}>
-              <button
-                type="button"
-                onClick={handleRateLimitSave}
-                disabled={rateLimitSaving || !rateLimitValid}
-                data-testid="studio-access-rate-limit-save"
-                style={
-                  rateLimitSaving || !rateLimitValid
-                    ? { ...styles.saveBtn, opacity: 0.6, cursor: rateLimitSaving ? 'wait' : 'default' }
-                    : styles.saveBtn
-                }
-              >
-                {rateLimitSaving ? 'Saving…' : 'Save rate limit'}
-              </button>
+            <div style={styles.noticeBanner} data-testid="studio-access-rate-limit-coming-soon">
+              Coming soon: Studio rate-limit controls are not configurable yet.
+              Runtime defaults still protect public run endpoints.
             </div>
           </section>
         </div>
