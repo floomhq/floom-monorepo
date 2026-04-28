@@ -198,8 +198,8 @@ function CompactHeroStrip({
   appCount,
   runCount,
 }: {
-  appCount: number;
-  runCount: number;
+  appCount: number | null;
+  runCount: number | null;
 }) {
   // TODO: wire to real metrics endpoint when available (/api/workspace/stats)
   return (
@@ -222,10 +222,10 @@ function CompactHeroStrip({
         flexWrap: 'wrap',
       }}
     >
-      <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{appCount}</span>
+      <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{appCount ?? '—'}</span>
       <span>runnable app{appCount !== 1 ? 's' : ''}</span>
       <span aria-hidden style={{ color: 'var(--line)', userSelect: 'none' }}>·</span>
-      <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{runCount}</span>
+      <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{runCount ?? '—'}</span>
       <span>runs this week</span>
     </div>
   );
@@ -697,9 +697,10 @@ export function RunAppsPage() {
         </div>
 
         {/* Compact hero metric strip (issue #913: NOT 4-card grid) */}
-        {dataReady && (
-          <CompactHeroStrip appCount={appCount} runCount={runCount} />
-        )}
+        <CompactHeroStrip
+          appCount={dataReady ? appCount : null}
+          runCount={dataReady ? runCount : null}
+        />
 
         {/* Filter chip toolbar (wireframe run-apps.html lines 136–143) */}
         {dataReady && appCount > 0 && (
