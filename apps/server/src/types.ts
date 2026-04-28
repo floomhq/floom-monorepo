@@ -525,6 +525,11 @@ export interface SessionMePayload {
   // preview.floom.dev sets it to true; floom.dev sets it to false until
   // the GA cutover.
   deploy_enabled: boolean;
+  // Staging mode flag (2026-04-28). When true, the LAUNCH_LISTED_SLUGS
+  // allowlist in hub-filter.ts is bypassed so every ingested app appears
+  // in /apps and on the landing page. Test fixtures are still hidden.
+  // Set via FLOOM_STAGING_MODE=1 on preview only, never on prod.
+  staging_mode: boolean;
 }
 
 export interface AppMemoryRecord {

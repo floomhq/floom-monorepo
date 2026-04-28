@@ -126,33 +126,31 @@ const menuItemStyle: CSSProperties = {
   borderRadius: 6,
 };
 
-// v17 TopBar — auth-branched chrome 2026-04-25 (project_floom_nav_ia.md).
+// v26 TopBar — auth-branched chrome (V26-IA-SPEC §10 + §12.5, locked 2026-04-27).
 //   Anonymous (waitlist visitor / signed-out):
-//     Centre: Apps · Docs · Pricing                                  (3 items)
-//     Right (preview):  GH stars · Publish (CTA) · Sign in · Sign up
-//     Right (waitlist): GH stars · Publish (CTA) · Join waitlist
+//     Centre: Apps · Docs · Pricing · Changelog                     (4 items)
+//     Right (preview):  GH stars · Copy for Claude · Publish (CTA) · Sign in · Sign up
+//     Right (waitlist): GH stars · Copy for Claude · Publish (CTA) · Join waitlist
 //
-//   Authenticated (deploy mode):
-//     Centre: Studio · My account                                    (2 items)
-//     Right:  GH stars · Copy for Claude · + New app · avatar dropdown
-//     Avatar dropdown: header (name + email) · Apps store · BYOK keys ·
-//                      Agent tokens · Settings · — · Pricing · Docs ·
-//                      — · Sign out
+//   Authenticated (slim — v26):
+//     Centre: NOTHING — left rail handles all mode/page navigation
+//     Right:  Copy for Claude · + New app · avatar dropdown
+//     Avatar dropdown: Account settings · Docs · Help · Sign out
+//     Logo: route-aware → /run/apps when authenticated
 //
-// Why the split: Federico 2026-04-25 — "Pricing, Docs etc don't matter
-// so much when I am already logged in, so the nav and the priorities of
-// what to click next change." Discovery items demote to the dropdown for
-// authed users; the centre nav surfaces only their day-to-day work
-// surfaces. MECE labelling: /me = "My account" (consumer, v23 rename
-// 2026-04-26), /studio = "Studio" (creator). URL slugs stay; only the
-// visible label changes.
+// v26 change from v25: removed authenticated centre nav (Studio · My runs).
+// Left rail [Run|Studio] toggle is now the mode switcher (§12.2).
+// Docs moved to avatar dropdown (§12.5).
+//
+// R10.1 (2026-04-29): nav switched from absolute-centered to inline flex.
+// Absolute centering caused the nav to overlap the right cluster (GH stars
+// + auth buttons) at 1200px width. Inline flex with margin-left: 32 keeps
+// spacing honest while letting the right cluster push to the edge.
 //
 // Two clean states only — never a 3rd. Preview vs prod differ in the
 // CTA wording (Publish vs Join waitlist), not the nav structure.
 //
-// Changelog stays in the footer (#572 nav declutter, original 04-23 pass).
-// Mobile: hamburger collapses everything to a vertical column menu, with
-// the same anon-vs-authed split.
+// Mobile: hamburger → MobileDrawer (v26 workspace identity + mode toggle + items).
 export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
@@ -335,72 +333,61 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           </button>
         )}
 
-        {/* Centre nav — branches on auth state (project_floom_nav_ia.md).
-            Anonymous: Apps · Docs · Pricing (discovery surfaces).
-            Authenticated: Studio · My runs (work surfaces). Pricing/Docs
-            move to the avatar dropdown — 1 click away when needed. */}
-        <nav
-          className="topbar-links topbar-links-desktop topbar-centre-nav"
-          aria-label="Primary"
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'auto',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 2,
-          }}
-        >
-          {showAuthedChrome ? (
-            <>
-              <Link
-                to="/studio"
-                data-testid="topbar-studio"
-                aria-current={isStudio ? 'page' : undefined}
-                style={navLinkStyle(isStudio)}
-              >
-                {studioNavLabel}
-              </Link>
-              <Link
-                to="/me"
-                data-testid="topbar-my-runs"
-                aria-current={isMe ? 'page' : undefined}
-                style={navLinkStyle(isMe)}
-              >
-                My account
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/apps"
-                data-testid="topbar-apps"
-                aria-current={isApps ? 'page' : undefined}
-                style={navLinkStyle(isApps)}
-              >
-                Apps
-              </Link>
-              <Link
-                to="/docs"
-                data-testid="topbar-docs"
-                aria-current={isDocs ? 'page' : undefined}
-                style={navLinkStyle(isDocs)}
-              >
-                Docs
-              </Link>
-              <Link
-                to="/pricing"
-                data-testid="topbar-pricing"
-                aria-current={isPricing ? 'page' : undefined}
-                style={navLinkStyle(isPricing)}
-              >
-                Pricing
-              </Link>
-            </>
-          )}
-        </nav>
+        {/* Centre nav — v26-IA-SPEC §10 + §12.5:
+            Anonymous: Apps · Docs · Pricing · Changelog (discovery surfaces).
+            Authenticated (slim): NOTHING — left rail handles mode/page navigation.
+            TopBar becomes logo + Copy for Claude + + New app + avatar only. */}
+        {!showAuthedChrome && (
+          <nav
+            className="topbar-links topbar-links-desktop topbar-centre-nav"
+            aria-label="Primary"
+            style={{
+              // R10.1 (2026-04-29): switched from absolute-centered to
+              // inline flex. Absolute centering caused the nav to
+              // overlap the right cluster (GH stars + auth buttons) at
+              // 1200px width — Changelog text rendered under the GH "6"
+              // badge. Inline flex with margin-left: 32 keeps spacing
+              // honest while letting the right cluster push to the edge.
+              marginLeft: 32,
+              pointerEvents: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <Link
+              to="/apps"
+              data-testid="topbar-apps"
+              aria-current={isApps ? 'page' : undefined}
+              style={navLinkStyle(isApps)}
+            >
+              Apps
+            </Link>
+            <Link
+              to="/docs"
+              data-testid="topbar-docs"
+              aria-current={isDocs ? 'page' : undefined}
+              style={navLinkStyle(isDocs)}
+            >
+              Docs
+            </Link>
+            <Link
+              to="/pricing"
+              data-testid="topbar-pricing"
+              aria-current={isPricing ? 'page' : undefined}
+              style={navLinkStyle(isPricing)}
+            >
+              Pricing
+            </Link>
+            <Link
+              to="/changelog"
+              data-testid="topbar-changelog"
+              style={navLinkStyle(false)}
+            >
+              Changelog
+            </Link>
+          </nav>
+        )}
 
         {/* Right side: Sign in + Sign up (anon) or avatar dropdown (authed) */}
         <div
@@ -408,23 +395,18 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           style={{
             gap: 8,
             marginLeft: 'auto',
+            paddingLeft: 24,
             alignItems: 'center',
           }}
         >
-          {/* GitHub stars badge — always on so social proof is visible
-              whether or not the viewer is logged in. Placed before the
-              auth pills so the hierarchy stays Sign-up > GH on preview,
-              and GH becomes the single rightmost affordance on
-              waitlist-prod (where Sign in / Sign up are hidden). */}
-          {!isLoginPage && <GitHubStarsBadge compact dataTestId="topbar-gh-stars" />}
+          {/* GitHub stars badge — social proof for anonymous visitors.
+              Hidden when authenticated (slim TopBar has no GH stars per
+              V26-IA-SPEC §10). Always shown on anon surfaces. */}
+          {!isLoginPage && !showAuthedChrome && <GitHubStarsBadge compact dataTestId="topbar-gh-stars" />}
 
           {/* Copy-for-Claude — globally present (anon + authed). Sits
               between centre nav and CTA/avatar cluster (Federico-locked
-              2026-04-26). Hidden only on auth pages so they stay focused.
-              The popover handles its own state, click-outside, and Esc.
-              Anon centre nav: Apps · Docs · Pricing → Copy-for-Claude →
-              Sign in / Sign up. Authed: Studio · My account →
-              Copy-for-Claude → + New app → avatar. */}
+              2026-04-26). Hidden only on auth pages so they stay focused. */}
           {!isLoginPage && <CopyForClaudeButton />}
 
           {/* Primary CTA — brand-green pill. Authed users get "+ New app"

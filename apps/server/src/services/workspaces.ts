@@ -740,6 +740,11 @@ export function me(ctx: SessionContext, cloud_mode: boolean): SessionMePayload {
     // their workflows unchanged — the waitlist form still works in
     // that mode, it just isn't the default affordance anymore.
     deploy_enabled: isDeployEnabled(),
+    // Staging mode: when true the LAUNCH_LISTED_SLUGS allowlist is
+    // bypassed on the client so every ingested app shows in /apps and
+    // on the landing page. Set FLOOM_STAGING_MODE=1 on preview only.
+    // Test fixtures are still hidden regardless. Default false.
+    staging_mode: isStagingMode(),
   };
 }
 
@@ -834,4 +839,23 @@ export function isDeployEnabled(): boolean {
   if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false;
   // Default: publishing enabled.
   return true;
+}
+
+/**
+ * Staging-mode gate for `/api/session/me.staging_mode`.
+ *
+ * When true, the web client bypasses the LAUNCH_LISTED_SLUGS allowlist
+ * in hub-filter.ts so every ingested app is visible in /apps and on the
+ * landing page. Intended for preview.floom.dev so new apps can be
+ * inspected before promoting them to the prod curated list.
+ *
+ * Test fixtures (swagger-petstore, stopwatch-*, etc.) remain hidden
+ * regardless — the `isTestFixture()` check in hub-filter.ts always runs.
+ *
+ * Set FLOOM_STAGING_MODE=1 (or true/yes/on) on preview only. Never set
+ * it on the prod container. Defaults to false when unset.
+ */
+export function isStagingMode(): boolean {
+  const raw = (process.env.FLOOM_STAGING_MODE || '').trim().toLowerCase();
+  return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on';
 }
