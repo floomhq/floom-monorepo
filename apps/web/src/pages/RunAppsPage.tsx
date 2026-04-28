@@ -463,7 +463,10 @@ function RecentRunsPanel({ runs }: { runs: MeRunSummary[] }) {
                 fontSize: 12.5,
                 textDecoration: 'none',
                 color: 'inherit',
+                transition: 'background 0.12s ease',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
               <span
                 aria-hidden="true"
