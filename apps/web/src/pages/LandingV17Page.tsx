@@ -377,23 +377,28 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               Ship AI apps <span style={{ color: 'var(--accent)' }}>fast</span>.
             </h1>
 
-            {/* Sub-positioning — locked copy. NO KICKER (dropped 2026-04-22). */}
-            <p
-              className="hero-sub"
-              data-testid="hero-sub-positioning"
-              style={{
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 19,
-                // R7 U3: tightened from 1.5 to 1.45 — sub was reading airy.
-                lineHeight: 1.45,
-                fontWeight: 400,
-                color: 'var(--muted)',
-                maxWidth: 640,
-                margin: isMvp ? '0 auto 36px' : '0 auto 28px',
-              }}
-            >
-              The protocol + runtime for agentic work.
-            </p>
+            {/* Sub-positioning — full variant only. R7.6 followup
+                (2026-04-28): MVP variant drops the sub for now; H1 +
+                npx command stand alone. Federico: "The protocol +
+                runtime for agentic work. can be removed from hero
+                for now". */}
+            {!isMvp && (
+              <p
+                className="hero-sub"
+                data-testid="hero-sub-positioning"
+                style={{
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  fontSize: 19,
+                  lineHeight: 1.45,
+                  fontWeight: 400,
+                  color: 'var(--muted)',
+                  maxWidth: 640,
+                  margin: '0 auto 28px',
+                }}
+              >
+                The protocol + runtime for agentic work.
+              </p>
+            )}
             {!isMvp && (
               <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)', margin: '-14px 0 28px' }}>
                 Vibe-coding speed. Production-grade safety.
