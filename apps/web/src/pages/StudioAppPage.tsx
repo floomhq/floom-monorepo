@@ -692,29 +692,20 @@ function TopErrorsPanel({ runs }: { runs: CreatorRun[] | null }) {
   const loading = runs === null;
 
   // Tally errors from the loaded runs.
-  const errorMap = new Map<string, { count: number; lastSeen: string }>();
+  const errorMap = new Map<string, number>();
   if (runs) {
     for (const r of runs) {
       if (r.status !== 'error' && r.status !== 'timeout') continue;
       const key = r.error || r.error_type || 'Unknown error';
-      const prev = errorMap.get(key);
-      const ts = r.started_at;
-      if (!prev) {
-        errorMap.set(key, { count: 1, lastSeen: ts });
-      } else {
-        errorMap.set(key, {
-          count: prev.count + 1,
-          lastSeen: ts > prev.lastSeen ? ts : prev.lastSeen,
-        });
-      }
+      errorMap.set(key, (errorMap.get(key) ?? 0) + 1);
     }
   }
 
   const sorted = Array.from(errorMap.entries())
-    .sort((a, b) => b[1].count - a[1].count)
+    .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
-  const maxCount = sorted[0]?.[1].count ?? 1;
+  const maxCount = sorted[0]?.[1] ?? 1;
 
   return (
     <section
@@ -738,7 +729,7 @@ function TopErrorsPanel({ runs }: { runs: CreatorRun[] | null }) {
           No errors in recent runs.
         </div>
       )}
-      {sorted.map(([msg, { count, lastSeen }]) => (
+      {sorted.map(([msg, count]) => (
         <div
           key={msg}
           style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, padding: '5px 0' }}
@@ -788,7 +779,7 @@ function TopErrorsPanel({ runs }: { runs: CreatorRun[] | null }) {
           {/* TODO: add link to filtered runs when /studio/:slug/runs supports error_type filter */}
         </div>
       ))}
-      {!loading && runs && runs.length >= 50 && sorted.length > 0 && (
+      {!loading && runs !== null && runs.length >= 50 && sorted.length > 0 && (
         <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
           Based on last 50 runs.
         </p>
