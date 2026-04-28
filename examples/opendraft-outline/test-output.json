@@ -1,0 +1,92 @@
+{
+  "working_title": "Investigating Aerosol Cloud Seeding Impacts on Regional Precipitation Dynamics",
+  "thesis_statement": "Aerosol cloud seeding demonstrably alters mesoscale atmospheric thermodynamics, leading to measurable shifts in regional precipitation intensity and distribution, contingent upon prevailing meteorological conditions and seeding agent properties.",
+  "outline": [
+    {
+      "heading": "1. Introduction: Cloud Seeding and Atmospheric Perturbation",
+      "key_points": [
+        "Define aerosol cloud seeding and its historical context.",
+        "Introduce the fundamental mechanisms of precipitation formation.",
+        "State the research question and its significance in atmospheric physics.",
+        "Briefly outline the paper's scope and methodology."
+      ],
+      "suggested_citations_count": 15
+    },
+    {
+      "heading": "2. Literature Review: Aerosol Microphysics and Precipitation Coupling",
+      "key_points": [
+        "Review existing theories on aerosol-cloud interactions (CCN, IN).",
+        "Analyze empirical evidence of cloud seeding effects on cloud properties (drop size distribution, glaciation).",
+        "Examine studies linking aerosol perturbations to precipitation changes.",
+        "Identify gaps in current understanding regarding regional precipitation responses."
+      ],
+      "suggested_citations_count": 50
+    },
+    {
+      "heading": "3. Theoretical Framework: Thermodynamic and Dynamic Pathways",
+      "key_points": [
+        "Elucidate the microphysical pathways of aerosol-induced precipitation enhancement.",
+        "Discuss potential thermodynamic feedbacks (latent heat release) and their regional implications.",
+        "Analyze dynamic feedbacks, including changes in updraft strength and convergence zones.",
+        "Formulate a conceptual model of regional precipitation alteration via seeding."
+      ],
+      "suggested_citations_count": 30
+    },
+    {
+      "heading": "4. Methodological Approaches for Assessing Regional Impacts",
+      "key_points": [
+        "Critically evaluate observational datasets (radar, satellite, surface gauges) for detecting seeding effects.",
+        "Discuss the role and limitations of numerical weather prediction models in simulating seeding scenarios.",
+        "Compare statistical analysis techniques for attribution (e.g., control-crests, time series analysis).",
+        "Consider hybrid approaches combining modeling and observational data."
+      ],
+      "suggested_citations_count": 40
+    },
+    {
+      "heading": "5. Case Studies and Empirical Evidence",
+      "key_points": [
+        "Present and analyze select historical cloud seeding operations with available regional data.",
+        "Quantify precipitation anomalies in target and control areas.",
+        "Correlate observed precipitation changes with meteorological conditions and seeding parameters.",
+        "Discuss the variability and uncertainty in empirical findings."
+      ],
+      "suggested_citations_count": 60
+    },
+    {
+      "heading": "6. Discussion: Factors Influencing Regional Precipitation Responses",
+      "key_points": [
+        "Synthesize findings on the influence of synoptic patterns and local topography.",
+        "Analyze the role of aerosol properties (type, concentration, size distribution) and seeding strategies.",
+        "Discuss the scalability and extent of seeding-induced precipitation changes.",
+        "Address limitations of current research and methodological challenges."
+      ],
+      "suggested_citations_count": 35
+    },
+    {
+      "heading": "7. Conclusion and Future Research Directions",
+      "key_points": [
+        "Reiterate the central argument regarding aerosol cloud seeding's impact on regional precipitation.",
+        "Summarize key findings and their implications for water resource management and climate modification.",
+        "Propose future research avenues, including advanced modeling and targeted observational campaigns.",
+        "Conclude on the scientific and societal relevance of understanding aerosol-cloud-precipitation interactions."
+      ],
+      "suggested_citations_count": 20
+    }
+  ],
+  "sample_search_terms": [
+    "aerosol cloud seeding \"precipitation\" regional",
+    "cloud condensation nuclei \"precipitation\" dynamics",
+    "ice nucleation \"rainfall\" augmentation",
+    "weather modification \"atmospheric rivers\" seeding"
+  ],
+  "screenshot_card_summary": "Investigating how aerosol cloud seeding alters regional precipitation patterns through microphysical and dynamic atmospheric processes.",
+  "next_step_cta": "Run the full draft locally — github.com/federicodeponte/opendraft",
+  "_meta": {
+    "engine": "opendraft-outline-preview",
+    "engine_version": "0.1.0",
+    "model": "gemini-2.5-flash-lite",
+    "full_engine_url": "https://github.com/federicodeponte/opendraft",
+    "full_engine_demo": "https://opendraft.xyz",
+    "disclaimer": "This is a structured outline preview. The full OpenDraft engine runs 19 agents over ~10 minutes and produces a 20,000-word draft with verified citations from 250M+ academic papers."
+  }
+}
