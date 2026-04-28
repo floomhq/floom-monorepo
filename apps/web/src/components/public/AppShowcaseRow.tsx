@@ -442,16 +442,20 @@ export function ShowcaseCard({
           }}
         >
           {entry.tags.map((tag) => (
+            // R16 (2026-04-28): tags wrapped as pills (border-radius: 999,
+            // padding 2px 8px, fontSize 11, --muted). Federico flagged
+            // the previous flat-text-with-thin-border styling as reading
+            // as plain text.
             <span
               key={tag}
               style={{
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                fontSize: 10,
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 11,
                 color: 'var(--muted)',
-                letterSpacing: '0.04em',
-                padding: '2px 7px',
+                letterSpacing: '0',
+                padding: '2px 8px',
                 border: '1px solid var(--line)',
-                borderRadius: 4,
+                borderRadius: 999,
                 background: 'var(--bg)',
                 fontWeight: 500,
               }}

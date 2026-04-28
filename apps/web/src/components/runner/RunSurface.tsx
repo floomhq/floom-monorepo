@@ -2015,6 +2015,39 @@ function InputCard({
               {Object.values(inputErrors)[0]}
             </div>
           )}
+          {/* R16 (2026-04-28): "Or try with example data" link rendered
+              ABOVE the Run button as a subtle text link. Federico
+              flagged the previous placement (small ghost button after
+              Reset, with a right-arrow that suggested navigation) as
+              "in a weird spot". Now reads as a one-click prefill hint
+              right where the user is about to click Run. */}
+          {onTrySample && mode === 'edit' && !lockedVisual && (
+            <button
+              type="button"
+              data-testid="run-surface-try-sample-link"
+              onClick={onTrySample}
+              disabled={running || disabledVisual}
+              className="run-surface-try-sample-link"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: 'transparent',
+                border: 'none',
+                padding: '4px 0',
+                margin: '4px 0 8px',
+                color: 'var(--muted)',
+                fontSize: 12.5,
+                fontFamily: 'inherit',
+                cursor: running || disabledVisual ? 'not-allowed' : 'pointer',
+                textAlign: 'left',
+                letterSpacing: '-0.005em',
+              }}
+            >
+              Or try with example data
+              <span aria-hidden="true" style={{ marginLeft: 2 }}>→</span>
+            </button>
+          )}
           <div className="run-surface-actions">
             {/* a11y 2026-04-20: aria-busy + aria-disabled announce "busy"
                 during an active run. Spinner icon is aria-hidden so the
@@ -2053,23 +2086,12 @@ function InputCard({
             >
               Reset
             </button>
-            {/* R15 UI-1 (2026-04-28): "Try sample" — Eva persona feedback
-                "paste what exactly?" Only renders when the app has a
-                registered sample payload + we're not running. Click
-                fills every required + optional field via onChange. */}
-            {onTrySample && mode === 'edit' && (
-              <button
-                type="button"
-                className="btn-ghost"
-                data-testid="run-surface-try-sample-btn"
-                onClick={onTrySample}
-                disabled={running || disabledVisual}
-                style={{ marginLeft: 'auto' }}
-              >
-                Try sample
-                <span aria-hidden="true" style={{ marginLeft: 4 }}>→</span>
-              </button>
-            )}
+            {/* R16 (2026-04-28): "Try sample" ghost button removed.
+                Replaced by the "Or try with example data →" link
+                rendered ABOVE the Run button (see block above the
+                run-surface-actions div). Federico: previous placement
+                "in a weird spot" — orphaned after Reset with a
+                right-arrow that suggested navigation away. */}
           </div>
         </form>
       ) : (

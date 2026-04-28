@@ -137,24 +137,27 @@ export function WorksWithBelt() {
       <div
         className="works-with-lead"
         style={LEAD_STYLE}
-        /* R10 (2026-04-28): plain-English tooltip for "MCP client".
-           Federico's brief: "MCP client" jargon — add a tooltip OR
-           a 1-line explainer. Native title is enough for the
-           hover-curious without bloating the eyebrow row. */
+        /* R16 (2026-04-28): tooltip-on-hover was poor discoverability for
+           non-devs (Federico). Replaced with an inline parenthetical
+           that names the agents people recognise — "MCP client (the
+           protocol Claude, Cursor and Codex use)". Native title kept as
+           a fallback for the hover-curious. */
         title="MCP = Model Context Protocol. The standard Claude, Cursor and ChatGPT use to call tools."
       >
         <span aria-hidden="true" style={LEAD_MARK}>
           {McpMark}
         </span>
         <span>
-          Works with any{' '}
+          Works with any MCP client{' '}
           <span
             style={{
-              borderBottom: '1px dotted currentColor',
-              cursor: 'help',
+              color: 'var(--muted)',
+              fontWeight: 500,
+              fontSize: '0.85em',
+              letterSpacing: '0',
             }}
           >
-            MCP client
+            (the protocol Claude, Cursor and Codex use)
           </span>
         </span>
       </div>

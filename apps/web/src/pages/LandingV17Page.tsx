@@ -41,7 +41,10 @@ import { HeroDemo } from '../components/home/HeroDemo';
 import { SectionEyebrow } from '../components/home/SectionEyebrow';
 import { WorkedExample } from '../components/home/WorkedExample';
 import { ThreeSurfacesDiagram } from '../components/home/ThreeSurfacesDiagram';
-import { HowItWorksDiagram } from '../components/home/HowItWorksDiagram';
+// R16 (2026-04-28): HowItWorksDiagram dropped from landing — MECE
+// violation with the "From idea to shipped app in 3 steps" section.
+// Component kept on disk for potential /about reuse.
+// import { HowItWorksDiagram } from '../components/home/HowItWorksDiagram';
 import { FitBand } from '../components/home/FitBand';
 import { WhosBehind } from '../components/home/WhosBehind';
 import { DiscordCta } from '../components/home/DiscordCta';
@@ -779,13 +782,13 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
           </div>
         </section>
 
-        {/* R15 UI-3 (2026-04-28): "How Floom works" 4-stage diagram.
-            Tackles Vladimir persona's "black box" complaint from the
-            launch user feedback PDF — visitors couldn't tell what Floom
-            actually does once they hit Run. Sits between the 3-step
-            narrative and the showcase so readers get conceptual model
-            BEFORE the apps. */}
-        <HowItWorksDiagram />
+        {/* R16 (2026-04-28): "How Floom works" 4-stage diagram dropped.
+            Federico flagged MECE violation — landing already has "From
+            idea to shipped app in 3 steps" (consumer narrative) above.
+            Two explainers covered the same ground. The 3-step section
+            stays; the 4-stage technical diagram is removed. The
+            HowItWorksDiagram component file is kept on disk (could be
+            reused on /about later). */}
 
         {/* HeroDemo moved back to right under the hero install snippet
             (R7.6 followup) — was pushed here in R7.6 first pass; Federico

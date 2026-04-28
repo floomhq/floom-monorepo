@@ -729,6 +729,17 @@ body:has(.topbar-mobile-menu) {
   margin-top: 16px; flex-wrap: wrap;
 }
 
+/* R16 (2026-04-28): subtle text-link variant of the "Try sample" CTA.
+   Lives ABOVE the Run button (not in run-surface-actions row). Hover
+   tint nudges the eye toward the brand accent without making it look
+   like a primary button. */
+.run-surface-try-sample-link:hover:not(:disabled) {
+  color: var(--accent);
+}
+.run-surface-try-sample-link:disabled {
+  opacity: 0.5;
+}
+
 .run-surface-empty-input { padding: 4px 0 0; }
 .run-surface-empty-copy {
   margin: 0 0 16px; font-size: 13.5px; color: var(--muted); line-height: 1.55;

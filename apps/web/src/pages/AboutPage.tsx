@@ -102,7 +102,12 @@ export function AboutPage() {
         data-testid="about-hero"
         style={{ ...SECTION_STYLE, padding: '72px 0 48px', textAlign: 'center' }}
       >
-        <p style={{ ...EYEBROW_STYLE, textAlign: 'center' }}>About Floom</p>
+        {/* R16 (2026-04-28): eyebrow reframes the page as the "why"
+            behind the landing brand line ("Ship AI apps fast."). H1
+            keeps the human-pain framing ("Get that thing off localhost
+            fast.") so the page articulates the motivation, not the
+            mechanism. */}
+        <p style={{ ...EYEBROW_STYLE, textAlign: 'center' }}>Why I built Floom</p>
         <h1
           style={{
             fontFamily: 'var(--font-display)',
@@ -127,8 +132,9 @@ export function AboutPage() {
             textWrap: 'balance' as unknown as 'balance',
           }}
         >
-          Floom exists for one reason: to turn your code into a real app
-          with a real URL so other people can actually use it.
+          The landing page says "ship AI apps fast." This page tells you
+          what that means in practice: take the script you already
+          built, give it a real URL, and let other people actually use it.
         </p>
 
         {/* R11b: explicit primary CTA in the hero so the page tells you

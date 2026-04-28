@@ -968,8 +968,11 @@ export function AppPermalinkPage() {
                     {summary.avg.toFixed(1)}
                   </span>
                 )}
+                {/* R16 (2026-04-28): dropped "· stable" qualifier.
+                    "v0.1.0 · stable" reads as a contradiction (0.1.0 is
+                    not stable per semver). Just the version number. */}
                 <span data-testid="hero-version" style={{ fontSize: 11, padding: '3px 9px', borderRadius: 999, border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--bg)', fontFamily: 'JetBrains Mono, ui-monospace, monospace', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  v{app.version ?? '0.1.0'} · {app.version_status ?? 'stable'}
+                  v{app.version ?? '0.1.0'}
                 </span>
                 {/* G5: capability chips merged inline — same row, same
                     pill style, no wrap. */}
