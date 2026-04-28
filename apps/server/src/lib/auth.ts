@@ -27,7 +27,7 @@ import { getAppAccessDecision } from '../services/sharing.js';
 // able to act on the hint without knowing anything about the server.
 export const AUTH_DOCS_URL = 'https://floom.dev/docs/auth';
 export const AUTH_HINT_CLOUD =
-  'Run `floom auth login --token=<your_agent_token>` or set FLOOM_API_KEY, then retry. Get a token at https://floom.dev/home';
+  'Run `floom auth login --token=<your_agent_token>` or set FLOOM_API_KEY, then retry. Get a token at https://floom.dev/me/agent-keys';
 export const AUTH_HINT_SELFHOST =
   'Set FLOOM_AUTH_TOKEN on the server and present it via Authorization: Bearer <token>.';
 export const AUTH_HINT_SIGNATURE =

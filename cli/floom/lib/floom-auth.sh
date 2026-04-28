@@ -66,7 +66,7 @@ import json
 import os
 
 c = json.load(open(os.environ["CONFIG_PATH"]))
-key = c.get("api_key", "")
+key = c.get("api_key") or c.get("agent_token", "")
 red = key[:4] + "..." + key[-4:] if len(key) > 8 else "***"
 print(f"api_url: {c.get('api_url', 'https://floom.dev')}")
 print(f"agent_token: {red}")
@@ -77,13 +77,10 @@ PY
     echo "cleared $CONFIG"
     exit 0 ;;
   whoami)
-    if [[ ! -f "$CONFIG" && -z "${FLOOM_API_KEY:-}" ]]; then
-      echo "not logged in. Run: floom auth <agent-token>"
-      exit 1
-    fi
-    CONFIG_PATH="$CONFIG" python3 - <<'PY'
+    AUTH_EXPORTS=$(CONFIG_PATH="$CONFIG" python3 - <<'PY'
 import json
 import os
+import shlex
 
 env_key = os.environ.get("FLOOM_API_KEY", "")
 cfg_path = os.environ.get("CONFIG_PATH", "")
@@ -92,21 +89,50 @@ if env_key:
     url = os.environ.get("FLOOM_API_URL", "https://floom.dev")
 elif cfg_path and os.path.exists(cfg_path):
     c = json.load(open(cfg_path))
-    key = c.get("api_key", "")
+    key = c.get("api_key") or c.get("agent_token", "")
     url = c.get("api_url", "https://floom.dev")
 else:
-    print("not logged in. Run: floom auth <agent-token>")
-    raise SystemExit(1)
+    key = ""
+    url = os.environ.get("FLOOM_API_URL", "https://floom.dev")
 
-if not key:
-    print("not logged in. Run: floom auth <agent-token>")
-    raise SystemExit(1)
+print("WHOAMI_KEY=" + shlex.quote(key))
+print("WHOAMI_URL=" + shlex.quote(url))
+PY
+)
+    eval "$AUTH_EXPORTS"
+    if [[ -z "${WHOAMI_KEY:-}" ]]; then
+      echo "not logged in. Run: floom auth <agent-token>"
+      exit 1
+    fi
+    VALIDATE_FILE=$(mktemp)
+    trap 'rm -f "$VALIDATE_FILE"' RETURN
+    HTTP_CODE=$(validate_token_file "$WHOAMI_URL" "$WHOAMI_KEY" "$VALIDATE_FILE")
+    if [[ "$HTTP_CODE" != "200" ]]; then
+      echo "not logged in. Token rejected by ${WHOAMI_URL} (HTTP ${HTTP_CODE})." >&2
+      echo "Mint a fresh Agent token at ${WHOAMI_URL%/}/me/agent-keys and try again." >&2
+      exit 1
+    fi
+    CONFIG_PATH="$CONFIG" WHOAMI_KEY="$WHOAMI_KEY" WHOAMI_URL="$WHOAMI_URL" VALIDATE_FILE="$VALIDATE_FILE" python3 - <<'PY'
+import json
+import os
 
+key = os.environ["WHOAMI_KEY"]
+url = os.environ["WHOAMI_URL"]
 red = key[:14] + "..." + key[-4:] if len(key) > 18 else key[:4] + "..."
+try:
+    data = json.load(open(os.environ["VALIDATE_FILE"]))
+except Exception:
+    data = {}
+user = data.get("user") or {}
+workspace = data.get("active_workspace") or data.get("workspace") or {}
+identity = user.get("email") or user.get("id") or data.get("user_id") or "unknown"
+workspace_label = workspace.get("name") or workspace.get("id") or data.get("workspace_id") or "unknown"
 print(f"logged in  api_url: {url}")
+print(f"identity:  {identity}")
+print(f"workspace: {workspace_label}")
 print(f"token:     {red}")
 PY
-    exit $? ;;
+    exit 0 ;;
   login)
     AGENT_TOKEN=""
     API_URL="$(default_host)"

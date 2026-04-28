@@ -220,7 +220,11 @@ const upstream = http.createServer((req, res) => {
       body: Buffer.concat(chunks).toString('utf8'),
     });
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, slug, saw_secret: req.headers['x-gemini-key'] === WORKSPACE_KEY }));
+    // NOTE: avoid the literal "secret" in field names because the run output
+    // redactor (apps/server/src/services/proxied-runner.ts -> isSensitiveKey)
+    // matches /secret/i and replaces values with "[redacted]". The test asserts
+    // the boolean shape end-to-end, so we use "key_match" instead.
+    res.end(JSON.stringify({ ok: true, slug, key_match: req.headers['x-gemini-key'] === WORKSPACE_KEY }));
   });
 });
 
@@ -244,7 +248,7 @@ try {
     log(`${slug}: run_id returned`, typeof runId === 'string' && runId.length > 0, started.text);
     const run = await pollRun(server.port, runId);
     log(`${slug}: run succeeds`, run.status === 'success', JSON.stringify(run));
-    log(`${slug}: result returns`, run.outputs?.saw_secret === true, JSON.stringify(run.outputs));
+    log(`${slug}: result returns`, run.outputs?.key_match === true, JSON.stringify(run.outputs));
     const row = db.prepare(`SELECT workspace_id, user_id FROM runs WHERE id = ?`).get(runId);
     log(
       `${slug}: run row writes workspace_id/user_id`,

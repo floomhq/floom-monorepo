@@ -14,9 +14,9 @@
  *   ── Visibility ───────────────────────────────
  *     radio: Private / Invite-only / Public
  *
- * Backend contract (stubbed for the initial PR — see #637 for real impl):
- *   POST /api/apps/:slug/invite  { emails: string[], permission }
- *     → { ok: true, invite_id: 'stub-<ts>' }
+ * Backend contract:
+ *   POST /api/me/apps/:slug/sharing/invite  { email }
+ *     → { ok: true, invite }
  *
  * Responsive: centered card on desktop, full-screen bottom-sheet on
  * viewports <= 640px. Accessible: role=dialog, aria-modal, aria-labelledby,
@@ -29,7 +29,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Mail, Link as LinkIcon, Users, Check, X, Trash2, Copy } from 'lucide-react';
-import { inviteToApp, type InvitePermission } from '../../api/client';
+import { inviteToApp, revokeAppInvite, type InvitePermission } from '../../api/client';
 import type { AppVisibility } from '../../lib/types';
 
 export type ShareModalMode = 'app' | 'run';
@@ -180,6 +180,7 @@ export function ShareModal({
   const [copied, setCopied] = useState<'public' | 'private' | null>(null);
   const [publicToggle, setPublicToggle] = useState<boolean>(visibility === 'public');
   const [rows, setRows] = useState<AccessRow[]>(accessList ?? []);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
 
   // Sync seed when caller reloads access list.
   useEffect(() => {
@@ -269,12 +270,21 @@ export function ShareModal({
     setSendError(null);
     setInviteOk(false);
     try {
-      await inviteToApp(slug, { emails: all, permission });
+      const response = await inviteToApp(slug, { emails: all, permission });
       setInviteOk(true);
-      // Optimistic row add — real list will reconcile once #637 ships the
-      // GET endpoint. Status stays 'pending' until the invitee accepts.
       setRows((prev) => {
         const byEmail = new Map(prev.map((r) => [r.email, r] as const));
+        for (const invite of response.invites ?? []) {
+          const email = invite.invited_email ?? invite.invited_user_email;
+          if (!email) continue;
+          byEmail.set(email, {
+            id: invite.id,
+            email,
+            status: invite.state === 'accepted' ? 'accepted' : 'pending',
+            permission,
+            last_run_at: null,
+          });
+        }
         for (const email of all) {
           if (!byEmail.has(email)) {
             byEmail.set(email, {
@@ -307,10 +317,18 @@ export function ShareModal({
   }, []);
 
   const handleRevoke = useCallback((id: string) => {
-    // Stub: real endpoint tracked in #637. Remove optimistically so the
-    // modal feels responsive even before the DELETE route lands.
-    setRows((prev) => prev.filter((r) => r.id !== id));
-  }, []);
+    if (revokingId) return;
+    setRevokingId(id);
+    setSendError(null);
+    void revokeAppInvite(slug, id)
+      .then(() => setRows((prev) => prev.filter((r) => r.id !== id)))
+      .catch((err) => {
+        setSendError(err instanceof Error ? err.message : 'Could not revoke invite.');
+      })
+      .finally(() => {
+        setRevokingId(null);
+      });
+  }, [revokingId, slug]);
 
   // Non-owners viewing a public app always see "PUBLIC" — that's the only
   // state they can reach (private/invite-only apps are 404 upstream).
@@ -707,14 +725,16 @@ export function ShareModal({
                   <button
                     type="button"
                     aria-label={`Revoke ${row.email}`}
+                    disabled={revokingId !== null}
                     onClick={() => handleRevoke(row.id)}
                     style={{
                       border: 'none',
                       background: 'transparent',
-                      cursor: 'pointer',
+                      cursor: revokingId === null ? 'pointer' : 'not-allowed',
                       padding: 4,
                       borderRadius: 6,
                       display: 'inline-flex',
+                      opacity: revokingId === row.id ? 0.55 : 1,
                       color: 'var(--muted, #6c6a66)',
                     }}
                   >

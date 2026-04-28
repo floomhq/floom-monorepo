@@ -43,13 +43,6 @@ import {
   checkAppVisibility,
 } from '../lib/auth.js';
 import { buildAppSourceInfo } from '../lib/app-source.js';
-import {
-  extractAgentTokenPrefix,
-  generateAgentToken,
-  hashAgentToken,
-  isValidAgentTokenScope,
-  newAgentTokenId,
-} from '../lib/agent-tokens.js';
 import { checkMcpIngestLimit, extractIp } from '../lib/rate-limit.js';
 import { runGate } from '../lib/run-gate.js';
 import { filterTestFixtures } from '../lib/hub-filter.js';
@@ -84,8 +77,6 @@ import {
 } from '../services/app_library.js';
 import type {
   ActionSpec,
-  AgentTokenRecord,
-  AgentTokenScope,
   AppRecord,
   AppReviewRecord,
   InputSpec,
@@ -1278,6 +1269,16 @@ function mcpJson(payload: unknown) {
 }
 
 function mcpError(err: unknown) {
+  if (err instanceof Error && err.message === 'illegal_transition') {
+    return mcpError(
+      new AgentToolError(
+        'invalid_input',
+        'Illegal visibility transition.',
+        409,
+        { code: 'illegal_transition' },
+      ),
+    );
+  }
   if (err instanceof AppLibraryError) {
     const code =
       err.status === 404
@@ -1393,21 +1394,6 @@ function parseStudioManifest(app: AppRecord): NormalizedManifest {
 
 function manifestSecretKeys(manifest: NormalizedManifest): string[] {
   return Array.from(new Set(manifest.secrets_needed || [])).sort();
-}
-
-function serializeAgentToken(row: AgentTokenRecord): Record<string, unknown> {
-  return {
-    id: row.id,
-    prefix: row.prefix,
-    label: row.label,
-    scope: row.scope,
-    workspace_id: row.workspace_id,
-    issued_by_user_id: row.issued_by_user_id || row.user_id,
-    created_at: row.created_at,
-    last_used_at: row.last_used_at,
-    revoked: row.revoked_at !== null,
-    rate_limit_per_minute: row.rate_limit_per_minute,
-  };
 }
 
 function serializeInviteForMcp(invite: AppInviteRow): Record<string, unknown> {
@@ -2865,146 +2851,6 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       },
     );
 
-    server.registerTool(
-      'account_list_agent_tokens',
-      {
-        title: 'List agent tokens',
-        description:
-          'List agent tokens for this workspace. Raw token values are never returned.',
-        inputSchema: {},
-      },
-      async () => {
-        recordMcpToolCall('account_list_agent_tokens');
-        try {
-          requireAccountScope(ctx);
-          requireWorkspaceRole(ctx, 'admin');
-          const rows = db
-            .prepare(
-              `SELECT * FROM agent_tokens
-                WHERE workspace_id = ?
-                ORDER BY created_at DESC`,
-            )
-            .all(ctx.workspace_id) as AgentTokenRecord[];
-          return mcpJson({ tokens: rows.map(serializeAgentToken) });
-        } catch (err) {
-          return mcpError(err);
-        }
-      },
-    );
-
-    server.registerTool(
-      'account_create_agent_token',
-      {
-        title: 'Create agent token',
-        description:
-          'Create a new workspace agent token. Returns the raw token once; store it immediately.',
-        inputSchema: {
-          label: z.string().trim().min(1).max(80),
-          scope: z.enum(['read', 'read-write', 'publish-only']),
-          rate_limit_per_minute: z.number().int().min(1).max(10000).optional(),
-        },
-      },
-      async ({ label, scope, rate_limit_per_minute }) => {
-        recordMcpToolCall('account_create_agent_token');
-        try {
-          requireAccountScope(ctx);
-          requireWorkspaceRole(ctx, 'admin');
-          if (!isValidAgentTokenScope(scope)) {
-            throw new AgentToolError('invalid_input', 'Invalid token scope.', 400);
-          }
-          const rawToken = generateAgentToken();
-          const createdAt = new Date().toISOString();
-          const row = {
-            id: newAgentTokenId(),
-            prefix: extractAgentTokenPrefix(rawToken),
-            hash: hashAgentToken(rawToken),
-            label,
-            scope: scope as AgentTokenScope,
-            workspace_id: ctx.workspace_id,
-            user_id: ctx.user_id,
-            created_at: createdAt,
-            rate_limit_per_minute: rate_limit_per_minute ?? 60,
-          };
-          db.prepare(
-            `INSERT INTO agent_tokens
-               (id, prefix, hash, label, scope, workspace_id, user_id, created_at,
-                last_used_at, revoked_at, rate_limit_per_minute)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
-          ).run(
-            row.id,
-            row.prefix,
-            row.hash,
-            row.label,
-            row.scope,
-            row.workspace_id,
-            row.user_id,
-            row.created_at,
-            row.rate_limit_per_minute,
-          );
-          auditLog({
-            actor: getAuditActor(c, ctx),
-            action: 'agent_token.minted',
-            target: { type: 'agent_token', id: row.id },
-            before: null,
-            after: {
-              label: row.label,
-              scope: row.scope,
-              workspace_id: row.workspace_id,
-              issued_by_user_id: row.user_id,
-              revoked: false,
-              rate_limit_per_minute: row.rate_limit_per_minute,
-            },
-            metadata: { prefix: row.prefix, via: 'mcp' },
-          });
-          return mcpJson({
-            ...serializeAgentToken({
-              ...row,
-              last_used_at: null,
-              revoked_at: null,
-            } as AgentTokenRecord),
-            raw_token: rawToken,
-          });
-        } catch (err) {
-          return mcpError(err);
-        }
-      },
-    );
-
-    server.registerTool(
-      'account_revoke_agent_token',
-      {
-        title: 'Revoke agent token',
-        description:
-          'Revoke an agent token by id in this workspace.',
-        inputSchema: {
-          token_id: z.string().min(1).max(160),
-        },
-      },
-      async ({ token_id }) => {
-        recordMcpToolCall('account_revoke_agent_token');
-        try {
-          requireAccountScope(ctx);
-          requireWorkspaceRole(ctx, 'admin');
-          const result = db.prepare(
-            `UPDATE agent_tokens
-               SET revoked_at = COALESCE(revoked_at, ?)
-             WHERE id = ?
-               AND workspace_id = ?`,
-          ).run(new Date().toISOString(), token_id, ctx.workspace_id);
-          auditLog({
-            actor: getAuditActor(c, ctx),
-            action: 'agent_token.revoked',
-            target: { type: 'agent_token', id: token_id },
-            before: null,
-            after: { revoked: result.changes > 0 },
-            metadata: { workspace_id: ctx.workspace_id, via: 'mcp' },
-          });
-          return mcpJson({ ok: true, token_id, revoked: result.changes > 0 });
-        } catch (err) {
-          return mcpError(err);
-        }
-      },
-    );
   }
 
   return server;

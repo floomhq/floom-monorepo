@@ -23,7 +23,7 @@
     "type": "bearer",
     "header": "Authorization",
     "prefix": "Bearer floom_agent_",
-    "mint": "https://floom.dev/settings/agent-tokens"
+    "mint": "https://floom.dev/me/agent-keys"
   },
   "cli": {
     "install": "curl -fsSL https://floom.dev/install.sh | bash",

@@ -346,21 +346,17 @@ try {
 
   const inviteMissing = await request(reviewsRouter, 'POST', '/missing/reviews', { rating: 5 });
   log('reviews missing app returns 404', inviteMissing.status === 404);
-  const inviteBad = await request(reviewsRouter, 'POST', '/parser-app/invite', {
-    emails: ['not-an-email'],
-    permission: 'view',
-  });
-  log('review invite rejects bad email', inviteBad.status === 400);
-  const inviteMany = await request(reviewsRouter, 'POST', '/parser-app/invite', {
-    emails: Array.from({ length: 26 }, (_, i) => `u${i}@example.com`),
-    permission: 'view',
-  });
-  log('review invite rejects more than 25 emails', inviteMany.status === 400);
   const inviteOk = await request(reviewsRouter, 'POST', '/parser-app/invite', {
     emails: ['owner@example.com'],
     permission: 'run',
   });
-  log('review invite happy path returns stub id', inviteOk.status === 201 && /^stub-/.test(inviteOk.json?.invite_id || ''));
+  log(
+    'legacy public invite route is disabled',
+    inviteOk.status === 410 &&
+      inviteOk.json?.code === 'deprecated_endpoint' &&
+      typeof inviteOk.json?.replacement === 'string' &&
+      inviteOk.json.replacement.includes('/api/me/apps/parser-app/sharing/invite'),
+  );
 } finally {
   try {
     db.close();

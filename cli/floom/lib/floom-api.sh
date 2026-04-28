@@ -71,7 +71,7 @@ fi
 
 # 2. new config file
 if [[ -z "$API_KEY" && -f "$CONFIG" ]]; then
-  API_KEY=$(python3 -c "import json; c=json.load(open('$CONFIG')); print(c.get('api_key',''))")
+  API_KEY=$(python3 -c "import json; c=json.load(open('$CONFIG')); print(c.get('api_key') or c.get('agent_token',''))")
   API_URL=$(python3 -c "import json; c=json.load(open('$CONFIG')); print(c.get('api_url','https://floom.dev'))")
 fi
 

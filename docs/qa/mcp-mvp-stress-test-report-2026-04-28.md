@@ -213,8 +213,8 @@ Cleanup completed during both suites:
 - Deleted defect-isolation apps:
   - `mcp-bug-28085700a`
   - `mcp-bug-28085700b`
-- Revoked temp created token: `agtok_b17b5867-3483-440a-b1e6-9041eb8741a8`
-- Removed temp account secret: `MCP_STRESS_085521`
+- Revoked temp created agent-token row: `agtok_[redacted-test-id]`
+- Removed temp account vault entry: `MCP_STRESS_085521`
 
 ## 9) Confidence and Limitations
 
@@ -405,4 +405,3 @@ Open items still reproducible:
 ### 12.4 Current launch-readiness interpretation
 
 The updated build is more stable on lifecycle transitions than the prior pass. Remaining friction is concentrated in install semantics for pending-review apps and auth-mode constraints for CLI token management.
-

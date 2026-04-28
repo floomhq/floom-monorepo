@@ -301,15 +301,6 @@ export function shareRun(runId: string): Promise<ShareRunResponse> {
   });
 }
 
-/**
- * Invite email(s) to collaborate on an app (see #640 / #637).
- *
- * The /api/apps/:slug/invite endpoint is currently a minimal stub that
- * returns `{ ok: true, invite_id: 'stub-<ts>' }` so the Notion-style
- * ShareModal can ship without blocking on the full invite pipeline.
- * Real persistence, email delivery, and accept/revoke flows are tracked
- * in #637.
- */
 export type InvitePermission = 'run' | 'view';
 
 export interface InviteRequest {
@@ -320,13 +311,80 @@ export interface InviteRequest {
 export interface InviteResponse {
   ok: boolean;
   invite_id: string;
+  invites?: AppSharingInvite[];
+}
+
+export type AppSharingState = 'private' | 'link' | 'invited';
+
+export interface AppSharingInvite {
+  id: string;
+  invited_user_id: string | null;
+  invited_email: string | null;
+  state: 'pending_accept' | 'pending_email' | 'accepted' | 'declined' | 'revoked';
+  created_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  invited_by_user_id: string;
+  invited_user_name?: string | null;
+  invited_user_email?: string | null;
+}
+
+export interface AppSharingResponse {
+  slug: string;
+  visibility: AppSharingState;
+  link_share_token: string | null;
+  invites: AppSharingInvite[];
+  review: {
+    submitted_at: string | null;
+    decided_at: string | null;
+    decided_by: string | null;
+    comment: string | null;
+  };
 }
 
 export function inviteToApp(slug: string, body: InviteRequest): Promise<InviteResponse> {
-  return request<InviteResponse>(`/api/apps/${encodeURIComponent(slug)}/invite`, {
-    method: 'POST',
+  const uniqueEmails = Array.from(new Set(body.emails.map((email) => email.trim().toLowerCase()).filter(Boolean)));
+  return Promise.all(
+    uniqueEmails.map((email) =>
+      request<{ ok: true; invite: AppSharingInvite }>(
+        `/api/me/apps/${encodeURIComponent(slug)}/sharing/invite`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ email }),
+        },
+      ),
+    ),
+  ).then((results) => ({
+    ok: true,
+    invite_id: results[0]?.invite.id ?? '',
+    invites: results.map((result) => result.invite),
+  }));
+}
+
+export function getAppSharing(slug: string): Promise<AppSharingResponse> {
+  return request<AppSharingResponse>(
+    `/api/me/apps/${encodeURIComponent(slug)}/sharing`,
+  );
+}
+
+export function setAppSharing(
+  slug: string,
+  body: { state: AppSharingState; comment?: string; link_token_rotate?: boolean },
+): Promise<{ ok: true; slug: string; visibility: AppSharingState; link_share_token: string | null }> {
+  return request(`/api/me/apps/${encodeURIComponent(slug)}/sharing`, {
+    method: 'PATCH',
     body: JSON.stringify(body),
   });
+}
+
+export function revokeAppInvite(
+  slug: string,
+  inviteId: string,
+): Promise<{ ok: true; invite: AppSharingInvite }> {
+  return request(
+    `/api/me/apps/${encodeURIComponent(slug)}/sharing/invite/${encodeURIComponent(inviteId)}/revoke`,
+    { method: 'POST' },
+  );
 }
 
 export interface RunStreamHandlers {

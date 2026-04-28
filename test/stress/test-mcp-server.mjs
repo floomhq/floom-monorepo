@@ -208,13 +208,10 @@ try {
   });
   const writeNames = (writeList.json?.result?.tools || []).map((tool) => tool.name).sort();
   const writeExpected = [
-    'account_create_agent_token',
     'account_delete_secret',
     'account_get',
     'account_get_context',
-    'account_list_agent_tokens',
     'account_list_secrets',
-    'account_revoke_agent_token',
     'account_set_secret',
     'account_set_user_context',
     'account_set_workspace_context',
@@ -698,6 +695,14 @@ try {
   const accountDeleteSecretPayload = parseToolText(accountDeleteSecret);
   log('account_delete_secret removes workspace secret', accountDeleteSecretPayload?.ok === true && accountDeleteSecretPayload?.removed === true, accountDeleteSecret.text);
 
+  log(
+    'read-write token does not expose agent-token governance tools',
+    !writeNames.includes('account_create_agent_token') &&
+      !writeNames.includes('account_list_agent_tokens') &&
+      !writeNames.includes('account_revoke_agent_token'),
+    JSON.stringify(writeNames),
+  );
+
   const accountCreateToken = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',
     id: 26,
@@ -707,9 +712,13 @@ try {
       arguments: { label: 'mcp child token', scope: 'read', rate_limit_per_minute: 77 },
     },
   });
-  const accountCreateTokenPayload = parseToolText(accountCreateToken);
-  log('account_create_agent_token returns raw token once', typeof accountCreateTokenPayload?.raw_token === 'string' && accountCreateTokenPayload.raw_token.startsWith('floom_agent_'), accountCreateToken.text);
-  log('account_create_agent_token does not leak hash material', accountCreateTokenPayload && !('hash' in accountCreateTokenPayload) && !accountCreateToken.text.includes(agentTokens.hashAgentToken(accountCreateTokenPayload.raw_token || '')), accountCreateToken.text);
+  log(
+    'account_create_agent_token is not callable via agent-token MCP auth',
+    accountCreateToken.json?.error?.code === -32602 ||
+      accountCreateToken.json?.error?.code === -32601 ||
+      /not found|Unknown tool|not registered/i.test(accountCreateToken.text),
+    accountCreateToken.text,
+  );
 
   const accountListTokens = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',
@@ -717,19 +726,27 @@ try {
     method: 'tools/call',
     params: { name: 'account_list_agent_tokens', arguments: {} },
   });
-  const accountListTokensPayload = parseToolText(accountListTokens);
-  const childTokenListRow = (accountListTokensPayload?.tokens || []).find((token) => token.id === accountCreateTokenPayload?.id);
-  log('account_list_agent_tokens returns child token metadata', Boolean(childTokenListRow) && childTokenListRow.rate_limit_per_minute === 77, accountListTokens.text);
-  log('account_list_agent_tokens never returns raw token or hash', Boolean(childTokenListRow) && !('raw_token' in childTokenListRow) && !('hash' in childTokenListRow), accountListTokens.text);
+  log(
+    'account_list_agent_tokens is not callable via agent-token MCP auth',
+    accountListTokens.json?.error?.code === -32602 ||
+      accountListTokens.json?.error?.code === -32601 ||
+      /not found|Unknown tool|not registered/i.test(accountListTokens.text),
+    accountListTokens.text,
+  );
 
   const accountRevokeToken = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',
     id: 28,
     method: 'tools/call',
-    params: { name: 'account_revoke_agent_token', arguments: { token_id: accountCreateTokenPayload?.id } },
+    params: { name: 'account_revoke_agent_token', arguments: { token_id: 'agtok_missing' } },
   });
-  const accountRevokeTokenPayload = parseToolText(accountRevokeToken);
-  log('account_revoke_agent_token revokes workspace child token', accountRevokeTokenPayload?.ok === true && accountRevokeTokenPayload?.revoked === true, accountRevokeToken.text);
+  log(
+    'account_revoke_agent_token is not callable via agent-token MCP auth',
+    accountRevokeToken.json?.error?.code === -32602 ||
+      accountRevokeToken.json?.error?.code === -32601 ||
+      /not found|Unknown tool|not registered/i.test(accountRevokeToken.text),
+    accountRevokeToken.text,
+  );
 
   const initialSharing = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',
@@ -784,6 +801,21 @@ try {
   });
   const withdrawReviewPayload = parseToolText(withdrawReview);
   log('studio_withdraw_app_review returns pending app to private', withdrawReviewPayload?.ok === true && withdrawReviewPayload?.visibility === 'private', withdrawReview.text);
+
+  const invalidWithdrawReview = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 345,
+    method: 'tools/call',
+    params: { name: 'studio_withdraw_app_review', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const invalidWithdrawReviewPayload = parseToolText(invalidWithdrawReview);
+  log(
+    'studio_withdraw_app_review maps illegal transition to 409 tool error',
+    invalidWithdrawReview.json?.result?.isError === true &&
+      invalidWithdrawReviewPayload?.status === 409 &&
+      invalidWithdrawReviewPayload?.code === 'illegal_transition',
+    invalidWithdrawReview.text,
+  );
 
   const secretPolicies = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',

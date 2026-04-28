@@ -65,6 +65,9 @@ function writeConfig(conf) {
 }
 
 function openInBrowser(url) {
+  if (process.env.FLOOM_CLI_NO_BROWSER === '1' || process.env.FLOOM_NO_BROWSER === '1') {
+    return false;
+  }
   // No deps. Best-effort cross-platform open. Falls back to printing the URL.
   const cmds =
     process.platform === 'darwin'
@@ -102,11 +105,36 @@ function looksLikeToken(s) {
   return /^floom_(agent|user)_[A-Za-z0-9_\-]{16,}$/.test(s);
 }
 
+async function verifyToken(apiUrl, token) {
+  const url = `${apiUrl.replace(/\/$/, '')}/api/session/me`;
+  let res;
+  let body = '';
+  try {
+    res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    body = await res.text();
+  } catch (err) {
+    throw new Error(`could not reach ${url}: ${err && err.message ? err.message : String(err)}`);
+  }
+  let json = null;
+  try {
+    json = body ? JSON.parse(body) : null;
+  } catch {
+    // Keep json null; the status still drives validation.
+  }
+  if (!res.ok) {
+    const code = json && (json.code || json.error) ? ` (${json.code || json.error})` : '';
+    throw new Error(`token rejected by ${apiUrl.replace(/\/$/, '')}: HTTP ${res.status}${code}`);
+  }
+  return json || {};
+}
+
 // ---- setup ----------------------------------------------------------------
 
 async function runSetup(opts) {
   const apiUrl = opts.apiUrl || DEFAULT_API_URL;
-  const tokenUrl = `${apiUrl.replace(/\/$/, '')}/home`;
+  const tokenUrl = `${apiUrl.replace(/\/$/, '')}/me/agent-keys`;
 
   console.log('');
   console.log(c.bold('  Floom · setup'));
@@ -123,6 +151,7 @@ async function runSetup(opts) {
   }
 
   let token = '';
+  let identity = {};
   for (;;) {
     token = await ask('  ' + c.bold('Step 2.') + '  Paste your token here: ');
     if (!token) {
@@ -133,6 +162,13 @@ async function runSetup(opts) {
       console.log(c.yellow('  That does not look like a Floom token (expected floom_agent_… or floom_user_…). Try again or press Ctrl+C.'));
       continue;
     }
+    try {
+      identity = await verifyToken(apiUrl, token);
+    } catch (err) {
+      console.log(c.yellow(`  ${err.message}`));
+      console.log(c.yellow('  Mint a fresh Agent token and try again, or press Ctrl+C.'));
+      continue;
+    }
     break;
   }
 
@@ -141,13 +177,16 @@ async function runSetup(opts) {
   const next = {
     ...existing,
     api_url: apiUrl,
-    agent_token: token,
+    api_key: token,
     saved_at: new Date().toISOString(),
   };
   writeConfig(next);
 
   console.log('');
   console.log(c.green('  ✓ Token saved to ') + c.dim(CONFIG_PATH));
+  const user = identity.user || {};
+  const label = user.email || user.id || identity.user_id || 'verified token';
+  console.log(c.green('  ✓ Verified ') + c.dim(String(label)));
   console.log('');
   console.log('  ' + c.bold('Next:'));
   console.log('  ' + c.dim('  • Verify: ') + 'floom auth whoami');

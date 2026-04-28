@@ -73,7 +73,7 @@ The whole stack self-hosts in one Docker container. Source is [MIT](./LICENSE).
 
 ```bash
 curl -X POST http://localhost:3000/api/resend/send-email \
-  -H "Authorization: Bearer $FLOOM_TOKEN" \
+  -H "Authorization: Bearer $FLOOM_API_KEY" \
   -H "content-type: application/json" \
   -d '{"from":"hi@floom.dev","to":"you@example.com","subject":"hi","text":"first"}'
 ```
@@ -156,7 +156,7 @@ build: pip install .
 run: uvicorn my_app.server:app --port 8000
 ```
 
-A single request header can only carry one auth token, so pick one per deployment: `FLOOM_AUTH_TOKEN` (operator-wide kill switch) **or** `FLOOM_CLOUD_MODE=true` (real user sign-in + per-user API keys). Full breakdown: [`docker/.env.example`](./docker/.env.example).
+A single request header can only carry one auth token, so pick one per deployment: `FLOOM_AUTH_TOKEN` (operator-wide kill switch) **or** `FLOOM_CLOUD_MODE=true` (real user sign-in + Agent tokens). Full breakdown: [`docker/.env.example`](./docker/.env.example).
 
 Full self-host guide: [docs/SELF_HOST.md](./docs/SELF_HOST.md) · Protocol spec: [spec/protocol.md](./spec/protocol.md) · More examples: [`examples/`](./examples).
 

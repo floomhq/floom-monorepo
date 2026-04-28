@@ -60,7 +60,7 @@ function makeManifest() {
   };
 }
 
-const secret = 'sk_launch_secret_1234567890';
+const secret = 'fixture-redaction-value';
 const server = createServer((req, res) => {
   if (req.url?.startsWith('/large')) {
     res.writeHead(200, { 'content-type': 'application/json' });

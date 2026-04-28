@@ -622,10 +622,10 @@ export function MvpHomePage() {
   }, [isAuthenticated, navigate]);
 
   const hasToken = tokens !== null && tokens.length > 0;
-  // After minting, use the live raw token in snippets. Fall back to masked
-  // placeholder once token exists but the raw value is no longer in state
-  // (e.g. after page reload — the user has to rotate to see a new raw token).
-  const installToken = liveRawToken ?? (hasToken ? 'floom_agent_••••••••' : '');
+  // Agent tokens are display-once. After a reload we can show that a token
+  // exists, but we cannot produce a copyable install snippet with a masked
+  // placeholder because that creates broken client configs.
+  const installToken = liveRawToken ?? '';
 
   // Pull a sane greeting label from the session.
   const user = session?.user;
@@ -680,8 +680,23 @@ export function MvpHomePage() {
             <h2 style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: INK, margin: '28px 0 12px' }}>
               Install
             </h2>
-            {hasToken || liveRawToken ? (
+            {liveRawToken ? (
               <InstallTabs token={installToken} />
+            ) : hasToken ? (
+              <div
+                data-testid="install-token-hidden"
+                style={{
+                  border: `1px solid ${LINE}`,
+                  borderRadius: 12,
+                  background: CARD,
+                  padding: '28px 24px',
+                  textAlign: 'center' as const,
+                }}
+              >
+                <p style={{ fontSize: 13, color: MUTED, margin: 0, lineHeight: 1.6 }}>
+                  Existing tokens are hidden after creation. Mint a new token to copy a fresh install snippet.
+                </p>
+              </div>
             ) : (
               <div
                 data-testid="install-no-token"

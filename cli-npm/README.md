@@ -8,7 +8,7 @@ One command to set up Floom: mints a token, configures MCP, and you're live.
 npx @floomhq/cli@latest setup
 ```
 
-This opens https://floom.dev/home in your browser, asks you to paste an agent token, saves it to `~/.floom/config.json`, and prints the MCP config snippet.
+This opens https://floom.dev/me/agent-keys in your browser, asks you to paste an Agent token, verifies it against the API, saves it to `~/.floom/config.json`, and prints the MCP config snippet.
 
 ## Other commands
 
