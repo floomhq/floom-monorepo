@@ -762,28 +762,6 @@ export function StudioAppsV26Page() {
                   <StudioEmptyState />
                 ) : (
                   <>
-                    {/* Section label */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        marginBottom: 12,
-                        fontFamily: 'JetBrains Mono, ui-monospace, monospace',
-                        fontSize: 10.5,
-                        fontWeight: 700,
-                        color: 'var(--muted)',
-                        letterSpacing: '0.1em',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      <span>Your apps</span>
-                      <span
-                        aria-hidden="true"
-                        style={{ flex: 1, height: 1, background: 'var(--line)' }}
-                      />
-                    </div>
-
                     {/* Filter empty state — shown inline above grid, grid stays visible */}
                     {filteredApps !== null && filteredApps.length === 0 && activeFilter !== 'all' && (
                       <div
