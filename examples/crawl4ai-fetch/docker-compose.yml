@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  proxy:
+    image: node:22-slim
+    working_dir: /app
+    command: ["node", "examples/crawl4ai-fetch/server.mjs"]
+    ports:
+      - "127.0.0.1:4330:4330"
+    environment:
+      - CRAWL4AI_FETCH_PORT=4330
+      - CRAWL4AI_FETCH_HOST=0.0.0.0
+      - UPSTREAM_URL=http://engine:8000
+    volumes:
+      - ../..:/app:ro
+    depends_on:
+      engine:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - floom-internal
+
+  engine:
+    build: .
+    expose:
+      - "8000"
+    environment:
+      - PORT=8000
+      - DATA_DIR=/data
+    volumes:
+      - crawl4ai-data:/data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/appuser/.cache
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    shm_size: "1gb"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - floom-internal
+
+volumes:
+  crawl4ai-data:
+
+networks:
+  floom-internal:
+    internal: true

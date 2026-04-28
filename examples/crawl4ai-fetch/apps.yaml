@@ -1,0 +1,19 @@
+apps:
+  - slug: crawl4ai-fetch
+    display_name: Crawl4AI Fetch
+    category: developer-tools
+    description: >
+      Fetch any URL and get the full page content as clean Markdown, ready for AI pipelines.
+      Handles JavaScript-heavy pages that simple HTTP clients can't read.
+    runtime: node
+    entrypoint: examples/crawl4ai-fetch/server.mjs
+    port: 4330
+    visibility: public
+    env:
+      - UPSTREAM_URL
+    icon: crawl4ai-fetch
+    tags:
+      - web-scraping
+      - markdown
+      - developer-tools
+      - crawling
