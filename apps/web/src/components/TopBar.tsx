@@ -178,6 +178,14 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
     location.pathname === '/login' || location.pathname === '/signup';
   const isSignInRoute = location.pathname === '/login';
   const isSignUpRoute = location.pathname === '/signup';
+  // R11 (2026-04-28): Gemini audit on /p/:slug flagged Publish as a
+  // confusing CTA for visitors who landed on a SOMEONE ELSE's app page.
+  // Hide Publish on app permalink routes — the marketing landing still
+  // shows it for would-be creators, but the app detail page is now
+  // focused on understanding/running the existing app, not promoting
+  // your own. Anonymous + signed-in non-owner users alike get this
+  // simpler view. (Owners see Publish elsewhere via Studio.)
+  const isAppPermalinkRoute = location.pathname.startsWith('/p/');
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -409,8 +417,12 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           {!isLoginPage && !showAuthedChrome && <GitHubStarsBadge compact />}
 
           {/* Get install snippet — anon only (authed users have the /home page).
-              Hidden on auth pages. */}
-          {!isLoginPage && !showAuthedChrome && <CopyForClaudeButton />}
+              Hidden on auth pages. R11b (2026-04-28): also hidden on
+              /p/:slug routes — the app detail page already has its own
+              Install button next to the app name, so the global "Get
+              install snippet" duplicates that affordance and clutters
+              the right cluster. */}
+          {!isLoginPage && !showAuthedChrome && !isAppPermalinkRoute && <CopyForClaudeButton />}
 
           {/* Primary CTA — brand-green pill for anon only on launch-mvp.
               Authed users use /home (token + install). Drop "+ New app" from
@@ -425,7 +437,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               + New app
             </Link>
           )}
-          {!isLoginPage && !showAuthedChrome && deployEnabled && (
+          {!isLoginPage && !showAuthedChrome && deployEnabled && !isAppPermalinkRoute && (
             <Link
               to="/studio/build"
               data-testid="topbar-publish-cta"
@@ -435,7 +447,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               Publish
             </Link>
           )}
-          {!isLoginPage && !showAuthedChrome && waitlistMode && (
+          {!isLoginPage && !showAuthedChrome && waitlistMode && !isAppPermalinkRoute && (
             <button
               type="button"
               data-testid="topbar-publish-cta-waitlist"

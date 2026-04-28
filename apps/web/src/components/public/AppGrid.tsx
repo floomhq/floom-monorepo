@@ -594,19 +594,26 @@ function AppGridCard({
         ) : (
           <span aria-hidden="true" />
         )}
+        {/* R11b (2026-04-28): Gemini audit — small text "Open →"
+            wasn't reading as an interactive CTA. Promoted to a
+            button-styled accent pill so the affordance is unambiguous
+            even though the entire card is the click target. */}
         <span
           className="app-grid-cta"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 4,
+            padding: '5px 10px',
+            background: 'var(--accent, #047857)',
+            color: '#fff',
+            borderRadius: 6,
             fontSize: 12,
             fontWeight: 600,
-            color: 'var(--accent, #047857)',
           }}
         >
-          Run
-          <ArrowRight size={14} aria-hidden="true" />
+          Open app
+          <ArrowRight size={12} aria-hidden="true" />
         </span>
       </div>
     </Link>

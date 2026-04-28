@@ -202,24 +202,34 @@ export function AppShowcaseRow({ apps }: AppShowcaseRowProps) {
             margin: 0,
           }}
         >
-          3 AI apps. 5 free runs each on Floom's Gemini key.
+          {/* R11b: clarify the messaging to avoid the "10 vs 3 vs Free"
+              confusion Gemini flagged. Featured row is the curated
+              launch set; the 5 free runs are per app, on our key. */}
+          Curated launch set. 5 free runs per app, on our Gemini key.
         </p>
       </div>
 
+      {/* R11 (2026-04-28): floom.dev-pattern hero treatment — first
+          featured card spans 2 cols at >=1024px (visually dominant)
+          while the remaining cards stay 1-col. 4-col grid gives us
+          2+1+1 layout. The CSS class `apps-showcase-grid` collapses
+          this to a single column on phones via the existing media
+          rules in csp-inline-style-migrations.css. */}
       <div
         data-testid="apps-showcase-grid"
-        className="apps-showcase-grid"
+        className="apps-showcase-grid apps-showcase-grid-hero"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 22,
         }}
       >
-        {visibleEntries.map((entry) => (
+        {visibleEntries.map((entry, idx) => (
           <ShowcaseCard
             key={entry.slug}
             entry={entry}
             app={bySlug.get(entry.slug)}
+            isHero={idx === 0}
           />
         ))}
       </div>
@@ -230,9 +240,12 @@ export function AppShowcaseRow({ apps }: AppShowcaseRowProps) {
 function ShowcaseCard({
   entry,
   app,
+  isHero = false,
 }: {
   entry: ShowcaseEntry;
   app?: HubApp;
+  /** First card in the row gets the 2-col hero treatment. */
+  isHero?: boolean;
 }) {
   // Prefer live API name/desc/stats when present (so a server edit
   // doesn't require a redeploy of the editorial fallback). Fall back
@@ -255,6 +268,9 @@ function ShowcaseCard({
     boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
     transition:
       'border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease',
+    // R11: hero card spans 2 cols on desktop (4-col grid → 2+1+1).
+    // CSS class also overrides this on mobile via media query.
+    gridColumn: isHero ? 'span 2' : 'span 1',
   };
 
   return (
@@ -465,6 +481,11 @@ function ShowcaseCard({
           >
             {entry.installVia}
           </span>
+          {/* R11 (2026-04-28): Gemini audit — "Run it" implied immediate
+              execution, but clicking the card actually navigates to
+              /p/:slug (the about-the-app + runner surface). "Open app"
+              is honest and gives visitors the path to read first, run
+              second. */}
           <span
             style={{
               display: 'inline-flex',
@@ -478,7 +499,7 @@ function ShowcaseCard({
               fontWeight: 600,
             }}
           >
-            Run it
+            Open app
             <ArrowRight size={14} aria-hidden="true" />
           </span>
         </div>

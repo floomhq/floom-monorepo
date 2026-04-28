@@ -813,6 +813,19 @@ export function RunSurface({
     submittedPayloadRef.current = { inputs, spec: actionSpec };
 
     if (app.is_async) {
+      // R11 (2026-04-28): Gemini audit — output panel stayed on
+      // "Positioning will appear here" for the duration of the network
+      // round-trip to startJob (could be 200-800ms). Flip the phase to
+      // 'job' synchronously so JobProgress with a "Connecting..."
+      // placeholder paints within the first frame. We patch in the
+      // real job_id below once startJob resolves.
+      setState((s) => ({
+        ...s,
+        phase: 'job',
+        jobId: undefined,
+        job: null,
+        errorMessage: undefined,
+      }));
       try {
         const { job_id } = await api.startJob(app.slug, inputs, action);
         let stopPoll: (() => void) | null = null;
@@ -893,9 +906,23 @@ export function RunSurface({
       return;
     }
 
+    // R11 (2026-04-28): Gemini audit — output panel stayed on the
+    // "Positioning will appear here" placeholder during the network
+    // round-trip to startRun (could be 200-800ms on cold start), making
+    // the click feel unresponsive. Flip phase to 'streaming' with an
+    // empty log buffer SYNCHRONOUSLY so StreamingTerminal's "Running..."
+    // state paints within the first frame. We patch in the real
+    // run_id once startRun resolves.
+    setState((s) => ({
+      ...s,
+      phase: 'streaming',
+      runId: undefined,
+      logs: [],
+      errorMessage: undefined,
+    }));
     try {
       const { run_id } = await api.startRun(app.slug, inputs, undefined, action);
-      setState((s) => ({ ...s, phase: 'streaming', runId: run_id, logs: [] }));
+      setState((s) => ({ ...s, phase: 'streaming', runId: run_id, logs: s.logs ?? [] }));
 
       const close = api.streamRun(run_id, {
         onLog: (line) => {

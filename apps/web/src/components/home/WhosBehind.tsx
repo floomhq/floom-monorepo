@@ -122,8 +122,8 @@ export function WhosBehind() {
             Ex-founder of SCAILE (reached $600K ARR, team of 10, left in
             March 2026). Building Floom full-time from San Francisco. If
             you&rsquo;re shipping an agent-era app and something on the
-            page is unclear, please write &mdash; the fastest way to reach
-            me is email.
+            page is unclear, please write. Email is the fastest way to
+            reach me.
           </p>
           <p style={{ ...BODY_STYLE, marginTop: 12, fontSize: 13, color: 'var(--muted)' }}>
             Floom is in the <a href="https://f.inc" target="_blank" rel="noreferrer" style={{ color: 'var(--ink)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid var(--line)' }}>Founders Inc</a> cohort.

@@ -14,7 +14,6 @@ import { AppGrid } from '../components/public/AppGrid';
 import {
   AppShowcaseRow,
   AppShowcaseRowSkeleton,
-  SHOWCASE_ROW_SLUGS,
 } from '../components/public/AppShowcaseRow';
 import { FeedbackButton } from '../components/FeedbackButton';
 import { PageHead } from '../components/PageHead';
@@ -304,10 +303,13 @@ export function AppsDirectoryPage() {
   const showShowcaseBand = !isFiltered || showcaseApps.length > 0;
 
   const appCount = sortedApps.length;
-  // Total slugs the showcase row will render — used for the H1 ("3 AI
-  // apps. Free to run.") and as a stable count independent of which
-  // showcase apps the API has loaded yet.
-  const showcaseCount = SHOWCASE_ROW_SLUGS.length;
+  // R11 (2026-04-28): Gemini audit flagged the H1 contradicting the
+  // toolbar count. Previously the H1 said "3 AI apps." (hardcoded
+  // showcase row) while the toolbar chip said "All 10". Federico's bar:
+  // the H1 must match the live count of every app the visitor can see.
+  // Pulled from the same `sortedApps` source as the chip filter so the
+  // numbers stay locked together.
+  const showcaseCount = appCount;
 
   return (
     <div
