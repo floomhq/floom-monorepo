@@ -1,31 +1,29 @@
 /**
  * InstallPopover — unified "Install" affordance for /p/:slug.
  *
- * R7.6 (2026-04-28). Federico's brief: replace the two-button install
- * cluster ("+ Install in workspace" disabled stub + "Install as Skill"
- * modal trigger) with ONE primary Install button that opens a popover
- * with three tabs:
+ * R14 (2026-04-28). Federico's brief: redesign the popover for clarity.
+ * Gemini scored 4/10 on R13 because the token field, endpoint URL, and
+ * copy buttons were buried inside the JSON config block. R14 surfaces
+ * each as its own labeled affordance.
  *
- *   - MCP    — pre-filled MCP config snippet for /mcp/app/:slug
- *   - CLI    — `npx @floomhq/cli@latest run <slug>` (or `floom run <slug>`)
- *   - Skill  — paste paths for Claude Code / Cursor / Codex + download
+ * Layout (top → bottom, every tab):
+ *   1. Token section — paste field (signed-out) OR masked token + reveal
+ *      (signed-in). Pasting/typing updates the snippet below in real time.
+ *   2. Endpoint URL field (MCP) / Skill URL field (Skill) with its own
+ *      Copy URL button. CLI tab skips this — the command IS the URL.
+ *   3. Code block with a prominent labeled Copy button above-right.
+ *   4. Skill tab also keeps the per-agent sub-tabs and skill.md download.
  *
- * The popover is anchored to the trigger button. Click-outside and Escape
- * dismiss. Tabs are role=tablist for a11y. Snippets sit on `--studio`
- * tinted bg per the global "no black copy boxes" rule.
- *
- * Token state: when the user is signed in and has a token minted, we
- * inline a masked placeholder (`floom_agent_••••••••`) plus a "Mint a
- * token →" link if no token exists. We deliberately don't fetch the
- * raw token here — that lives behind `/home`'s mint flow so it's only
- * shown once at create time. Users with a token get the snippet ready
- * to paste; users without get the snippet template + a clear path to
- * mint.
+ * Token state strategy: we never fetch the raw signed-in token (it's
+ * shown once at mint time on /home). Signed-in users see a masked
+ * placeholder (`floom_agent_••••...••••`) unless they paste their token
+ * back in to preview the working snippet locally. The paste field is
+ * client-only — the value never leaves the browser.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ElementType } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Terminal, Server, Download } from 'lucide-react';
+import { Sparkles, Terminal, Server, Download, Eye, EyeOff } from 'lucide-react';
 import { CopyButton } from '../output/CopyButton';
 
 // lucide-react icons forward refs and use `Booleanish` for aria-hidden,
@@ -84,11 +82,14 @@ const AGENTS: Array<{
   },
 ];
 
+const MASKED_TOKEN = 'floom_agent_••••••••••••••••';
+const PLACEHOLDER_TOKEN = 'YOUR_TOKEN';
+
 export function InstallPopover({
   open,
   onClose,
   slug,
-  appName,
+  appName: _appName,
   isAuthenticated,
   hasToken = false,
   firstInputName,
@@ -96,6 +97,8 @@ export function InstallPopover({
 }: InstallPopoverProps) {
   const [activeTab, setActiveTab] = useState<TabId>('mcp');
   const [activeAgent, setActiveAgent] = useState<AgentId>('claude-code');
+  const [pastedToken, setPastedToken] = useState('');
+  const [revealMasked, setRevealMasked] = useState(false);
   const surfaceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -119,23 +122,37 @@ export function InstallPopover({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  const baseOrigin = useMemo(
+    () =>
+      origin ||
+      (typeof window !== 'undefined' ? window.location.origin : 'https://floom.dev'),
+    [origin]
+  );
 
-  const baseOrigin =
-    origin ||
-    (typeof window !== 'undefined' ? window.location.origin : 'https://floom.dev');
-  const tokenPlaceholder = hasToken
-    ? 'floom_agent_<your_token>'
-    : 'floom_agent_<your_token>';
+  // Token to render inside the JSON snippet. Priority:
+  //   1. Pasted token (live preview)
+  //   2. Signed-in masked placeholder
+  //   3. Anonymous placeholder (`YOUR_TOKEN`)
+  const effectiveToken = pastedToken.trim()
+    ? pastedToken.trim()
+    : isAuthenticated && hasToken
+      ? MASKED_TOKEN
+      : isAuthenticated
+        ? MASKED_TOKEN
+        : PLACEHOLDER_TOKEN;
+
+  // URLs surfaced as their own copy-able fields.
+  const endpointUrl = `${baseOrigin}/mcp/app/${slug}`;
+  const skillUrl = `${baseOrigin}/p/${slug}/skill.md`;
 
   // MCP snippet — points at the per-app route (/mcp/app/<slug>) so the
   // agent only sees this app, not the whole catalogue.
   const mcpSnippet = `{
   "mcpServers": {
     "${slug}": {
-      "url": "${baseOrigin}/mcp/app/${slug}",
+      "url": "${endpointUrl}",
       "headers": {
-        "Authorization": "Bearer ${tokenPlaceholder}"
+        "Authorization": "Bearer ${effectiveToken}"
       }
     }
   }
@@ -146,7 +163,6 @@ export function InstallPopover({
 
   // Skill: per-agent install command. Mirrors SkillModal's structure
   // but inlined here so the popover is one self-contained surface.
-  const skillUrl = `${baseOrigin}/p/${slug}/skill.md`;
   const agent = AGENTS.find((a) => a.id === activeAgent) ?? AGENTS[0];
   const pastePath = agent.pastePath(slug);
   const skillCommand = [
@@ -157,6 +173,8 @@ export function InstallPopover({
   const examplePrompt = firstInputName
     ? `Run ${slug} with ${firstInputName}=…`
     : `Run ${slug}`;
+
+  if (!open) return null;
 
   const tabBtn = (id: TabId, label: string, Icon: IconCmp) => {
     const active = id === activeTab;
@@ -169,7 +187,7 @@ export function InstallPopover({
         data-testid={`install-popover-tab-${id}`}
         onClick={() => setActiveTab(id)}
         style={{
-          padding: '9px 14px',
+          padding: '10px 14px',
           fontSize: 12.5,
           fontWeight: active ? 700 : 500,
           border: 'none',
@@ -196,13 +214,13 @@ export function InstallPopover({
       ref={surfaceRef}
       role="dialog"
       aria-modal="false"
-      aria-label={`Install ${appName}`}
+      aria-label={`Install ${_appName}`}
       data-testid="install-popover"
       style={{
         position: 'absolute',
         top: 'calc(100% + 8px)',
         right: 0,
-        width: 'min(520px, calc(100vw - 32px))',
+        width: 'min(560px, calc(100vw - 32px))',
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 12,
@@ -218,7 +236,7 @@ export function InstallPopover({
         style={{
           display: 'flex',
           gap: 2,
-          padding: '0 14px',
+          padding: '0 16px',
           borderBottom: '1px solid var(--line)',
           background: 'var(--bg, #fafaf8)',
         }}
@@ -228,56 +246,47 @@ export function InstallPopover({
         {tabBtn('skill', 'Skill', Sparkles)}
       </div>
 
-      {/* Tab body */}
-      <div style={{ padding: 14 }}>
-        {/* Token affordance — visible on every tab so the user always
-            knows whether their snippet is ready to paste. */}
-        {!isAuthenticated ? (
-          <p
-            data-testid="install-popover-signin"
-            style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.55 }}
-          >
-            <Link
-              to={`/login?next=${encodeURIComponent(`/p/${slug}`)}`}
-              style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
-            >
-              Sign in to mint a token →
-            </Link>{' '}
-            or paste with a placeholder and fill it in later.
-          </p>
-        ) : !hasToken ? (
-          <p
-            data-testid="install-popover-mint"
-            style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.55 }}
-          >
-            <Link
-              to="/home"
-              style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
-            >
-              Mint a token →
-            </Link>{' '}
-            then replace <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>{'<your_token>'}</code> below.
-          </p>
-        ) : null}
+      {/* Body */}
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* 1. Token affordance — appears on every tab so the user always
+              has the token primitive at hand. */}
+        <TokenSection
+          isAuthenticated={isAuthenticated}
+          hasToken={hasToken}
+          slug={slug}
+          pastedToken={pastedToken}
+          onPaste={setPastedToken}
+          revealMasked={revealMasked}
+          onToggleReveal={() => setRevealMasked((v) => !v)}
+        />
 
+        {/* 2. Per-tab URL field + 3. code block with prominent Copy. */}
         {activeTab === 'mcp' && (
-          <Snippet
-            label="MCP config"
-            description="Works with any MCP client (Claude Desktop, Cursor, Codex, …)."
-            value={mcpSnippet}
-            testId="install-popover-mcp-snippet"
-          />
+          <>
+            <UrlField
+              label="Endpoint URL"
+              value={endpointUrl}
+              testId="install-popover-mcp-url"
+              copyLabel="Copy URL"
+            />
+            <CodeBlock
+              description="Paste this into your MCP client's config file."
+              value={mcpSnippet}
+              testId="install-popover-mcp-snippet"
+              copyLabel="Copy JSON config"
+            />
+          </>
         )}
         {activeTab === 'cli' && (
-          <Snippet
-            label="CLI"
+          <CodeBlock
             description="Run from any shell — Node 18+ required."
             value={cliSnippet}
             testId="install-popover-cli-snippet"
+            copyLabel="Copy command"
           />
         )}
         {activeTab === 'skill' && (
-          <div data-testid="install-popover-skill-pane">
+          <div data-testid="install-popover-skill-pane" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Per-agent sub-tabs */}
             <div
               role="tablist"
@@ -285,7 +294,6 @@ export function InstallPopover({
               style={{
                 display: 'flex',
                 gap: 2,
-                marginBottom: 10,
                 borderBottom: '1px solid var(--line)',
               }}
             >
@@ -300,7 +308,7 @@ export function InstallPopover({
                     data-testid={`install-popover-agent-${a.id}`}
                     onClick={() => setActiveAgent(a.id)}
                     style={{
-                      padding: '6px 12px',
+                      padding: '7px 12px',
                       fontSize: 11.5,
                       fontWeight: active ? 700 : 500,
                       border: 'none',
@@ -317,25 +325,32 @@ export function InstallPopover({
                 );
               })}
             </div>
-            <Snippet
-              label={`Save to ${agent.label}`}
+            <UrlField
+              label="Skill file URL"
+              value={skillUrl}
+              testId="install-popover-skill-url"
+              copyLabel="Copy URL"
+            />
+            <CodeBlock
               description={
                 <>
-                  Saves to{' '}
-                  <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>{pastePath}</code>
+                  Save to{' '}
+                  <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>
+                    {pastePath}
+                  </code>
                 </>
               }
               value={skillCommand}
               testId="install-popover-skill-snippet"
+              copyLabel="Copy install command"
             />
-            {/* Direct download fallback. */}
             <div
               style={{
-                marginTop: 10,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 10,
+                gap: 12,
                 flexWrap: 'wrap',
+                marginTop: -2,
               }}
             >
               <a
@@ -366,42 +381,353 @@ export function InstallPopover({
   );
 }
 
-function Snippet({
+/* ============================================================== */
+/* Token section                                                  */
+/* ============================================================== */
+
+function TokenSection({
+  isAuthenticated,
+  hasToken,
+  slug,
+  pastedToken,
+  onPaste,
+  revealMasked,
+  onToggleReveal,
+}: {
+  isAuthenticated: boolean;
+  hasToken: boolean;
+  slug: string;
+  pastedToken: string;
+  onPaste: (v: string) => void;
+  revealMasked: boolean;
+  onToggleReveal: () => void;
+}) {
+  const sectionStyle: React.CSSProperties = {
+    border: '1px solid var(--line)',
+    borderRadius: 10,
+    padding: '10px 12px',
+    background: 'var(--bg, #fafaf8)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11,
+    fontWeight: 700,
+    color: 'var(--muted)',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  };
+
+  const helperStyle: React.CSSProperties = {
+    fontSize: 11.5,
+    color: 'var(--muted)',
+    margin: 0,
+    lineHeight: 1.5,
+  };
+
+  // Anonymous: paste field + "Get your token" CTA.
+  if (!isAuthenticated) {
+    return (
+      <div data-testid="install-popover-token" style={sectionStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={labelStyle}>Agent token</div>
+          <Link
+            data-testid="install-popover-signin"
+            to={`/login?next=${encodeURIComponent(`/p/${slug}`)}`}
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--accent)',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Get your token →
+          </Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
+          <input
+            type="text"
+            inputMode="text"
+            spellCheck={false}
+            autoComplete="off"
+            data-testid="install-popover-token-input"
+            placeholder="Paste an existing token (floom_agent_…)"
+            value={pastedToken}
+            onChange={(e) => onPaste(e.target.value)}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: '7px 10px',
+              fontSize: 12,
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              border: '1px solid var(--line)',
+              borderRadius: 8,
+              background: 'var(--card)',
+              color: 'var(--ink)',
+              outline: 'none',
+            }}
+          />
+        </div>
+        <p style={helperStyle}>
+          Stays in your browser. Snippet below updates as you type.
+        </p>
+      </div>
+    );
+  }
+
+  // Signed in but no token minted yet.
+  if (!hasToken) {
+    return (
+      <div data-testid="install-popover-token" style={sectionStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={labelStyle}>Agent token</div>
+          <Link
+            data-testid="install-popover-mint"
+            to="/home"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--accent)',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Mint a token →
+          </Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
+          <input
+            type="text"
+            inputMode="text"
+            spellCheck={false}
+            autoComplete="off"
+            data-testid="install-popover-token-input"
+            placeholder="Or paste an existing token (floom_agent_…)"
+            value={pastedToken}
+            onChange={(e) => onPaste(e.target.value)}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: '7px 10px',
+              fontSize: 12,
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              border: '1px solid var(--line)',
+              borderRadius: 8,
+              background: 'var(--card)',
+              color: 'var(--ink)',
+              outline: 'none',
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Signed in with a token. Show masked placeholder + reveal toggle (which
+  // here only swaps between mask and a longer mask — the raw token is
+  // never available client-side once minted). The paste field stays so
+  // a user with multiple tokens can preview a different one.
+  const displayedToken = revealMasked
+    ? 'floom_agent_••••••••••••••••••••••••'
+    : MASKED_TOKEN;
+  return (
+    <div data-testid="install-popover-token" style={sectionStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={labelStyle}>Your agent token</div>
+        <Link
+          to="/me/settings/tokens"
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--accent)',
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Manage tokens →
+        </Link>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <code
+          data-testid="install-popover-token-masked"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: '7px 10px',
+            fontSize: 12,
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            background: 'var(--card)',
+            color: 'var(--ink)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {displayedToken}
+        </code>
+        <button
+          type="button"
+          aria-label={revealMasked ? 'Hide token' : 'Reveal token'}
+          onClick={onToggleReveal}
+          style={{
+            padding: '7px 9px',
+            fontSize: 12,
+            fontWeight: 600,
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            background: 'var(--card)',
+            color: 'var(--muted)',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+          }}
+        >
+          {revealMasked ? <EyeOff size={13} aria-hidden /> : <Eye size={13} aria-hidden />}
+        </button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
+        <input
+          type="text"
+          inputMode="text"
+          spellCheck={false}
+          autoComplete="off"
+          data-testid="install-popover-token-input"
+          placeholder="Or paste a different token to preview"
+          value={pastedToken}
+          onChange={(e) => onPaste(e.target.value)}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: '6px 10px',
+            fontSize: 11.5,
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            background: 'var(--card)',
+            color: 'var(--ink)',
+            outline: 'none',
+          }}
+        />
+      </div>
+      <p style={helperStyle}>
+        Raw token is shown once at mint time. Pasted tokens stay in your browser only.
+      </p>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* URL field                                                      */
+/* ============================================================== */
+
+function UrlField({
   label,
-  description,
   value,
   testId,
+  copyLabel,
 }: {
   label: string;
-  description: React.ReactNode;
   value: string;
   testId: string;
+  copyLabel: string;
 }) {
   return (
     <div>
       <div
         style={{
-          fontSize: 11.5,
-          fontWeight: 600,
+          fontSize: 11,
+          fontWeight: 700,
           color: 'var(--muted)',
-          letterSpacing: 0.4,
+          letterSpacing: 0.5,
           textTransform: 'uppercase',
-          margin: '0 0 4px',
+          margin: '0 0 6px',
         }}
       >
         {label}
       </div>
-      <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--muted)', lineHeight: 1.55 }}>
-        {description}
-      </p>
       <div
         data-testid={testId}
         style={{
-          position: 'relative',
+          display: 'flex',
+          alignItems: 'stretch',
+          gap: 8,
+        }}
+      >
+        <code
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: '8px 10px',
+            fontSize: 12,
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            background: 'var(--studio, #f5f4f0)',
+            color: 'var(--ink)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {value}
+        </code>
+        <CopyButton value={value} label={copyLabel} className="install-copy-btn install-copy-btn-inline" />
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* Code block                                                      */
+/* ============================================================== */
+
+function CodeBlock({
+  description,
+  value,
+  testId,
+  copyLabel,
+}: {
+  description: React.ReactNode;
+  value: string;
+  testId: string;
+  copyLabel: string;
+}) {
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: 12,
+          margin: '0 0 6px',
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: 'var(--muted)',
+            lineHeight: 1.5,
+            flex: 1,
+          }}
+        >
+          {description}
+        </p>
+        <CopyButton value={value} label={copyLabel} className="install-copy-btn install-copy-btn-primary" />
+      </div>
+      <div
+        data-testid={testId}
+        style={{
           border: '1px solid var(--line)',
           borderRadius: 10,
           background: 'var(--studio, #f5f4f0)',
-          padding: '10px 12px',
+          padding: '12px 14px',
         }}
       >
         <pre
@@ -410,18 +736,14 @@ function Snippet({
             fontFamily:
               'JetBrains Mono, ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
             fontSize: 12,
-            lineHeight: 1.55,
+            lineHeight: 1.6,
             color: 'var(--ink)',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
-            paddingRight: 64,
           }}
         >
           {value}
         </pre>
-        <div style={{ position: 'absolute', top: 8, right: 8 }}>
-          <CopyButton value={value} label="Copy" className="output-copy-btn" />
-        </div>
       </div>
     </div>
   );

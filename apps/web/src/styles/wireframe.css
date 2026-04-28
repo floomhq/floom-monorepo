@@ -984,6 +984,41 @@ input { font-family: inherit; }
   color: var(--accent);
 }
 
+/* ── Install popover copy buttons ────────────────────────── */
+.install-copy-btn {
+  height: 30px;
+  padding: 0 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.install-copy-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.install-copy-btn-primary {
+  background: var(--ink);
+  color: var(--card);
+  border-color: var(--ink);
+}
+.install-copy-btn-primary:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.install-copy-btn-inline {
+  height: 34px;
+  padding: 0 14px;
+}
+
 .quick-pills {
   display: flex;
   gap: 8px;
