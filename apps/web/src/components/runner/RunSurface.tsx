@@ -1208,13 +1208,14 @@ export function RunSurface({
       {/* v26 R4-1: unified card wraps input + output as one container. */}
       <div className="run-unified-card">
       {/* R10 (2026-04-28): wireframe v17 status header. Shows live state
-          INSIDE the run card (not just in the page hero). Three states:
-            idle    — quiet "Ready" + Run button
+          INSIDE the run card. Three states:
+            idle    — quiet "Ready" pill (no Run button — InputCard owns it)
             running — green pulsing dot + "Running · 0:03" + Stop button
             done    — green check + "Done · 1.2s" + Run again button
-          Federico R10 brief: "lift run state into the hero next to the
-          title" — we do it INSIDE the run-card so it scopes to this
-          surface and doesn't fight the page-level breadcrumb hero. */}
+          Gemini R10 audit: removed the duplicate idle Run button from
+          the header (was conflicting with the InputCard's Run button).
+          The header's Run button only appears in done/error states as
+          "Run again", which is the wireframe's intended affordance. */}
       <RunStatusHeader
         appName={app.name}
         phase={state.phase}
@@ -1529,7 +1530,7 @@ function RunStatusHeader({
   running,
   onCancel,
   onRun,
-  runLabel,
+  runLabel: _runLabel,
 }: {
   appName: string;
   phase: Phase;
@@ -1540,7 +1541,13 @@ function RunStatusHeader({
   onRun: () => void;
   runLabel: string;
 }) {
+  void _runLabel;
   const showRunAgain = phase === 'done' || phase === 'error';
+  // R10 polish (Gemini audit): only show the header Run button when
+  // the action is meaningfully different from the InputCard's Run
+  // button. In `ready` (idle), the InputCard already has a primary
+  // green Run; surfacing the same affordance twice diluted the CTA.
+  const showHeaderRunButton = running || showRunAgain;
   return (
     <div
       data-testid="run-status-header"
@@ -1599,7 +1606,7 @@ function RunStatusHeader({
             Stop
           </button>
         )}
-        {!running && (
+        {!running && showHeaderRunButton && (
           <button
             type="button"
             data-testid="run-status-run-btn"
@@ -1619,7 +1626,7 @@ function RunStatusHeader({
               gap: 6,
             }}
           >
-            {showRunAgain ? 'Run again' : runLabel}
+            Run again
             <svg viewBox="0 0 16 16" width={11} height={11} aria-hidden="true">
               <path d="M5 3l6 5-6 5V3z" fill="currentColor" />
             </svg>
@@ -2390,9 +2397,12 @@ function EmptyOutputCard({
           <div style={{ marginTop: 18 }}>
             <SampleOutputPreview slug={slug} />
           </div>
-        ) : (
-          <EmptyOutputSkeleton outputType={heroOutput?.type} />
-        )}
+        ) : null}
+        {/* R10 polish (Gemini audit): the no-sample fallback used to
+            render a fake RESULT/SCORE skeleton table. That was confusing
+            (read as "loading" not "empty"). The clear instructional
+            copy above is enough — no skeleton when we don't have real
+            sample data. */}
       </div>
     </div>
   );
@@ -2422,6 +2432,10 @@ function pickHeroOutput(
  * upcoming run output. Purely presentational — role=presentation so
  * screen readers skip it (the copy above already describes the slot).
  */
+// R10 polish: kept in case sample data lands for non-launch slugs.
+// Currently unreferenced; main empty path shows the instruction copy
+// only. The `void EmptyOutputSkeleton` at the bottom of the module
+// keeps TS6133 happy without deleting the helper.
 function EmptyOutputSkeleton({ outputType }: { outputType: OutputType | undefined }) {
   const commonWrap: React.CSSProperties = {
     marginTop: 18,
@@ -3368,3 +3382,6 @@ export const __test__ = {
   formatWhen,
   formatRecapValue,
 };
+
+// R10: keep EmptyOutputSkeleton importable for tests / future restore.
+void EmptyOutputSkeleton;
