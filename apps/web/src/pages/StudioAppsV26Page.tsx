@@ -207,13 +207,18 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
-        transition: 'border-color 0.15s ease',
+        boxShadow: 'var(--shadow-2)',
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--line-hover)';
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(22,21,18,0.04), 0 1px 3px rgba(22,21,18,0.03), 0 4px 16px rgba(14,14,12,0.05)';
+        e.currentTarget.style.transform = 'translateY(-1px)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--line)';
+        e.currentTarget.style.boxShadow = 'var(--shadow-2)';
+        e.currentTarget.style.transform = '';
       }}
     >
       {/* Row 1: icon + name + live/draft pill */}
