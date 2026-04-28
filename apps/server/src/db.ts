@@ -100,6 +100,13 @@ if (!appCols.includes('review_decided_by')) {
 if (!appCols.includes('review_comment')) {
   db.exec(`ALTER TABLE apps ADD COLUMN review_comment TEXT`);
 }
+if (!appCols.includes('forked_from_app_id')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN forked_from_app_id TEXT REFERENCES apps(id) ON DELETE SET NULL`);
+}
+if (!appCols.includes('claimed_at')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN claimed_at TEXT`);
+}
+db.exec(`CREATE INDEX IF NOT EXISTS idx_apps_forked_from ON apps(forked_from_app_id)`);
 
 export function migrateLegacyAuthRequiredColumn(): void {
   const columns = (db.prepare(`PRAGMA table_info(apps)`).all() as { name: string }[]).map(
@@ -199,6 +206,11 @@ if (!appCols.includes('retries')) {
 // acts on apps with an explicit positive day count.
 if (!appCols.includes('max_run_retention_days')) {
   db.exec(`ALTER TABLE apps ADD COLUMN max_run_retention_days INTEGER`);
+}
+// Creator-configurable per-app run cap. NULL means use the global
+// FLOOM_RATE_LIMIT_APP_PER_HOUR/defaultPerAppPerHour budget.
+if (!appCols.includes('run_rate_limit_per_hour')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN run_rate_limit_per_hour INTEGER`);
 }
 // Client contract for async apps: 'poll' (default), 'webhook', or 'stream'.
 // Stored for the manifest advertisement; runtime behavior is the same today.
@@ -1045,6 +1057,21 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_app_reviews_slug ON app_reviews(app_slug);
   CREATE INDEX IF NOT EXISTS idx_app_reviews_user ON app_reviews(user_id);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS app_installs (
+    id TEXT PRIMARY KEY,
+    app_id TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    installed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(app_id, workspace_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_app_installs_workspace
+    ON app_installs(workspace_id, user_id, installed_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_app_installs_app
+    ON app_installs(app_id);
 `);
 
 // ---------- W4-minimal: product feedback ----------
