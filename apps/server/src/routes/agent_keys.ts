@@ -54,15 +54,22 @@ function assertWorkspaceAccess(
   workspace_id: string,
 ): Response | null {
   try {
-    workspaces.assertRole(ctx, workspace_id, 'editor');
+    workspaces.assertRole(ctx, workspace_id, 'admin');
     return null;
-  } catch {
+  } catch (err) {
+    const code =
+      err instanceof workspaces.InsufficientRoleError
+        ? 'insufficient_role'
+        : 'workspace_not_found';
     return c.json(
       {
-        error: 'Workspace not found or not accessible',
-        code: 'workspace_not_found',
+        error:
+          code === 'insufficient_role'
+            ? 'Admin role required to manage Agent tokens for this workspace'
+            : 'Workspace not found or not accessible',
+        code,
       },
-      404,
+      code === 'insufficient_role' ? 403 : 404,
     );
   }
 }

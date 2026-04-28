@@ -45,6 +45,72 @@ export const RUN_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
 export const isRunBodyLimitDisabled = (): boolean =>
   process.env.FLOOM_RUN_BODY_LIMIT_DISABLED === 'true';
 
+export class RequestBodyTooLargeError extends Error {
+  readonly limitBytes: number;
+  readonly observedBytes: number;
+
+  constructor(
+    limitBytes: number,
+    observedBytes: number,
+  ) {
+    super(
+      `Request body is ${observedBytes} bytes; max allowed for run endpoints is ${limitBytes}.`,
+    );
+    this.name = 'RequestBodyTooLargeError';
+    this.limitBytes = limitBytes;
+    this.observedBytes = observedBytes;
+  }
+}
+
+export async function readRequestTextWithLimit(
+  request: Request,
+  limitBytes = RUN_BODY_LIMIT_BYTES,
+): Promise<string> {
+  const lenHeader = request.headers.get('content-length');
+  if (lenHeader) {
+    const len = Number(lenHeader);
+    if (Number.isFinite(len) && len > limitBytes) {
+      throw new RequestBodyTooLargeError(limitBytes, len);
+    }
+  }
+
+  if (!request.body) return '';
+
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  let received = 0;
+  try {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > limitBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new RequestBodyTooLargeError(limitBytes, received);
+      }
+      chunks.push(decoder.decode(value, { stream: true }));
+    }
+    const tail = decoder.decode();
+    if (tail) chunks.push(tail);
+    return chunks.join('');
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function tooLargeResponse(observedBytes: number) {
+  return Response.json(
+    {
+      error: 'request_body_too_large',
+      message: `Request body is ${observedBytes} bytes; max allowed for run endpoints is ${RUN_BODY_LIMIT_BYTES}.`,
+      limit_bytes: RUN_BODY_LIMIT_BYTES,
+    },
+    { status: 413 },
+  );
+}
+
 /**
  * Middleware: reject requests whose Content-Length exceeds the cap with
  * HTTP 413. GETs and other methods without bodies are a no-op.
@@ -61,23 +127,23 @@ export const runBodyLimit: MiddlewareHandler = async (c, next) => {
   if (lenHeader) {
     const len = Number(lenHeader);
     if (Number.isFinite(len) && len > RUN_BODY_LIMIT_BYTES) {
-      return c.json(
-        {
-          error: 'request_body_too_large',
-          message: `Request body is ${len} bytes; max allowed for run endpoints is ${RUN_BODY_LIMIT_BYTES}.`,
-          limit_bytes: RUN_BODY_LIMIT_BYTES,
-        },
-        413,
-      );
+      return tooLargeResponse(len);
     }
   }
-  // No Content-Length (chunked transfer, streaming client): let the
-  // downstream JSON parser handle it. Hono reads the full body into a
-  // Buffer on `c.req.text()`, so a hostile client sending an infinite
-  // chunked body would only get as far as the global Node.js request
-  // timeout. In practice every HTTP client we care about (fetch, curl,
-  // pnpm, Hono test client) sends Content-Length; the header-check path
-  // is the tight loop.
+
+  try {
+    const raw = await readRequestTextWithLimit(c.req.raw);
+    c.req.raw = new Request(c.req.raw.url, {
+      method: c.req.raw.method,
+      headers: c.req.raw.headers,
+      body: raw,
+    });
+  } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return tooLargeResponse(err.observedBytes);
+    }
+    throw err;
+  }
 
   return next();
 };

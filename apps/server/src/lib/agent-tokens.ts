@@ -7,7 +7,6 @@ const TOKEN_PREFIX = 'floom_agent_';
 const TOKEN_RANDOM_LENGTH = 32;
 const PREFIX_RANDOM_LENGTH = 8;
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-const LEGACY_TOKEN_RE = /^floom_(?!agent_)[0-9A-Za-z+/=]{32,128}$/;
 const LAST_USED_DEBOUNCE_MS = 60_000;
 
 export interface AgentTokenAuthContext {
@@ -26,15 +25,11 @@ export function getPresentedAgentToken(c: Context): string | null {
   const match = /^Bearer\s+(.+)$/.exec(header);
   if (!match) return null;
   const token = match[1].trim();
-  return isAgentTokenString(token) || isLegacyAgentTokenString(token) ? token : null;
+  return isAgentTokenString(token) ? token : null;
 }
 
 export function isAgentTokenString(value: string): boolean {
   return new RegExp(`^${TOKEN_PREFIX}[0-9A-Za-z]{${TOKEN_RANDOM_LENGTH}}$`).test(value);
-}
-
-function isLegacyAgentTokenString(value: string): boolean {
-  return LEGACY_TOKEN_RE.test(value);
 }
 
 export function isValidAgentTokenScope(value: unknown): value is AgentTokenScope {
@@ -96,13 +91,19 @@ export function agentContextToSessionContext(
 }
 
 export function lookupAgentToken(rawToken: string): AgentTokenRecord | null {
-  if (!isAgentTokenString(rawToken) && !isLegacyAgentTokenString(rawToken)) return null;
+  if (!isAgentTokenString(rawToken)) return null;
   const hash = hashAgentToken(rawToken);
   const row = db
     .prepare(
-      `SELECT * FROM agent_tokens
-        WHERE hash = ?
-          AND revoked_at IS NULL
+      `SELECT t.* FROM agent_tokens t
+        WHERE t.hash = ?
+          AND t.revoked_at IS NULL
+          AND EXISTS (
+            SELECT 1
+              FROM workspace_members wm
+             WHERE wm.workspace_id = t.workspace_id
+               AND wm.user_id = t.user_id
+          )
         LIMIT 1`,
     )
     .get(hash) as AgentTokenRecord | undefined;
@@ -152,7 +153,7 @@ export const agentTokenAuthMiddleware: MiddlewareHandler = async (c, next) => {
         {
           error: 'invalid_token',
           code: 'invalid_token',
-          hint: 'The token format is invalid. Agent tokens look like floom_agent_<32 alphanumeric chars>. Get a valid token at https://floom.dev/home',
+          hint: 'The token format is invalid. Agent tokens look like floom_agent_<32 alphanumeric chars>. Get a valid token at https://floom.dev/me/agent-keys',
         },
         401,
       );
@@ -166,7 +167,7 @@ export const agentTokenAuthMiddleware: MiddlewareHandler = async (c, next) => {
       {
         error: 'invalid_agent_token',
         code: 'invalid_token',
-        hint: 'Token not found or revoked. Mint a new token at https://floom.dev/home',
+        hint: 'Token not found, revoked, or no longer workspace-valid. Mint a new token at https://floom.dev/me/agent-keys',
       },
       401,
     );

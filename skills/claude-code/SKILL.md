@@ -19,7 +19,7 @@ Docs: https://floom.dev/docs. Examples: https://github.com/floomhq/floom/tree/ma
 
 The `floom` CLI resolves auth in this order:
 
-1. `FLOOM_API_KEY` env var (+ optional `FLOOM_API_URL`, default `https://floom.dev`)
+1. `FLOOM_API_KEY` env var containing a `floom_agent_...` token (+ optional `FLOOM_API_URL`, default install host or `https://floom.dev`)
 2. `~/.floom/config.json` written by `floom auth`
 3. Legacy `~/.claude/floom-skill-config.json` (backward-compatible)
 
@@ -29,19 +29,20 @@ Check on first run:
 floom auth --show 2>/dev/null || echo "NOT_CONFIGURED"
 ```
 
-If not configured, prompt the user for their API key:
+If not configured, prompt the user for an Agent token:
 
 ```
-Get your Floom API key at https://floom.dev/me/api-keys, then run:
+Get your Floom Agent token at https://floom.dev/me/agent-keys, then run:
 
-  floom auth <your-api-key>
+  floom auth login --token=floom_agent_...
 
 Or for self-host:
 
-  floom auth <your-api-key> http://localhost:3051
+  floom auth login --token=floom_agent_... --api-url=http://localhost:3051
 ```
 
-Run `floom auth <key>` — the CLI writes `~/.floom/config.json` (chmod 600).
+Run `floom login` to open the token page and print the exact command. The CLI
+writes `~/.floom/config.json` (chmod 600).
 
 Verify with `floom status` (expects JSON or "No apps yet", not an auth error).
 
@@ -89,10 +90,10 @@ On success the CLI prints:
 Published: <name>
   App page:    https://floom.dev/p/<slug>
   MCP URL:     https://floom.dev/mcp/app/<slug>
-  Owner view:  https://floom.dev/me/apps/<slug>
+  Owner view:  https://floom.dev/studio/<slug>
 
 Add to Claude Desktop config:
-  {"mcpServers":{"floom-<slug>":{"command":"npx","args":["-y","mcp-remote","https://floom.dev/mcp/app/<slug>"]}}}
+  {"mcpServers":{"floom-<slug>":{"url":"https://floom.dev/mcp/app/<slug>"}}}
 ```
 
 On 409 `slug_taken`: show the response `suggestions` array, ask the user to pick one, update `floom.yaml`, retry.
@@ -125,7 +126,7 @@ No apps yet. Run /floom-init to scaffold one.
 
 | HTTP | Code | What to say |
 |------|------|-------------|
-| 401 | auth_required | "Floom token isn't working. Run `floom auth --clear` then `floom auth <key>` to re-auth." |
+| 401 | auth_required | "Floom token isn't working. Run `floom auth logout` then `floom login` to re-auth." |
 | 400 | invalid_body | Show `details` from response, point at the bad field. |
 | 400 | detect_failed | "Couldn't reach or parse <url>. Does `curl <url>` return valid JSON/YAML?" |
 | 409 | slug_taken | Show `suggestions`, ask user to pick, retry. |
@@ -135,7 +136,29 @@ Never retry on 4xx. 5xx may retry once with 2s backoff.
 
 ---
 
+## Account context and secrets
+
+For headless runs that use profile autofill:
+
+```bash
+floom account context get
+floom account context set-user --json '{"name":"Federico"}'
+floom account context set-workspace --json '{"company":{"name":"Floom"}}'
+floom run invoice-generator '{"invoice_id":"INV-1"}' --use-context
+```
+
+For workspace secrets:
+
+```bash
+floom account secrets list
+floom account secrets set GEMINI_API_KEY --value "$GEMINI_API_KEY"
+```
+
+Never print secret values. `secrets list` returns metadata, not plaintext.
+
+---
+
 ## Gaps flagged for launch
 
-1. **No publish endpoint for custom runtimes.** `POST /api/hub/ingest` only accepts OpenAPI URLs; Python/Docker apps like `lead-scorer` get seeded from `examples/` on server boot. The skill routes users to open a PR.
-2. **No server-side dry-run.** Skill simulates dry-run client-side via `FLOOM_DRY_RUN=1`. A `?dry_run=1` on `/api/hub/ingest` would let users preview the parsed manifest.
+1. **Docker-image publish is gated.** `docker_image_ref` deploys require `FLOOM_ENABLE_DOCKER_PUBLISH=true` on the target Floom instance.
+2. **Claude Code skill is CLI-first.** The CLI is the authority for deploy output, auth, context, and secrets.

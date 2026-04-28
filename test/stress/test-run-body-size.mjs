@@ -112,5 +112,26 @@ app.get('/run', (c) => c.json({ ok: true }));
   log('escape hatch bypasses limit', resp.status === 200);
 }
 
+// Case 7: unknown-length/chunked bodies are capped before route parsing.
+{
+  const chunk = new Uint8Array(1024 * 1024);
+  let sent = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      controller.enqueue(chunk);
+      sent += 1;
+      if (sent > 9) controller.close();
+    },
+  });
+  const req = new Request('http://localhost/run', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: stream,
+    duplex: 'half',
+  });
+  const resp = await app.request(req);
+  log('unknown-length streamed body over cap returns 413', resp.status === 413, `status=${resp.status}`);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

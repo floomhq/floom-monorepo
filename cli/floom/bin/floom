@@ -5,7 +5,15 @@
 #   init      scaffold floom.yaml in the current directory
 #   deploy    validate + publish the current app
 #   account   manage workspace secrets and agent tokens
+#   store     browse public Store apps
+#   runs      list, inspect, share, and delete runs
+#   jobs      create, inspect, and cancel async jobs
+#   quota     inspect app run quota
+#   triggers  manage schedule and webhook triggers
+#   workspaces manage workspace tenancy and members
+#   feedback  submit product feedback
 #   status    list your apps and recent runs
+#   login     open the token page and print login instructions
 #   auth      save an Agent token to ~/.floom/config.json
 #   --help    show this help
 #   --version print version
@@ -26,10 +34,18 @@ usage:
   floom <command> [options]
 
 commands:
+  login               open the token page and print login instructions
   auth <agent-token>  save an Agent token to ~/.floom/config.json
   account             manage workspace secrets and agent tokens
   apps list           list your workspace apps
   apps update         update, share, or delete workspace apps
+  store               browse public Store apps
+  runs                list, inspect, share, or delete runs
+  jobs                create, inspect, or cancel async jobs
+  quota               inspect app run quota
+  triggers            manage schedule and webhook triggers
+  workspaces          manage workspace tenancy and members
+  feedback            submit product feedback
   run <slug> [json]   run a Floom app by slug
   init                scaffold a floom.yaml in the current directory
   deploy              validate + publish the current app (use --dry-run to preview)
@@ -41,7 +57,7 @@ options:
 
 docs:     https://floom.dev/docs
 examples: https://github.com/floomhq/floom/tree/main/examples
-agent tokens: https://floom.dev/home
+agent tokens: https://floom.dev/me/agent-keys
 EOF
 }
 
@@ -70,12 +86,24 @@ case "$CMD" in
     exec bash "$LIB_DIR/floom-deploy.sh" "$@" ;;
   status)
     exec bash "$LIB_DIR/floom-status.sh" "$@" ;;
+  login|setup)
+    exec bash "$LIB_DIR/floom-auth.sh" login "$@" ;;
   auth)
     exec bash "$LIB_DIR/floom-auth.sh" "$@" ;;
   account)
     exec bash "$LIB_DIR/floom-account.sh" "$@" ;;
   apps)
     exec bash "$LIB_DIR/floom-apps.sh" "$@" ;;
+  store)
+    exec bash "$LIB_DIR/floom-store.sh" "$@" ;;
+  runs|jobs|quota)
+    exec bash "$LIB_DIR/floom-runs.sh" "$CMD" "$@" ;;
+  triggers)
+    exec bash "$LIB_DIR/floom-triggers.sh" "$@" ;;
+  workspaces|workspace)
+    exec bash "$LIB_DIR/floom-workspaces.sh" "$@" ;;
+  feedback)
+    exec bash "$LIB_DIR/floom-feedback.sh" "$@" ;;
   run)
     exec bash "$LIB_DIR/floom-run.sh" "$@" ;;
   validate)

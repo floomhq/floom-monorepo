@@ -34,38 +34,87 @@ floom --help
 ## Commands
 
 ```text
-floom init                     scaffold a floom.yaml in the current directory
-floom deploy [--dry-run]       validate + publish the current app
-floom status                   list your apps and recent runs
-floom auth <agent-token> [url] save Agent token to ~/.floom/config.json
-floom --help                   show usage
-floom --version                print version
+floom auth <agent-token> [url]       save an Agent token to ~/.floom/config.json
+floom login                          open the token page + print login command
+floom auth login                     open the token page + print login command
+floom auth login --token=<token>     save an Agent token with explicit flags
+floom auth whoami                    print identity for the current token
+floom auth logout                    clear saved auth
+
+floom account secrets list           list workspace secrets
+floom account secrets set <key> ...  set a workspace secret
+floom account agent-tokens list      list workspace Agent tokens
+floom account agent-tokens create    create a workspace Agent token
+
+floom apps list                      list your workspace apps
+floom apps get <slug>                inspect one of your apps
+floom apps update <slug> ...         update app metadata and controls
+floom apps delete <slug>             delete an app
+
+floom store list                     browse public Store apps
+floom store search <query>           search public Store apps
+floom store get <slug>               inspect a public Store app
+
+floom runs list                      list recent runs
+floom runs get <run-id>              inspect a run
+floom runs share <run-id>            create a public run share link
+floom runs delete <run-id>           delete a run
+floom runs activity                  list recent Studio activity
+
+floom jobs create <slug>             start an async app job
+floom jobs get <slug> <job-id>       inspect an async job
+floom jobs cancel <slug> <job-id>    cancel an async job
+
+floom quota get <slug>               inspect app run quota
+
+floom triggers list                  list app triggers
+floom triggers create <slug> ...     create schedule or webhook triggers
+floom triggers update <trigger-id>   update a trigger
+floom triggers delete <trigger-id>   delete a trigger
+
+floom workspaces me                  inspect current workspace session
+floom workspaces create ...          create a workspace
+floom workspaces update <id> ...     update workspace metadata
+floom workspaces members ...         manage workspace members
+floom workspaces invites ...         manage workspace invites
+floom workspaces runs delete <id>    delete workspace runs
+
+floom feedback submit ...            submit product feedback
+floom run <slug> [inputs-json]       run a Floom app by slug
+floom run <slug> --use-context       run with profile autofill enabled
+floom init                           scaffold a floom.yaml in the current directory
+floom deploy [--dry-run]             validate + publish the current app
+floom status                         list your apps and recent runs
+floom --help                         show usage
+floom --version                      print version
 ```
 
 ## Auth
 
 Order of resolution:
 
-1. `FLOOM_API_KEY` env var (+ optional `FLOOM_API_URL`, default `https://floom.dev`)
+1. `FLOOM_API_KEY` env var containing a `floom_agent_...` token (+ optional `FLOOM_API_URL`, default `https://floom.dev`)
 2. `~/.floom/config.json` with `{"api_key": "...", "api_url": "https://floom.dev"}`
 3. Legacy `~/.claude/floom-skill-config.json` (from the old Claude Code skill)
 
-Create an Agent token in Workspace settings at https://floom.dev/settings/agent-tokens, then:
+Get your Agent token at https://floom.dev/me/agent-keys, then:
 
 ```bash
-floom auth floom_agent_xxx
+floom login
+# then paste the printed command:
+floom auth login --token=floom_agent_...
 ```
 
 Self-host:
 
 ```bash
-floom auth floom_agent_xxx http://localhost:3051
+floom auth login --token=floom_agent_... --api-url=http://localhost:3051
 ```
 
 Env-only (CI):
 
 ```bash
-export FLOOM_API_KEY=floom_agent_xxx
+export FLOOM_API_KEY=floom_agent_...
 export FLOOM_API_URL=https://floom.dev
 floom status
 ```

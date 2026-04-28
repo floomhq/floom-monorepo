@@ -4,7 +4,10 @@
 // Run: node test/stress/test-proxied-timeout.mjs
 
 import { createServer } from 'node:http';
-import { runProxied } from '../../apps/server/dist/services/proxied-runner.js';
+import {
+  MAX_PROXIED_TIMEOUT_MS,
+  runProxied,
+} from '../../apps/server/dist/services/proxied-runner.js';
 
 let passed = 0;
 let failed = 0;
@@ -150,6 +153,26 @@ try {
     'shorter timeout_ms values clamp to the 30 second floor',
     captured[2] === 30_000 && resultFloor.status === 'success',
     `captured=${captured[2]} result=${JSON.stringify(resultFloor)}`,
+  );
+
+  const resultCeiling = await runProxied({
+    app: {
+      slug: 'timeout-probe-ceiling',
+      base_url: `http://127.0.0.1:${port}`,
+      auth_type: null,
+      auth_config: null,
+      openapi_spec_cached: spec,
+      timeout_ms: 24 * 60 * 60 * 1000,
+    },
+    manifest,
+    action: 'probe',
+    inputs: { message: 'hello' },
+    secrets: {},
+  });
+  log(
+    'huge timeout_ms values clamp to the server ceiling',
+    captured[3] === MAX_PROXIED_TIMEOUT_MS && resultCeiling.status === 'success',
+    `captured=${captured[3]} ceiling=${MAX_PROXIED_TIMEOUT_MS} result=${JSON.stringify(resultCeiling)}`,
   );
 } finally {
   AbortSignal.timeout = originalTimeout;

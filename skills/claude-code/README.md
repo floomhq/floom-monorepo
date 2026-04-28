@@ -11,15 +11,16 @@ This skill is a thin wrapper. It calls the `floom` CLI, which must be installed 
 ## Install the CLI
 
 ```bash
-git clone --depth 1 https://github.com/floomhq/floom.git ~/.floom/repo
-export PATH="$HOME/.floom/repo/cli/floom/bin:$PATH"
+curl -fsSL https://floom.dev/install.sh | bash
 floom --version
 ```
 
-Or use the curl installer (when live):
+Manual install:
 
 ```bash
-curl -fsSL https://floom.dev/install.sh | bash
+git clone --depth 1 https://github.com/floomhq/floom.git ~/.floom/repo
+export PATH="$HOME/.floom/repo/cli/floom/bin:$PATH"
+floom --version
 ```
 
 ## Install this skill
@@ -50,23 +51,28 @@ Restart Claude Code. Verify: `/floom-init`.
 Run once after installing:
 
 ```bash
-floom auth <your-api-key>
+floom login
 ```
 
-Get your key at https://floom.dev/me/api-keys.
+Mint an Agent token at https://floom.dev/me/agent-keys, then run the command printed by
+`floom login`.
+
+```bash
+floom auth login --token=floom_agent_...
+```
 
 For self-host:
 
 ```bash
-floom auth <your-api-key> http://localhost:3051
+floom auth login --token=floom_agent_... --api-url=http://localhost:3051
 ```
 
 Config is stored at `~/.floom/config.json` (chmod 600). Do not check it into git.
 
-You can also set `FLOOM_API_KEY` as an env var (useful in CI):
+You can also set `FLOOM_API_KEY` as an env var for CI compatibility:
 
 ```bash
-export FLOOM_API_KEY=sk_live_xxx
+export FLOOM_API_KEY=floom_agent_...
 floom status
 ```
 
