@@ -92,7 +92,9 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
       description="Install Floom apps in your AI tool, publish apps to Floom, and mint workspace Agent tokens for MCP clients."
       contentStyle={{ maxWidth: 1120 }}
     >
-      <main data-testid="install-in-claude-page" style={pageStyle}>
+      {/* R18B (2026-04-28): nested <main> dropped — PageShell already
+          renders <main id="main">. */}
+      <div data-testid="install-in-claude-page" style={pageStyle}>
         <section style={heroStyle}>
           <div style={kickerStyle}>Works with Claude Desktop, Cursor, Codex, and any MCP client</div>
           <h1 style={h1Style}>{title}</h1>
@@ -178,7 +180,7 @@ FLOOM_API_KEY=floom_agent_•••••• floom deploy ./floom.yaml`}</pre>
             ))}
           </div>
         </section>
-      </main>
+      </div>
     </PageShell>
   );
 }

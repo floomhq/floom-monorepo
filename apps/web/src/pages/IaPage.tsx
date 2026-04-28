@@ -50,7 +50,10 @@ export function IaPage() {
       description="Floom information architecture: public, Workspace Run, and Studio surfaces."
       contentStyle={{ maxWidth: 1180 }}
     >
-      <main style={pageStyle}>
+      {/* R18B (2026-04-28): nested <main> dropped — PageShell already
+          renders the outer <main id="main">. Duplicate landmarks confuse
+          screen readers and assistive tech. */}
+      <div style={pageStyle}>
         <section style={heroStyle}>
           <div style={eyebrowStyle}>v24 canon</div>
           <h1 style={h1Style}>Information architecture</h1>
@@ -100,7 +103,7 @@ export function IaPage() {
             />
           </div>
         </InfoBlock>
-      </main>
+      </div>
     </PageShell>
   );
 }

@@ -489,6 +489,7 @@ export function ProtocolPage() {
       <TopBar />
 
       <main
+        id="main"
         style={{
           maxWidth: 1080,
           margin: '0 auto',

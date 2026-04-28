@@ -64,7 +64,9 @@ export function ArchitecturePage() {
       description="How Floom maps web, MCP, REST, and CLI surfaces onto one protocol and one runtime."
       contentStyle={{ maxWidth: 1120 }}
     >
-      <main style={pageStyle}>
+      {/* R18B (2026-04-28): nested <main> dropped — PageShell already
+          renders <main id="main">. WCAG: single landmark per page. */}
+      <div style={pageStyle}>
         <section style={heroStyle}>
           <div style={eyebrowStyle}>How Floom works</div>
           <h1 style={h1Style}>Four user paths × four surfaces.</h1>
@@ -137,7 +139,7 @@ cli.run()`}</pre>
             <Link to="/settings/agent-tokens" style={secondaryLinkStyle}>Agent tokens</Link>
           </div>
         </section>
-      </main>
+      </div>
     </PageShell>
   );
 }

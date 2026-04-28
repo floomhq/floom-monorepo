@@ -563,6 +563,9 @@ export function PricingPage() {
         data-testid="pricing-selfhost"
         style={{ maxWidth: 820, margin: '0 auto 48px', padding: '0 24px' }}
       >
+        {/* R18B (2026-04-28): switched grid → flex-wrap so the docker
+            command (whitespace: nowrap, ~465px wide) wraps to its own row
+            on narrow screens. /pricing was overflowing at 375 + 390. */}
         <div
           className="selfhost-inner"
           style={{
@@ -570,10 +573,11 @@ export function PricingPage() {
             border: `1px solid ${LINE}`,
             borderRadius: 14,
             padding: '24px 28px',
-            display: 'grid',
-            gridTemplateColumns: '1fr auto',
+            display: 'flex',
+            flexWrap: 'wrap',
             gap: 20,
             alignItems: 'center',
+            justifyContent: 'space-between',
           }}
         >
           <div>
@@ -609,6 +613,9 @@ export function PricingPage() {
               .
             </p>
           </div>
+          {/* R18B (2026-04-28): horizontal scroll on the code element so
+              the long docker command never pushes the layout wider than the
+              viewport. maxWidth: 100% pins it to the parent flex line. */}
           <code
             style={{
               ...MONO,
@@ -619,6 +626,9 @@ export function PricingPage() {
               borderRadius: 6,
               padding: '6px 12px',
               whiteSpace: 'nowrap',
+              overflowX: 'auto',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
             }}
           >
             docker run -p 3000:3000 ghcr.io/floomhq/floom-monorepo:latest

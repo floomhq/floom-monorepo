@@ -36,7 +36,9 @@ export function InstallPage() {
       title="Self-host Floom · Floom"
       description="Run Floom on your own server in one Docker command. Open source, no waitlist."
     >
-      <main
+      {/* R18B (2026-04-28): nested <main> dropped — PageShell already
+          renders <main id="main">. */}
+      <div
         data-testid="install-page"
         style={{ maxWidth: 720, margin: '40px auto', padding: '0 24px' }}
       >
@@ -153,7 +155,7 @@ export function InstallPage() {
             dashboard served from the same host.
           </p>
         </details>
-      </main>
+      </div>
     </PageShell>
   );
 }

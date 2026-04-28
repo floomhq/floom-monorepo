@@ -10,7 +10,11 @@ const SYSTEMS = [
 export function StatusPage() {
   return (
     <PageShell title="Status · Floom">
-      <main style={{ maxWidth: 760, margin: '0 auto', padding: '56px 20px 72px' }}>
+      {/* R18B (2026-04-28): wrapper changed from <main> to <div> — BaseLayout
+          already renders an outer <main>, so nesting another <main> creates
+          duplicate landmarks. WCAG 2.1 + ARIA require a single <main> per
+          document. */}
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: '56px 20px 72px' }}>
         <p
           style={{
             margin: '0 0 10px',
@@ -98,7 +102,7 @@ export function StatusPage() {
           </a>
           .
         </p>
-      </main>
+      </div>
     </PageShell>
   );
 }

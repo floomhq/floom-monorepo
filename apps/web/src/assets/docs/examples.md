@@ -4,43 +4,43 @@ Real apps shipping on Floom today. Each one is a single manifest plus code — c
 
 Pick the shape closest to what you're building, copy its `floom.yaml`, swap the logic.
 
-## Lead scorer
+## Competitor lens
 
-Score a company against an ICP description. JSON in, scored breakdown out.
+Paste two URLs (yours plus one competitor). Floom fetches both pages and one Gemini call returns a positioning, pricing, and angle diff.
 
-- **Shape**: single action, LLM-backed, cached.
-- **Use for**: sales-ops scoring, account prioritisation, inbound triage.
-- **Run it**: [`/p/lead-scorer`](/p/lead-scorer)
-- **Source**: [`examples/lead-scorer/`](https://github.com/floomhq/floom/tree/main/examples/lead-scorer)
+- **Shape**: web-fetch + LLM, JSON in, JSON out.
+- **Use for**: GTM research, positioning audits, sales battlecards.
+- **Run it**: [`/p/competitor-lens`](/p/competitor-lens)
+- **Source**: [`examples/competitor-lens/`](https://github.com/floomhq/floom/tree/main/examples/competitor-lens)
 
 ```bash
-floom run lead-scorer --input '{"company":"stripe.com","icp":"B2B SaaS, series A+"}'
+floom run competitor-lens --input '{"yours":"https://example.com","theirs":"https://stripe.com"}'
 ```
 
-## Competitor analyzer
+## AI readiness audit
 
-Given a domain, pull positioning, pricing, and differentiators. Single tool call per competitor.
+Paste one HTTPS URL. Floom fetches the landing page and a single Gemini call returns a readiness score 0-10, three risks, three opportunities, and one next action.
 
-- **Shape**: sequenced web lookups, markdown report out.
-- **Use for**: sales battlecards, GTM research, positioning audits.
-- **Run it**: [`/p/competitor-analyzer`](/p/competitor-analyzer)
-- **Source**: [`examples/competitor-analyzer/`](https://github.com/floomhq/floom/tree/main/examples/competitor-analyzer)
+- **Shape**: single web fetch, LLM-scored JSON output.
+- **Use for**: site audits, sales-ops scoring, inbound triage.
+- **Run it**: [`/p/ai-readiness-audit`](/p/ai-readiness-audit)
+- **Source**: [`examples/ai-readiness-audit/`](https://github.com/floomhq/floom/tree/main/examples/ai-readiness-audit)
 
 ```bash
-floom run competitor-analyzer --input '{"domain":"linear.app"}'
+floom run ai-readiness-audit --input '{"url":"https://stripe.com"}'
 ```
 
-## Resume screener
+## Pitch coach
 
-Score a CV against a job description. Returns strengths, gaps, fit score.
+Paste a 20-500 character startup pitch. A single Gemini call returns three direct critiques, three angle-specific rewrites, and a 1-line TL;DR of the biggest issue.
 
-- **Shape**: file-input app (PDF upload), JSON scored output.
-- **Use for**: recruiter triage, candidate ranking, rejection letters.
-- **Run it**: [`/p/resume-screener`](/p/resume-screener)
-- **Source**: [`examples/resume-screener/`](https://github.com/floomhq/floom/tree/main/examples/resume-screener)
+- **Shape**: text-in, structured-JSON-out, LLM-only.
+- **Use for**: pitch reviews, copy critique, founder coaching.
+- **Run it**: [`/p/pitch-coach`](/p/pitch-coach)
+- **Source**: [`examples/pitch-coach/`](https://github.com/floomhq/floom/tree/main/examples/pitch-coach)
 
 ```bash
-floom run resume-screener --input '{"jd":"Senior Backend Engineer","cv_url":"..."}'
+floom run pitch-coach --input '{"pitch":"We are building..."}'
 ```
 
 ## More examples

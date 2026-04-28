@@ -56,8 +56,19 @@ export default defineConfig({
     // warm-cache vendor immediately.
     rollupOptions: {
       output: {
+        // R18B (2026-04-28): split heavy non-LCP libs into named chunks so
+        // the landing index.js stops carrying them. react-markdown +
+        // remark-gfm pull `unified` and a markdown parser tree (~150KB),
+        // sentry/react carries its own runtime (~80KB), posthog is ~50KB.
+        // These are referenced from non-landing routes (DocsPage, ProtocolPage,
+        // bootstrap) so splitting them into their own async chunks keeps the
+        // landing TTI clean while still letting each route stream them in.
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          markdown: ['react-markdown', 'remark-gfm'],
+          sentry: ['@sentry/react'],
+          analytics: ['posthog-js'],
+          icons: ['lucide-react'],
         },
       },
     },
