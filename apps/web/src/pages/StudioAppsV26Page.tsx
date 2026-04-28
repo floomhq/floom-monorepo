@@ -6,6 +6,7 @@
 // Shell: WorkspacePageShell mode="studio" (StudioRail + ModeToggle per v26 §12).
 // Hero: COMPACT single-line stat strip (NOT 4-card grid — issue #913).
 // Grid: apps this user has built, sourced from useMyApps.
+// Filter chips: All / Active / Drafts / Pending review (URL param ?filter=).
 // Recent activity: panel from run history scoped to owned app slugs.
 // Bottom CTA: + New app → /studio/build (overlay is issue #917, deferred).
 //
@@ -14,8 +15,8 @@
 // overrides the v23 route registration in main.tsx (last-wins in React Router).
 // Per spec §9, /studio will redirect to /studio/apps going forward.
 
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { useMyApps } from '../hooks/useMyApps';
 import { useSession } from '../hooks/useSession';
@@ -24,6 +25,90 @@ import { DescriptionMarkdown } from '../components/DescriptionMarkdown';
 import { Sparkline } from '../components/studio/Sparkline';
 import * as api from '../api/client';
 import type { CreatorApp, MeRunSummary } from '../lib/types';
+
+// ------------------------------------------------------------------
+// Filter chips (wireframe studio-apps.html line 114)
+// ------------------------------------------------------------------
+
+type StudioAppFilter = 'all' | 'active' | 'drafts' | 'pending';
+
+const STUDIO_APP_FILTER_LABELS: Record<StudioAppFilter, string> = {
+  all: 'All',
+  active: 'Active',
+  drafts: 'Drafts',
+  pending: 'Pending review',
+};
+
+function filterStudioApps(apps: CreatorApp[], filter: StudioAppFilter): CreatorApp[] {
+  if (filter === 'all') return apps;
+  if (filter === 'active') {
+    return apps.filter(
+      (a) => !a.publish_status || a.publish_status === 'published',
+    );
+  }
+  if (filter === 'drafts') {
+    return apps.filter((a) => a.publish_status === 'draft');
+  }
+  if (filter === 'pending') {
+    return apps.filter((a) => a.publish_status === 'pending_review');
+  }
+  return apps;
+}
+
+function StudioFilterChipBar({
+  active,
+  totalCount,
+  onChange,
+}: {
+  active: StudioAppFilter;
+  totalCount: number;
+  onChange: (f: StudioAppFilter) => void;
+}) {
+  const filters: StudioAppFilter[] = ['all', 'active', 'drafts', 'pending'];
+  return (
+    <div
+      data-testid="studio-apps-filter-chips"
+      style={{
+        display: 'flex',
+        gap: 8,
+        flexWrap: 'wrap',
+        marginBottom: 16,
+      }}
+    >
+      {filters.map((f) => {
+        const isOn = f === active;
+        return (
+          <button
+            key={f}
+            type="button"
+            data-testid={`studio-apps-chip-${f}`}
+            onClick={() => onChange(f)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 12,
+              padding: '5px 11px',
+              borderRadius: 999,
+              background: isOn ? 'var(--accent-soft)' : 'var(--card)',
+              border: `1px solid ${isOn ? 'var(--accent-border, #a7f3d0)' : 'var(--line)'}`,
+              color: isOn ? 'var(--accent)' : 'var(--muted)',
+              fontWeight: isOn ? 600 : 500,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'all 0.12s ease',
+            }}
+          >
+            {STUDIO_APP_FILTER_LABELS[f]}
+            {f === 'all' && (
+              <span style={{ opacity: 0.7 }}>{totalCount}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 // ------------------------------------------------------------------
 // Compact hero metric strip (issue #913: NOT 4-card grid)
@@ -491,6 +576,35 @@ export function StudioAppsV26Page() {
   const { apps, loading: appsLoading } = useMyApps();
   const { data: session } = useSession();
   const [recentRuns, setRecentRuns] = useState<MeRunSummary[] | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Filter state from URL param; default 'all'
+  const rawFilter = searchParams.get('filter');
+  const activeFilter: StudioAppFilter =
+    rawFilter === 'active' || rawFilter === 'drafts' || rawFilter === 'pending'
+      ? rawFilter
+      : 'all';
+
+  function handleFilterChange(f: StudioAppFilter) {
+    if (f === 'all') {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('filter');
+        return next;
+      }, { replace: true });
+    } else {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('filter', f);
+        return next;
+      }, { replace: true });
+    }
+  }
+
+  const filteredApps = useMemo(
+    () => (apps ? filterStudioApps(apps, activeFilter) : null),
+    [apps, activeFilter],
+  );
 
   // Fetch recent runs scoped to owned app slugs.
   //
@@ -603,6 +717,15 @@ export function StudioAppsV26Page() {
               <CompactHeroStrip apps={apps ?? null} totalRuns={totalRuns} />
             )}
 
+            {/* Filter chip toolbar (wireframe studio-apps.html line 114) */}
+            {!appsLoading && apps && apps.length > 0 && (
+              <StudioFilterChipBar
+                active={activeFilter}
+                totalCount={apps.length}
+                onChange={handleFilterChange}
+              />
+            )}
+
             {/* Loading state */}
             {appsLoading && !apps && (
               <div
@@ -642,6 +765,21 @@ export function StudioAppsV26Page() {
                       />
                     </div>
 
+                    {/* Filter empty state — shown inline above grid, grid stays visible */}
+                    {filteredApps !== null && filteredApps.length === 0 && activeFilter !== 'all' && (
+                      <div
+                        data-testid="studio-apps-filter-empty"
+                        style={{
+                          fontSize: 13,
+                          color: 'var(--muted)',
+                          marginBottom: 12,
+                          padding: '10px 0',
+                        }}
+                      >
+                        No apps match this filter.
+                      </div>
+                    )}
+
                     <div
                       data-testid="studio-apps-grid"
                       style={{
@@ -651,7 +789,7 @@ export function StudioAppsV26Page() {
                         marginBottom: 18,
                       }}
                     >
-                      {apps.map((app) => (
+                      {(filteredApps && filteredApps.length > 0 ? filteredApps : apps).map((app) => (
                         <StudioAppCard key={app.slug} app={app} />
                       ))}
                     </div>
