@@ -651,7 +651,12 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           anchoring to the topbar's bounds (rendering ABOVE the topbar
           at right edge) instead of the viewport bottom-right. Sibling
           placement makes `position: fixed` correctly viewport-relative. */}
-      {!isLoginPage && !showAuthedChrome && (
+      {/* R20 (2026-04-29): also hide on /p/:slug — same rationale as the
+          desktop variant on line 406 (the app detail page has its own
+          Install button right next to the app name). At mobile the
+          floating pill physically overlaps the input fields on the run
+          panel, which made the form harder to use. */}
+      {!isLoginPage && !showAuthedChrome && !isAppPermalinkRoute && (
         <div className="topbar-mcp-mobile" data-testid="topbar-mcp-mobile">
           <CopyForClaudeButton variant="mobile" />
         </div>
