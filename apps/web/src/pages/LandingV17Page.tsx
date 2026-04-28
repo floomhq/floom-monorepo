@@ -480,37 +480,16 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 - Add vertical breathing room around H1 + sub
                 - Demote WorksWithBelt to a soft caption under the snippet
                 - Resume banner slimmed to a 1-line stripe (above) */}
+            {/* MVP eyebrow: WorksWithBelt above H1 — agent-agnostic
+                positioning ("Works with any MCP client" + 3 logos) is
+                more useful than a Founders Inc credential here. Founders
+                Inc cohort credit stays in footer + WhosBehind. Federico
+                2026-04-28: hero eyebrow should be product positioning,
+                not investor proof. */}
             {isMvp && (
-              <p
-                data-testid="hero-backed-by"
-                style={{
-                  // R7 U3: gap from BACKED-BY → H1 widened 28 → 32 for more
-                  // vertical breathing room. Hero is calmer with the H1
-                  // sitting on its own line of breath.
-                  margin: '0 auto 32px',
-                  fontSize: 11.5,
-                  color: 'var(--muted)',
-                  letterSpacing: '0.10em',
-                  textTransform: 'uppercase',
-                  fontWeight: 600,
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                  textAlign: 'center',
-                }}
-              >
-                <a
-                  href="https://f.inc"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    color: 'inherit',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    letterSpacing: 'inherit',
-                  }}
-                >
-                  FOUNDERS INC COHORT
-                </a>
-              </p>
+              <div data-testid="hero-eyebrow-belt" style={{ marginBottom: 32 }}>
+                <WorksWithBelt />
+              </div>
             )}
             {!isMvp && (
               <div style={{ marginTop: 24 }}>
@@ -564,15 +543,9 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
             {isMvp ? (
               <>
                 <MvpHeroInstall />
-                {/* G1 (2026-04-28): WorksWithBelt as a soft caption under
-                    the snippet — visually subdued.
-                    R7 U3 (2026-04-28): pushed further into the background
-                    (opacity 0.85 → 0.7, marginTop 28 → 32) so the lead
-                    promise reads as a quiet caption, not a second hero
-                    element competing with H1+snippet. */}
-                <div style={{ marginTop: 32, opacity: 0.7 }}>
-                  <WorksWithBelt />
-                </div>
+                {/* WorksWithBelt moved to the eyebrow above H1 (Federico
+                    2026-04-28). No longer rendered under the snippet — it
+                    was a second hero element competing with H1+snippet. */}
               </>
             ) : (
             <div
