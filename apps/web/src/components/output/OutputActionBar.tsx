@@ -401,6 +401,50 @@ export function IconCopyButton({
 }
 
 /**
+ * R13 (2026-04-28) — share icon button. Lifted next to Copy / Download /
+ * Expand in the output action bar so the share affordance lives inline
+ * with the other run-output actions. Replaces the heavy RunCompleteCard
+ * panel that previously rendered below the output card.
+ */
+export function IconShareButton({
+  onClick,
+  label = 'Share this run',
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      data-testid="output-icon-share-btn"
+      className="output-icon-btn"
+      style={iconBtnStyle()}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="18" cy="5" r="3" />
+        <circle cx="6" cy="12" r="3" />
+        <circle cx="18" cy="19" r="3" />
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+      </svg>
+    </button>
+  );
+}
+
+/**
  * R7.7 — download icon button. Click invokes `onClick` (caller assembles
  * the CSV + Blob + anchor download). Tooltip says "Download CSV" by
  * default; callers can override via `label`.

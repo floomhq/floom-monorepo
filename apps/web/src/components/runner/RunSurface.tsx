@@ -67,6 +67,14 @@ export interface RunSurfaceProps {
   initialRun?: RunRecord | null;
   onResetInitialRun?: () => void;
   onResult?: (result: RunSurfaceResult) => void;
+  /**
+   * R13 (2026-04-28): when provided, the multi-section composite output
+   * card shows a Share icon button in its master sticky toolbar. The
+   * page-level "Share this run" panel that used to render below the
+   * output card has been demoted to a quiet toast, so this is the
+   * primary share affordance after a successful run.
+   */
+  onShare?: () => void;
 }
 
 type Phase = 'ready' | 'streaming' | 'job' | 'done' | 'error';
@@ -460,6 +468,7 @@ export function RunSurface({
   initialRun,
   onResetInitialRun,
   onResult,
+  onShare,
 }: RunSurfaceProps) {
   // Upgrade 2 (2026-04-19): honor ?action=<name> on mount so multi-action
   // apps can be linked directly to a specific tab. Only the initial
@@ -1369,6 +1378,7 @@ export function RunSurface({
               onResetInitialRun?.();
             }}
             onRetry={handleRun}
+            onShare={onShare}
           />
         </section>
       </div>
@@ -2197,6 +2207,13 @@ interface OutputSlotProps {
    * inputs. RunSurface wires this to its top-level handleRun.
    */
   onRetry: () => void;
+  /**
+   * R13 (2026-04-28): forwarded to OutputPanel → CompositeOutputCard so
+   * the master sticky toolbar can surface a Share icon button. Replaces
+   * the heavy RunCompleteCard panel that previously rendered below the
+   * output card.
+   */
+  onShare?: () => void;
 }
 
 function OutputSlot({
@@ -2211,6 +2228,7 @@ function OutputSlot({
   onCancelStream,
   onIterate,
   onRetry,
+  onShare,
 }: OutputSlotProps) {
   if (state.phase === 'ready') {
     if (byokExhausted) {
@@ -2289,6 +2307,7 @@ function OutputSlot({
           run={state.run}
           onIterate={iterateHandler}
           onRetry={onRetry}
+          onShare={onShare}
         />
       </CustomRendererHost>
     );
@@ -2301,6 +2320,7 @@ function OutputSlot({
       run={state.run}
       onIterate={iterateHandler}
       onRetry={onRetry}
+      onShare={onShare}
     />
   );
 }

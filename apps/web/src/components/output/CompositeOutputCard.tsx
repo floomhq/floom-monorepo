@@ -12,6 +12,7 @@ import { useMemo, useState, type ReactElement } from 'react';
 import {
   IconCopyButton,
   IconDownloadButton,
+  IconShareButton,
   FullscreenButton,
   OutputActionBar,
   OutputDoneBadge,
@@ -46,6 +47,14 @@ export interface CompositeOutputCardProps {
    */
   appSlug?: string;
   runId?: string;
+  /**
+   * R13 (2026-04-28): when provided, the toolbar surfaces a Share icon
+   * button next to Copy / Download / Expand. Click invokes the same
+   * shareRun() flow that the page-level "Share this run" panel used to
+   * fire — so we keep the affordance inline with the output instead of
+   * rendering a heavy card below it.
+   */
+  onShare?: () => void;
 }
 
 /**
@@ -59,6 +68,7 @@ export function CompositeOutputCard({
   durationLabel,
   appSlug,
   runId,
+  onShare,
 }: CompositeOutputCardProps) {
   const [fullscreen, setFullscreen] = useState(false);
   // R7.7: stable identifier for cascadeIsMultiComposite() — minified
@@ -145,6 +155,9 @@ export function CompositeOutputCard({
               label={tables.length > 1 ? 'Download all CSVs' : 'Download CSV'}
               disabled={tables.length === 0}
             />
+            {onShare && (
+              <IconShareButton onClick={onShare} label="Share this run" />
+            )}
             <FullscreenButton
               onClick={() => setFullscreen(true)}
               label="Expand output to fullscreen"

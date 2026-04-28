@@ -52,9 +52,15 @@ interface Props {
    * keep the pre-v16 behaviour unchanged.
    */
   appDetail?: AppDetail;
+  /**
+   * R13 (2026-04-28): when provided, the multi-section composite's
+   * master sticky toolbar surfaces a Share icon button next to Copy /
+   * Download / Expand. Click invokes the page-level shareRun() flow.
+   */
+  onShare?: () => void;
 }
 
-export function OutputPanel({ app, run, onIterate, onOpenDetails, onRetry, appDetail }: Props) {
+export function OutputPanel({ app, run, onIterate, onOpenDetails, onRetry, appDetail, onShare }: Props) {
   const duration = run.duration_ms
     ? run.duration_ms < 1000
       ? `${run.duration_ms}ms`
@@ -78,6 +84,7 @@ export function OutputPanel({ app, run, onIterate, onOpenDetails, onRetry, appDe
           runId: run.id,
           appName: app.name,
           durationLabel: duration,
+          onShare,
         })
       : null;
   // R7.7: when the multi-section composite renders, it OWNS the Done

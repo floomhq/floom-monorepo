@@ -154,6 +154,14 @@ interface CascadeArgs {
    */
   appName?: string;
   durationLabel?: string;
+  /**
+   * R13 (2026-04-28): when provided, the multi-section composite renders
+   * a Share icon button in the master sticky toolbar. Click fires the
+   * shareRun() flow from the host page so the affordance stays inline
+   * with the output — replacing the heavy RunCompleteCard panel that
+   * used to render below the output card.
+   */
+  onShare?: () => void;
 }
 
 export interface CascadeResult {
@@ -260,6 +268,8 @@ interface AutoPickCtx {
   /** R7.7: passed to CompositeOutputCard for the "Done · App · 995ms" badge. */
   appName?: string;
   durationLabel?: string;
+  /** R13: optional share-this-run callback wired into the master toolbar. */
+  onShare?: () => void;
 }
 
 /**
@@ -497,6 +507,7 @@ function autoPick(
             durationLabel={ctx?.durationLabel}
             appSlug={ctx?.appSlug}
             runId={ctx?.runId}
+            onShare={ctx?.onShare}
           >
             {children}
           </CompositeOutputCard>
@@ -586,6 +597,7 @@ function autoPick(
           durationLabel={ctx?.durationLabel}
           appSlug={ctx?.appSlug}
           runId={ctx?.runId}
+          onShare={ctx?.onShare}
         >
           {children}
         </CompositeOutputCard>
@@ -879,6 +891,7 @@ export function pickRenderer({
   runId,
   appName,
   durationLabel,
+  onShare,
 }: CascadeArgs): CascadeResult {
   const appSlug = app.slug;
   const render = app.manifest?.render;
@@ -975,6 +988,7 @@ export function pickRenderer({
     rowsFieldHint,
     appName,
     durationLabel,
+    onShare,
   });
   if (auto) {
     return { kind: 'auto', element: auto };
