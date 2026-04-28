@@ -379,6 +379,15 @@ body:has(.topbar-mobile-menu) {
   }
 }
 
+/* ── Workspace rail: hide on mobile (< 768px) per v26 wireframe spec ─── */
+@media (max-width: 767px) {
+  [data-testid="run-rail"],
+  [data-testid="studio-rail"],
+  [data-testid="settings-rail"] {
+    display: none !important;
+  }
+}
+
 /* ── Mobile responsive ───────────────────────────────────────────────── */
 @media (max-width: 640px) {
   /* Reduce main padding so content fits within 375px */
