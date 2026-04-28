@@ -209,27 +209,27 @@ export function AppShowcaseRow({ apps }: AppShowcaseRowProps) {
         </p>
       </div>
 
-      {/* R11 (2026-04-28): floom.dev-pattern hero treatment — first
-          featured card spans 2 cols at >=1024px (visually dominant)
-          while the remaining cards stay 1-col. 4-col grid gives us
-          2+1+1 layout. The CSS class `apps-showcase-grid` collapses
-          this to a single column on phones via the existing media
-          rules in csp-inline-style-migrations.css. */}
+      {/* R12 (2026-04-29): drop the 2:1:1 asymmetric hero layout —
+          Federico flagged "cards on the right are too narrow". The
+          right-side cards got crushed next to a 2x first card. Floom.dev's
+          actual pattern is equal-width but visually substantial cards;
+          we match by going 3-up at >=1024px with bigger preview chips
+          and more padding (handled inside ShowcaseCard). */}
       <div
         data-testid="apps-showcase-grid"
-        className="apps-showcase-grid apps-showcase-grid-hero"
+        className="apps-showcase-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(3, 1fr)',
           gap: 22,
         }}
       >
-        {visibleEntries.map((entry, idx) => (
+        {visibleEntries.map((entry) => (
           <ShowcaseCard
             key={entry.slug}
             entry={entry}
             app={bySlug.get(entry.slug)}
-            isHero={idx === 0}
+            isHero={false}
           />
         ))}
       </div>
