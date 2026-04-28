@@ -23,7 +23,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Code2, Rocket, Share2 } from 'lucide-react';
 
 import { TopBar } from '../components/TopBar';
 import { PublicFooter } from '../components/public/PublicFooter';
@@ -83,24 +83,24 @@ function MvpHeroInstall() {
     } catch { /* silent */ }
   }
   return (
-    <div style={{ maxWidth: 560, margin: '28px auto 0', textAlign: 'left' }}>
-      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 10px', textAlign: 'center' }}>
-        Paste this in your MCP client config:
+    <div style={{ maxWidth: 480, margin: '20px auto 0', textAlign: 'left' }}>
+      <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 8px', textAlign: 'center' }}>
+        Paste in your MCP client config:
       </p>
       <div style={{ position: 'relative' }}>
         <pre
           data-testid="hero-mcp-snippet"
           style={{
             fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-            fontSize: 12,
+            fontSize: 11,
             background: '#1b1a17',
             color: '#d4d4c8',
-            borderRadius: 10,
-            padding: '14px 16px',
-            paddingRight: 80,
+            borderRadius: 8,
+            padding: '10px 12px',
+            paddingRight: 64,
             overflowX: 'auto',
             whiteSpace: 'pre',
-            lineHeight: 1.6,
+            lineHeight: 1.5,
             margin: 0,
           }}
         >
@@ -429,8 +429,9 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               Federico 2026-04-23): top ~120-150px is visible above the fold
               at 1440x900, rest scrolls into view. Bigger canvas = more
               cinematic, no squishing to fit the viewport.
-              MVP variant: dropped (consumer-first, install snippet replaces it). */}
-          {!isMvp && <HeroDemo />}
+              MVP variant: KEEP (Federico 2026-04-28 — visual hero asset
+              is essential, install snippet sits below it not instead). */}
+          <HeroDemo />
         </section>
 
         {/* Compact CLI reference strip below the hero — smaller than the
@@ -476,7 +477,9 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               margin: '0 auto',
             }}
           >
-            {STEPS.map((s) => (
+            {STEPS.map((s, idx) => {
+              const Icon = idx === 0 ? Code2 : idx === 1 ? Rocket : Share2;
+              return (
               <div
                 key={s.num}
                 className="step"
@@ -488,6 +491,22 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                   position: 'relative',
                 }}
               >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 10,
+                    background: 'rgba(4,120,87,0.08)',
+                    border: '1px solid rgba(4,120,87,0.18)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#047857',
+                    marginBottom: 16,
+                  }}
+                >
+                  <Icon size={22} strokeWidth={1.6} />
+                </div>
                 <div
                   style={{
                     fontFamily: "'JetBrains Mono', ui-monospace, monospace",
@@ -526,7 +545,8 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                   {s.mono}
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         </section>
 
