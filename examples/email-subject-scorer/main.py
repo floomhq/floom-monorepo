@@ -171,7 +171,7 @@ def _dry_run(subject: str) -> dict[str, Any]:
         issues = ["Too short to convey value", "Missing context for the reader"]
     elif word_count >= 12:
         score, verdict = 4, "average"
-        issues = ["Too long — likely gets cut off on mobile", "Dilutes the main message"]
+        issues = ["Too long, likely gets cut off on mobile", "Dilutes the main message"]
     else:
         score, verdict = 6, "average"
         issues = ["Subject is okay but lacks a strong hook"]
@@ -183,7 +183,7 @@ def _dry_run(subject: str) -> dict[str, Any]:
         "rewrites": [
             {"angle": "curiosity", "subject": f"Quick question about {subject[:30]}..."},
             {"angle": "value", "subject": f"How to improve your {subject[:20].lower()} results"},
-            {"angle": "directness", "subject": f"{subject[:40]} — 5 min read"},
+            {"angle": "directness", "subject": f"{subject[:40]}: 5 min read"},
         ],
         "explanation": "DRY RUN (no GEMINI_API_KEY). Heuristic scoring only; not a real evaluation.",
         "dry_run": True,
