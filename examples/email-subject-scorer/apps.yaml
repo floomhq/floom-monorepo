@@ -1,0 +1,18 @@
+apps:
+  - slug: email-subject-scorer
+    display_name: Subject Line Scorer
+    category: marketing
+    description: >
+      Paste your email subject line — get an open-rate score from 1-10, the top issues,
+      and 3 stronger rewrites in under 3 seconds.
+    runtime: python
+    entrypoint: examples/email-subject-scorer/main.py
+    port: null
+    visibility: public
+    env:
+      - GEMINI_API_KEY
+    icon: email-subject-scorer
+    tags:
+      - email
+      - marketing
+      - sales
