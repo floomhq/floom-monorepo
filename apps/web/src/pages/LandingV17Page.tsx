@@ -51,10 +51,14 @@ import { waitlistHref } from '../lib/waitlistCta';
 import { useSession } from '../hooks/useSession';
 
 // MVP hero install snippet — generic MCP config, no per-app slug.
+// IMPORTANT: use the current origin so tokens minted on mvp.floom.dev /
+// v26.floom.dev / floom.dev (post-flip) point at the SAME host they were
+// minted on. Hardcoding floom.dev breaks the 401-on-cross-host case.
+const MCP_HOST = typeof window !== 'undefined' ? window.location.origin : 'https://floom.dev';
 const MVP_MCP_SNIPPET = `{
   "mcpServers": {
     "floom": {
-      "url": "https://floom.dev/mcp",
+      "url": "${MCP_HOST}/mcp",
       "headers": {
         "Authorization": "Bearer floom_agent_<your_token>"
       }
