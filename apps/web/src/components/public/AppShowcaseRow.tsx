@@ -35,7 +35,7 @@ import type { HubApp } from '../../lib/types';
  * shape — when these strings drift from real run output, update both
  * here and the live demo so the card stays honest.
  */
-interface ShowcaseEntry {
+export interface ShowcaseEntry {
   slug: string;
   /** Display name fallback when the API hasn't loaded yet. */
   name: string;
@@ -55,7 +55,7 @@ interface ShowcaseEntry {
   topFeatured?: boolean;
 }
 
-const SHOWCASE_ENTRIES: ShowcaseEntry[] = [
+export const SHOWCASE_ENTRIES: ShowcaseEntry[] = [
   {
     slug: 'competitor-lens',
     name: 'Competitor Lens',
@@ -237,7 +237,7 @@ export function AppShowcaseRow({ apps }: AppShowcaseRowProps) {
   );
 }
 
-function ShowcaseCard({
+export function ShowcaseCard({
   entry,
   app,
   isHero = false,

@@ -29,6 +29,7 @@ import { TopBar } from '../components/TopBar';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { AppStripe } from '../components/public/AppStripe';
 import { AppGrid } from '../components/public/AppGrid';
+import { ShowcaseCard, SHOWCASE_ENTRIES } from '../components/public/AppShowcaseRow';
 import { FeedbackButton } from '../components/FeedbackButton';
 
 import { WorksWithBelt } from '../components/home/WorksWithBelt';
@@ -716,31 +717,34 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
           >
             Real AI doing real work. All three deploy from a single GitHub repo.
           </p>
-          {/* R8 #25 (2026-04-28): switched MVP showcase to AppGrid (the
-              same component /apps + floom.dev use), so the cards render
-              the sample-output preview chip per app — matches floom.dev
-              visual style instead of the simpler icon+name+tagline cards. */}
+          {/* R13.1 (2026-04-29): use the SAME ShowcaseCard component as
+              /apps featured row. AppGrid's "featured" variant rendered
+              the small horizontal AppStripe shape — Federico flagged
+              "landing showcase still sucks". Now landing matches /apps:
+              rich card with sample-output preview chip, name, description,
+              category, "Open app" CTA. Same component, same look. */}
           {isMvp ? (
-            <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-              {showcaseHubApps.length > 0 ? (
-                <AppGrid apps={showcaseHubApps} variant="featured" />
-              ) : (
-                // Fallback while /api/hub is in-flight: render simpler
-                // stripe row from FALLBACK_STRIPES so the slot doesn't
-                // collapse on cold load.
-                <div className="mvp-showcase-grid-fallback" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
-                  {stripes.map((s) => (
-                    <AppStripe
-                      key={s.slug}
-                      slug={s.slug}
-                      name={s.name}
-                      description={s.description}
-                      category={s.category}
-                      variant="landing"
+            <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+              <div
+                className="apps-showcase-grid"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: 22,
+                }}
+              >
+                {SHOWCASE_ENTRIES.map((entry) => {
+                  const app = showcaseHubApps.find((a) => a.slug === entry.slug);
+                  return (
+                    <ShowcaseCard
+                      key={entry.slug}
+                      entry={entry}
+                      app={app}
+                      isHero={false}
                     />
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <div className="mvp-showcase-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, maxWidth: 1100, margin: '0 auto' }}>
