@@ -135,6 +135,7 @@ meAppsRouter.get('/:slug/sharing', async (c) => {
       decided_by: app.review_decided_by,
       comment: app.review_comment,
     },
+    publish_status: app.publish_status,
   });
 });
 
@@ -189,6 +190,7 @@ meAppsRouter.patch('/:slug/sharing', async (c) => {
     slug: nextApp.slug,
     visibility: canonicalVisibility(nextApp.visibility),
     link_share_token: canonicalVisibility(nextApp.visibility) === 'link' ? nextApp.link_share_token : null,
+    publish_status: nextApp.publish_status,
   });
 });
 
@@ -323,7 +325,7 @@ meAppsRouter.post('/:slug/sharing/submit-review', async (c) => {
       reason: canonicalVisibility(app.visibility) === 'changes_requested' ? 'owner_resubmit_review' : 'owner_submit_review',
     });
     invalidateHubCache();
-    return c.json({ ok: true, slug: next.slug, visibility: canonicalVisibility(next.visibility) });
+    return c.json({ ok: true, slug: next.slug, visibility: canonicalVisibility(next.visibility), publish_status: next.publish_status });
   } catch {
     return c.json({ error: 'Illegal visibility transition', code: 'illegal_transition' }, 409);
   }
@@ -344,7 +346,7 @@ meAppsRouter.post('/:slug/sharing/withdraw-review', async (c) => {
       reason: 'owner_withdraw_review',
     });
     invalidateHubCache();
-    return c.json({ ok: true, slug: next.slug, visibility: canonicalVisibility(next.visibility) });
+    return c.json({ ok: true, slug: next.slug, visibility: canonicalVisibility(next.visibility), publish_status: next.publish_status });
   } catch {
     return c.json({ error: 'Illegal visibility transition', code: 'illegal_transition' }, 409);
   }

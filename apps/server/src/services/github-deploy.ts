@@ -702,7 +702,7 @@ function publishPrivateDockerApp(args: {
          ?, ?, ?, ?, ?, 'active', ?, ?,
          ?, ?, NULL, 'docker', NULL, NULL, NULL,
          NULL, NULL, 'private', 0,
-         NULL, NULL, 0, NULL, ?, 'published'
+         NULL, NULL, 0, NULL, ?, 'pending_review'
        )`,
     ).run(
       args.appId,
@@ -742,7 +742,6 @@ function publishPrivateDockerApp(args: {
        async_mode=NULL,
        workspace_id=?,
        author=?,
-       publish_status='published',
        updated_at=datetime('now')
      WHERE id=?`,
   ).run(
