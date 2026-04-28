@@ -409,6 +409,86 @@ export function IconSprite() {
         />
       </symbol>
 
+      {/* Boring Pack icons */}
+      <symbol id="app-receipt" viewBox="0 0 24 24">
+        {/* Lucide `receipt` — printable receipt with line items and total. */}
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          d="M9 9h6M9 13h4"
+        />
+      </symbol>
+      <symbol id="app-vcard" viewBox="0 0 24 24">
+        {/* Contact card with person silhouette — matches vCard concept. */}
+        <rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="8" cy="11" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          d="M5 15c.5-1.5 1.5-2.5 3-2.5s2.5 1 3 2.5M14 10h4M14 13h3"
+        />
+      </symbol>
+      <symbol id="app-ics" viewBox="0 0 24 24">
+        {/* Calendar with a single event dot — ICS / .ics event file. */}
+        <rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
+        <circle cx="12" cy="15" r="1.5" fill="currentColor" />
+      </symbol>
+      <symbol id="app-iban-validate" viewBox="0 0 24 24">
+        {/* Bank building with a checkmark — IBAN validation for finance. */}
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 10h18M3 21h18M6 10V21M10 10V21M14 10V21M18 10V21M12 3L3 7h18L12 3z"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M16 14l2 2 3-3"
+        />
+      </symbol>
+      <symbol id="app-cover-letter-format" viewBox="0 0 24 24">
+        {/* Document with bullet list — structured cover letter variants. */}
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14 2v6h6"
+        />
+        <circle cx="8.5" cy="12" r="1" fill="currentColor" />
+        <circle cx="8.5" cy="15.5" r="1" fill="currentColor" />
+        <circle cx="8.5" cy="19" r="1" fill="currentColor" />
+        <path fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" d="M11 12h5M11 15.5h5M11 19h3" />
+      </symbol>
+
       {/* Default fallback app icon */}
       <symbol id="app-default" viewBox="0 0 24 24">
         <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -579,6 +659,12 @@ export function iconForSlug(slug: string): string {
     'competitor-lens': 'app-competitor-lens',
     'ai-readiness-audit': 'app-ai-readiness-audit',
     'pitch-coach': 'app-pitch-coach',
+    // Boring Pack
+    receipt: 'app-receipt',
+    vcard: 'app-vcard',
+    ics: 'app-ics',
+    'iban-validate': 'app-iban-validate',
+    'cover-letter-format': 'app-cover-letter-format',
   };
   const explicit = map[slug];
   if (explicit) return explicit;
