@@ -2639,6 +2639,15 @@ input { font-family: inherit; }
     grid-column: span 2;
   }
 }
+/* workspace-apps mobile: single-column below 640px */
+@media (max-width: 640px) {
+  .me-apps-page .ma-grid {
+    grid-template-columns: 1fr;
+  }
+  .me-apps-page .ma-grid > .ma-card-hero {
+    grid-column: span 1;
+  }
+}
 
 /* Card chrome. */
 .me-apps-page .ma-card {
