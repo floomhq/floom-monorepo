@@ -403,7 +403,7 @@ function RecentActivityPanel({ runs }: { runs: MeRunSummary[] }) {
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 12,
-        padding: '16px 18px 6px',
+        padding: '18px 20px 6px',
         marginBottom: 16,
       }}
     >
