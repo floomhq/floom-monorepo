@@ -1,13 +1,16 @@
 // GET /og/:slug.svg — dynamic social preview image for /p/:slug.
+// GET /og/main.svg — the Floom landing OG image.
 //
 // Produces a 1200x630 SVG with:
-//   - Floom wordmark top-left
-//   - App name (large, bold)
-//   - App description (up to 2 lines)
-//   - Sample output card — curated per slug, or generic bullets
-//   - "run it on floom.dev/p/<slug>" footer
-//
-// Also exposes /og/main.svg — the Floom landing OG image.
+//   - Inline path-based Floom mark (no web fonts, no halo filter — just
+//     the brand glyph + wordmark). Renders identically on Discord,
+//     Slack, iMessage, LinkedIn, Twitter — none of which load
+//     <font-face> definitions when SVGs are referenced via og:image.
+//   - App name (large, bold) with subtle ink gradient for visual weight.
+//   - App description (up to 2 lines).
+//   - Sample output card — per-slug curated SAMPLES map, with three
+//     known launch apps hand-tuned to match real outputs.
+//   - Footer: "floom.dev · Free to run · MIT" with a tight accent dot.
 //
 // Served with Cache-Control: public, max-age=300 so crawlers hit the
 // route but we can update the copy by deploying.
@@ -44,12 +47,36 @@ function truncate(s: string, max: number): string {
 //
 // Falls back to generic bullets if slug not found.
 const CURATED_SAMPLES: Record<string, { score: string; bullets: string[] }> = {
-  'ai-readiness-audit': {
-    score: 'Score: 8/10',
+  'competitor-lens': {
+    score: 'stripe vs adyen',
     bullets: [
-      'Clear positioning and concrete use-case',
-      'Missing customer proof points',
-      'Add one quantified case study to unlock 9/10',
+      'Fee: 1.4% (Stripe) vs 1.6% (Adyen)',
+      'Setup: minutes (Stripe) vs days (Adyen)',
+      'Winner: Stripe for SMB, Adyen for enterprise',
+    ],
+  },
+  'competitor-analyzer': {
+    score: '3 gaps found',
+    bullets: [
+      'Pricing: competitor A is 30% cheaper on starter tier',
+      'Feature gap: no mobile app (both rivals have one)',
+      'Opportunity: only you offer an API — highlight it',
+    ],
+  },
+  'ai-readiness-audit': {
+    score: 'floom.dev — 8.4/10',
+    bullets: [
+      '3 risks: no PII red-team, no eval suite, no rate limits',
+      '3 wins: typed I/O, JSON schemas, observability',
+      'Next: ship the eval harness to unlock 9.5/10',
+    ],
+  },
+  'pitch-coach': {
+    score: 'harsh truth',
+    bullets: [
+      '3 critiques: vague problem, no wedge, weak ask',
+      '3 rewrites: open with pain, name the wedge, anchor ask',
+      'Verdict: rewrite slide 1 — buries the lede',
     ],
   },
   'lead-scorer': {
@@ -66,14 +93,6 @@ const CURATED_SAMPLES: Record<string, { score: string; bullets: string[] }> = {
       'Alice M. — Strong match (Python, 4y exp, ML background)',
       'Bob K. — Partial match (React focus, no backend)',
       'Carol D. — Weak match (entry-level, no relevant projects)',
-    ],
-  },
-  'competitor-analyzer': {
-    score: '3 gaps found',
-    bullets: [
-      'Pricing: competitor A is 30% cheaper on starter tier',
-      'Feature gap: no mobile app (both rivals have one)',
-      'Opportunity: only you offer an API — highlight it',
     ],
   },
 };
