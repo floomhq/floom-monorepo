@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { useSession } from '../hooks/useSession';
+import { useMyApps } from '../hooks/useMyApps';
 import { formatTime } from '../lib/time';
 import * as api from '../api/client';
 import type { MeRunSummary } from '../lib/types';
@@ -27,6 +28,7 @@ const FETCH_LIMIT = 200;
 interface RunApp {
   slug: string;
   name: string;
+  description?: string;
   runCount: number;
   lastRunAt: string | null;
   lastRunId: string;
@@ -175,6 +177,23 @@ function AppCard({ app }: { app: RunApp }) {
           </div>
         </div>
       </div>
+
+      {app.description && (
+        <p
+          style={{
+            fontSize: 14,
+            color: 'var(--ink-2, var(--muted))',
+            margin: '6px 0 0',
+            lineHeight: 1.5,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {app.description}
+        </p>
+      )}
 
       <div
         style={{
@@ -394,6 +413,7 @@ function EmptyState() {
 
 export function RunAppsPage() {
   const { data: session, loading: sessionLoading, error: sessionError } = useSession();
+  const { apps: myApps } = useMyApps();
   const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
 
   const sessionPending =
@@ -417,8 +437,16 @@ export function RunAppsPage() {
 
   const apps = useMemo<RunApp[]>(() => {
     if (!runs) return [];
-    return deriveApps(runs);
-  }, [runs]);
+    const derived = deriveApps(runs);
+    // Merge description from useMyApps (CreatorApp.description) by slug.
+    const descBySlug = new Map<string, string>(
+      (myApps ?? []).map((a) => [a.slug, a.description]),
+    );
+    return derived.map((app) => ({
+      ...app,
+      description: descBySlug.get(app.slug) || undefined,
+    }));
+  }, [runs, myApps]);
 
   const appCount = apps.length;
   // TODO: replace with real 7-day metric from /api/workspace/stats
