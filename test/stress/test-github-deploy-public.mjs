@@ -166,7 +166,7 @@ const validDone = await waitBuild(valid.json.build_id);
 log('valid public repo: build publishes', validDone.json.status === 'published', JSON.stringify(validDone.json));
 const validRow = db.prepare('SELECT visibility, publish_status FROM apps WHERE slug = ?').get(validDone.json.slug);
 log('valid public repo: app is private', validRow?.visibility === 'private');
-log('valid public repo: app publish_status is published', validRow?.publish_status === 'published');
+log('valid public repo: app publish_status is pending_review', validRow?.publish_status === 'pending_review');
 
 const priv = await request('POST', '/api/studio/build/from-github', {
   github_url: 'https://github.com/octo/private-app',
