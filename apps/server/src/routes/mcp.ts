@@ -34,6 +34,8 @@ import {
 import { resolveUserContext } from '../services/session.js';
 import * as userSecrets from '../services/user_secrets.js';
 import * as creatorSecrets from '../services/app_creator_secrets.js';
+import * as profileContext from '../services/profile_context.js';
+import * as ws from '../services/workspaces.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import {
   AUTH_DOCS_URL,
@@ -207,7 +209,9 @@ function buildZodSchema(
       default:
         field = z.string().describe(inp.description ?? inp.label);
     }
-    if (!inp.required) {
+    // Context-backed required inputs are enforced after `_use_context` has had
+    // a chance to fill them; otherwise the MCP SDK rejects the call too early.
+    if (!inp.required || inp.context_path) {
       field = field.optional();
     }
     schema[inp.name] = field;
@@ -233,6 +237,10 @@ function buildZodSchema(
         )}. These values are used for this call only and are never stored server-side.`,
       );
   }
+  schema._use_context = z
+    .boolean()
+    .optional()
+    .describe('When true, fill missing declared inputs from the caller user/workspace profile context.');
   return schema;
 }
 
@@ -305,6 +313,8 @@ function createPerAppMcpServer(
         // Never persisted server-side.
         const raw = { ...(rawInputs as Record<string, unknown>) };
         let perCallSecrets: Record<string, string> | undefined;
+        const useContext = raw._use_context === true;
+        delete raw._use_context;
         if (raw._auth && typeof raw._auth === 'object' && raw._auth !== null) {
           const authObj = raw._auth as Record<string, unknown>;
           perCallSecrets = {};
@@ -318,7 +328,9 @@ function createPerAppMcpServer(
 
         let validated: Record<string, unknown>;
         try {
-          validated = validateInputs(actionSpec, raw);
+          const enrichedRaw =
+            useContext && ctx ? profileContext.applyProfileContext(actionSpec, raw, ctx) : raw;
+          validated = validateInputs(actionSpec, enrichedRaw);
         } catch (err) {
           const e = err as ManifestError;
           return {
@@ -1325,6 +1337,28 @@ function requireAccountScope(ctx: SessionContext): void {
   );
 }
 
+function requireWorkspaceRole(
+  ctx: SessionContext,
+  role: 'admin' | 'editor' | 'viewer',
+): void {
+  try {
+    ws.assertRole(ctx, ctx.workspace_id, role);
+  } catch (err) {
+    if (err instanceof ws.InsufficientRoleError) {
+      throw new AgentToolError(
+        'forbidden_scope',
+        `This tool requires ${role} workspace role.`,
+        403,
+      );
+    }
+    throw new AgentToolError(
+      'not_accessible',
+      'Workspace not found or not accessible.',
+      404,
+    );
+  }
+}
+
 function canUseRunTools(ctx: SessionContext): boolean {
   return ctx.agent_token_scope === 'read' || ctx.agent_token_scope === 'read-write';
 }
@@ -1569,9 +1603,10 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
           slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
           action: z.string().min(1).max(120).optional(),
           inputs: z.record(z.unknown()).optional(),
+          use_context: z.boolean().optional(),
         },
       },
-      async ({ slug, action, inputs }) => {
+      async ({ slug, action, inputs, use_context }) => {
         recordMcpToolCall('run_app');
         try {
           return mcpJson(
@@ -1579,6 +1614,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
               slug,
               action,
               inputs: inputs as Record<string, unknown> | undefined,
+              use_context,
             }),
           );
         } catch (err) {
@@ -2666,6 +2702,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_get');
         try {
           requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'viewer');
           return mcpJson({
             user_id: ctx.user_id,
             workspace_id: ctx.workspace_id,
@@ -2673,6 +2710,72 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             agent_token_scope: ctx.agent_token_scope,
             agent_token_rate_limit_per_minute: ctx.agent_token_rate_limit_per_minute,
           });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_get_context',
+      {
+        title: 'Get profile context',
+        description:
+          'Return the JSON user_profile and workspace_profile used to prefill app inputs when run_app is called with use_context=true.',
+        inputSchema: {},
+      },
+      async () => {
+        recordMcpToolCall('account_get_context');
+        try {
+          requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'viewer');
+          return mcpJson(profileContext.getProfileContext(ctx));
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_set_user_context',
+      {
+        title: 'Set user profile context',
+        description:
+          'Replace this token user\'s JSON profile context. Values are not secrets; use account_set_secret for API keys.',
+        inputSchema: {
+          profile: z.record(z.unknown()),
+        },
+      },
+      async ({ profile }) => {
+        recordMcpToolCall('account_set_user_context');
+        try {
+          requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'viewer');
+          profileContext.setUserProfile(ctx.user_id, profile as Record<string, unknown>);
+          return mcpJson({ ok: true, ...profileContext.getProfileContext(ctx) });
+        } catch (err) {
+          return mcpError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      'account_set_workspace_context',
+      {
+        title: 'Set workspace profile context',
+        description:
+          'Replace this workspace\'s JSON profile context. Values are not secrets; use account_set_secret for API keys.',
+        inputSchema: {
+          profile: z.record(z.unknown()),
+        },
+      },
+      async ({ profile }) => {
+        recordMcpToolCall('account_set_workspace_context');
+        try {
+          requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'editor');
+          profileContext.setWorkspaceProfile(ctx.workspace_id, profile as Record<string, unknown>);
+          return mcpJson({ ok: true, ...profileContext.getProfileContext(ctx) });
         } catch (err) {
           return mcpError(err);
         }
@@ -2691,6 +2794,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_list_secrets');
         try {
           requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'viewer');
           return mcpJson({ entries: userSecrets.listWorkspaceMasked(ctx) });
         } catch (err) {
           return mcpError(err);
@@ -2713,6 +2817,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_set_secret');
         try {
           requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'editor');
           userSecrets.setWorkspaceSecret(ctx.workspace_id, key, value);
           auditLog({
             actor: getAuditActor(c, ctx),
@@ -2743,6 +2848,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_delete_secret');
         try {
           requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'editor');
           const removed = userSecrets.delWorkspaceSecret(ctx.workspace_id, key);
           auditLog({
             actor: getAuditActor(c, ctx),
@@ -2771,6 +2877,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_list_agent_tokens');
         try {
           requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'admin');
           const rows = db
             .prepare(
               `SELECT * FROM agent_tokens
@@ -2801,6 +2908,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_create_agent_token');
         try {
           requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'admin');
           if (!isValidAgentTokenScope(scope)) {
             throw new AgentToolError('invalid_input', 'Invalid token scope.', 400);
           }
@@ -2876,6 +2984,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('account_revoke_agent_token');
         try {
           requireAccountScope(ctx);
+          requireWorkspaceRole(ctx, 'admin');
           const result = db.prepare(
             `UPDATE agent_tokens
                SET revoked_at = COALESCE(revoked_at, ?)

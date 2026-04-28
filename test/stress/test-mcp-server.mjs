@@ -104,19 +104,23 @@ async function stopServer(server) {
   await new Promise((resolve) => setTimeout(resolve, 150));
 }
 
-function createToken(scope = 'read-write') {
+function createToken(scope = 'read-write', opts = {}) {
   const raw = agentTokens.generateAgentToken();
+  const workspaceId = opts.workspace_id || 'local';
+  const userId = opts.user_id || 'local';
   db.prepare(
     `INSERT INTO agent_tokens
        (id, prefix, hash, label, scope, workspace_id, user_id, created_at,
         last_used_at, revoked_at, rate_limit_per_minute)
-     VALUES (?, ?, ?, ?, ?, 'local', 'local', ?, NULL, NULL, 1000)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1000)`,
   ).run(
     `agtok_${scope}_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     agentTokens.extractAgentTokenPrefix(raw),
     agentTokens.hashAgentToken(raw),
     `test-${scope}`,
     scope,
+    workspaceId,
+    userId,
     new Date().toISOString(),
   );
   db.pragma('wal_checkpoint(TRUNCATE)');
@@ -124,7 +128,11 @@ function createToken(scope = 'read-write') {
 }
 
 async function callMcp(port, token, body) {
-  const res = await fetch(`http://localhost:${port}/mcp`, {
+  return callMcpAt(port, '/mcp', token, body);
+}
+
+async function callMcpAt(port, path, token, body) {
+  const res = await fetch(`http://localhost:${port}${path}`, {
     method: 'POST',
     headers: {
       accept: 'application/json, text/event-stream',
@@ -156,6 +164,15 @@ console.log('MCP agent read server');
 const readToken = createToken('read');
 const writeToken = createToken('read-write');
 const publishToken = createToken('publish-only');
+db.prepare(
+  `INSERT INTO users (id, email, name, auth_provider, auth_subject)
+   VALUES ('viewer_user', 'viewer@example.com', 'Viewer', 'test', 'viewer_user')`,
+).run();
+db.prepare(
+  `INSERT INTO workspace_members (workspace_id, user_id, role)
+   VALUES ('local', 'viewer_user', 'viewer')`,
+).run();
+const viewerWriteToken = createToken('read-write', { user_id: 'viewer_user', workspace_id: 'local' });
 const server = await bootServer();
 
 try {
@@ -171,6 +188,7 @@ try {
     'discover_apps',
     'get_app_about',
     'get_app_details',
+    'get_app_logs',
     'get_app_skill',
     'get_app_source',
     'get_run',
@@ -193,13 +211,17 @@ try {
     'account_create_agent_token',
     'account_delete_secret',
     'account_get',
+    'account_get_context',
     'account_list_agent_tokens',
     'account_list_secrets',
     'account_revoke_agent_token',
     'account_set_secret',
+    'account_set_user_context',
+    'account_set_workspace_context',
     'discover_apps',
     'get_app_about',
     'get_app_details',
+    'get_app_logs',
     'get_app_skill',
     'get_app_source',
     'get_run',
@@ -508,6 +530,164 @@ try {
   });
   const accountListSecretsPayload = parseToolText(accountListSecrets);
   log('account_list_secrets returns masked key inventory', Boolean((accountListSecretsPayload?.entries || []).find((entry) => entry.key === 'TEST_API_KEY')), accountListSecrets.text);
+
+  const accountSetUserContext = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 241,
+    method: 'tools/call',
+    params: { name: 'account_set_user_context', arguments: { profile: { name: 'Federico' } } },
+  });
+  const accountSetUserContextPayload = parseToolText(accountSetUserContext);
+  log('account_set_user_context stores JSON profile', accountSetUserContextPayload?.ok === true && accountSetUserContextPayload?.user_profile?.name === 'Federico', accountSetUserContext.text);
+
+  const accountSetSecretLikeUserContext = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 2411,
+    method: 'tools/call',
+    params: { name: 'account_set_user_context', arguments: { profile: { nested: { clientSecret: 'plaintext-secret' } } } },
+  });
+  log(
+    'account_set_user_context rejects secret-shaped profile keys',
+    accountSetSecretLikeUserContext.json?.result?.isError === true &&
+      !accountSetSecretLikeUserContext.text.includes('plaintext-secret'),
+    accountSetSecretLikeUserContext.text,
+  );
+
+  const accountSetWorkspaceContext = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 242,
+    method: 'tools/call',
+    params: { name: 'account_set_workspace_context', arguments: { profile: { company: { name: 'Floom' } } } },
+  });
+  const accountSetWorkspaceContextPayload = parseToolText(accountSetWorkspaceContext);
+  log('account_set_workspace_context stores JSON profile', accountSetWorkspaceContextPayload?.ok === true && accountSetWorkspaceContextPayload?.workspace_profile?.company?.name === 'Floom', accountSetWorkspaceContext.text);
+
+  const accountGetContext = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 243,
+    method: 'tools/call',
+    params: { name: 'account_get_context', arguments: {} },
+  });
+  const accountGetContextPayload = parseToolText(accountGetContext);
+  log(
+    'account_get_context returns user + workspace profiles',
+    accountGetContextPayload?.user_profile?.name === 'Federico' &&
+      accountGetContextPayload?.workspace_profile?.company?.name === 'Floom',
+    accountGetContext.text,
+  );
+
+  const perAppContextManifest = {
+    name: 'Agent Context App',
+    description: 'Per-app MCP context fill fixture',
+    runtime: 'python',
+    manifest_version: '2.0',
+    python_dependencies: [],
+    node_dependencies: {},
+    secrets_needed: [],
+    actions: {
+      run: {
+        label: 'Run',
+        inputs: [
+          { name: 'person', label: 'Person', type: 'text', required: true, context_path: 'user.name' },
+          { name: 'company', label: 'Company', type: 'text', required: true, context_path: 'workspace.company.name' },
+        ],
+        outputs: [{ name: 'result', label: 'Result', type: 'json' }],
+        secrets_needed: [],
+      },
+    },
+  };
+  const perAppContextSpec = {
+    openapi: '3.0.0',
+    info: { title: 'Agent Context App', version: '1.0.0' },
+    servers: [{ url: `http://localhost:${server.port}` }],
+    paths: {
+      '/api/health': {
+        get: {
+          operationId: 'run',
+          parameters: [
+            { name: 'person', in: 'query', required: true, schema: { type: 'string' } },
+            { name: 'company', in: 'query', required: true, schema: { type: 'string' } },
+          ],
+          responses: { 200: { description: 'ok' } },
+        },
+      },
+    },
+  };
+  db.prepare(
+    `INSERT INTO apps
+       (id, slug, name, description, manifest, status, code_path, author, workspace_id,
+        visibility, publish_status, app_type, base_url, openapi_spec_cached)
+     VALUES ('app_context_mcp', 'agent-context-app', 'Agent Context App',
+       'Per-app MCP context fill fixture', ?, 'active', '', 'local', 'local',
+       'private', 'published', 'proxied', ?, ?)`,
+  ).run(
+    JSON.stringify(perAppContextManifest),
+    `http://localhost:${server.port}`,
+    JSON.stringify(perAppContextSpec),
+  );
+  db.pragma('wal_checkpoint(TRUNCATE)');
+  const agentContextCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 2451,
+    method: 'tools/call',
+    params: { name: 'run_app', arguments: { slug: 'agent-context-app', use_context: true } },
+  });
+  const agentContextPayload = parseToolText(agentContextCall);
+  const agentContextRun = db
+    .prepare(`SELECT inputs, status FROM runs WHERE id = ?`)
+    .get(agentContextPayload?.run_id || '');
+  const agentContextInputs = agentContextRun?.inputs ? JSON.parse(agentContextRun.inputs) : {};
+  log(
+    'run_app use_context fills context-backed required inputs',
+    agentContextPayload?.status === 'success' &&
+      agentContextRun?.status === 'success' &&
+      agentContextInputs.person === 'Federico' &&
+      agentContextInputs.company === 'Floom',
+    agentContextCall.text,
+  );
+  const perAppContextCall = await callMcpAt(server.port, '/mcp/app/agent-context-app', writeToken, {
+    jsonrpc: '2.0',
+    id: 246,
+    method: 'tools/call',
+    params: { name: 'agent_context_app', arguments: { _use_context: true } },
+  });
+  const perAppContextRun = db
+    .prepare(`SELECT inputs, status FROM runs WHERE app_id = 'app_context_mcp' ORDER BY started_at DESC LIMIT 1`)
+    .get();
+  const perAppContextInputs = perAppContextRun?.inputs ? JSON.parse(perAppContextRun.inputs) : {};
+  log(
+    'per-app MCP _use_context fills context-backed required inputs',
+    perAppContextRun?.status === 'success' &&
+      perAppContextInputs.person === 'Federico' &&
+      perAppContextInputs.company === 'Floom' &&
+      !perAppContextCall.text.includes('Input validation error'),
+    perAppContextCall.text,
+  );
+
+  const viewerSetSecret = await callMcp(server.port, viewerWriteToken, {
+    jsonrpc: '2.0',
+    id: 244,
+    method: 'tools/call',
+    params: { name: 'account_set_secret', arguments: { key: 'VIEWER_KEY', value: 'viewer-secret' } },
+  });
+  log(
+    'viewer read-write token cannot write workspace secrets',
+    viewerSetSecret.json?.result?.isError === true && !viewerSetSecret.text.includes('viewer-secret'),
+    viewerSetSecret.text,
+  );
+
+  const viewerSetWorkspaceContext = await callMcp(server.port, viewerWriteToken, {
+    jsonrpc: '2.0',
+    id: 245,
+    method: 'tools/call',
+    params: { name: 'account_set_workspace_context', arguments: { profile: { company: { name: 'ViewerCorp' } } } },
+  });
+  log(
+    'viewer read-write token cannot write workspace context',
+    viewerSetWorkspaceContext.json?.result?.isError === true &&
+      !viewerSetWorkspaceContext.text.includes('ViewerCorp'),
+    viewerSetWorkspaceContext.text,
+  );
 
   const accountDeleteSecret = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',

@@ -740,6 +740,24 @@ db.exec(`
   );
 `);
 
+// ---------- profile context: JSON user/workspace facts for headless runs ----------
+// Values here are ordinary JSON metadata used to prefill declared app inputs
+// when callers opt in with use_context. Secrets remain in the encrypted
+// user_secrets/workspace_secrets vaults above and are never stored here.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    profile_json TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS workspace_profiles (
+    workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+    profile_json TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
 export type WorkspaceSecretsBackfillResult = {
   dry_run: boolean;
   groups_scanned: number;
@@ -1462,8 +1480,9 @@ db.exec(`
 // v14: waitlist_signups.deploy_repo_url + deploy_intent (#454).
 // v15: agent_tokens for agents-native phase 2A backend.
 // v16: audit_log (ADR-013), generalized from app_visibility_audit.
+// v17: profile context JSON stores for user/workspace profile prefill.
 const currentUserVersion = (db.prepare(`PRAGMA user_version`).get() as { user_version: number })
   .user_version;
-if (currentUserVersion < 16) {
-  db.pragma('user_version = 16');
+if (currentUserVersion < 17) {
+  db.pragma('user_version = 17');
 }

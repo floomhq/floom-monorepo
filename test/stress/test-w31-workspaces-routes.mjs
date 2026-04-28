@@ -42,6 +42,8 @@ const { db, DEFAULT_WORKSPACE_ID } = await import(
 const { workspacesRouter, sessionRouter } = await import(
   '../../apps/server/dist/routes/workspaces.js'
 );
+const { runRouter } = await import('../../apps/server/dist/routes/run.js');
+const { newAppId } = await import('../../apps/server/dist/lib/ids.js');
 
 let passed = 0;
 let failed = 0;
@@ -339,7 +341,87 @@ r = await fetchRoute(
 log('POST /switch-workspace: 200', r.status === 200);
 log('POST /switch-workspace: ok=true', r.json?.ok === true);
 
-// ---- 22. POST /switch-workspace — bad body ----
+// ---- 22. GET/PATCH /api/session/context — profile context ----
+r = await fetchRoute(sessionRouter, 'GET', '/context', undefined, cookie);
+log('GET /context: 200', r.status === 200);
+log('GET /context: user_profile object', r.json?.user_profile && typeof r.json.user_profile === 'object');
+log('GET /context: workspace_profile object', r.json?.workspace_profile && typeof r.json.workspace_profile === 'object');
+
+r = await fetchRoute(sessionRouter, 'PATCH', '/context', {
+  user_profile: { name: 'Federico' },
+  workspace_profile: { company: { name: 'Floom' } },
+}, cookie);
+log('PATCH /context: 200', r.status === 200);
+log('PATCH /context: user profile persisted', r.json?.user_profile?.name === 'Federico');
+log(
+  'PATCH /context: workspace profile persisted',
+  r.json?.workspace_profile?.company?.name === 'Floom',
+);
+log('PATCH /context: plaintext profile is not treated as a secret', !('value' in (r.json || {})));
+const profileAudit = db
+  .prepare(`SELECT after_state FROM audit_log WHERE action = 'profile.updated' ORDER BY created_at DESC LIMIT 1`)
+  .get();
+log(
+  'PATCH /context audit log stores update flags, not full profile JSON',
+  profileAudit?.after_state &&
+    !profileAudit.after_state.includes('Federico') &&
+    !profileAudit.after_state.includes('Floom') &&
+    profileAudit.after_state.includes('user_profile_updated'),
+  profileAudit?.after_state,
+);
+
+r = await fetchRoute(sessionRouter, 'PATCH', '/context', {
+  user_profile: ['not-object'],
+}, cookie);
+log('PATCH /context bad profile: 400', r.status === 400);
+
+r = await fetchRoute(sessionRouter, 'PATCH', '/context', {
+  user_profile: { nested: { accessToken: 'plaintext-secret' } },
+}, cookie);
+log('PATCH /context rejects secret-shaped profile keys', r.status === 400 && !r.text.includes('plaintext-secret'), r.text);
+
+const contextAppId = newAppId();
+db.prepare(
+  `INSERT INTO apps (id, slug, name, description, manifest, code_path, workspace_id, author, visibility)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'private')`,
+).run(
+  contextAppId,
+  'context-fill',
+  'Context Fill',
+  'Profile context test',
+  JSON.stringify({
+    name: 'Context Fill',
+    description: 'Profile context test',
+    runtime: 'python',
+    python_dependencies: [],
+    node_dependencies: {},
+    manifest_version: '2.0',
+    secrets_needed: [],
+    actions: {
+      run: {
+        label: 'Run',
+        inputs: [
+          { name: 'person', label: 'Person', type: 'text', required: true, context_path: 'user.name' },
+          { name: 'company', label: 'Company', type: 'text', required: true, context_path: 'workspace.company.name' },
+        ],
+        outputs: [{ name: 'result', label: 'Result', type: 'text' }],
+      },
+    },
+  }),
+  'examples/noop',
+  acmeId,
+  'local',
+);
+r = await fetchRoute(runRouter, 'POST', '/', { app_slug: 'context-fill', use_context: true }, cookie);
+log('POST /:slug/run use_context: 200', r.status === 200, r.text);
+const runInputs = db
+  .prepare('SELECT inputs FROM runs WHERE id = ?')
+  .get(r.json?.run_id)?.inputs;
+const parsedRunInputs = runInputs ? JSON.parse(runInputs) : {};
+log('run use_context filled user path', parsedRunInputs.person === 'Federico', runInputs);
+log('run use_context filled workspace path', parsedRunInputs.company === 'Floom', runInputs);
+
+// ---- 23. POST /switch-workspace — bad body ----
 r = await fetchRoute(
   sessionRouter,
   'POST',
@@ -349,7 +431,7 @@ r = await fetchRoute(
 );
 log('POST /switch-workspace bad body: 400', r.status === 400);
 
-// ---- 23. POST /switch-workspace — non-member (force a fresh ws bob) ----
+// ---- 24. POST /switch-workspace — non-member (force a fresh ws bob) ----
 // Manually insert a workspace the local user is NOT in.
 db.prepare(
   `INSERT INTO workspaces (id, slug, name, plan) VALUES (?, ?, ?, 'cloud_free')`,
@@ -364,7 +446,7 @@ r = await fetchRoute(
 log('POST /switch-workspace non-member: 403', r.status === 403);
 log("POST /switch-workspace non-member: code='not_a_member'", r.json?.code === 'not_a_member');
 
-// ---- 24. session cookie attributes ----
+// ---- 25. session cookie attributes ----
 log('cookie: HttpOnly', setCookie.includes('HttpOnly'));
 log('cookie: SameSite=Lax', setCookie.includes('SameSite=Lax'));
 

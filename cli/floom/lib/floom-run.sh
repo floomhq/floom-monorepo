@@ -5,6 +5,7 @@
 #   floom run <slug>                        run with no inputs (empty object)
 #   floom run <slug> '{"key":"value"}'      run with JSON body
 #   floom run <slug> --input key=value      run with key=value pairs
+#   floom run <slug> --use-context          fill missing inputs from profiles
 #   floom run --help                        show this help
 
 set -euo pipefail
@@ -20,6 +21,7 @@ usage:
   floom run <slug>                    run app with no inputs
   floom run <slug> '<json>'           run app with JSON body
   floom run <slug> --input key=val    run app with key=value pairs (repeatable)
+  floom run <slug> --use-context      fill missing inputs from profiles
 
 examples:
   floom run uuid
@@ -37,6 +39,7 @@ shift
 # Parse remaining args: either a raw JSON string, or --input key=value pairs
 BODY="{}"
 INPUT_PAIRS=()
+USE_CONTEXT=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -49,6 +52,9 @@ while [[ $# -gt 0 ]]; do
       shift ;;
     --input=*)
       INPUT_PAIRS+=("${1#--input=}")
+      shift ;;
+    --use-context)
+      USE_CONTEXT=1
       shift ;;
     *)
       # Treat as raw JSON body
@@ -67,6 +73,25 @@ for p in pairs:
     k, _, v = p.partition('=')
     d[k.strip()] = v.strip()
 print(json.dumps(d))
+PY
+)
+fi
+
+if [[ "$USE_CONTEXT" == "1" ]]; then
+  BODY=$(python3 - "$BODY" <<'PY'
+import json
+import sys
+
+try:
+    payload = json.loads(sys.argv[1])
+except json.JSONDecodeError as exc:
+    print(f"floom run: invalid JSON body: {exc}", file=sys.stderr)
+    sys.exit(1)
+if not isinstance(payload, dict):
+    print("floom run: JSON body must be an object", file=sys.stderr)
+    sys.exit(1)
+payload["use_context"] = True
+print(json.dumps(payload, separators=(",", ":")))
 PY
 )
 fi

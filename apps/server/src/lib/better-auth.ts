@@ -206,16 +206,13 @@ function buildAuthOptions(_overrideBaseURL?: string): any {
     database: db,
     emailAndPassword: {
       enabled: true,
-      // Launch MVP: email verification is deferred — sign up must return a
-      // session immediately so users can mint tokens without leaving their inbox.
-      // FLOOM_REQUIRE_EMAIL_VERIFY=true re-enables the gate (e.g. post-launch
-      // once Resend deliverability is confirmed and we want the verification
-      // funnel).  Default on launch-mvp: false + autoSignIn=true restores the
-      // behaviour of commit 1992f43c that was accidentally reverted in 774bd6c5.
+      // Launch security default: email verification is required unless an
+      // operator explicitly sets FLOOM_REQUIRE_EMAIL_VERIFY=false for a local
+      // or staging experiment.
       requireEmailVerification:
-        (process.env.FLOOM_REQUIRE_EMAIL_VERIFY || '').toLowerCase().trim() === 'true',
+        (process.env.FLOOM_REQUIRE_EMAIL_VERIFY || '').toLowerCase().trim() !== 'false',
       autoSignIn:
-        (process.env.FLOOM_REQUIRE_EMAIL_VERIFY || '').toLowerCase().trim() !== 'true',
+        (process.env.FLOOM_REQUIRE_EMAIL_VERIFY || '').toLowerCase().trim() === 'false',
       // SMTP via Resend (2026-04-20). Outside the Resend-required production
       // signal, when RESEND_API_KEY is unset the handler in ./email.ts falls
       // back to stdout: Better Auth won't crash, the reset URL just appears

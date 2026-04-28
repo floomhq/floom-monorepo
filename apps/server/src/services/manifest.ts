@@ -118,6 +118,19 @@ function validateInput(raw: unknown, prefix: string): InputSpec {
   if (raw.description !== undefined && typeof raw.description === 'string') {
     spec.description = raw.description;
   }
+  if (raw.context_path !== undefined) {
+    if (typeof raw.context_path !== 'string' || raw.context_path.length === 0) {
+      throw new ManifestError(`${prefix}.context_path must be a non-empty string`, `${prefix}.context_path`);
+    }
+    const [scope] = raw.context_path.split('.');
+    if (scope !== 'user' && scope !== 'workspace' && scope !== 'user_profile' && scope !== 'workspace_profile') {
+      throw new ManifestError(
+        `${prefix}.context_path must start with user. or workspace.`,
+        `${prefix}.context_path`,
+      );
+    }
+    spec.context_path = raw.context_path;
+  }
   if (spec.type === 'enum') {
     if (!Array.isArray(raw.options) || raw.options.some((o) => typeof o !== 'string')) {
       throw new ManifestError(

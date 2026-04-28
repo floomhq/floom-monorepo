@@ -41,6 +41,7 @@ import { requireAuthenticatedInCloud } from '../lib/auth.js';
 import { deleteWorkspaceRuns } from '../services/run-retention-sweeper.js';
 import * as userSecrets from '../services/user_secrets.js';
 import { SecretDecryptError } from '../services/user_secrets.js';
+import * as profileContext from '../services/profile_context.js';
 import {
   createAgentKey,
   listAgentKeys,
@@ -114,6 +115,15 @@ const SecretSetBody = z.object({
   key: z.string().min(1).max(128),
   value: z.string().min(1).max(65536),
 });
+
+const ProfileContextBody = z
+  .object({
+    user_profile: z.record(z.unknown()).optional(),
+    workspace_profile: z.record(z.unknown()).optional(),
+  })
+  .refine((v) => v.user_profile !== undefined || v.workspace_profile !== undefined, {
+    message: 'must include user_profile or workspace_profile',
+  });
 
 // --------------------------------------------------------------------
 // Error envelope helper
@@ -626,6 +636,85 @@ sessionRouter.get('/me', async (c) => {
     const payload = ws.me(ctx, isCloudMode());
     return c.json(payload);
   } catch (err) {
+    const m = mapError(err);
+    return c.json(m.body, m.status);
+  }
+});
+
+/**
+ * GET /api/session/context
+ * Returns JSON profile context for the active user and workspace. Values
+ * are used only when a run opts in with use_context.
+ */
+sessionRouter.get('/context', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
+  return c.json(profileContext.getProfileContext(ctx));
+});
+
+/**
+ * PATCH /api/session/context
+ * Body: { user_profile?, workspace_profile? }
+ *
+ * user_profile is editable by the authenticated user. workspace_profile
+ * requires editor/admin membership because it affects every workspace
+ * member who opts into context-prefilled runs.
+ */
+sessionRouter.patch('/context', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Body must be JSON', code: 'invalid_body' }, 400);
+  }
+  const parsed = ProfileContextBody.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: 'Invalid body shape',
+        code: 'invalid_body',
+        details: parsed.error.flatten(),
+      },
+      400,
+    );
+  }
+  try {
+    if (parsed.data.user_profile !== undefined) {
+      profileContext.setUserProfile(ctx.user_id, parsed.data.user_profile);
+    }
+    if (parsed.data.workspace_profile !== undefined) {
+      ws.assertRole(ctx, ctx.workspace_id, 'editor');
+      profileContext.setWorkspaceProfile(ctx.workspace_id, parsed.data.workspace_profile);
+    }
+    const after = profileContext.getProfileContext(ctx);
+    auditLog({
+      actor: getAuditActor(c, ctx),
+      action: 'profile.updated',
+      target: { type: 'workspace', id: ctx.workspace_id },
+      before: null,
+      after: {
+        user_profile_updated: parsed.data.user_profile !== undefined,
+        workspace_profile_updated: parsed.data.workspace_profile !== undefined,
+      },
+      metadata: {
+        workspace_id: ctx.workspace_id,
+        user_id: ctx.user_id,
+        updated_user_profile: parsed.data.user_profile !== undefined,
+        updated_workspace_profile: parsed.data.workspace_profile !== undefined,
+      },
+    });
+    return c.json({ ok: true, ...after });
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.message.includes('must be') || err.message.includes('secret-like key'))
+    ) {
+      return c.json({ error: err.message, code: 'invalid_body' }, 400);
+    }
     const m = mapError(err);
     return c.json(m.body, m.status);
   }

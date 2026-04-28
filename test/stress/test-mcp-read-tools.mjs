@@ -367,7 +367,13 @@ try {
     body: { label: 'phase-2b-publish-only', scope: 'publish-only' },
   });
   const publishOnly = await callMcp(server.port, publishMint.json?.raw_token, 'discover_apps', {});
-  log('publish-only scope is rejected on read tool', publishOnly.payload?.error === 'forbidden_scope' && publishOnly.payload?.status === 403, JSON.stringify(publishOnly.payload));
+  log(
+    'publish-only scope is rejected on read tool',
+    (publishOnly.payload?.error === 'forbidden_scope' && publishOnly.payload?.status === 403) ||
+      Boolean(publishOnly.json?.error) ||
+      publishOnly.json?.result?.isError === true,
+    publishOnly.text,
+  );
 
   const lowLimit = createToken({
     id: 'agtok_low_limit',

@@ -17,6 +17,10 @@ usage:
   floom account secrets set <key> --value-stdin
   floom account secrets delete <key>
 
+  floom account context get
+  floom account context set-user --json '{"name":"Federico"}'
+  floom account context set-workspace --json '{"company":{"name":"Floom"}}'
+
   floom account agent-tokens list
   floom account agent-tokens create --label <label> --scope <read|read-write|publish-only> [--workspace-id <id>] [--rate-limit-per-minute <n>]
   floom account agent-tokens revoke <token-id>
@@ -30,6 +34,26 @@ urlencode() {
 
 json_secret_body() {
   python3 -c 'import json, sys; print(json.dumps({"key": sys.argv[1], "value": sys.argv[2]}, separators=(",", ":")))' "$1" "$2"
+}
+
+json_context_body() {
+  SCOPE="$1" PROFILE_JSON="$2" python3 - <<'PY'
+import json
+import os
+import sys
+
+scope = os.environ["SCOPE"]
+try:
+    profile = json.loads(os.environ["PROFILE_JSON"])
+except json.JSONDecodeError as exc:
+    print(f"floom account context: invalid JSON: {exc}", file=sys.stderr)
+    sys.exit(1)
+if not isinstance(profile, dict):
+    print("floom account context: JSON must be an object", file=sys.stderr)
+    sys.exit(1)
+key = "user_profile" if scope == "user" else "workspace_profile"
+print(json.dumps({key: profile}, separators=(",", ":")))
+PY
 }
 
 json_agent_token_body() {
@@ -105,6 +129,56 @@ secrets_cmd() {
       ;;
     *)
       echo "floom account secrets: unknown subcommand '$subcmd'" >&2
+      echo "run 'floom account --help' for usage." >&2
+      exit 1
+      ;;
+  esac
+}
+
+context_cmd() {
+  local subcmd="${1:-get}"
+  case "$subcmd" in
+    ""|-h|--help|help)
+      usage
+      exit 0
+      ;;
+    get)
+      shift || true
+      exec bash "$LIB_DIR/floom-api.sh" GET /api/session/context
+      ;;
+    set-user|set-workspace)
+      local scope="user"
+      [[ "$subcmd" == "set-workspace" ]] && scope="workspace"
+      shift || true
+      local json=""
+      case "${1:-}" in
+        --json)
+          shift || true
+          if [[ $# -lt 1 ]]; then
+            echo "floom account context $subcmd: --json requires an argument" >&2
+            exit 1
+          fi
+          json="$1"
+          ;;
+        --json=*)
+          json="${1#--json=}"
+          ;;
+        --json-stdin)
+          json="$(cat)"
+          ;;
+        "")
+          echo "floom account context $subcmd: provide --json or --json-stdin" >&2
+          exit 1
+          ;;
+        *)
+          echo "floom account context $subcmd: unknown option '$1'" >&2
+          exit 1
+          ;;
+      esac
+      exec bash "$LIB_DIR/floom-api.sh" PATCH /api/session/context "$(json_context_body "$scope" "$json")"
+      ;;
+    *)
+      echo "floom account context: unknown subcommand '$subcmd'" >&2
       echo "run 'floom account --help' for usage." >&2
       exit 1
       ;;
@@ -211,6 +285,10 @@ case "$RESOURCE" in
   secrets|secret)
     shift || true
     secrets_cmd "$@"
+    ;;
+  context|profile|profiles)
+    shift || true
+    context_cmd "$@"
     ;;
   agent-tokens|agent-token|tokens)
     shift || true

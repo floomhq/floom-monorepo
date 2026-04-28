@@ -38,6 +38,11 @@ export interface InputSpec {
   options?: string[];
   placeholder?: string;
   description?: string;
+  /**
+   * Optional profile-context lookup path used when a caller opts in with
+   * use_context. Supported scopes: user.* and workspace.*.
+   */
+  context_path?: string;
 }
 
 export interface OutputSpec {

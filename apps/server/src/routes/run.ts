@@ -17,6 +17,7 @@ import {
 } from '../lib/auth.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import { resolveUserContext } from '../services/session.js';
+import { applyProfileContext } from '../services/profile_context.js';
 import { parseJsonBody, bodyParseError } from '../lib/body.js';
 import {
   bulkDeleteRunsForOwner,
@@ -209,6 +210,7 @@ runRouter.post('/', async (c) => {
     inputs?: unknown;
     action?: unknown;
     thread_id?: unknown;
+    use_context?: unknown;
   };
   if (typeof body.app_slug !== 'string') {
     return c.json({ error: '"app_slug" is required' }, 400);
@@ -250,9 +252,14 @@ runRouter.post('/', async (c) => {
 
   let validated: Record<string, unknown>;
   try {
+    const inputPayload = (body.inputs as Record<string, unknown>) ?? {};
+    const enrichedInputs =
+      body.use_context === true
+        ? applyProfileContext(actionSpec, inputPayload, ctx)
+        : inputPayload;
     validated = validateInputs(
       actionSpec,
-      (body.inputs as Record<string, unknown>) ?? {},
+      enrichedInputs,
     );
   } catch (err) {
     const e = err as ManifestError;
@@ -591,6 +598,7 @@ slugRunRouter.post('/', async (c) => {
   const body = parsed.value as {
     action?: unknown;
     inputs?: unknown;
+    use_context?: unknown;
   } & Record<string, unknown>;
 
   const actionNames = Object.keys(manifest.actions);
@@ -605,15 +613,19 @@ slugRunRouter.post('/', async (c) => {
   let validated: Record<string, unknown>;
   try {
     const topLevelInputs = Object.fromEntries(
-      Object.entries(body).filter(([key]) => key !== 'action' && key !== 'inputs'),
+      Object.entries(body).filter(([key]) => key !== 'action' && key !== 'inputs' && key !== 'use_context'),
     );
     const inputPayload =
       body.inputs && typeof body.inputs === 'object' && !Array.isArray(body.inputs)
         ? (body.inputs as Record<string, unknown>)
         : topLevelInputs;
+    const enrichedInputs =
+      body.use_context === true
+        ? applyProfileContext(actionSpec, inputPayload, ctx)
+        : inputPayload;
     validated = validateInputs(
       actionSpec,
-      inputPayload,
+      enrichedInputs,
     );
   } catch (err) {
     const e = err as ManifestError;
