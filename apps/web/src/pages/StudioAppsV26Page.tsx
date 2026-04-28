@@ -197,7 +197,8 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
   const isPublished = isLiveApp(app);
   const initials = app.slug.slice(0, 2).toUpperCase();
   return (
-    <div
+    <Link
+      to={`/studio/${app.slug}`}
       data-testid={`studio-apps-card-${app.slug}`}
       style={{
         background: 'var(--card)',
@@ -207,6 +208,8 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
+        textDecoration: 'none',
+        color: 'inherit',
         boxShadow: 'var(--shadow-2)',
         transition: 'border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease',
       }}
@@ -371,20 +374,18 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
           runs
           {app.last_run_at ? ` · last ${formatTime(app.last_run_at)}` : ''}
         </span>
-        <Link
-          to={`/studio/${app.slug}`}
+        <span
           data-testid={`studio-apps-open-${app.slug}`}
           style={{
             fontSize: 12,
             color: 'var(--accent)',
             fontWeight: 600,
-            textDecoration: 'none',
           }}
         >
           Open dashboard →
-        </Link>
+        </span>
       </div>
-    </div>
+    </Link>
   );
 }
 
