@@ -1217,7 +1217,6 @@ export function RunSurface({
           The header's Run button only appears in done/error states as
           "Run again", which is the wireframe's intended affordance. */}
       <RunStatusHeader
-        appName={app.name}
         phase={state.phase}
         runStartedAt={runStartedAt}
         run={state.run}
@@ -1523,7 +1522,6 @@ function RunStatusPill({
 }
 
 function RunStatusHeader({
-  appName: _appName,
   phase,
   runStartedAt,
   run,
@@ -1532,7 +1530,6 @@ function RunStatusHeader({
   onRun,
   runLabel: _runLabel,
 }: {
-  appName: string;
   phase: Phase;
   runStartedAt: number | null;
   run: RunRecord | undefined;
