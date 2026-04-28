@@ -259,7 +259,10 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
               marginTop: 2,
             }}
           >
-            /p/{app.slug}
+            {app.run_count > 0
+              ? `${app.run_count.toLocaleString()} runs${app.last_run_at ? ` · ${formatTime(app.last_run_at)}` : ''}`
+              : 'No runs yet'}
+            {/* TODO: unique callers count not available in CreatorApp — add when API exposes it */}
           </div>
         </div>
         {isPublished ? (
