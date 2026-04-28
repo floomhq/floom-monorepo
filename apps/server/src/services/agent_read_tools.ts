@@ -12,6 +12,7 @@ import {
 } from '../lib/run-gate.js';
 import { isByokGated } from '../lib/byok-gate.js';
 import { validateInputs, ManifestError } from './manifest.js';
+import { resolveContextInputs } from './context_autofill.js';
 import { dispatchRun, getRun } from './runner.js';
 import type {
   AppRecord,
@@ -64,6 +65,7 @@ export interface RunAppArgs {
   slug: string;
   action?: string;
   inputs?: Record<string, unknown>;
+  use_context?: boolean;
 }
 
 function throwRunGateError(gate: Exclude<RunGateResult, { ok: true }>): never {
@@ -356,7 +358,10 @@ export async function runApp(
 
   let validated: Record<string, unknown>;
   try {
-    validated = validateInputs(actionSpec, byokInput.inputs);
+    validated = validateInputs(
+      actionSpec,
+      resolveContextInputs(ctx, actionSpec, byokInput.inputs, args.use_context === true),
+    );
   } catch (err) {
     const e = err as ManifestError;
     throw new AgentToolError('invalid_input', e.message, 400, { field: e.field });

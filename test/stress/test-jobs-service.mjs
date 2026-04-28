@@ -95,6 +95,14 @@ log(
   'decodePerCallSecrets: decrypts per-call secret for worker',
   decodedPerCallSecrets?.API_KEY === 'super_plaintext_secret_123',
 );
+const contextJob = jobs.createJob(newJobId(), {
+  app,
+  action: 'run',
+  inputs: { msg: 'raw' },
+  useContext: true,
+});
+log('createJob: use_context flag persists', contextJob.use_context === 1);
+db.prepare('DELETE FROM jobs WHERE id = ?').run(contextJob.id);
 const tooManySecrets = Object.fromEntries(
   Array.from({ length: 65 }, (_, i) => [`K_${i}`, 'v']),
 );

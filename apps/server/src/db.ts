@@ -464,6 +464,7 @@ db.exec(`
     max_retries INTEGER NOT NULL DEFAULT 0,
     attempts INTEGER NOT NULL DEFAULT 0,
     per_call_secrets_json TEXT,
+    use_context INTEGER NOT NULL DEFAULT 0,
     workspace_id TEXT NOT NULL DEFAULT 'local',
     user_id TEXT,
     device_id TEXT,
@@ -487,6 +488,9 @@ if (!jobCols.includes('user_id')) {
 }
 if (!jobCols.includes('device_id')) {
   db.exec(`ALTER TABLE jobs ADD COLUMN device_id TEXT`);
+}
+if (!jobCols.includes('use_context')) {
+  db.exec(`ALTER TABLE jobs ADD COLUMN use_context INTEGER NOT NULL DEFAULT 0`);
 }
 db.exec(`CREATE INDEX IF NOT EXISTS idx_jobs_owner ON jobs(workspace_id, user_id, device_id)`);
 

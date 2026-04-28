@@ -15,6 +15,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newRunId, newJobId } from '../lib/ids.js';
 import { validateInputs, ManifestError } from '../services/manifest.js';
+import { resolveContextInputs } from '../services/context_autofill.js';
 import { dispatchRun, getRun } from '../services/runner.js';
 import { cancelJob, createJob, formatJob, getJobBySlug } from '../services/jobs.js';
 import { pickApps } from '../services/embeddings.js';
@@ -223,7 +224,7 @@ function buildZodSchema(
       default:
         field = z.string().describe(inp.description ?? inp.label);
     }
-    if (!inp.required) {
+    if (!inp.required || inp.context) {
       field = field.optional();
     }
     schema[inp.name] = field;
@@ -247,6 +248,14 @@ function buildZodSchema(
         `Per-user secrets for this app. Required: ${secretsNeeded.join(
           ', ',
         )}. These values are used for this call only and are never stored server-side.`,
+      );
+  }
+  if (inputs.some((inp) => Boolean(inp.context))) {
+    schema._context = z
+      .object({ use: z.boolean().optional() })
+      .optional()
+      .describe(
+        'Floom context autofill. Set {"use": true} to fill missing manifest-declared inputs from this caller\'s user/workspace profiles.',
       );
   }
   return schema;
@@ -331,10 +340,27 @@ function createPerAppMcpServer(
           }
           delete raw._auth;
         }
+        const contextMeta = raw._context;
+        const useContext =
+          typeof contextMeta === 'object' &&
+          contextMeta !== null &&
+          (contextMeta as Record<string, unknown>).use === true;
+        delete raw._context;
 
         let validated: Record<string, unknown>;
         try {
-          validated = validateInputs(actionSpec, raw);
+          const runtimeCtx =
+            ctx ||
+            {
+              workspace_id: DEFAULT_WORKSPACE_ID,
+              user_id: DEFAULT_USER_ID,
+              device_id: DEFAULT_USER_ID,
+              is_authenticated: false,
+            };
+          validated = validateInputs(
+            actionSpec,
+            resolveContextInputs(runtimeCtx, actionSpec, raw, useContext),
+          );
         } catch (err) {
           const e = err as ManifestError;
           return {
@@ -394,11 +420,12 @@ function createPerAppMcpServer(
           createJob(jobId, {
             app: fresh,
             action: actionName,
-            inputs: validated,
+            inputs: raw,
             workspaceId: ctx?.workspace_id,
             userId: ctx?.user_id,
             deviceId: ctx?.device_id,
             perCallSecrets,
+            useContext,
           });
           const publicUrl =
             process.env.PUBLIC_URL ||
@@ -1768,9 +1795,13 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
           slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
           action: z.string().min(1).max(120).optional(),
           inputs: z.record(z.unknown()).optional(),
+          use_context: z
+            .boolean()
+            .optional()
+            .describe('Fill missing manifest-declared inputs from user/workspace JSON profiles.'),
         },
       },
-      async ({ slug, action, inputs }) => {
+      async ({ slug, action, inputs, use_context }) => {
         recordMcpToolCall('run_app');
         try {
           requireRunScope(ctx);
@@ -1779,6 +1810,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
               slug,
               action,
               inputs: inputs as Record<string, unknown> | undefined,
+              use_context,
             }),
           );
         } catch (err) {
@@ -1903,13 +1935,17 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
           slug: z.string().min(1).max(48).regex(/^[a-z0-9][a-z0-9-]*$/),
           action: z.string().min(1).max(120).optional(),
           inputs: z.record(z.unknown()).optional(),
+          use_context: z
+            .boolean()
+            .optional()
+            .describe('Fill missing manifest-declared inputs from user/workspace JSON profiles.'),
           webhook_url: z.string().url().max(2048).optional(),
           timeout_ms: z.number().int().min(1).max(24 * 60 * 60 * 1000).optional(),
           max_retries: z.number().int().min(0).max(10).optional(),
           _auth: z.record(z.string()).optional(),
         },
       },
-      async ({ slug, action, inputs, webhook_url, timeout_ms, max_retries, _auth }) => {
+      async ({ slug, action, inputs, use_context, webhook_url, timeout_ms, max_retries, _auth }) => {
         recordMcpToolCall('create_job');
         try {
           requireRunScope(ctx);
@@ -1942,9 +1978,17 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
               { valid_actions: actionNames },
             );
           }
-          let validated: Record<string, unknown>;
+          const rawJobInputs = (inputs as Record<string, unknown>) ?? {};
           try {
-            validated = validateInputs(actionSpec, (inputs as Record<string, unknown>) ?? {});
+            validateInputs(
+              actionSpec,
+              resolveContextInputs(
+                ctx,
+                actionSpec,
+                rawJobInputs,
+                use_context === true,
+              ),
+            );
           } catch (err) {
             const e = err as ManifestError;
             throw new AgentToolError('invalid_input', e.message, 400, { field: e.field });
@@ -1953,7 +1997,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
           const job = createJob(jobId, {
             app,
             action: actionName,
-            inputs: validated,
+            inputs: rawJobInputs,
             workspaceId: ctx.workspace_id,
             userId: ctx.user_id,
             deviceId: ctx.device_id,
@@ -1961,6 +2005,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             timeoutMsOverride: timeout_ms ?? null,
             maxRetriesOverride: max_retries ?? null,
             perCallSecrets: _auth || null,
+            useContext: use_context === true,
           });
           return mcpJson({
             ok: true,

@@ -118,6 +118,30 @@ function validateInput(raw: unknown, prefix: string): InputSpec {
   if (raw.description !== undefined && typeof raw.description === 'string') {
     spec.description = raw.description;
   }
+  if (raw.context !== undefined) {
+    assertObject(raw.context, `${prefix}.context`);
+    const source = raw.context.source;
+    if (source !== 'user_profile' && source !== 'workspace_profile') {
+      throw new ManifestError(
+        `${prefix}.context.source must be user_profile or workspace_profile`,
+        `${prefix}.context.source`,
+      );
+    }
+    assertString(raw.context.path, `${prefix}.context.path`);
+    if (
+      raw.context.path.length > 256 ||
+      !/^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$/.test(raw.context.path)
+    ) {
+      throw new ManifestError(
+        `${prefix}.context.path must be a dot path like company.billing_address.city`,
+        `${prefix}.context.path`,
+      );
+    }
+    spec.context = {
+      source,
+      path: raw.context.path,
+    };
+  }
   if (spec.type === 'enum') {
     if (!Array.isArray(raw.options) || raw.options.some((o) => typeof o !== 'string')) {
       throw new ManifestError(

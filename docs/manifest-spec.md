@@ -37,3 +37,37 @@ A manifest that declares both `auth_required` and
 ```text
 <slug>: auth_required is deprecated; use link_share_requires_auth, not both fields
 ```
+
+## Input Context Autofill
+
+Inputs can declare a profile context binding. Floom only uses this binding when
+the caller explicitly opts in with `use_context: true`.
+
+```yaml
+actions:
+  createInvoice:
+    label: Create invoice
+    inputs:
+      - name: sender_name
+        type: text
+        label: Sender name
+        required: true
+        context:
+          source: user_profile
+          path: person.name
+      - name: company_city
+        type: text
+        label: Company city
+        required: true
+        context:
+          source: workspace_profile
+          path: company.address.city
+```
+
+Rules:
+
+- `source` is `user_profile` or `workspace_profile`.
+- `path` is a dot path using letters, numbers, and underscores.
+- Explicit run inputs always win over profile values.
+- Missing profile paths stay missing, so existing required-input validation still applies.
+- Profile values are resolved at run time and are never embedded into MCP schemas.

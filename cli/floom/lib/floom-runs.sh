@@ -33,7 +33,7 @@ usage_jobs() {
 floom jobs — create, inspect, and cancel async jobs.
 
 usage:
-  floom jobs create <slug> [--action <action>] [--inputs-json <json> | --inputs-stdin]
+  floom jobs create <slug> [--action <action>] [--inputs-json <json> | --inputs-stdin] [--use-context]
   floom jobs get <slug> <job-id>
   floom jobs cancel <slug> <job-id>
 
@@ -72,12 +72,14 @@ urlencode() {
 }
 
 json_inputs_body() {
-  local action="$1" inputs="$2"
-  ACTION="$action" INPUTS="$inputs" python3 - <<'PY'
+  local action="$1" inputs="$2" use_context="${3:-0}"
+  ACTION="$action" INPUTS="$inputs" USE_CONTEXT="$use_context" python3 - <<'PY'
 import json, os
 body = {"inputs": json.loads(os.environ["INPUTS"])}
 if os.environ["ACTION"]:
     body["action"] = os.environ["ACTION"]
+if os.environ["USE_CONTEXT"] == "1":
+    body["use_context"] = True
 print(json.dumps(body, separators=(",", ":")))
 PY
 }
@@ -128,6 +130,7 @@ case "$GROUP:$CMD" in
     action=""
     inputs="{}"
     seen=0
+    use_context=0
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --action) action="${2:-}"; shift 2 ;;
@@ -137,11 +140,12 @@ case "$GROUP:$CMD" in
         --inputs-stdin)
           [[ "$seen" == 0 ]] || { echo "floom jobs create: use only one of --inputs-json or --inputs-stdin" >&2; exit 1; }
           inputs="$(cat)"; seen=1; shift ;;
+        --use-context) use_context=1; shift ;;
         *) echo "floom jobs create: unknown option '$1'" >&2; exit 1 ;;
       esac
     done
     python3 -c 'import json,sys; v=json.loads(sys.argv[1]); assert isinstance(v,dict)' "$inputs" 2>/dev/null || { echo "floom jobs create: inputs JSON must be an object" >&2; exit 1; }
-    exec bash "$LIB_DIR/floom-api.sh" POST "/api/$(urlencode "$slug")/jobs" "$(json_inputs_body "$action" "$inputs")" ;;
+    exec bash "$LIB_DIR/floom-api.sh" POST "/api/$(urlencode "$slug")/jobs" "$(json_inputs_body "$action" "$inputs" "$use_context")" ;;
   jobs:get)
     slug="${1:-}"; job_id="${2:-}"
     [[ -n "$slug" && -n "$job_id" ]] || { echo "floom jobs get: missing <slug> <job-id>" >&2; exit 1; }

@@ -24,6 +24,7 @@ export interface CreateJobInput {
   timeoutMsOverride?: number | null;
   maxRetriesOverride?: number | null;
   perCallSecrets?: Record<string, string> | null;
+  useContext?: boolean;
 }
 
 interface EncryptedPerCallSecretsEnvelope {
@@ -58,8 +59,8 @@ export function createJob(jobId: string, args: CreateJobInput): JobRecord {
     `INSERT INTO jobs (
        id, slug, app_id, action, status, input_json, webhook_url,
        timeout_ms, max_retries, attempts, per_call_secrets_json,
-       workspace_id, user_id, device_id
-     ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+       use_context, workspace_id, user_id, device_id
+     ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
   ).run(
     jobId,
     args.app.slug,
@@ -70,6 +71,7 @@ export function createJob(jobId: string, args: CreateJobInput): JobRecord {
     timeout,
     maxRetries,
     perCallSecretsJson,
+    args.useContext ? 1 : 0,
     workspaceId,
     args.userId || null,
     args.deviceId || null,
@@ -291,6 +293,7 @@ export function formatJob(row: JobRecord): Record<string, unknown> {
     timeout_ms: row.timeout_ms,
     max_retries: row.max_retries,
     attempts: row.attempts,
+    use_context: row.use_context === 1,
     workspace_id: row.workspace_id,
     user_id: row.user_id,
     device_id: row.device_id,

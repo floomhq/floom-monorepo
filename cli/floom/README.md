@@ -81,6 +81,7 @@ floom workspaces runs delete <id>    delete workspace runs
 
 floom feedback submit ...            submit product feedback
 floom run <slug> [inputs-json]       run a Floom app by slug
+floom run <slug> --use-context       run with profile autofill enabled
 floom init                           scaffold a floom.yaml in the current directory
 floom deploy [--dry-run]             validate + publish the current app
 floom status                         list your apps and recent runs

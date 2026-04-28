@@ -9,6 +9,7 @@ import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newRunId } from '../lib/ids.js';
 import { dispatchRun, getRun } from '../services/runner.js';
 import { validateInputs, ManifestError } from '../services/manifest.js';
+import { resolveContextInputs } from '../services/context_autofill.js';
 import { getOrCreateStream } from '../lib/log-stream.js';
 import {
   checkAppVisibility,
@@ -209,6 +210,7 @@ runRouter.post('/', async (c) => {
     inputs?: unknown;
     action?: unknown;
     thread_id?: unknown;
+    use_context?: unknown;
   };
   if (typeof body.app_slug !== 'string') {
     return c.json({ error: '"app_slug" is required' }, 400);
@@ -252,7 +254,12 @@ runRouter.post('/', async (c) => {
   try {
     validated = validateInputs(
       actionSpec,
-      (body.inputs as Record<string, unknown>) ?? {},
+      resolveContextInputs(
+        ctx,
+        actionSpec,
+        (body.inputs as Record<string, unknown>) ?? {},
+        body.use_context === true,
+      ),
     );
   } catch (err) {
     const e = err as ManifestError;
@@ -591,6 +598,7 @@ slugRunRouter.post('/', async (c) => {
   const body = parsed.value as {
     action?: unknown;
     inputs?: unknown;
+    use_context?: unknown;
   };
 
   const actionNames = Object.keys(manifest.actions);
@@ -606,7 +614,12 @@ slugRunRouter.post('/', async (c) => {
   try {
     validated = validateInputs(
       actionSpec,
-      (body.inputs as Record<string, unknown>) ?? {},
+      resolveContextInputs(
+        ctx,
+        actionSpec,
+        (body.inputs as Record<string, unknown>) ?? {},
+        body.use_context === true,
+      ),
     );
   } catch (err) {
     const e = err as ManifestError;

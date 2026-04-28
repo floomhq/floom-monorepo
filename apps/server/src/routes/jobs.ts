@@ -13,6 +13,7 @@ import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { newJobId } from '../lib/ids.js';
 import { createJob, formatJob, getJobBySlug, cancelJob } from '../services/jobs.js';
 import { validateInputs, ManifestError } from '../services/manifest.js';
+import { resolveContextInputs } from '../services/context_autofill.js';
 import { checkAppVisibility } from '../lib/auth.js';
 import { resolveUserContext } from '../services/session.js';
 import { parseJsonBody, bodyParseError } from '../lib/body.js';
@@ -101,6 +102,7 @@ jobsRouter.post('/', async (c) => {
     timeout_ms?: unknown;
     max_retries?: unknown;
     _auth?: unknown;
+    use_context?: unknown;
   };
 
   const actionNames = Object.keys(manifest.actions);
@@ -112,11 +114,16 @@ jobsRouter.post('/', async (c) => {
     return c.json({ error: `Action "${actionName}" not found` }, 400);
   }
 
-  let validated: Record<string, unknown>;
+  const rawInputs = (body.inputs as Record<string, unknown>) ?? {};
   try {
-    validated = validateInputs(
+    validateInputs(
       actionSpec,
-      (body.inputs as Record<string, unknown>) ?? {},
+      resolveContextInputs(
+        ctx,
+        actionSpec,
+        rawInputs,
+        body.use_context === true,
+      ),
     );
   } catch (err) {
     const e = err as ManifestError;
@@ -136,7 +143,7 @@ jobsRouter.post('/', async (c) => {
   createJob(jobId, {
     app: row,
     action: actionName,
-    inputs: validated,
+    inputs: rawInputs,
     workspaceId: ctx.workspace_id,
     userId: ctx.user_id,
     deviceId: ctx.device_id,
@@ -151,6 +158,7 @@ jobsRouter.post('/', async (c) => {
         ? body.max_retries
         : null,
     perCallSecrets,
+    useContext: body.use_context === true,
   });
 
   const publicUrl = process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3051}`;

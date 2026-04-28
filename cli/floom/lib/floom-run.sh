@@ -12,7 +12,7 @@ floom run - run a Floom app by slug.
 
 usage:
   floom run <slug> [inputs-json]
-  floom run <slug> --action <action> [--inputs-json <json>|--inputs-stdin]
+  floom run <slug> --action <action> [--inputs-json <json>|--inputs-stdin] [--use-context]
 
 examples:
   floom run slugify '{"text":"Hello World"}'
@@ -22,13 +22,15 @@ EOF
 }
 
 json_body() {
-  SLUG="$1" ACTION="$2" INPUTS="$3" python3 - <<'PY'
+  SLUG="$1" ACTION="$2" INPUTS="$3" USE_CONTEXT="$4" python3 - <<'PY'
 import json
 import os
 
 body = {"app_slug": os.environ["SLUG"]}
 if os.environ["ACTION"]:
     body["action"] = os.environ["ACTION"]
+if os.environ["USE_CONTEXT"] == "1":
+    body["use_context"] = True
 raw = os.environ["INPUTS"]
 if raw:
     inputs = json.loads(raw)
@@ -54,6 +56,7 @@ shift || true
 action=""
 inputs=""
 seen_inputs=0
+use_context=0
 
 if [[ $# -gt 0 && "${1:-}" != --* ]]; then
   inputs="$1"
@@ -89,6 +92,10 @@ while [[ $# -gt 0 ]]; do
       seen_inputs=1
       shift
       ;;
+    --use-context)
+      use_context=1
+      shift
+      ;;
     *)
       echo "floom run: unknown option '$1'" >&2
       exit 1
@@ -96,4 +103,4 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-exec bash "$LIB_DIR/floom-api.sh" POST /api/run "$(json_body "$slug" "$action" "$inputs")"
+exec bash "$LIB_DIR/floom-api.sh" POST /api/run "$(json_body "$slug" "$action" "$inputs" "$use_context")"

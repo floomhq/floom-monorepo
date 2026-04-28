@@ -91,6 +91,12 @@ for (const [label, args, needles] of [
 }
 
 {
+  const res = await run(['run', 'invoice', '--use-context', '--inputs-json', '{"currency":"USD"}']);
+  const body = bodyOf(res.stdout);
+  log('run supports context autofill opt-in', res.code === 0 && body?.app_slug === 'invoice' && body?.use_context === true && body?.inputs?.currency === 'USD', res.stdout + res.stderr);
+}
+
+{
   const res = await run(['store', 'list', '--category', 'text', '--sort', 'name', '--include-fixtures']);
   log('store list routes to /api/hub with filters', res.code === 0 && includes(res.stdout, `GET ${API_URL}/api/hub?sort=name&include_fixtures=1&category=text`), res.stdout + res.stderr);
 }
@@ -129,6 +135,12 @@ for (const [label, args, needles] of [
   const res = await run(['jobs', 'create', 'slow-echo', '--action', 'echo', '--inputs-json', '{"message":"hi"}']);
   const body = bodyOf(res.stdout);
   log('jobs create posts slug jobs endpoint', res.code === 0 && includes(res.stdout, `POST ${API_URL}/api/slow-echo/jobs`) && body?.action === 'echo' && body?.inputs?.message === 'hi', res.stdout + res.stderr);
+}
+
+{
+  const res = await run(['jobs', 'create', 'slow-echo', '--use-context', '--inputs-json', '{"message":"hi"}']);
+  const body = bodyOf(res.stdout);
+  log('jobs create supports context autofill opt-in', res.code === 0 && body?.use_context === true && body?.inputs?.message === 'hi', res.stdout + res.stderr);
 }
 
 {

@@ -120,3 +120,10 @@ floom account context set-workspace --json-file ./workspace-profile.json --mode 
 ```
 
 MCP exposes the same surface as `account_get_context`, `account_set_user_profile`, and `account_set_workspace_profile`.
+
+Apps can declare manifest input bindings to profile paths. Run calls only use
+those bindings when the caller opts in:
+
+```bash
+floom run invoice-generator --use-context --inputs-json '{"client":"Acme"}'
+```

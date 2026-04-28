@@ -44,6 +44,9 @@ Read/run:
 - `cancel_job`
 - `get_app_quota`
 
+`run_app` and `create_job` accept `use_context: true` to fill missing
+manifest-declared inputs from the caller's JSON user/workspace profiles.
+
 Studio:
 
 - `studio_detect_app`

@@ -38,6 +38,10 @@ export interface InputSpec {
   options?: string[];
   placeholder?: string;
   description?: string;
+  context?: {
+    source: 'user_profile' | 'workspace_profile';
+    path: string;
+  };
 }
 
 export interface OutputSpec {
@@ -282,6 +286,7 @@ export interface JobRecord {
   max_retries: number;
   attempts: number;
   per_call_secrets_json: string | null;
+  use_context: 0 | 1;
   workspace_id: string;
   user_id: string | null;
   device_id: string | null;

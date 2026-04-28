@@ -23,6 +23,8 @@ import {
 import { dispatchRun, getRun } from './runner.js';
 import { deliverWebhook, type WebhookPayload } from './webhook.js';
 import { getJobTriggerContext } from './triggers-worker.js';
+import { validateInputs, ManifestError } from './manifest.js';
+import { resolveContextInputs } from './context_autofill.js';
 import type {
   AppRecord,
   JobRecord,
@@ -103,7 +105,7 @@ export async function processOneJob(): Promise<JobRecord | null> {
     return claimed;
   }
 
-  const inputs =
+  const rawInputs =
     claimed.input_json === null
       ? {}
       : (JSON.parse(claimed.input_json) as Record<string, unknown>);
@@ -120,6 +122,33 @@ export async function processOneJob(): Promise<JobRecord | null> {
     return claimed;
   }
   const ctx = buildJobSessionContext(claimed);
+  const actionSpec = manifest.actions[claimed.action];
+  if (!actionSpec) {
+    failJob(
+      claimed.id,
+      { message: `Action "${claimed.action}" not found`, type: 'user_input_error' },
+      null,
+    );
+    await deliverCompletion(claimed.id);
+    return claimed;
+  }
+
+  let inputs: Record<string, unknown>;
+  try {
+    inputs = validateInputs(
+      actionSpec,
+      resolveContextInputs(ctx, actionSpec, rawInputs, claimed.use_context === 1),
+    );
+  } catch (err) {
+    const e = err as ManifestError;
+    failJob(
+      claimed.id,
+      { message: e.message, type: 'user_input_error', details: { field: e.field } },
+      null,
+    );
+    await deliverCompletion(claimed.id);
+    return claimed;
+  }
 
   const runId = newRunId();
   db.prepare(

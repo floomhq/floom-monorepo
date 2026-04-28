@@ -127,6 +127,48 @@ REST:
 - `GET /api/session/context`
 - `PATCH /api/session/context`
 
+## Profile Autofill
+
+Apps can opt in at the manifest-input level by declaring a context binding:
+
+```json
+{
+  "name": "sender_name",
+  "type": "text",
+  "label": "Sender name",
+  "required": true,
+  "context": {
+    "source": "user_profile",
+    "path": "person.name"
+  }
+}
+```
+
+Run callers opt in per call with `use_context: true`:
+
+```json
+{
+  "app_slug": "invoice-generator",
+  "action": "createInvoice",
+  "use_context": true,
+  "inputs": {
+    "client": "Acme"
+  }
+}
+```
+
+CLI:
+
+```bash
+floom run invoice-generator --use-context --inputs-json '{"client":"Acme"}'
+floom jobs create invoice-generator --use-context --inputs-json '{"client":"Acme"}'
+```
+
+Explicit inputs always win over profile values. Missing profile paths stay
+missing, so required-input validation still behaves the same. Resolved profile
+values become normal run inputs and follow the existing run-history ownership
+and public-share redaction rules.
+
 ## Next Context Layer: Entities
 
 The remaining follow-up is `workspace_entities`: reusable structured records such as clients, contacts, vendors, projects, and billing recipients.
@@ -137,36 +179,5 @@ Entity tools can build on the profile layer:
 - `account_upsert_entity`
 - `account_delete_entity`
 
-For app execution, add optional context mapping:
-
-```json
-{
-  "slug": "invoice-generator",
-  "action": "createInvoice",
-  "inputs": {
-    "client_id": "client_acme",
-    "line_items": []
-  },
-  "context": {
-    "use_workspace_profile": true,
-    "entities": ["client_acme"]
-  }
-}
-```
-
-The runner can resolve this to a typed context object before validation/autofill:
-
-```json
-{
-  "workspace": {
-    "company_name": "Acme GmbH",
-    "billing_address": "..."
-  },
-  "client": {
-    "name": "Example Client",
-    "billing_email": "billing@example.com"
-  }
-}
-```
-
-App input autofill remains a separate step: apps need an explicit manifest-level declaration for which context fields they accept.
+Entity-backed autofill remains separate from profile autofill. It needs
+explicit entity selectors and per-entity access rules before launch.

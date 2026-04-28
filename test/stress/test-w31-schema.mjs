@@ -138,6 +138,12 @@ const workspaceCols = db
   .map((r) => r.name);
 log('workspaces.profile_json column present', workspaceCols.includes('profile_json'));
 
+const jobCols = db
+  .prepare(`PRAGMA table_info(jobs)`)
+  .all()
+  .map((r) => r.name);
+log('jobs.use_context column present', jobCols.includes('use_context'));
+
 // ---- pragma user_version ----
 const uv = db.prepare('PRAGMA user_version').get().user_version;
 log(`pragma user_version >= 6 (got ${uv})`, uv >= 6);

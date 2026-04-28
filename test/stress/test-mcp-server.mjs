@@ -126,7 +126,11 @@ function createToken(scope = 'read-write', userId = 'local', workspaceId = 'loca
 }
 
 async function callMcp(port, token, body) {
-  const res = await fetch(`http://localhost:${port}/mcp`, {
+  return callMcpPath(port, '/mcp', token, body);
+}
+
+async function callMcpPath(port, path, token, body) {
+  const res = await fetch(`http://localhost:${port}${path}`, {
     method: 'POST',
     headers: {
       accept: 'application/json, text/event-stream',
@@ -338,12 +342,12 @@ try {
   log('get_app_details requires slug', Array.isArray(detail?.inputSchema?.required) && detail.inputSchema.required.includes('slug'));
   log('get_app_source exposes include_openapi_spec', Boolean(source?.inputSchema?.properties?.include_openapi_spec));
   log('list_app_reviews exposes limit', Boolean(reviews?.inputSchema?.properties?.limit));
-  log('run_app schema exposes slug + action + inputs', Boolean(run?.inputSchema?.properties?.slug) && Boolean(run?.inputSchema?.properties?.action) && Boolean(run?.inputSchema?.properties?.inputs));
+  log('run_app schema exposes slug + action + inputs + use_context', Boolean(run?.inputSchema?.properties?.slug) && Boolean(run?.inputSchema?.properties?.action) && Boolean(run?.inputSchema?.properties?.inputs) && Boolean(run?.inputSchema?.properties?.use_context));
   log('get_run requires run_id', Array.isArray(getRun?.inputSchema?.required) && getRun.inputSchema.required.includes('run_id'));
   log('list_my_runs schema exposes pagination args', Boolean(listRuns?.inputSchema?.properties?.limit) && Boolean(listRuns?.inputSchema?.properties?.cursor));
   log('share_run requires run_id', Array.isArray(shareRun?.inputSchema?.required) && shareRun.inputSchema.required.includes('run_id'));
   log('delete_run requires run_id', Array.isArray(deleteRun?.inputSchema?.required) && deleteRun.inputSchema.required.includes('run_id'));
-  log('create_job schema exposes slug + action + inputs', Boolean(createJobTool?.inputSchema?.properties?.slug) && Boolean(createJobTool?.inputSchema?.properties?.action) && Boolean(createJobTool?.inputSchema?.properties?.inputs));
+  log('create_job schema exposes slug + action + inputs + use_context', Boolean(createJobTool?.inputSchema?.properties?.slug) && Boolean(createJobTool?.inputSchema?.properties?.action) && Boolean(createJobTool?.inputSchema?.properties?.inputs) && Boolean(createJobTool?.inputSchema?.properties?.use_context));
   log('get_job requires slug + job_id', Array.isArray(getJobTool?.inputSchema?.required) && getJobTool.inputSchema.required.includes('slug') && getJobTool.inputSchema.required.includes('job_id'));
   log('cancel_job requires slug + job_id', Array.isArray(cancelJobTool?.inputSchema?.required) && cancelJobTool.inputSchema.required.includes('slug') && cancelJobTool.inputSchema.required.includes('job_id'));
   log('get_app_quota requires slug', Array.isArray(appQuota?.inputSchema?.required) && appQuota.inputSchema.required.includes('slug'));
@@ -423,6 +427,89 @@ try {
   log('publish-only token can publish via studio_publish_app', publishPayload?.ok === true && publishPayload?.slug === 'agent-studio-publish', publishCall.text);
   log('studio_publish_app persists owner-scoped app', Boolean(publishedRow) && publishedRow.workspace_id === 'local' && publishedRow.author === 'local', JSON.stringify(publishedRow));
   log('studio_publish_app returns request-origin URLs', publishPayload?.permalink === `http://localhost:${server.port}/p/agent-studio-publish` && publishPayload?.mcp_url === `http://localhost:${server.port}/mcp/app/agent-studio-publish`, JSON.stringify(publishPayload));
+
+  db.prepare(`UPDATE users SET profile_json = ? WHERE id = 'local'`).run(
+    JSON.stringify({ person: { full_name: 'MCP Context User' } }),
+  );
+  const contextManifest = {
+    name: 'Agent Context Autofill',
+    description: 'Context autofill fixture',
+    runtime: 'python',
+    manifest_version: '2.0',
+    python_dependencies: [],
+    node_dependencies: {},
+    secrets_needed: [],
+    actions: {
+      echo: {
+        label: 'Echo',
+        inputs: [
+          {
+            name: 'message',
+            type: 'text',
+            label: 'Message',
+            required: true,
+            context: { source: 'user_profile', path: 'person.full_name' },
+          },
+        ],
+        outputs: [{ name: 'response', type: 'json', label: 'Response' }],
+        secrets_needed: [],
+      },
+    },
+  };
+  db.prepare(
+    `INSERT INTO apps (id, slug, name, description, manifest, status, code_path, author, workspace_id, visibility, publish_status, app_type, base_url)
+     VALUES ('app_agent_context_autofill', 'agent-context-autofill', 'Agent Context Autofill', 'Context fixture', ?, 'active', '', 'local', 'local', 'private', 'draft', 'proxied', ?)`,
+  ).run(JSON.stringify(contextManifest), `http://localhost:${server.port}`);
+  const contextRunCall = await callMcp(server.port, writeToken, {
+    jsonrpc: '2.0',
+    id: 117,
+    method: 'tools/call',
+    params: { name: 'run_app', arguments: { slug: 'agent-context-autofill', action: 'echo', use_context: true } },
+  });
+  const contextRunPayload = parseToolText(contextRunCall);
+  const contextRunInputs = db.prepare('SELECT inputs FROM runs WHERE id = ?').get(contextRunPayload?.run_id);
+  log(
+    'run_app use_context fills required input from user profile',
+    JSON.parse(contextRunInputs?.inputs || '{}').message === 'MCP Context User',
+    contextRunCall.text,
+  );
+  const perAppContextList = await callMcpPath(
+    server.port,
+    '/mcp/app/agent-context-autofill',
+    writeToken,
+    {
+      jsonrpc: '2.0',
+      id: 1171,
+      method: 'tools/list',
+      params: {},
+    },
+  );
+  const perAppEchoTool = (perAppContextList.json?.result?.tools || []).find((tool) => tool.name === 'echo');
+  log(
+    'per-app MCP context-bound required input is schema-optional',
+    !((perAppEchoTool?.inputSchema?.required || []).includes('message')) &&
+      Boolean(perAppEchoTool?.inputSchema?.properties?._context),
+    perAppContextList.text,
+  );
+  const perAppContextRun = await callMcpPath(
+    server.port,
+    '/mcp/app/agent-context-autofill',
+    writeToken,
+    {
+      jsonrpc: '2.0',
+      id: 1172,
+      method: 'tools/call',
+      params: { name: 'echo', arguments: { _context: { use: true } } },
+    },
+  );
+  const perAppContextPayload = parseToolText(perAppContextRun);
+  const perAppContextInputs = db.prepare('SELECT inputs FROM runs WHERE id = ?').get(perAppContextPayload?.id);
+  log(
+    'per-app MCP _context.use fills required input from user profile',
+    JSON.parse(perAppContextInputs?.inputs || '{}').message === 'MCP Context User',
+    perAppContextRun.text,
+  );
+  db.prepare(`UPDATE users SET profile_json = '{}' WHERE id = 'local'`).run();
 
   const runCall = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',
