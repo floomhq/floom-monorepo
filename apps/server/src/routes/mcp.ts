@@ -20,6 +20,7 @@ import { createJob } from '../services/jobs.js';
 import { pickApps } from '../services/embeddings.js';
 import {
   buildIngestHint,
+  probeIngestHint,
   detectAppFromInlineSpec,
   ingestAppFromSpec,
   ingestAppFromUrl,
@@ -1909,7 +1910,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
       {
         title: 'Ingest hint',
         description:
-          'Return the filenames, minimal OpenAPI shape, recovery prompt, and upload URLs an agent needs when a repo lacks an obvious OpenAPI spec.',
+          'Probe the standard OpenAPI filenames in a GitHub repo, then return either the resolved spec URL (status: spec_found, spec_found_url) or a structured recovery shape (status: repo_no_spec) listing every path Floom checked. For non-repo inputs, returns the recovery shape without probing. Pass `spec_found_url` straight to studio_publish_app when present.',
         inputSchema: {
           input_url: z.string().min(1).max(2048),
           attempted: z.array(z.string().max(2048)).max(40).optional(),
@@ -1919,7 +1920,12 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('studio_ingest_hint');
         try {
           requireStudioScope(ctx);
-          return mcpJson(buildIngestHint({ input_url, attempted, baseUrl }));
+          // Use the probing variant so the agent gets a real
+          // `spec_found_url` for repos that ship a standard
+          // openapi.{yaml,yml,json} or swagger.* on `main`/`master`.
+          // Falls back to the same shape `buildIngestHint` returns
+          // when the input isn't a GitHub repo.
+          return mcpJson(await probeIngestHint({ input_url, attempted, baseUrl }));
         } catch (err) {
           return mcpError(err);
         }
