@@ -412,22 +412,31 @@ function RecentActivityPanel({ runs }: { runs: MeRunSummary[] }) {
           marginBottom: 10,
         }}
       >
-        <div>
-          <div
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span
+            aria-hidden="true"
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 999,
+              background: 'var(--accent)',
+              boxShadow: '0 0 0 3px var(--accent-soft)',
+              display: 'inline-block',
+              flexShrink: 0,
+            }}
+          />
+          <span
             style={{
               fontFamily: 'JetBrains Mono, ui-monospace, monospace',
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 600,
-              letterSpacing: '0.1em',
+              letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: 'var(--accent)',
+              color: 'var(--muted)',
             }}
           >
             Recent activity
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>
-            Your recent runs across your apps
-          </div>
+          </span>
         </div>
         <Link
           to="/studio/runs"

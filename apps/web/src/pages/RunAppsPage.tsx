@@ -396,17 +396,31 @@ function RecentRunsPanel({ runs }: { runs: MeRunSummary[] }) {
           marginBottom: 10,
         }}
       >
-        <div
-          style={{
-            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--accent)',
-          }}
-        >
-          Recent runs
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span
+            aria-hidden="true"
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 999,
+              background: 'var(--accent)',
+              boxShadow: '0 0 0 3px var(--accent-soft)',
+              display: 'inline-block',
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--muted)',
+            }}
+          >
+            Recent runs
+          </span>
         </div>
         <Link
           to="/run/runs"
