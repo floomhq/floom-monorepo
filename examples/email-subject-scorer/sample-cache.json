@@ -1,0 +1,18 @@
+{
+  "b6ca1f34b6c8762bae9404d285b80944db5e6c33a3dd1c6f2dbdf3eb23030356": {
+    "score": 3,
+    "verdict": "weak",
+    "issues": [
+      "Vague -- 'Your proposal' could mean anything to the recipient",
+      "No hook or reason to open beyond obligation",
+      "Feels like a follow-up thread, not a fresh message"
+    ],
+    "rewrites": [
+      {"angle": "curiosity", "subject": "The one gap I noticed in your GTM proposal"},
+      {"angle": "value", "subject": "3 ways to strengthen your proposal before the deadline"},
+      {"angle": "directness", "subject": "Feedback on your proposal: 2 quick points"}
+    ],
+    "explanation": "Re: prefix and generic reference give the reader no reason to open this over anything else in their inbox.",
+    "model": "sample-fixture (cached)"
+  }
+}

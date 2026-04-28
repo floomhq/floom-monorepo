@@ -1,0 +1,17 @@
+apps:
+  - slug: email-subject-scorer
+    type: proxied
+    openapi_spec_url: http://127.0.0.1:4350/openapi/email-subject-scorer.json
+    display_name: Subject Line Scorer
+    category: marketing
+    description: >
+      Paste your email subject line - get an open-rate score from 1-10, the top issues,
+      and 3 stronger rewrites in under 3 seconds.
+    visibility: public
+    env:
+      - GEMINI_API_KEY
+    icon: email-subject-scorer
+    tags:
+      - email
+      - marketing
+      - sales
