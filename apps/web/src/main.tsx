@@ -75,6 +75,11 @@ const StudioAppsV26Page = lazy(() => import('./pages/StudioAppsV26Page').then(m 
 // MeRunsPage at /me/runs is preserved untouched (COEXIST strategy).
 const RunRunsPage = lazy(() => import('./pages/RunRunsPage').then(m => ({ default: m.RunRunsPage })));
 const RunRunDetailPage = lazy(() => import('./pages/RunRunDetailPage').then(m => ({ default: m.RunRunDetailPage })));
+// v26 Wave 3c: per-app sub-surface pages under /run/apps/:slug/.
+// MeAppRunPage at /me/apps/:slug/run is preserved (COEXIST strategy).
+const RunAppRunPage = lazy(() => import('./pages/RunAppRunPage').then(m => ({ default: m.RunAppRunPage })));
+const RunAppTriggersPage = lazy(() => import('./pages/RunAppTriggersPage').then(m => ({ default: m.RunAppTriggersPage })));
+const RunAppSecretsPage = lazy(() => import('./pages/RunAppSecretsPage').then(m => ({ default: m.RunAppSecretsPage })));
 const StudioBuildPage = lazy(() => import('./pages/StudioBuildPage').then(m => ({ default: m.StudioBuildPage })));
 const StudioAppPage = lazy(() => import('./pages/StudioAppPage').then(m => ({ default: m.StudioAppPage })));
 const StudioRunsPage = lazy(() => import('./pages/StudioRunsPage').then(m => ({ default: m.StudioRunsPage })));
@@ -334,6 +339,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             v23 /me/apps (MeAppsPage with staggered grid + sparklines) is preserved above.
             Per spec, /me/apps will redirect here in a future PR. */}
         <Route path="/run/apps" element={<WaitlistGuard source="me"><RunAppsPage /></WaitlistGuard>} />
+        {/* v26 Wave 3c: per-app sub-surface pages under /run/apps/:slug/.
+            /me/apps/:slug/run (MeAppRunPage) is preserved untouched (COEXIST strategy).
+            Server knownPaths already registers the /run/apps/:slug/(run|triggers|secrets) patterns. */}
+        <Route path="/run/apps/:slug/run" element={<WaitlistGuard source="me"><RunAppRunPage /></WaitlistGuard>} />
+        <Route path="/run/apps/:slug/triggers" element={<WaitlistGuard source="me"><RunAppTriggersPage /></WaitlistGuard>} />
+        <Route path="/run/apps/:slug/secrets" element={<WaitlistGuard source="me"><RunAppSecretsPage /></WaitlistGuard>} />
         {/* v26 /run/runs + /run/runs/:runId — workspace runs list + detail (WorkspaceShell).
             v23 /me/runs (MeRunsPage) is preserved untouched (COEXIST strategy). */}
         <Route path="/run/runs" element={<WaitlistGuard source="me"><RunRunsPage /></WaitlistGuard>} />
