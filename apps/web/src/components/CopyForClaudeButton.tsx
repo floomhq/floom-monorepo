@@ -48,9 +48,28 @@ export function CopyForClaudeButton({ variant = 'desktop' }: Props = {}) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('mcp');
   const [copied, setCopied] = useState(false);
+  // R20 (2026-04-29): mobile pill auto-collapses to icon-only after a few
+  // seconds so it stops physically overlapping content (Gemini flagged
+  // this on /, /apps, and /help mobile audits at 7/10). Same pattern as
+  // CookieBanner mobile pill (see Issue #559).
+  const [pillCollapsed, setPillCollapsed] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
+
+  // Auto-collapse the mobile pill 4s after first paint. Skipped on
+  // desktop variant. Re-expands while popover is open. Resets the timer
+  // on route change so the new page gets a moment to read the full label.
+  useEffect(() => {
+    if (variant !== 'mobile') return;
+    if (open) {
+      setPillCollapsed(false);
+      return;
+    }
+    setPillCollapsed(false);
+    const t = window.setTimeout(() => setPillCollapsed(true), 4000);
+    return () => window.clearTimeout(t);
+  }, [variant, open, location.pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -226,6 +245,10 @@ export function CopyForClaudeButton({ variant = 'desktop' }: Props = {}) {
   };
 
   if (variant === 'mobile') {
+    // Collapsed = 44x44 round icon-only target (still meets WCAG 2.5.5),
+    // anchored to the corner so it stops covering card content. Tap
+    // re-expands via the open state below.
+    const expanded = !pillCollapsed || open;
     return (
       <div ref={wrapRef} style={{ position: 'fixed', bottom: 18, right: 18, zIndex: 30 }} data-testid="mcp-copy-mobile-wrap">
         <button
@@ -240,20 +263,24 @@ export function CopyForClaudeButton({ variant = 'desktop' }: Props = {}) {
             background: 'var(--ink)',
             color: '#fff',
             borderRadius: 999,
-            padding: '11px 16px',
+            padding: expanded ? '11px 16px' : '0',
+            width: expanded ? 'auto' : 44,
+            height: 44,
             fontSize: 12.5,
             fontWeight: 600,
             boxShadow: '0 12px 32px rgba(14,14,12,0.18)',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 7,
+            justifyContent: 'center',
+            gap: expanded ? 7 : 0,
             border: '1px solid var(--ink)',
             cursor: 'pointer',
             fontFamily: 'inherit',
+            transition: 'padding .25s cubic-bezier(0.22, 0.9, 0.28, 1), width .25s cubic-bezier(0.22, 0.9, 0.28, 1)',
           }}
         >
           <ClipboardIcon />
-          Get install snippet
+          {expanded && <span>Get install snippet</span>}
         </button>
         {open && (
           <div role="menu" data-testid="mcp-popover" style={{ ...popoverBaseStyle, top: 'auto', bottom: 'calc(100% + 8px)', right: 0, width: 340 }}>
