@@ -234,7 +234,7 @@ export function CopyForClaudeButton({ variant = 'desktop' }: Props = {}) {
           data-testid="mcp-copy-mobile"
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label="Get install snippet"
+          aria-label="Copy for Claude"
           onClick={() => setOpen((v) => !v)}
           style={{
             background: 'var(--ink)',
@@ -253,7 +253,7 @@ export function CopyForClaudeButton({ variant = 'desktop' }: Props = {}) {
           }}
         >
           <ClipboardIcon />
-          Get install snippet
+          Copy for Claude
         </button>
         {open && (
           <div role="menu" data-testid="mcp-popover" style={{ ...popoverBaseStyle, top: 'auto', bottom: 'calc(100% + 8px)', right: 0, width: 340 }}>
@@ -272,7 +272,7 @@ export function CopyForClaudeButton({ variant = 'desktop' }: Props = {}) {
         data-testid="topbar-copy-for-claude"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Get install snippet for MCP or CLI"
+        aria-label="Copy for Claude"
         onClick={() => setOpen((v) => !v)}
         style={{
           position: 'relative',
