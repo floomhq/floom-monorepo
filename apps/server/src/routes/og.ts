@@ -138,7 +138,14 @@ interface OgCopy {
 // less developer-y vibe in the OG card.
 function formatRunRelative(iso?: string | null): string {
   if (!iso) return 'just now';
-  const t = new Date(iso).getTime();
+  // SQLite stores `datetime('now')` as a UTC string without a 'Z' suffix.
+  // `new Date(iso)` then parses it as local time, which under-reports
+  // "ago" durations by the local UTC offset (e.g. CEST shows "24 mins
+  // ago" for a run that finished 2h24m back). Force UTC parsing by
+  // appending 'Z' when the string lacks any timezone marker.
+  const isoNormalized =
+    /[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso.replace(' ', 'T')}Z`;
+  const t = new Date(isoNormalized).getTime();
   if (Number.isNaN(t)) return 'just now';
   const diffMs = Math.max(0, Date.now() - t);
   const mins = Math.floor(diffMs / 60_000);
