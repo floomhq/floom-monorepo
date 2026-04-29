@@ -598,6 +598,7 @@ function loadAccessibleAgentApp(
       access.status === 401 ? 'auth_required' : 'not_found',
       access.status === 401 ? 'Authentication required for this app.' : `App not found: ${slug}`,
       access.status,
+      access.status === 401 ? { hint: AUTH_HINT_CLOUD, docs_url: AUTH_DOCS_URL } : undefined,
     );
   }
   return app;
@@ -1356,6 +1357,7 @@ function requireStudioScope(ctx: SessionContext): void {
       'auth_required',
       'Authorization: Bearer floom_agent_<token> is required.',
       401,
+      { hint: AUTH_HINT_CLOUD, docs_url: AUTH_DOCS_URL },
     );
   }
   if (ctx.agent_token_scope === 'read-write' || ctx.agent_token_scope === 'publish-only') {
@@ -1374,6 +1376,7 @@ function requireAccountScope(ctx: SessionContext): void {
       'auth_required',
       'Authorization: Bearer floom_agent_<token> is required.',
       401,
+      { hint: AUTH_HINT_CLOUD, docs_url: AUTH_DOCS_URL },
     );
   }
   if (ctx.agent_token_scope === 'read-write') {

@@ -982,7 +982,12 @@ try {
   log('studio_delete_app writes app.deleted audit log', Boolean(deleteAudit), JSON.stringify(deleteAudit));
 } finally {
   await stopServer(server);
-  rmSync(tmp, { recursive: true, force: true });
+  try {
+    rmSync(tmp, { recursive: true, force: true });
+  } catch (err) {
+    if (process.platform !== 'win32') throw err;
+    console.warn('[cleanup] failed to delete tmp dir (expected EBUSY on Windows):', err.message);
+  }
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
