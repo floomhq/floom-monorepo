@@ -92,7 +92,17 @@ type Action = {
   name: string;
   description?: string;
   input_schema?: {
-    properties?: Record<string, { type?: string; description?: string; example?: unknown; default?: unknown }>;
+    properties?: Record<
+      string,
+      {
+        type?: string;
+        description?: string;
+        example?: unknown;
+        default?: unknown;
+        enum?: string[];
+      }
+    >;
+    required?: string[];
     example?: unknown;
   };
 };
@@ -1314,32 +1324,46 @@ function SampleInputs({
   values: Record<string, unknown>;
   setValues: (v: Record<string, unknown>) => void;
 }) {
-  const props = (action.input_schema ?? {}).properties ?? {};
+  const schema = action.input_schema ?? {};
+  const props = schema.properties ?? {};
+  const required = new Set(schema.required ?? []);
   const fields = Object.entries(props);
   if (fields.length === 0) {
     return <span style={{ fontSize: 12, color: 'var(--muted)' }}>no inputs · ready to run</span>;
   }
   return (
     <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 8 }}>
-      {fields.slice(0, 3).map(([key, def]) => (
-        <code key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          {key}
-          <input
-            data-testid={`sample-input-${key}`}
-            value={String(values[key] ?? '')}
-            onChange={(e) => setValues({ ...values, [key]: e.target.value })}
-            placeholder={def.description || key}
-            style={{
-              padding: '4px 8px',
-              border: '1px solid var(--line)',
-              borderRadius: 6,
-              fontSize: 11.5,
-              fontFamily: 'var(--font-mono)',
-              maxWidth: 180,
-            }}
-          />
-        </code>
-      ))}
+      {fields.slice(0, 3).map(([key, def]) => {
+        const isRequired = required.has(key);
+        return (
+          <code key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {key}
+            {isRequired && (
+              <span
+                aria-label="required"
+                title="Required"
+                style={{ color: 'var(--danger)', fontWeight: 700 }}
+              >
+                *
+              </span>
+            )}
+            <input
+              data-testid={`sample-input-${key}`}
+              value={String(values[key] ?? '')}
+              onChange={(e) => setValues({ ...values, [key]: e.target.value })}
+              placeholder={def.description || key}
+              style={{
+                padding: '4px 8px',
+                border: '1px solid var(--line)',
+                borderRadius: 6,
+                fontSize: 11.5,
+                fontFamily: 'var(--font-mono)',
+                maxWidth: 180,
+              }}
+            />
+          </code>
+        );
+      })}
       {fields.length > 3 && <span style={{ fontSize: 11, color: 'var(--muted)' }}>+{fields.length - 3} more</span>}
     </span>
   );

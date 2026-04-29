@@ -411,11 +411,39 @@ export interface Review {
 // feature/ui-composio-connections. Backend shape lives in
 // apps/server/src/lib/schema/connections.ts.
 
+/**
+ * JSON-Schema-ish view of an action's inputs. Mirrors the shape the
+ * server returns from /api/hub/detect (see openapi-ingest.ts::DetectedApp).
+ * Used by /studio/build's SampleInputs to render real fields BEFORE the
+ * app is persisted — without this, required inputs (e.g. the OpenAPI
+ * fallback `path`) collapse into "no inputs · ready to run" and the
+ * sample run dies with `Missing required input: path`.
+ */
+export interface DetectedActionInputSchema {
+  type: 'object';
+  properties: Record<
+    string,
+    {
+      type?: string;
+      description?: string;
+      default?: unknown;
+      example?: unknown;
+      enum?: string[];
+    }
+  >;
+  required?: string[];
+}
+
 export interface DetectedApp {
   slug: string;
   name: string;
   description: string;
-  actions: Array<{ name: string; label: string; description?: string }>;
+  actions: Array<{
+    name: string;
+    label: string;
+    description?: string;
+    input_schema?: DetectedActionInputSchema;
+  }>;
   auth_type: string | null;
   category: string | null;
   openapi_spec_url: string;
