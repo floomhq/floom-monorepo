@@ -1,6 +1,7 @@
 # @floomhq/cli
 
-One command to set up Floom: mints a token, configures MCP, and you're live.
+One command to set up Floom: opens the Agent-token page, verifies the token,
+configures MCP, and you're live.
 
 ## Quickstart
 
@@ -30,11 +31,14 @@ floom auth <agent-token>     # save token non-interactively
 floom auth login --token=... # validate token, then save config non-interactively
 floom auth whoami            # print identity for current token
 floom run <slug> [json]      # run a Floom app by slug and wait for result
+floom run <slug> --input k=v # pass repeatable key=value inputs
+floom run <slug> --json      # print raw JSON
 floom apps list [--json]     # list workspace apps
 floom deploy                 # validate + publish current floom.yaml
 floom init                   # scaffold floom.yaml in current dir
 floom status [--json]        # list apps and recent runs
 floom account                # manage secrets; agent-token commands need a browser session
+floom api GET /api/me/runs   # call raw API endpoints for advanced surfaces
 ```
 
 ## Configuration

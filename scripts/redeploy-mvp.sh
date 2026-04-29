@@ -37,19 +37,12 @@ HOST_PORT=3057
 CONTAINER_PORT=3000
 HEALTH_URL="http://127.0.0.1:${HOST_PORT}/api/health"
 
-# Volume binds — match what's been live. Keep in sync if storage layout changes.
-#
-# docker.sock NOTE (2026-04-29): mvp keeps the docker.sock bind because 3 of
-# the launch-week demo apps (competitor-lens, ai-readiness-audit, pitch-coach)
-# are app_type=docker — they spawn a runner container per run via the host
-# Docker daemon. Without this bind they error with `connect ENOENT
-# /var/run/docker.sock`. PROD and PREVIEW intentionally DO NOT have this
-# bind: the security exposure is unacceptable on user-facing surfaces. Once
-# the Docker isolation pass lands (gVisor / kata-containers) we can re-add
-# it everywhere.
+# Volume binds — keep launch containers away from the host Docker socket.
+# Mounting /var/run/docker.sock gives host-root-equivalent access if the
+# web process is compromised. Launch demo Docker apps stay disabled until
+# they run through an isolated runner path.
 BINDS=(
   "-v" "floom-mvp-data:/data"
-  "-v" "/var/run/docker.sock:/var/run/docker.sock"
   "-v" "/opt/floom-preview-apps:/apps"
   "-v" "/opt/floom-mvp-file-inputs:/floom-file-inputs"
 )

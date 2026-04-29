@@ -62,27 +62,27 @@ export function InstallPage() {
 
         <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>1. Docker (recommended)</h2>
         <pre style={codeBlockStyle}>
-          docker run -p 3000:3000 ghcr.io/floomhq/floom-monorepo:latest
+          docker run -p 3051:3051 ghcr.io/floomhq/floom-monorepo:latest
         </pre>
         <p style={{ color: 'var(--muted)', margin: '0 0 20px', fontSize: 14 }}>
-          Visit <code>http://localhost:3000</code>. Self-hosted Floom ships with
+          Visit <code>http://localhost:3051</code>. Self-hosted Floom ships with
           publish enabled by default, so you can paste an OpenAPI spec and get a
           live app without joining any waitlist.
         </p>
 
-        <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>2. CLI (coming soon)</h2>
+        <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>2. CLI</h2>
         <p style={{ color: 'var(--muted)', margin: '0 0 6px', fontSize: 14 }}>
-          A published npm CLI (<code>@floomhq/cli</code>) is on the roadmap.
-          Until then, the Docker image is the self-host path.
+          The shell CLI can point at a self-hosted instance with an explicit API
+          URL.
         </p>
         <pre style={codeBlockStyle}>
-          # coming soon{'\n'}
-          npm i -g @floomhq/cli
+          curl -fsSL http://localhost:3051/install.sh | bash{'\n'}
+          floom auth login --token=floom_agent_... --api-url=http://localhost:3051
         </pre>
 
         <h2 style={{ fontSize: 18, margin: '24px 0 8px' }}>3. Link it to your AI tool</h2>
         <p style={{ color: 'var(--muted)', margin: '0 0 6px', fontSize: 14 }}>
-          The MCP endpoint is at <code>http://localhost:3000/mcp</code>. Add it
+          The MCP endpoint is at <code>http://localhost:3051/mcp</code>. Add it
           in your MCP client settings and every app on your instance becomes a
           tool.
         </p>
@@ -151,7 +151,7 @@ export function InstallPage() {
             pnpm --filter @floom/server dev
           </pre>
           <p style={{ color: 'var(--muted)', margin: '0 0 0', fontSize: 14 }}>
-            The server comes up on <code>http://localhost:8787</code> with the
+            The server comes up on <code>http://localhost:3051</code> with the
             dashboard served from the same host.
           </p>
         </details>

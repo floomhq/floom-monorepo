@@ -36,3 +36,25 @@ ade72f9a99b684afd1e93bf8ba144c43aa731a90:test/stress/test-hub-runs-auth.mjs:gene
 16cccf8c6e453dcd139cf0a379d615856befa0b8:test/stress/test-proxied-response-hardening.mjs:generic-api-key:63
 c3f936b1c5b50aee5dbba13889f511845683376d:docs/qa/mcp-mvp-stress-test-report-2026-04-28.md:generic-api-key:216
 c3f936b1c5b50aee5dbba13889f511845683376d:docs/qa/mcp-mvp-stress-test-report-2026-04-28.md:generic-api-key:217
+
+# Historical launch-audit reports and removed internal scratch docs. These are
+# not present in the current tree; production credential rotation is tracked
+# outside this repo because allowlisting a historical fingerprint only makes
+# scanner output actionable, it does not revoke an exposed value.
+804ddfefdebadb89f0b8571e44deae2011b5a5c6:qa/reports/2026-04-29-cli-stress-test-round-5.md:generic-api-key:58
+804ddfefdebadb89f0b8571e44deae2011b5a5c6:qa/reports/2026-04-29-cli-stress-test-round-5.md:generic-api-key:59
+eeea9632b343b115194a79622e0134dad8d21682:docs/qa/mcp-mvp-stress-test-report-2026-04-28.md:generic-api-key:216
+eeea9632b343b115194a79622e0134dad8d21682:docs/qa/mcp-mvp-stress-test-report-2026-04-28.md:generic-api-key:217
+e875ee7708797c63e51f152e0abb5528fef2faed:LAUNCH-RUNBOOK-2026-04-25.md:jwt:242
+0b8ffcc3285498c2e431b36f50942576cece09bd:docs/internal/stash-archive-20260421/patches/stash-14-full.patch:jwt:2146
+0b8ffcc3285498c2e431b36f50942576cece09bd:docs/internal/stash-archive-20260421/patches/stash-14-full.patch:generic-api-key:1438
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:gcp-api-key:1471
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:gcp-api-key:1477
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:gcp-api-key:1480
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:gcp-api-key:1483
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:gcp-api-key:1486
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:gcp-api-key:1489
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:gcp-api-key:1492
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:gcp-api-key:1495
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:gcp-api-key:1498
+0459f91dbbca76d38ef6beff7f1deac48013e2c1:apps/server/src/db/seed.json:generic-api-key:1474

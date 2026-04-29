@@ -1,7 +1,7 @@
 {
   "name": "@floomhq/cli",
   "version": "0.2.5",
-  "description": "One command to set up Floom: mints a token, configures MCP, and you're live.",
+  "description": "One command to set up Floom: opens the Agent-token page, verifies the token, configures MCP, and you're live.",
   "type": "commonjs",
   "bin": {
     "floom": "./dist/index.js"

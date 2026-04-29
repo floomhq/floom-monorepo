@@ -4,9 +4,9 @@ Floom is the production layer for AI apps that do real work. This spec defines h
 
 ## One spec, every surface
 
-In v17, a tool becomes a Floom app by landing an **OpenAPI contract** through a supported ingest path. A **GitHub repository URL** runs in hosted mode: Floom reads `apps.yaml` and/or an OpenAPI file at the repo root and runs the app. An **OpenAPI spec URL** runs in proxied mode: we fetch the contract and forward to your existing origin. The same spec drives the web form, MCP tools, HTTP API, and clients—**GitHub** is the recommended starting point when you can use a repo so Floom owns the runtime, while **OpenAPI URL** is the escape hatch for an API you already host.
+In the public beta, a tool becomes a Floom app by landing an **OpenAPI contract** through a supported ingest path. A **GitHub repository URL** is a discovery path: Floom can read OpenAPI files from the repo root and publish a proxied app from that contract. An **OpenAPI spec URL** is the direct path: we fetch the contract and forward to your existing origin. The same spec drives the web form, MCP tools, and HTTP API. Full arbitrary repo-code hosting is roadmap work, not part of the current cloud beta.
 
-- **GitHub repo URL (hosted):** public repo; Floom reads `apps.yaml` and/or an OpenAPI file from the root.
+- **GitHub repo URL (OpenAPI discovery):** public repo; Floom reads an OpenAPI file from the root.
 - **OpenAPI URL (proxied):** paste a public spec URL; Floom uses it in proxied mode against your `base_url`.
 
 ## The manifest
@@ -24,7 +24,7 @@ auth: bearer
 secrets: [STRIPE_SECRET_KEY]
 ```
 
-### Hosted: Floom runs your app
+### Hosted: Floom runs your app (roadmap)
 
 ```yaml
 name: my-app
@@ -42,7 +42,7 @@ Write the spec once. Floom turns it into four things your users actually touch:
 - **Agent-callable tools** (MCP server). MCP — Model Context Protocol — is how agents like Claude, Cursor, and ChatGPT discover and call external tools. Every operation in your spec becomes one tool your agent can call, using the spec's parameters as inputs and the response schema as structured output.
 - **A web UI** that users can run without any agent. Floom reads the spec's input types and renders the right form controls automatically (a date picker for a date, a file uploader for a file, a text area for a long string). Output flows through a built-in renderer; long-running operations stream their progress live so the page doesn't just spin.
 - **An HTTP API** that anyone — your own code, another team's service, a curl command — can hit. Floom handles the auth tokens, rate limits, and keeps secrets out of your codebase.
-- **Client libraries in any language** (TypeScript, Python, Go, Java, Rust, …). We use [openapi-generator](https://openapi-generator.tech/) — a standard tool that reads your spec and outputs a ready-to-install SDK — so your users can `pip install` or `npm install` and skip the raw HTTP step entirely.
+- **Client library compatibility** through the OpenAPI contract. Floom does not generate SDK packages in the current beta; users can point standard OpenAPI generators at the app's source OpenAPI document when they want typed clients.
 
 ## Plumbing layers (auto-applied)
 
@@ -57,7 +57,7 @@ Every Floom app gets these for free. We split what's shipped from what's on the 
 
 ### Roadmap
 
-- Access control
+- Generated SDK packages
 - Staging environments
 - Version control
 - Per-app databases
@@ -82,7 +82,7 @@ Floom is MIT licensed. Floom.dev is the hosted flagship, but you can run the ful
 
 **Via Docker** (one command):
 ```bash
-docker run -p 3000:3000 \
+docker run -p 3051:3051 \
   -e OPENAI_API_KEY=... \
   ghcr.io/floomhq/floom-monorepo:latest
 ```

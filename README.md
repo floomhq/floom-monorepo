@@ -69,7 +69,7 @@ Then publish and run it:
 ```bash
 floom deploy --dry-run
 floom deploy
-floom run petstore-demo '{}'
+floom run petstore-demo '{"action":"getInventory"}'
 ```
 
 The deploy output prints the web page at `https://floom.dev/p/petstore-demo`, the MCP endpoint, and the Studio owner URL.

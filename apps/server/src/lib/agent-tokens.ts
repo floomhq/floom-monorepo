@@ -159,6 +159,11 @@ function hasPresentedAdminBearer(c: Context): boolean {
 }
 
 export const agentTokenAuthMiddleware: MiddlewareHandler = async (c, next) => {
+  const path = c.req.path || (c.req.url ? new URL(c.req.url).pathname : '');
+  if (path === '/api/metrics' || path === '/api/metrics/') {
+    return next();
+  }
+
   const rawToken = getPresentedAgentToken(c);
 
   // No valid Floom token presented. Any non-admin bearer on an agent-aware

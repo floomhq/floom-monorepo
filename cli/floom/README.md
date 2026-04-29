@@ -53,10 +53,13 @@ floom apps update <slug> ...         update app metadata and controls
 floom apps delete <slug>             delete an app
 
 floom run <slug> [inputs-json]       run a Floom app by slug and wait for result
+floom run <slug> --input key=value   run with repeatable key=value inputs
 floom run <slug> --use-context       run with profile autofill enabled
+floom run <slug> --json              print raw JSON
 floom init                           scaffold a floom.yaml in the current directory
 floom deploy [--dry-run]             validate + publish the current app
 floom status [--json]                list your apps and recent runs
+floom api <METHOD> <PATH>            call raw API endpoints for advanced surfaces
 floom --help                         show usage
 floom --version                      print version
 ```
@@ -109,9 +112,17 @@ floom init --name "Lead Scorer" --description "Score leads" --openapi-url https:
 floom deploy --dry-run     # preview the request
 floom deploy               # publish
 floom status               # see it listed
+floom run lead-scorer --input lead=https://example.com
 ```
 
 `floom deploy` posts OpenAPI/proxied manifests to `/api/hub/ingest`. True repo-code hosting is not wired in this shell CLI path.
+
+`floom run` waits for completion by default. Multi-action apps pass the
+operation in the JSON body, for example:
+
+```bash
+floom run petstore '{"action":"getInventory"}'
+```
 
 ## Network allowlist
 

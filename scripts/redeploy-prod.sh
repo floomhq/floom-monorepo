@@ -37,16 +37,8 @@ IMAGE_REPO=floom-prod
 
 BINDS=(
   "-v" "floom-chat-deploy_floom-chat-data:/data"
-  # docker.sock needed for the 3 launch-week demo apps that are app_type=docker
-  # (competitor-lens, ai-readiness-audit, pitch-coach). They spawn a runner
-  # container per run. Federico 2026-04-29 launch decision: pragmatic accept
-  # of the same security trade-off mvp already has — without this bind, the
-  # hero apps Federico showcases on /apps return floom_internal_error within
-  # 1s of clicking Run. Mitigation surface area: only authenticated visitors
-  # can trigger docker spawn (anon hits a 401 before the runner). gVisor /
-  # kata-containers isolation pass is the proper fix and remains tracked
-  # post-launch.
-  "-v" "/var/run/docker.sock:/var/run/docker.sock"
+  # Never mount /var/run/docker.sock into public launch containers.
+  # Launch demo Docker apps stay disabled until isolated runners land.
   "-v" "/opt/floom-preview-apps:/apps"
   "-v" "/opt/floom-preview-file-inputs:/floom-file-inputs"
 )

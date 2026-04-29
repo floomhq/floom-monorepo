@@ -29,7 +29,7 @@ Three commands to publish an OpenAPI spec as a Floom app:
 ```bash
 export FLOOM_API_KEY=floom_agent_...    # mint one at https://floom.dev/me/agent-keys
 floom auth whoami                       # verify the token reaches the API
-floom deploy <path-to-floom.yaml>       # or `floom init --openapi-url <spec-url>` first, then `floom deploy`
+floom deploy                            # reads ./floom.yaml; or `floom init --openapi-url <spec-url>` first
 ```
 
 `floom deploy` reads a `floom.yaml`. If you only have an OpenAPI URL, scaffold one first:
@@ -80,7 +80,7 @@ If you see `floom: No FLOOM_API_KEY found`: the CLI couldn't resolve a key from 
 ## When you are scoping work
 
 - ICP: non-developer AI engineer with a `localhost` prototype who needs production hosting. If your plan assumes infra fluency from the user, you are scoping for the wrong person.
-- Primary path: *paste a repo URL, we host it*. OpenAPI-wrapping is an advanced path, not the default.
+- Primary cloud-beta path: publish an OpenAPI/proxied app. Repo-code hosting is roadmap work until the runtime isolation path is complete.
 - Three surfaces: web form, MCP, HTTP. Always.
 
 ## Writing style

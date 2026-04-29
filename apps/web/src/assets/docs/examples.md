@@ -14,7 +14,9 @@ Paste two URLs (yours plus one competitor). Floom fetches both pages and one Gem
 - **Source**: [`examples/competitor-lens/`](https://github.com/floomhq/floom/tree/main/examples/competitor-lens)
 
 ```bash
-floom run competitor-lens --input '{"yours":"https://example.com","theirs":"https://stripe.com"}'
+floom run competitor-lens '{"yours":"https://example.com","theirs":"https://stripe.com"}'
+# or:
+floom run competitor-lens --input yours=https://example.com --input theirs=https://stripe.com
 ```
 
 ## AI readiness audit
@@ -27,7 +29,7 @@ Paste one HTTPS URL. Floom fetches the landing page and a single Gemini call ret
 - **Source**: [`examples/ai-readiness-audit/`](https://github.com/floomhq/floom/tree/main/examples/ai-readiness-audit)
 
 ```bash
-floom run ai-readiness-audit --input '{"url":"https://stripe.com"}'
+floom run ai-readiness-audit --input url=https://stripe.com
 ```
 
 ## Pitch coach
@@ -40,7 +42,7 @@ Paste a 20-500 character startup pitch. A single Gemini call returns three direc
 - **Source**: [`examples/pitch-coach/`](https://github.com/floomhq/floom/tree/main/examples/pitch-coach)
 
 ```bash
-floom run pitch-coach --input '{"pitch":"We are building..."}'
+floom run pitch-coach '{"pitch":"We are building..."}'
 ```
 
 ## More examples

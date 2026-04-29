@@ -46,7 +46,11 @@ floom deploy --dry-run
 floom deploy
 floom status
 floom run <slug> '{"input":"hello"}'
-floom run <slug> '{"invoice_id":"INV-1"}' --use-context
+floom run <slug> --input input=hello
+floom run <slug> '{"action":"getInventory"}'
+floom run <slug> '{"input":"hello"}' --json
+floom run <slug> --input invoice_id=INV-1 --use-context
+floom api GET /api/me/runs/<run_id>
 ```
 
 `floom deploy` publishes OpenAPI/proxied manifests through `/api/hub/ingest`:
@@ -64,6 +68,10 @@ floom account context set-workspace --json '{"company":{"name":"Floom"}}'
 ```
 
 Apps can mark inputs with profile context paths. `floom run --use-context` fills missing inputs from the user/workspace JSON profile and still lets explicit CLI inputs win.
+
+`floom run` waits for completion by default. For multi-action apps, put
+`"action":"operationId"` in the JSON body. For raw endpoints or surfaces not
+wrapped by a first-class shell command, use `floom api <METHOD> <PATH>`.
 
 ## Secrets and tokens
 
@@ -105,9 +113,9 @@ floom apps sharing submit-review <slug>
 floom apps sharing withdraw-review <slug>
 
 floom apps secret-policies list <slug>
-floom apps secret-policies set <slug> GEMINI_API_KEY --policy user_vault
-floom apps creator-secrets set <slug> GEMINI_API_KEY --value "$GEMINI_API_KEY"
-floom apps creator-secrets delete <slug> GEMINI_API_KEY
+floom apps secret-policies set <slug> ApiKeyAuth --policy user_vault
+floom apps creator-secrets set <slug> ApiKeyAuth --value "$API_KEY"
+floom apps creator-secrets delete <slug> ApiKeyAuth
 
 floom apps rate-limit get <slug>
 floom apps rate-limit set <slug> --per-hour 120
@@ -123,7 +131,13 @@ floom apps renderer delete <slug>
 
 Pending-review, private, link-shared, and invited apps return `409 app_not_installable` from Store install commands. Owners manage those apps through Studio commands.
 
-Other top-level namespaces advertised by `floom --help` are intentionally not documented here because their shell command files are not present in this checkout. Use the REST API or MCP account tools for those surfaces until the CLI namespaces are wired.
+For OpenAPI apps, secret keys are the `securitySchemes` object keys from the
+spec, not the HTTP header names. If your spec says
+`components.securitySchemes.ApiKeyAuth`, use `ApiKeyAuth` in secret-policy and
+creator-secret commands, even when the actual header is `X-API-Key`.
+
+Other product surfaces that are not listed by `floom --help` are available through
+raw API calls with `floom api <METHOD> <PATH> [JSON_BODY]` or through MCP.
 
 ## CI
 
