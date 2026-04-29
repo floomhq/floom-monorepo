@@ -384,3 +384,78 @@ test('ScoredRowsTable model chip: legacy "(cached)" backend stamp is normalized,
   );
   assert.ok(html.includes('· CACHED'), 'the new suffix should be present exactly once');
 });
+
+// R38 regression: competitor-lens proxied-runtime shape.
+// Root cause: openapi-ingest stores outputs:[{name:'response',type:'json'}]
+// because it cannot parse the response schema from arbitrary OpenAPI specs.
+// The patchManifestOutputs fix in launch-week-sidecars.ts overwrites those
+// with the correct declared specs after ingest. This test verifies that the
+// renderer cascade correctly handles the competitor-lens output shape when the
+// manifest has the proper outputs (positioning table + pricing table +
+// pricing_insight text + unique string-array fields + meta), producing a
+// CompositeOutputCard instead of a KeyValueTable fallback.
+test('competitor-lens proxied shape: 5-output composite, not KeyValueTable fallback (R38)', () => {
+  const app = {
+    slug: 'competitor-lens',
+    manifest: mkManifest({
+      outputs: [
+        { name: 'positioning', label: 'Positioning', type: 'table' as const },
+        { name: 'pricing', label: 'Pricing', type: 'table' as const },
+        { name: 'pricing_insight', label: 'Pricing Insight', type: 'text' as const },
+        { name: 'unique_to_you', label: 'Unique To You', type: 'json' as const },
+        { name: 'unique_to_competitor', label: 'Unique To Competitor', type: 'json' as const },
+        { name: 'meta', label: 'Meta', type: 'json' as const },
+      ],
+    }),
+  };
+  const runOutput = {
+    positioning: [
+      { perspective: 'You', angle: 'Floom turns Python scripts into shareable apps.' },
+      { perspective: 'Competitor', angle: 'n8n is a workflow automation platform.' },
+      { perspective: 'Contrast', angle: 'Floom focuses on deployment speed; n8n on workflow breadth.' },
+    ],
+    pricing: [
+      { who: 'You', pricing: 'Free and open source.' },
+      { who: 'Competitor', pricing: 'Starter from 20€/mo.' },
+    ],
+    pricing_insight: 'Floom bets on open-source trust signals; n8n surfaces explicit pricing tiers.',
+    unique_to_you: [
+      'One script → four outputs: URL, web UI, REST API, MCP',
+      'Deploy in ~45 seconds',
+      'Code-first workflow for local scripts',
+    ],
+    unique_to_competitor: [
+      'Visual workflow canvas with AI-agent tracing',
+      '500+ integrations',
+      'Self-hosted option with community edition',
+    ],
+    meta: { dry_run: false, cache_hit: true, model: 'gemini-2.5-flash-lite' },
+  };
+
+  const result = pickRenderer({ app, action: 'analyze_route_analyze_post', runOutput, runId: 'r38' });
+
+  // Bug A fix: cascade kind must be 'auto' (CompositeOutputCard), not 'shape' (KeyValueTable).
+  // 'shape' means autoPick returned null and shapePick fired — the regression.
+  assert.equal(result.kind, 'auto', 'cascade must be auto (CompositeOutputCard), not shape (KeyValueTable)');
+
+  const html = renderToStaticMarkup(result.element!);
+
+  // Bug B fix: positioning and pricing must render as RowTable sections,
+  // not as '· N items' collapse pills from KeyValueTable.Row.
+  assert.ok(html.includes('Floom turns Python scripts'), 'positioning rows must be expanded inline');
+  assert.ok(html.includes('n8n is a workflow automation'), 'competitor positioning must be visible');
+  assert.ok(html.includes('Free and open source'), 'pricing rows must be expanded inline');
+
+  // unique_to_you is a string array: must render as a StringList (list items),
+  // not as a collapsed '· 3 items' pill.
+  assert.ok(html.includes('One script'), 'unique_to_you strings must be expanded inline');
+  assert.ok(html.includes('Visual workflow canvas'), 'unique_to_competitor strings must be visible');
+
+  // Bug A fix: CompositeOutputCard renders the master toolbar with Download CSV.
+  // The toolbar is only present when autoPick returns CompositeOutputCard.
+  // Verify the card renders with its expected data attributes.
+  assert.ok(
+    html.includes('data-multi="true"'),
+    'CompositeOutputCard must render with data-multi (master toolbar with Download CSV button present)',
+  );
+});
