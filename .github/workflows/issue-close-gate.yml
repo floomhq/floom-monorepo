@@ -1,0 +1,109 @@
+# Issue close gate — re-opens any issue closed without a verification artifact.
+#
+# Trust-erosion incident 2026-04-29 (Federico): "there were so many ux bugs
+# that i raised like 3-4x and you said solved but never checked".
+#
+# Pattern this fixes: closing an issue with "fixed in commit X" or "merged in
+# PR #Y" without ever proving the bug is gone on the live deployed surface.
+#
+# What this workflow does:
+#   On every issue close, scan the issue body + last 5 comments for ONE of:
+#     1. A line matching "Verified at https?://..." (live URL — not localhost)
+#     2. An attached image (uploads.githubusercontent.com / user-images URL)
+#     3. A fenced ```bash block containing curl + http_code or exit code
+#     4. A reference to a stress test path (test/stress/test-*.mjs)
+#
+#   If NONE found → re-open the issue + leave a comment explaining what's
+#   needed. The comment is bot-authored so a human knows it's the gate, not
+#   another reviewer.
+#
+# Bypass: comment "/skip-verification <reason>" before closing. Logs the
+# reason on the issue so it's auditable later.
+#
+# Out of scope: PR-merge gate (separate workflow). This is issue-only.
+
+name: Issue close gate
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  enforce-verification-artifact:
+    runs-on: ubuntu-latest
+    if: github.event.issue.state_reason != 'not_planned' && github.event.issue.state_reason != 'duplicate'
+    steps:
+      - name: Check for verification artifact
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+
+            // Pull last 5 comments
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              per_page: 100,
+            });
+            const recent = comments.data.slice(-5).map(c => c.body || '').join('\n\n');
+            const allText = body + '\n\n' + recent;
+
+            // Bypass: maintainer comment with /skip-verification
+            if (/\/skip-verification/i.test(allText)) {
+              console.log('Bypass tag /skip-verification found; allowing close.');
+              return;
+            }
+
+            // Patterns that count as a verification artifact:
+            const livePattern = /Verified at https?:\/\/(?!localhost|127\.0\.0\.1)[^\s)]+/i;
+            const imagePattern = /https?:\/\/(?:user-images\.githubusercontent\.com|github\.com\/[^/]+\/[^/]+\/assets|private-user-images\.githubusercontent\.com)/;
+            const curlPattern = /```(?:bash|sh)?\s*[\s\S]*?curl[\s\S]*?(?:HTTP\/[12]|http_code|exit code|status[:= ]\s*\d{3})/i;
+            const testPattern = /test\/stress\/test-[\w-]+\.(mjs|ts|js)/;
+
+            const hasLive = livePattern.test(allText);
+            const hasImage = imagePattern.test(allText);
+            const hasCurl = curlPattern.test(allText);
+            const hasTest = testPattern.test(allText);
+
+            console.log(`Checks: live=${hasLive} image=${hasImage} curl=${hasCurl} test=${hasTest}`);
+
+            if (hasLive && (hasImage || hasCurl || hasTest)) {
+              console.log('Verification artifact found. Close stands.');
+              return;
+            }
+
+            // Not enough — reopen + comment.
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              state: 'open',
+            });
+
+            const checklist =
+              `- [${hasLive ? 'x' : ' '}] Live URL: a line like \`Verified at https://floom.dev/...\` (NOT localhost)\n` +
+              `- [${hasImage ? 'x' : ' '}] Screenshot OR\n` +
+              `- [${hasCurl ? 'x' : ' '}] Fenced \\\`\\\`\\\`bash block with curl + http_code OR\n` +
+              `- [${hasTest ? 'x' : ' '}] Reference to a stress test under \`test/stress/test-*.mjs\``;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body:
+                `### Re-opened by close-gate workflow\n\n` +
+                `This issue was closed without a verification artifact. To re-close, add ONE of:\n\n` +
+                `1. A live URL line — \`Verified at https://floom.dev/...\` (not localhost)\n\n` +
+                `   AND ONE of:\n\n` +
+                `2. A screenshot of the affected surface (drag-drop into the comment)\n` +
+                `3. A fenced \\\`\\\`\\\`bash block with the curl + response that proves the fix\n` +
+                `4. A reference to a stress test path (\`test/stress/test-foo.mjs\`)\n\n` +
+                `Current state:\n${checklist}\n\n` +
+                `Bypass for non-code closes (won't fix, duplicate, etc): comment \`/skip-verification <reason>\` before closing.\n\n` +
+                `*Why this gate exists: [trust-erosion fix 2026-04-29](https://github.com/floomhq/floom/blob/launch-mvp/docs/internal/discipline.md#issue-close-gate).*`,
+            });

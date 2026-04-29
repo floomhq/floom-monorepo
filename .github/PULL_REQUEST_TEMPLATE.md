@@ -14,9 +14,27 @@
   - Steps:
   - Expected:
 
+## Verification on live surface
+
+<!--
+After deploying to preview/mvp, verify the change actually works on the
+live URL (not localhost). The issue-close-gate workflow looks for ONE of:
+  - A "Verified at https://..." line (live URL, not localhost) — required
+  AND ONE of:
+  - A screenshot
+  - A fenced `bash` block with curl + http_code
+  - A reference to test/stress/test-*.mjs
+This prevents the "claimed solved but never checked" pattern.
+-->
+
+Verified at: <!-- e.g. https://mvp.floom.dev/p/petstore at 2026-04-29 02:15 UTC -->
+
+Evidence:
+<!-- Screenshot OR curl block OR test path. Pick one. -->
+
 ## Screenshots or logs
 
-<!-- Optional. Paste UI screenshots or relevant log lines. -->
+<!-- Optional additional context. -->
 
 ## Checklist
 
