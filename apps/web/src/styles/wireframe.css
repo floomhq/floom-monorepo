@@ -168,6 +168,18 @@ input { font-family: inherit; }
   justify-content: space-between;
 }
 
+/* Federico 2026-04-29: on non-landing pages, drop the centered max-width
+   so the logo sits flush left and the avatar/CTA cluster flush right.
+   Matches the Linear / Vercel / GitHub pattern where chrome hugs the
+   browser edges and only page CONTENT is constrained to a max-width.
+   Landing keeps the centered chrome (data-edge-aligned="false") so the
+   hero alignment remains balanced with the centered H1 + CTAs. */
+.topbar-inner[data-edge-aligned="true"] {
+  max-width: none;
+  margin: 0;
+  padding: 0 24px;
+}
+
 .brand {
   font-size: 18px;
   font-weight: 700;

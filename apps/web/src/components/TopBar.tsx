@@ -239,11 +239,15 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
     >
       <div
         className="topbar-inner"
+        data-edge-aligned={location.pathname === '/' ? 'false' : 'true'}
         style={{
-          /* F9 (2026-04-28): consistent topbar width. The CSS class
-             sets max-width:1200 + padding:0 32px; we leave padding to
-             CSS (was nullified inline only when compact) so the logo
-             + avatar pin to the same x across every page. */
+          /* F9 (2026-04-28): consistent topbar width.
+             Federico 2026-04-29: on non-landing pages, logo flush left +
+             avatar flush right (matches Linear/Vercel/GitHub pattern).
+             Landing keeps the centered max-width:1200 chrome to align with
+             the centered hero content. The data-edge-aligned attribute
+             toggles a CSS rule in wireframe.css that drops max-width and
+             tightens the side padding. */
           gap: compact ? 10 : 16,
           padding: compact ? '0 20px' : undefined,
         }}
