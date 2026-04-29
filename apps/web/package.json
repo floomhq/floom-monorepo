@@ -12,6 +12,8 @@
     "test": "tsx --test src/components/output/__tests__/rendererCascade.test.tsx"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@sentry/react": "^10.49.0",
     "cronstrue": "2.50.0",
     "dompurify": "3.4.0",

@@ -57,15 +57,20 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // R18B (2026-04-28): split heavy non-LCP libs into named chunks so
-        // the landing index.js stops carrying them. react-markdown +
-        // remark-gfm pull `unified` and a markdown parser tree (~150KB),
-        // sentry/react carries its own runtime (~80KB), posthog is ~50KB.
-        // These are referenced from non-landing routes (DocsPage, ProtocolPage,
-        // bootstrap) so splitting them into their own async chunks keeps the
-        // landing TTI clean while still letting each route stream them in.
+        // the landing index.js stops carrying them.
+        //
+        // r39-perf (2026-04-29):
+        //   - markdown removed from manualChunks: DescriptionMarkdown now
+        //     lazy-loads its inner renderer, so react-markdown + remark-gfm
+        //     are a code-split chunk (NOT added to modulepreload on the
+        //     landing page). Keeping it here would force Vite to add it to
+        //     modulepreload even though it's only dynamically referenced.
+        //   - sentry / analytics stay in manualChunks so they remain
+        //     separate files; their init is deferred to requestIdleCallback
+        //     in main.tsx (Fix 4) but the Sentry ErrorBoundary still needs
+        //     the module available synchronously for the boundary fallback.
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          markdown: ['react-markdown', 'remark-gfm'],
           sentry: ['@sentry/react'],
           analytics: ['posthog-js'],
           icons: ['lucide-react'],
