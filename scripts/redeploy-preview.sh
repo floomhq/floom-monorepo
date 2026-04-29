@@ -164,15 +164,16 @@ PY
 
 log "merged env file: $MERGED_ENV"
 
-# --- 3b. Append FLOOM_STORE_HIDE_SLUGS from kill list ---
+# --- 3b. Set FLOOM_STORE_HIDE_SLUGS = kill list + docker-runtime apps ---
+DOCKER_RUNTIME_HIDE="competitor-lens,ai-readiness-audit,pitch-coach"
 
-if [ -f "$KILL_LIST" ] && ! grep -q '^FLOOM_STORE_HIDE_SLUGS=' "$MERGED_ENV"; then
+if [ -f "$KILL_LIST" ]; then
   KILL_CSV=$(grep -v '^[[:space:]]*#' "$KILL_LIST" | grep -v '^[[:space:]]*$' | paste -sd, -)
-  if [ -n "$KILL_CSV" ]; then
-    echo "FLOOM_STORE_HIDE_SLUGS=${KILL_CSV}" >> "$MERGED_ENV"
-    KILL_COUNT=$(echo "$KILL_CSV" | tr ',' '\n' | wc -l)
-    log "appended FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs from kill list)"
-  fi
+  COMBINED="${KILL_CSV},${DOCKER_RUNTIME_HIDE}"
+  grep -v '^FLOOM_STORE_HIDE_SLUGS=' "$MERGED_ENV" > "${MERGED_ENV}.tmp" && mv "${MERGED_ENV}.tmp" "$MERGED_ENV"
+  echo "FLOOM_STORE_HIDE_SLUGS=${COMBINED}" >> "$MERGED_ENV"
+  KILL_COUNT=$(echo "$COMBINED" | tr ',' '\n' | wc -l)
+  log "set FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs: kill-list + 3 docker-runtime apps)"
 fi
 
 # --- 4. Stop + remove old container ---

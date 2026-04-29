@@ -200,13 +200,20 @@ log "merged env file: $MERGED_ENV"
 # conflict — if the file already declares FLOOM_STORE_HIDE_SLUGS we leave
 # it alone.
 
-if [ -f "$KILL_LIST" ] && ! grep -q '^FLOOM_STORE_HIDE_SLUGS=' "$MERGED_ENV"; then
+# Apps that need /var/run/docker.sock at runtime (app_type=docker). Hidden
+# from every env's public directory until the docker-runtime isolation pass
+# (gVisor / kata-containers) lands. mvp / preview / prod no longer mount the
+# host docker socket on user-facing containers.
+DOCKER_RUNTIME_HIDE="competitor-lens,ai-readiness-audit,pitch-coach"
+
+if [ -f "$KILL_LIST" ]; then
   KILL_CSV=$(grep -v '^[[:space:]]*#' "$KILL_LIST" | grep -v '^[[:space:]]*$' | paste -sd, -)
-  if [ -n "$KILL_CSV" ]; then
-    echo "FLOOM_STORE_HIDE_SLUGS=${KILL_CSV}" >> "$MERGED_ENV"
-    KILL_COUNT=$(echo "$KILL_CSV" | tr ',' '\n' | wc -l)
-    log "FLOOM_STORE_HIDE_SLUGS loaded from data/launch-kill-list.txt (${KILL_COUNT} slugs)"
-  fi
+  COMBINED="${KILL_CSV},${DOCKER_RUNTIME_HIDE}"
+  # Drop any existing FLOOM_STORE_HIDE_SLUGS line, then append the fresh one.
+  grep -v '^FLOOM_STORE_HIDE_SLUGS=' "$MERGED_ENV" > "${MERGED_ENV}.tmp" && mv "${MERGED_ENV}.tmp" "$MERGED_ENV"
+  echo "FLOOM_STORE_HIDE_SLUGS=${COMBINED}" >> "$MERGED_ENV"
+  KILL_COUNT=$(echo "$COMBINED" | tr ',' '\n' | wc -l)
+  log "set FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs: kill-list + 3 docker-runtime apps)"
 fi
 
 # --- 4. Stop + remove old container ---
