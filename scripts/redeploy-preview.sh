@@ -70,10 +70,11 @@ else
     [ -n "${VITE_SENTRY_WEB_DSN:-}" ] && BUILD_ARGS+=(--build-arg "VITE_SENTRY_WEB_DSN=${VITE_SENTRY_WEB_DSN}")
     [ -n "${VITE_POSTHOG_KEY:-}" ] && BUILD_ARGS+=(--build-arg "VITE_POSTHOG_KEY=${VITE_POSTHOG_KEY}")
     [ -n "${VITE_POSTHOG_HOST:-}" ] && BUILD_ARGS+=(--build-arg "VITE_POSTHOG_HOST=${VITE_POSTHOG_HOST}")
-    [ -n "${SENTRY_AUTH_TOKEN:-}" ] && BUILD_ARGS+=(--build-arg "SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}")
+    SECRET_ARGS=()
+    [ -n "${SENTRY_AUTH_TOKEN:-}" ] && SECRET_ARGS+=(--secret "id=sentry_auth_token,env=SENTRY_AUTH_TOKEN")
     [ -n "${SENTRY_ORG:-}" ] && BUILD_ARGS+=(--build-arg "SENTRY_ORG=${SENTRY_ORG}")
     [ -n "${SENTRY_PROJECT:-}" ] && BUILD_ARGS+=(--build-arg "SENTRY_PROJECT=${SENTRY_PROJECT}")
-    docker build "${BUILD_ARGS[@]}" -t "$TAG" -f docker/Dockerfile .
+    DOCKER_BUILDKIT=1 docker build "${BUILD_ARGS[@]}" "${SECRET_ARGS[@]}" -t "$TAG" -f docker/Dockerfile .
   else
     log "image $TAG already exists locally; skipping build"
   fi

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # Floom — multi-stage production Docker image.
 # Stage 1 (builder): install all deps + build TypeScript + Vite.
 # Stage 2 (runtime): copy only production deps + compiled artifacts.
@@ -68,14 +69,12 @@ RUN pnpm install --frozen-lockfile
 # Sentry build-time args. All optional:
 #   - VITE_SENTRY_WEB_DSN is baked into the web bundle so the browser knows
 #     where to POST errors. Unset = Sentry stays dark on the client.
-#   - SENTRY_AUTH_TOKEN/ORG/PROJECT wire @sentry/vite-plugin to upload source
-#     maps during the Vite build, then delete .map files from dist/ so the
-#     runtime image doesn't ship them. All three unset = plugin no-ops and
-#     maps are generated but not uploaded.
+#   - SENTRY_AUTH_TOKEN is supplied as a BuildKit secret during the Vite build.
+#     It is never persisted as an image ENV. SENTRY_ORG/PROJECT are non-secret
+#     build args for source-map upload metadata.
 # Pass at build time: docker build --build-arg VITE_SENTRY_WEB_DSN=... ...
 ARG VITE_SENTRY_WEB_DSN
 ARG COMMIT_SHA
-ARG SENTRY_AUTH_TOKEN
 ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 # PostHog build args (added 2026-04-29). Same shape as Sentry: baked into
@@ -86,7 +85,6 @@ ARG VITE_POSTHOG_HOST
 ENV VITE_SENTRY_WEB_DSN=${VITE_SENTRY_WEB_DSN}
 ENV VITE_COMMIT_SHA=${COMMIT_SHA}
 ENV COMMIT_SHA=${COMMIT_SHA}
-ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
 ENV SENTRY_ORG=${SENTRY_ORG}
 ENV SENTRY_PROJECT=${SENTRY_PROJECT}
 ENV VITE_POSTHOG_KEY=${VITE_POSTHOG_KEY}
@@ -96,8 +94,11 @@ ENV VITE_POSTHOG_HOST=${VITE_POSTHOG_HOST}
 RUN cd apps/server && pnpm run build
 
 # Build web (Vite → dist/) — fail LOUDLY if the build breaks so we never
-# silently ship the backend-only stub again.
-RUN cd apps/web && pnpm run build
+# silently ship the backend-only stub again. The Sentry upload token is mounted
+# as a BuildKit secret, used only for this process, and omitted from image env.
+RUN --mount=type=secret,id=sentry_auth_token,required=false \
+  export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
+  && cd apps/web && pnpm run build
 
 # ── stage 2: runtime ────────────────────────────────────────────────────────
 FROM node:20-slim AS runtime
