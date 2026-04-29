@@ -447,7 +447,7 @@ curl -X POST https://api.floom.dev/api/lead-scorer/run \\
           </h2>
           <p style={pStyle}>
             Every Floom app is a ready-to-use MCP tool at{' '}
-            <code>mcp.floom.dev/app/&lt;slug&gt;</code>. Point your agent at that URL
+            <code>floom.dev/mcp/app/&lt;slug&gt;</code>. Point your agent at that URL
             and it can call the app like any other tool. There&apos;s also a discovery
             endpoint so agents can find apps on their own, and a web Studio for
             managing the apps you own
@@ -461,7 +461,7 @@ curl -X POST https://api.floom.dev/api/lead-scorer/run \\
               <p style={{ ...pStyle, fontSize: 12.5, margin: 0 }}>
                 JSON list of live apps with manifests. Read-only, no auth.
               </p>
-              <span style={surfaceToolStyle}>mcp.floom.dev/search</span>
+              <span style={surfaceToolStyle}>floom.dev/mcp/search</span>
             </div>
             <div style={surfaceCardStyle}>
               <span style={surfaceNameStyle}>Run</span>
@@ -470,7 +470,7 @@ curl -X POST https://api.floom.dev/api/lead-scorer/run \\
                 One MCP endpoint per app. Invoke with JSON, get structured JSON back.
               </p>
               <span style={surfaceToolStyle}>
-                mcp.floom.dev/app/&lt;slug&gt;
+                floom.dev/mcp/app/&lt;slug&gt;
               </span>
             </div>
             <div style={surfaceCardStyle}>
