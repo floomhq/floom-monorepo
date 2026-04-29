@@ -233,16 +233,18 @@ function baseLayout({
   const logoPng2x = `${assetBase}/brand/logo-email@2x.png`;
   const logoSvg = `${assetBase}/brand/logo-email.svg`;
 
-  // <picture> lets Apple Mail, iOS Mail, and most webmail clients pick
-  // the crisp SVG, while Outlook + Gmail fall back to the PNG (they
-  // ignore the <source> element entirely). srcset on the <img> handles
-  // retina for clients that honour it. Width/height are set so clients
-  // that strip styles still lay the image out correctly, and max-width
-  // keeps it from overflowing the card on narrow screens.
-  const logoBlock = `<picture>
-<source type="image/svg+xml" srcset="${escapeHtml(logoSvg)}">
-<img src="${escapeHtml(logoPng)}" srcset="${escapeHtml(logoPng)} 1x, ${escapeHtml(logoPng2x)} 2x" width="200" height="60" alt="Floom" style="display:block;border:0;outline:none;text-decoration:none;width:200px;height:60px;max-width:100%;">
-</picture>`;
+  // PNG-only logo for emails. We previously offered an SVG <source> so
+  // crisp-display webmail clients could pick the vector, but the SVG
+  // wordmark uses font-family="Inter" via system-ui fallback — and
+  // because email clients refuse to fetch @font-face for security, those
+  // clients render the wordmark in their default serif (often Times /
+  // Georgia) instead of Inter. The result was the wordmark looking
+  // "back to the old serif logo" even after the v26 brand update
+  // (Federico 2026-04-29). PNG bakes the Inter typography into pixels,
+  // so it always renders correctly.
+  // logoSvg is intentionally referenced (eslint) but no longer rendered.
+  void logoSvg;
+  const logoBlock = `<img src="${escapeHtml(logoPng)}" srcset="${escapeHtml(logoPng)} 1x, ${escapeHtml(logoPng2x)} 2x" width="200" height="60" alt="Floom" style="display:block;border:0;outline:none;text-decoration:none;width:200px;height:60px;max-width:100%;">`;
 
   const unsubscribeBlock = unsubscribeUrl
     ? `<br><a href="${escapeHtml(unsubscribeUrl)}" style="color:${EMAIL_MUTED};text-decoration:underline;">Unsubscribe</a>`
