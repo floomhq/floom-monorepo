@@ -760,6 +760,34 @@ export function RunSurface({
     onResetInitialRun?.();
   }, [app.manifest.actions, defaultEntry, initialInputs, onResetInitialRun]);
 
+  // Iter28 (2026-04-29): "Or try with example data →" handler. Fills the
+  // form with the manifest's per-input `default` values so first-time
+  // visitors can press Run without typing. Only meaningful when at least
+  // one input declares a non-empty default; the affordance hides itself
+  // otherwise.
+  const sampleSeed = useMemo(() => {
+    const spec = state.actionSpec;
+    const seed: Record<string, unknown> = {};
+    let hasNonEmpty = false;
+    for (const inp of spec.inputs ?? []) {
+      const def = inp.default;
+      if (def === undefined || def === null) continue;
+      if (typeof def === 'string' && def.length === 0) continue;
+      seed[inp.name] = def;
+      hasNonEmpty = true;
+    }
+    return hasNonEmpty ? seed : null;
+  }, [state.actionSpec]);
+
+  const handleTrySample = useCallback(() => {
+    if (!sampleSeed) return;
+    setState((s) => ({
+      ...s,
+      inputs: { ...s.inputs, ...sampleSeed },
+      inputErrors: undefined,
+    }));
+  }, [sampleSeed]);
+
   const handleRun = useCallback(async () => {
     if (state.phase !== 'ready' && state.phase !== 'done' && state.phase !== 'error') return;
     if (!defaultEntry) return;
@@ -1230,6 +1258,36 @@ export function RunSurface({
         </>
       )}
 
+      {/* Iter28 (2026-04-29): "RUN READY" status pill, restored to match
+          prod (floom.dev). Visible only in the pre-run `ready` phase to
+          signal "form is filled, press Run to go". Hidden during
+          streaming / job (replaced by the run-banner above) and on the
+          done / error states (the output card carries the result
+          identity then). Mono uppercase eyebrow style, framed in a thin
+          pill so it reads as a status indicator, not a label. */}
+      {state.phase === 'ready' && (
+        <div
+          data-testid="run-surface-status-pill"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '10px 16px',
+            border: '1px solid var(--line)',
+            borderRadius: 10,
+            background: 'var(--card)',
+            marginBottom: 0,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            color: 'var(--muted)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            fontWeight: 600,
+          }}
+        >
+          Run Ready
+        </div>
+      )}
+
       <div className="run-surface-grid">
         <section
           className="run-surface-input"
@@ -1263,6 +1321,7 @@ export function RunSurface({
             onChange={handleInputChange}
             onRun={handleRun}
             onReset={handleReset}
+            onTrySample={sampleSeed ? handleTrySample : undefined}
             onEditRerun={() => {
               // "Edit & rerun" path: drop the run state back to ready
               // (re-enables fields) but KEEP the inputs so the user can
@@ -1384,6 +1443,14 @@ interface InputCardProps {
    * back to phase='ready' while preserving the inputs.
    */
   onEditRerun: () => void;
+  /**
+   * Iter28 (2026-04-29): "Or try with example data" affordance. Fills
+   * the form with the manifest's `inputs[].default` values (and any
+   * curated sample data the slug carries), so visitors can press Run
+   * without typing anything. Only rendered when at least one input has
+   * a useful default to seed.
+   */
+  onTrySample?: () => void;
 }
 
 function InputCard({
@@ -1399,6 +1466,7 @@ function InputCard({
   onChange,
   onRun,
   onReset,
+  onTrySample,
   onEditRerun,
 }: InputCardProps) {
   // Fix 5 (2026-04-19): progressive disclosure of optional inputs.
@@ -1648,6 +1716,31 @@ function InputCard({
             >
               {Object.values(inputErrors)[0]}
             </div>
+          )}
+          {/* Iter28 (2026-04-29): "Or try with example data →" affordance.
+              Only shown in edit mode (form is empty) when the manifest
+              carries useful default values. Restored from prod parity —
+              first-time visitors can press Run without typing anything. */}
+          {onTrySample && mode === 'edit' && !running && (
+            <button
+              type="button"
+              data-testid="run-surface-try-sample"
+              onClick={onTrySample}
+              style={{
+                marginTop: 10,
+                padding: '6px 0',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--accent)',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'left',
+              }}
+            >
+              Or try with example data <span aria-hidden="true">→</span>
+            </button>
           )}
           <div className="run-surface-actions">
             {/* a11y 2026-04-20: aria-busy + aria-disabled announce "busy"
@@ -2038,7 +2131,10 @@ function EmptyOutputCard({
             <SampleOutputPreview slug={slug} />
           </div>
         ) : (
-          <EmptyOutputSkeleton outputType={heroOutput?.type} />
+          <EmptyOutputSkeleton
+            outputType={heroOutput?.type}
+            outputs={actionSpec.outputs}
+          />
         )}
       </div>
     </div>
@@ -2068,8 +2164,21 @@ function pickHeroOutput(
  * Faint, non-interactive skeleton that hints at the shape of the
  * upcoming run output. Purely presentational — role=presentation so
  * screen readers skip it (the copy above already describes the slot).
+ *
+ * Iter28 (2026-04-29): for `json` outputs, render the manifest's field
+ * names as a bullet list instead of the empty `{ ... }` shell. The
+ * shell read as a broken/loading state on /p/:slug; prod (floom.dev)
+ * shows the named fields ("Audited URL · Readiness Score · ...") so
+ * visitors know what they'll get. Falls back to the `{ ... }` shell
+ * only when `outputs` is empty (no schema to introspect).
  */
-function EmptyOutputSkeleton({ outputType }: { outputType: OutputType | undefined }) {
+function EmptyOutputSkeleton({
+  outputType,
+  outputs,
+}: {
+  outputType: OutputType | undefined;
+  outputs?: ActionSpec['outputs'];
+}) {
   const commonWrap: React.CSSProperties = {
     marginTop: 18,
     opacity: 0.55,
@@ -2166,6 +2275,39 @@ function EmptyOutputSkeleton({ outputType }: { outputType: OutputType | undefine
     );
   }
   if (outputType === 'json') {
+    // Iter28: prefer the bullet field-name list from the manifest's
+    // `outputs[]`. This matches prod (floom.dev) which shows the
+    // schema's field labels ("Audited URL · Readiness Score · ...").
+    // Falls back to the `{ ... }` shell only when the schema is empty.
+    if (outputs && outputs.length > 0) {
+      return (
+        <ul
+          role="presentation"
+          data-testid="run-surface-empty-output-fields"
+          style={{
+            ...commonWrap,
+            opacity: 1,
+            margin: 0,
+            paddingLeft: 22,
+            display: 'grid',
+            gap: 6,
+            listStyle: 'disc',
+            color: 'var(--ink)',
+            fontSize: 13,
+            lineHeight: 1.55,
+          }}
+        >
+          {outputs.map((o) => (
+            <li
+              key={o.name}
+              style={{ fontWeight: 600, color: 'var(--ink)' }}
+            >
+              {o.label || o.name}
+            </li>
+          ))}
+        </ul>
+      );
+    }
     return (
       <pre
         role="presentation"
@@ -2711,7 +2853,7 @@ function FriendlyStartupError({
 
 // ── Past runs disclosure ───────────────────────────────────────────────────
 
-function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
+export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
   const { isAuthenticated } = useSession();
   const deployEnabled = useDeployEnabled();
   const location = useLocation();

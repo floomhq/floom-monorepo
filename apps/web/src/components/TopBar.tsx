@@ -303,7 +303,10 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               on /p/:slug run views, but Federico 2026-04-24 asked for
               consistency: the brand lockup should read the same on every
               page. Compact's height reduction (40px top bar) still
-              applies; only the wordmark-hide behaviour is dropped. */}
+              applies; only the wordmark-hide behaviour is dropped.
+              Iter28 (2026-04-29): restored prod's "floom." brand lockup —
+              the trailing period is part of the brand mark on floom.dev
+              and was lost in the v26 unify merge. */}
           <span
             style={{
               fontSize: compact ? 15 : WORDMARK_SIZE,
@@ -313,7 +316,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
               color: INK,
             }}
           >
-            floom
+            floom<span style={{ color: ACCENT }}>.</span>
           </span>
         </Link>
 

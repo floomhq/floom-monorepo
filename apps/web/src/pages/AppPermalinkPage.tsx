@@ -22,7 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { Footer } from '../components/Footer';
-import { RunSurface, type RunSurfaceResult } from '../components/runner/RunSurface';
+import { RunSurface, PastRunsDisclosure, type RunSurfaceResult } from '../components/runner/RunSurface';
 import { AppIcon } from '../components/AppIcon';
 import { AppReviews } from '../components/AppReviews';
 import { FeedbackButton } from '../components/FeedbackButton';
@@ -120,10 +120,17 @@ export function AppPermalinkPage() {
   // Run is the default — the previous product-page layout made users scroll
   // past marketing copy to find the actual run surface. Shared-run URLs
   // (/p/:slug?run=<id>) auto-land on Run.
-  type PTab = 'run' | 'about' | 'install' | 'source';
+  // Iter28 (2026-04-29): restored 5th 'runs' tab — was present pre-v26-merge
+  // (commit 012983db, "port R10+R13 — 5th tab") and dropped in 78c10413
+  // unify merge. The PastRunsDisclosure component (re-used as the body)
+  // already handles both anon (sign-in CTA) and authed (the caller's own
+  // run history) — the tab is a pure promotion of that affordance.
+  // No new backend endpoint required; /api/me/runs is auth-gated and the
+  // anon branch shows a sign-in upsell.
+  type PTab = 'run' | 'about' | 'install' | 'source' | 'runs';
   const initialTab: PTab = searchParams.get('tab') as PTab | null ?? 'run';
   const [activeTab, setActiveTab] = useState<PTab>(
-    ['run', 'about', 'install', 'source'].includes(initialTab) ? initialTab : 'run',
+    ['run', 'about', 'install', 'source', 'runs'].includes(initialTab) ? initialTab : 'run',
   );
   // Run prefetched from /api/run/:id when the URL contains ?run=<id>. Lets
   // RunSurface hydrate directly into the `done` phase for shared links.
@@ -1117,6 +1124,7 @@ export function AppPermalinkPage() {
               { id: 'about' as PTab, label: 'About' },
               { id: 'install' as PTab, label: 'Install' },
               { id: 'source' as PTab, label: 'Source' },
+              { id: 'runs' as PTab, label: 'Earlier runs' },
             ]).map((t) => {
               const isOn = activeTab === t.id;
               return (
@@ -1671,6 +1679,33 @@ export function AppPermalinkPage() {
               Browsable OpenAPI spec + floom manifest. Until this ships,
               grab the spec from <code style={{ fontFamily: 'var(--font-mono)' }}>/api/hub/{app.slug}/openapi.json</code>.
             </p>
+          </section>
+        )}
+
+        {/* Iter28 (2026-04-29): Earlier runs tab — promotes
+            PastRunsDisclosure into a full tab. Anon visitors get the
+            sign-in upsell branch; authed visitors see their own run
+            history scoped to this slug, fetched lazily via /api/me/runs
+            on first reveal. No new backend endpoint required. */}
+        {activeTab === 'runs' && (
+          <section
+            data-testid="tab-content-runs"
+            style={{ padding: '4px 0' }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10.5,
+                color: 'var(--muted)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                marginBottom: 14,
+              }}
+            >
+              Earlier runs
+            </div>
+            <PastRunsDisclosure appSlug={app.slug} />
           </section>
         )}
           </div>
