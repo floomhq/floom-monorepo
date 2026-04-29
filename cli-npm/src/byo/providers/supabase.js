@@ -162,16 +162,16 @@ function createSupabaseProvider({ token, baseUrl = process.env.FLOOM_BYO_SUPABAS
       throw new Error('Supabase BYO write() is reserved for Cloud Phase 2');
     },
 
-    async query(sql, params = []) {
-      return { sql, params };
+    async query() {
+      throw new Error('Supabase BYO query() is reserved for Cloud Phase 2');
     },
 
-    async transaction(fn) {
-      return fn(this);
+    async transaction() {
+      throw new Error('Supabase BYO transaction() is reserved for Cloud Phase 2');
     },
 
-    async configureRLS(table, policy) {
-      return { table, policy };
+    async configureRLS() {
+      throw new Error('Supabase BYO configureRLS() is reserved for Cloud Phase 2');
     },
   };
 }
