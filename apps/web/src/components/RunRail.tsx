@@ -11,9 +11,10 @@
  *   Rail: {workspace name ▾} → [Run|Studio] toggle → Apps · Runs → footer
  */
 
+import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, Play, Plus } from 'lucide-react';
+import { Box, Play, Plus, Settings as SettingsIcon } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
 // V13 fix: rail's "Apps" count is now sourced from /api/hub/installed via
@@ -79,13 +80,71 @@ export function RunRail() {
 }
 
 /**
- * v26 §12.5 + §12.6: Avatar and Sign out live in the TopBar avatar dropdown ONLY.
- * The rail has no footer account section. RailFoot is exported for backward-compat
- * but renders nothing.
+ * Rail footer: Settings shortcut + local time/timezone.
+ *
+ * Federico 2026-04-29: requested settings icon + time/tz at bottom-left after
+ * the prior V2 cleanup left the rail bottom empty. Avatar + Sign out still
+ * live in the TopBar dropdown only (per §12.5 + §12.6); this is just a quick
+ * Settings shortcut and an at-a-glance "where am I" time display.
  */
 export function RailFoot() {
-  return null;
+  const now = useRailClock();
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tzCity = tz.split('/').pop()?.replace(/_/g, ' ') ?? tz;
+  const time = now.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  return (
+    <div style={railFootStyle}>
+      <Link to="/me/settings" style={railFootLinkStyle} aria-label="Settings">
+        <SettingsIcon size={14} aria-hidden="true" />
+        <span>Settings</span>
+      </Link>
+      <div style={railFootMetaStyle}>
+        {time} · {tzCity}
+      </div>
+    </div>
+  );
 }
+
+function useRailClock(intervalMs = 60_000) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+const railFootStyle: CSSProperties = {
+  borderTop: '1px solid var(--line)',
+  padding: '10px 12px 12px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+};
+
+const railFootLinkStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  color: 'var(--muted)',
+  textDecoration: 'none',
+  fontSize: 13,
+  fontWeight: 500,
+  padding: '4px 0',
+};
+
+const railFootMetaStyle: CSSProperties = {
+  color: 'var(--muted)',
+  fontSize: 11,
+  letterSpacing: 0.2,
+  paddingLeft: 22,
+  fontVariantNumeric: 'tabular-nums',
+};
 
 /** Kept for backward-compat imports only (StudioRail used to import Brand). */
 export function Brand({ to, label, tag }: { to: string; label: string; tag?: string }) {
