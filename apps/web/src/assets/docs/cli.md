@@ -23,7 +23,7 @@ floom --help
 floom login
 ```
 
-Mint an Agent token at `https://floom.dev/me/agent-keys`, then run the command printed by the CLI. This requires beta account access while public Cloud is in waitlist mode:
+Mint an Agent token at `https://floom.dev/settings/agent-tokens`, then run the command printed by the CLI. This requires beta account access while public Cloud is in waitlist mode:
 
 ```bash
 floom auth login --token=floom_agent_...

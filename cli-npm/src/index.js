@@ -200,10 +200,11 @@ async function authFetch(overrideApiUrl, urlPath, opts = {}) {
   const auth = resolveAuth(overrideApiUrl);
   if (!auth) {
     const host = overrideApiUrl || DEFAULT_API_URL;
+    const tokenUrl = agentKeysUrl(host);
     process.stderr.write([
       'floom: not authenticated.',
       '',
-      `Mint an Agent token at ${host.replace(/\/$/, '')}/me/agent-keys, then:`,
+      `Mint an Agent token at ${tokenUrl}, then:`,
       '',
       '  floom auth login --token=floom_agent_...',
       '',
@@ -262,7 +263,7 @@ async function verifyToken(apiUrl, token) {
 // ---- browser open -----------------------------------------------------------
 
 function agentKeysUrl(apiUrl) {
-  return `${apiUrl.replace(/\/$/, '')}/me/agent-keys`;
+  return `${apiUrl.replace(/\/$/, '')}/settings/agent-tokens`;
 }
 
 function openInBrowser(url) {
@@ -446,7 +447,7 @@ async function runWhoami(opts) {
     identity = await verifyToken(apiUrl, token);
   } catch (err) {
     console.error(c.red('not logged in.'), err && err.message ? err.message : String(err));
-    process.stderr.write(`Mint a fresh Agent token at ${apiUrl.replace(/\/$/, '')}/me/agent-keys and try again.\n`);
+    process.stderr.write(`Mint a fresh Agent token at ${agentKeysUrl(apiUrl)} and try again.\n`);
     process.exit(1);
   }
 
@@ -510,7 +511,7 @@ async function runAuthLogin(args, globalApiUrl) {
         '  floom auth login --token=<agent_token> [--api-url=<url>]',
         '',
         'options:',
-        '  --token=<token>   Agent token. Get yours at <api_url>/me/agent-keys',
+        '  --token=<token>   Agent token. Get yours at <api_url>/settings/agent-tokens',
         '  --api-url=<url>   Override API base URL (default: https://floom.dev)',
       ].join('\n'));
       return;
@@ -531,7 +532,7 @@ async function runAuthLogin(args, globalApiUrl) {
 
   if (!agentToken) {
     // Print URL and instructions
-    const loginUrl = `${apiUrl.replace(/\/$/, '')}/me/agent-keys`;
+    const loginUrl = agentKeysUrl(apiUrl);
     const opened = openInBrowser(loginUrl);
     if (opened) {
       console.log(`Opened ${loginUrl}`);
@@ -548,7 +549,7 @@ async function runAuthLogin(args, globalApiUrl) {
   if (!looksLikeAgentToken(agentToken)) {
     process.stderr.write('ERROR: Invalid Agent token format.\n');
     process.stderr.write('Agent tokens look like floom_agent_<32 alphanumeric chars>.\n');
-    process.stderr.write(`Mint a fresh token at ${apiUrl.replace(/\/$/, '')}/me/agent-keys and try again.\n`);
+    process.stderr.write(`Mint a fresh token at ${agentKeysUrl(apiUrl)} and try again.\n`);
     process.exit(1);
   }
 
@@ -558,7 +559,7 @@ async function runAuthLogin(args, globalApiUrl) {
 
   const candidateUrls = [apiUrl];
   if (apiUrl.replace(/\/$/, '') === 'https://floom.dev') {
-    candidateUrls.push('https://mvp.floom.dev', 'https://v26.floom.dev');
+    candidateUrls.push('https://v26.floom.dev');
   }
 
   for (const candidate of candidateUrls) {
@@ -573,7 +574,7 @@ async function runAuthLogin(args, globalApiUrl) {
 
   if (!identity) {
     process.stderr.write(`ERROR: Token rejected by ${resolvedUrl} (could not verify).\n`);
-    process.stderr.write(`Mint a fresh token at ${resolvedUrl.replace(/\/$/, '')}/me/agent-keys and try again.\n`);
+    process.stderr.write(`Mint a fresh token at ${agentKeysUrl(resolvedUrl)} and try again.\n`);
     process.exit(1);
   }
 
@@ -2008,8 +2009,8 @@ usage:
 
 note:
   Agent-token management requires a browser session. Agent tokens are rejected
-  for creating, listing, or revoking other Agent tokens; open /me/agent-keys in
-  a signed-in browser for that flow.
+  for creating, listing, or revoking other Agent tokens; open
+  /settings/agent-tokens in a signed-in browser for that flow.
 `);
 }
 
@@ -2097,7 +2098,7 @@ async function main() {
           'paste it. On success it writes ~/.floom/config.json and verifies the token.',
           '',
           'Get your Agent token:',
-          '  https://floom.dev/me/agent-keys',
+          '  https://floom.dev/settings/agent-tokens',
         ].join('\n'));
         return;
       }
@@ -2135,7 +2136,7 @@ async function main() {
             '  floom auth --show                      print redacted config',
             '',
             'Get your Agent token:',
-            '  https://floom.dev/me/agent-keys',
+            '  https://floom.dev/settings/agent-tokens',
           ].join('\n'));
           return;
         default:

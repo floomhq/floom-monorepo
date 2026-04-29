@@ -19,7 +19,7 @@ npm i -g @floomhq/cli@latest
 floom auth login --token=floom_agent_...
 ```
 
-Get your beta Agent token at [floom.dev/me/agent-keys](https://floom.dev/me/agent-keys). If that page is not enabled for your account, join the waitlist or use a self-host instance.
+Get your beta Agent token at [floom.dev/settings/agent-tokens](https://floom.dev/settings/agent-tokens). If that page is not enabled for your account, join the waitlist or use a self-host instance.
 
 ## Commands
 

@@ -59,7 +59,7 @@ console.log('\nCase 1: floom auth login — no token prints URL');
   rmSync(tmp, { recursive: true });
 
   assert('exits 0', r.status === 0, `got ${r.status}`);
-  assert('mentions me/agent-keys', r.combined.includes('me/agent-keys'), r.combined.trim());
+  assert('mentions settings/agent-tokens', r.combined.includes('settings/agent-tokens'), r.combined.trim());
   assert('no curl error', !r.combined.toLowerCase().includes('curl: not found'), r.combined.trim());
   assert('no bash error', !r.combined.includes('command not found'), r.combined.trim());
 }

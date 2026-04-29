@@ -10,7 +10,7 @@ Every public Floom app exposes an MCP server. Add the endpoint to Claude Desktop
 | **Discover apps** | `https://floom.dev/mcp/search` | Search public apps from an agent. | None. |
 | **Account + Studio tools** | `https://floom.dev/mcp` | Beta account surface for inspecting runs, managing Studio apps, secrets, profile context, sharing, and rate limits. | Beta Agent token required. |
 
-Mint Agent tokens at `https://floom.dev/me/agent-keys` after your account has beta access.
+Mint Agent tokens at `https://floom.dev/settings/agent-tokens` after your account has beta access.
 
 ## Claude Desktop
 

@@ -15,7 +15,7 @@ floom --version
 floom login
 ```
 
-Mint an Agent token at `https://floom.dev/me/agent-keys`, then run the printed command. If your account is not in the Cloud publishing beta, join the waitlist and use the live apps or self-host path.
+Mint an Agent token at `https://floom.dev/settings/agent-tokens`, then run the printed command. If your account is not in the Cloud publishing beta, join the waitlist and use the live apps or self-host path.
 
 ```bash
 floom auth login --token=floom_agent_...

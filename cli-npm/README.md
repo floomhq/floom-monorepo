@@ -9,19 +9,19 @@ configures MCP, and you're live.
 npx @floomhq/cli@latest setup
 ```
 
-This opens https://floom.dev/me/agent-keys in your browser, asks you to paste an Agent token, verifies it against the API, saves it to `~/.floom/config.json`, and prints the MCP config snippet.
+This opens https://floom.dev/settings/agent-tokens in your browser, asks you to paste an Agent token, verifies it against the API, saves it to `~/.floom/config.json`, and prints the MCP config snippet.
 
-For the MVP cloud:
+For a self-hosted instance:
 
 ```bash
-floom login --api-url https://mvp.floom.dev
+floom login --api-url http://localhost:3051
 ```
 
-This opens or prints https://mvp.floom.dev/me/agent-keys and then prints the
+This opens or prints http://localhost:3051/settings/agent-tokens and then prints the
 noninteractive save command:
 
 ```bash
-floom auth login --token=<agent_token> --api-url=https://mvp.floom.dev
+floom auth login --token=<agent_token> --api-url=http://localhost:3051
 ```
 
 ## Other commands
@@ -49,15 +49,15 @@ runs. Authenticated runs still use your saved Agent token when one is present.
 
 | Variable        | Default                         | Purpose                  |
 |-----------------|---------------------------------|--------------------------|
-| `FLOOM_API_URL` | `https://floom.dev`             | API host (use mvp.floom.dev for the MVP cloud) |
+| `FLOOM_API_URL` | `https://floom.dev`             | API host |
 | `FLOOM_CONFIG`  | `~/.floom/config.json`          | Config file location     |
 | `FLOOM_CLI_NO_BROWSER` | unset                    | Set to `1` to print login URLs without opening a browser |
 | `FLOOM_USER_API_KEY` | unset                       | BYOK key forwarded as `X-User-Api-Key` for gated launch app runs |
 
 Agent-token management commands under `floom account agent-tokens` require a
 signed-in browser session on the server. Agent tokens are rejected for creating,
-listing, or revoking other Agent tokens; use `/me/agent-keys` in a signed-in
-browser for that flow.
+listing, or revoking other Agent tokens; use `/settings/agent-tokens` in a
+signed-in browser for that flow.
 
 ## What this package is
 
