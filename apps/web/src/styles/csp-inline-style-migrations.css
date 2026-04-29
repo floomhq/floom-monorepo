@@ -6,6 +6,8 @@
   .about-who-cards { grid-template-columns: 1fr !important; }
   /* about-why-floom-grid: collapse 2-col to 1-col on tablet */
   .about-why-floom-grid { grid-template-columns: 1fr !important; }
+  /* R28: about-two-col (what-it-does section) collapses on mobile */
+  .about-two-col { grid-template-columns: 1fr !important; gap: 32px !important; }
 }
 
 @media (max-width: 640px) {
