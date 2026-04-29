@@ -521,6 +521,37 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               Ship AI apps <span style={{ color: 'var(--accent)' }}>fast</span>.
             </h1>
 
+            {/* R38 (2026-04-29): quiet honest qualifier under the H1.
+                Surfaces "Localhost to live in 60 seconds" claim from
+                the LinkedIn/HN launch post, plus the waitlist context
+                so visitors landing via the post know what to expect.
+                Both variants (mvp + full) get this line. */}
+            <p
+              data-testid="hero-waitlist-qualifier"
+              style={{
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 16,
+                lineHeight: 1.5,
+                fontWeight: 400,
+                color: 'var(--muted)',
+                margin: isMvp ? '-4px 0 20px' : '-8px 0 20px',
+              }}
+            >
+              Localhost to live in 60 seconds.{' '}
+              <Link
+                to="/waitlist"
+                data-testid="hero-waitlist-qualifier-link"
+                style={{
+                  color: 'var(--muted)',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                  fontWeight: 500,
+                }}
+              >
+                Beta access via waitlist.
+              </Link>
+            </p>
+
             {/* Sub-positioning — full variant only. R7.6 followup
                 (2026-04-28): MVP variant drops the sub for now; H1 +
                 npx command stand alone. Federico: "The protocol +
