@@ -59,6 +59,13 @@ looks_like_agent_token() {
   [[ "$1" =~ ^floom_agent_[0-9A-Za-z]{32}$ ]]
 }
 
+if [[ $# -gt 0 && -z "$1" ]]; then
+  echo "ERROR: Invalid Agent token format." >&2
+  echo "Agent tokens look like floom_agent_<32 alphanumeric chars>." >&2
+  echo "Mint a fresh token at $(default_host | sed 's#/*$##')/me/agent-keys and try again." >&2
+  exit 1
+fi
+
 case "${1:-}" in
   --show)
     if [[ ! -f "$CONFIG" ]]; then
@@ -233,7 +240,7 @@ except Exception:
 " 2>/dev/null || echo "unknown")
     echo "Logged in as ${IDENTITY} at ${API_URL}"
     exit 0 ;;
-  -h|--help|"")
+  -h|--help)
     cat <<EOF
 floom auth — manage Agent token authentication.
 
@@ -253,7 +260,6 @@ Get your Agent token:
 Agent tokens look like:
   floom_agent_...
 EOF
-    [[ "${1:-}" == "" ]] && exit 1
     exit 0 ;;
 esac
 

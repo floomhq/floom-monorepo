@@ -241,6 +241,19 @@ try {
     invalidLogin.status !== 0 && invalidLogin.stderr.includes('Token rejected') && !existsSync(invalidLoginConfig),
     invalidLogin.stdout + invalidLogin.stderr,
   );
+
+  const emptyAuth = run(
+    'bash',
+    [join(REPO_ROOT, 'cli/floom/bin/floom'), 'auth', ''],
+    { ...env, FLOOM_CONFIG: join(tmp, 'empty-auth-config.json') },
+  );
+  log(
+    'floom auth empty token errors instead of printing help',
+    emptyAuth.status !== 0 &&
+      emptyAuth.stderr.includes('Invalid Agent token format') &&
+      !emptyAuth.stdout.includes('usage:'),
+    emptyAuth.stdout + emptyAuth.stderr,
+  );
 } finally {
   server.proc.kill('SIGTERM');
   await new Promise((resolve) => setTimeout(resolve, 150));

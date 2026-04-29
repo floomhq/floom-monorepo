@@ -22,11 +22,22 @@ delete process.env.RESEND_API_KEY;
 const { db } = await import('../../apps/server/dist/db.js');
 const betterAuth = await import('../../apps/server/dist/lib/better-auth.js');
 const authResponse = await import('../../apps/server/dist/lib/auth-response.js');
+const { Hono } = await import('../../apps/server/node_modules/hono/dist/hono.js');
 const { workspacesRouter } = await import('../../apps/server/dist/routes/workspaces.js');
+const { hubRouter } = await import('../../apps/server/dist/routes/hub.js');
+const { meRouter } = await import('../../apps/server/dist/routes/run.js');
+const { meAppsRouter } = await import('../../apps/server/dist/routes/me_apps.js');
+const agentTokens = await import('../../apps/server/dist/lib/agent-tokens.js');
 
 betterAuth._resetAuthForTests();
 await betterAuth.runAuthMigrations();
 const auth = betterAuth.getAuth();
+const agentApp = new Hono();
+agentApp.use('*', agentTokens.agentTokenAuthMiddleware);
+agentApp.use('*', agentTokens.agentTokenHttpScopeMiddleware);
+agentApp.route('/api/me', meRouter);
+agentApp.route('/api/me/apps', meAppsRouter);
+agentApp.route('/api/hub', hubRouter);
 
 let passed = 0;
 let failed = 0;
@@ -62,15 +73,40 @@ async function callAuth(method, path, body, cookie) {
   return { status: res.status, text, json, headers: res.headers };
 }
 
-async function fetchRoute(router, method, path, body) {
+async function fetchRoute(router, method, path, body, extraHeaders = {}) {
   const headers = new Headers();
   if (body !== undefined) headers.set('content-type', 'application/json');
+  for (const [key, value] of Object.entries(extraHeaders)) {
+    headers.set(key, value);
+  }
   const req = new Request(`http://localhost${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const res = await router.fetch(req);
+  const text = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    // leave null
+  }
+  return { status: res.status, text, json };
+}
+
+async function fetchApp(method, path, body, extraHeaders = {}) {
+  const headers = new Headers();
+  if (body !== undefined) headers.set('content-type', 'application/json');
+  for (const [key, value] of Object.entries(extraHeaders)) {
+    headers.set(key, value);
+  }
+  const req = new Request(`http://localhost${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const res = await agentApp.fetch(req);
   const text = await res.text();
   let json = null;
   try {
@@ -104,6 +140,23 @@ function extractCookie(setCookieHeader) {
 function extractVerifyToken(logOutput) {
   const match = logOutput.match(/verify-email\?token=([^&\s]+)/);
   return match ? match[1] : null;
+}
+
+function mintAgentToken() {
+  const raw = agentTokens.generateAgentToken();
+  db.prepare(
+    `INSERT INTO agent_tokens
+       (id, prefix, hash, label, scope, workspace_id, user_id, created_at,
+        last_used_at, revoked_at, rate_limit_per_minute)
+     VALUES (?, ?, ?, 'auth-launch-security', 'read-write', 'local', 'local', ?, NULL, NULL, 1000)`,
+  ).run(
+    `agtok_auth_launch_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    agentTokens.extractAgentTokenPrefix(raw),
+    agentTokens.hashAgentToken(raw),
+    new Date().toISOString(),
+  );
+  db.pragma('wal_checkpoint(TRUNCATE)');
+  return raw;
 }
 
 console.log('Launch auth security');
@@ -213,6 +266,39 @@ try {
     blockedWrite.status === 401 && blockedWrite.json?.code === 'auth_required',
     blockedWrite.text,
   );
+
+  const workspaceReads = [
+    ['GET /api/me/runs', meRouter, '/runs'],
+    ['GET /api/me/runs/:id', meRouter, '/runs/run_missing_auth_launch'],
+    ['GET /api/me/studio/stats', meRouter, '/studio/stats'],
+    ['GET /api/me/studio/activity', meRouter, '/studio/activity'],
+    ['GET /api/me/apps', meAppsRouter, '/'],
+    ['GET /api/hub/mine', hubRouter, '/mine'],
+  ];
+  for (const [label, router, path] of workspaceReads) {
+    const res = await fetchRoute(router, 'GET', path);
+    log(
+      `${label}: anonymous cloud caller gets 401`,
+      res.status === 401 && res.json?.code === 'auth_required',
+      res.text,
+    );
+  }
+
+  const agentToken = mintAgentToken();
+  const workspaceReadPaths = [
+    ['GET /api/me/runs', '/api/me/runs', 200],
+    ['GET /api/me/runs/:id', '/api/me/runs/run_missing_auth_launch', 404],
+    ['GET /api/me/studio/stats', '/api/me/studio/stats', 200],
+    ['GET /api/me/studio/activity', '/api/me/studio/activity', 200],
+    ['GET /api/me/apps', '/api/me/apps', 200],
+    ['GET /api/hub/mine', '/api/hub/mine', 200],
+  ];
+  for (const [label, path, expectedStatus] of workspaceReadPaths) {
+    const res = await fetchApp('GET', path, undefined, {
+      authorization: `Bearer ${agentToken}`,
+    });
+    log(`${label}: Agent token passes auth gate`, res.status === expectedStatus, res.text);
+  }
 } finally {
   db.close();
   rmSync(tmp, { recursive: true, force: true });

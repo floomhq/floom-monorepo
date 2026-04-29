@@ -347,7 +347,7 @@ const INVALID_CASES = {
   uuid: { count: 999 },
   password: { lower: false, upper: false, digits: false, symbols: false },
   hash: { text: 'x', algorithm: 'bogus' },
-  base64: { text: 123 }, // wrong type
+  base64: { text: 'hello', operation: 'hack' }, // unknown field
   'json-format': { text: 'not-json{' },
   'jwt-decode': { token: 'one.two' },
   'word-count': { text: 42 }, // wrong type

@@ -340,6 +340,14 @@ export function validateInputs(
   rawInputs: Record<string, unknown>,
 ): Record<string, unknown> {
   const cleaned: Record<string, unknown> = {};
+  const allowedNames = new Set(action.inputs.map((input) => input.name));
+  const unknownInputs = Object.keys(rawInputs).filter((name) => !allowedNames.has(name));
+  if (unknownInputs.length > 0) {
+    throw new ManifestError(
+      `Unknown input${unknownInputs.length === 1 ? '' : 's'}: ${unknownInputs.join(', ')}`,
+      unknownInputs[0],
+    );
+  }
   for (const spec of action.inputs) {
     const value = rawInputs[spec.name];
     if (value === undefined || value === null || value === '') {

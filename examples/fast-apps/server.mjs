@@ -190,10 +190,14 @@ function handleHash(body) {
 }
 
 function handleBase64(body) {
+  assertAllowedFields(body, ['text', 'mode', 'url_safe']);
   if (typeof body.text !== 'string') {
     throw httpError(400, 'text must be a string');
   }
-  const mode = body.mode === 'decode' ? 'decode' : 'encode';
+  const mode = body.mode ?? 'encode';
+  if (!['encode', 'decode'].includes(mode)) {
+    throw httpError(400, 'mode must be one of: encode, decode');
+  }
   const urlSafe = body.url_safe === true;
   if (mode === 'encode') {
     let out = Buffer.from(body.text, 'utf-8').toString('base64');
@@ -1289,6 +1293,17 @@ function httpError(status, message, code) {
   err.statusCode = status;
   err.code = code || 'bad_request';
   return err;
+}
+
+function assertAllowedFields(body, allowed) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return;
+  }
+  const allowedSet = new Set(allowed);
+  const unknown = Object.keys(body).filter((key) => !allowedSet.has(key));
+  if (unknown.length > 0) {
+    throw httpError(400, `unknown field(s): ${unknown.join(', ')}`, 'invalid_input');
+  }
 }
 
 // ---------- HTTP server ----------

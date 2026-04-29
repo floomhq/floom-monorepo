@@ -407,6 +407,8 @@ hubRouter.post('/ingest', async (c) => {
 // GET /api/hub/mine — apps owned by the caller's active workspace.
 hubRouter.get('/mine', async (c) => {
   const ctx = await resolveUserContext(c);
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
   const rows = db
     .prepare(
       `SELECT apps.*, (

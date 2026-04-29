@@ -114,6 +114,8 @@ function publicUrl(): string {
 // GET /api/me/apps. The canonical endpoint is GET /api/hub/mine.
 meAppsRouter.get('/', async (c) => {
   const ctx = await resolveUserContext(c);
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
   const rows = db
     .prepare(
       `SELECT apps.*, (
