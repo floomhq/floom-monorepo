@@ -4,18 +4,18 @@
  * v26 changes (V26-IA-SPEC §12):
  *   §12.1 — brand logo REMOVED from rail (TopBar carries it)
  *   §12.2 — same shell shape as RunRail ([Run|Studio] toggle below workspace name)
- *   §12.3/12.4 — "+ New app" is the ONLY app-entry CTA in Studio mode;
+ *   §12.3/12.4 — creation entry point lives in the TopBar;
  *                no standalone "App store" item
  *   §12.5 — Docs removed from rail (moved to avatar dropdown)
  *   §12.6 — workspace settings only via identity-block click (no gear in rail)
  *   Rail: {workspace name ▾} → [Run|Studio] toggle → Apps · Runs →
- *         + New app → footer
+ *         footer
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutGrid, Play, Plus } from 'lucide-react';
+import { LayoutGrid, Play } from 'lucide-react';
 import { AppIcon } from './AppIcon';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
@@ -111,40 +111,11 @@ export function StudioRail() {
             ))}
           </div>
         )}
-
-        {/* v26 §12.3/12.4: "+ New app" is the single entry point in Studio */}
-        <div style={{ marginTop: 'auto', paddingTop: 12 }}>
-          <Link
-            to="/studio/build"
-            data-testid="studio-rail-new-app"
-            style={primaryCtaStyle}
-          >
-            <Plus size={14} aria-hidden="true" />
-            <span>New app</span>
-          </Link>
-        </div>
       </div>
       <RailFoot />
     </aside>
   );
 }
-
-const primaryCtaStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 7,
-  padding: '9px 12px',
-  borderRadius: 8,
-  background: 'var(--ink)',
-  border: '1px solid var(--ink)',
-  color: '#fff',
-  textDecoration: 'none',
-  fontSize: 13,
-  fontWeight: 700,
-  width: '100%',
-  boxSizing: 'border-box',
-};
 
 function appItemStyle(active: boolean): CSSProperties {
   return {

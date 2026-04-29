@@ -4,8 +4,7 @@
  * v26 changes (V26-IA-SPEC §12):
  *   §12.1 — brand logo REMOVED from rail (TopBar carries it)
  *   §12.2 — [Run|Studio] mode toggle pill below workspace name
- *   §12.3/12.4 — no standalone "App store" item; "+ New app" is the single
- *                entry point; in Run mode it opens an overlay
+ *   §12.3/12.4 — creation entry point lives in the TopBar
  *   §12.5 — Docs removed from rail (moved to avatar dropdown)
  *   §12.6 — workspace settings only via identity-block click
  *   Rail: {workspace name ▾} → [Run|Studio] toggle → Apps · Runs → footer
@@ -14,7 +13,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutGrid, Play, Plus } from 'lucide-react';
+import { LayoutGrid, Play } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
 import { useMyApps } from '../hooks/useMyApps';
@@ -79,27 +78,6 @@ export function RunRail() {
         >
           Runs
         </RailItem>
-
-        {/* v26 §12.3/12.4: "+ New app" in Run mode → browse store (overlay in v1.1).
-            Sticky so it stays visible at standard (900px) viewport heights. */}
-        <div
-          style={{
-            position: 'sticky',
-            bottom: 0,
-            paddingTop: 8,
-            paddingBottom: 4,
-            background: 'var(--bg)',
-          }}
-        >
-          <Link
-            to="/apps"
-            data-testid="run-rail-new-app"
-            style={runPrimaryCtaStyle}
-          >
-            <Plus size={14} aria-hidden="true" />
-            <span>New app</span>
-          </Link>
-        </div>
       </div>
       <RailFoot />
     </aside>
@@ -186,23 +164,6 @@ export function RailItem({
     </Link>
   );
 }
-
-const runPrimaryCtaStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 7,
-  padding: '9px 12px',
-  borderRadius: 8,
-  background: 'var(--ink)',
-  border: '1px solid var(--ink)',
-  color: '#fff',
-  textDecoration: 'none',
-  fontSize: 13,
-  fontWeight: 700,
-  width: '100%',
-  boxSizing: 'border-box' as const,
-};
 
 export const railStyle: CSSProperties = {
   width: RAIL_WIDTH,
