@@ -26,7 +26,7 @@ const path = require('path');
 const readline = require('readline');
 const { execSync, spawn } = require('child_process');
 
-const VERSION = '0.2.9';
+const VERSION = '0.2.10';
 const DEFAULT_API_URL = process.env.FLOOM_API_URL || 'https://floom.dev';
 const CONFIG_PATH = process.env.FLOOM_CONFIG || path.join(os.homedir(), '.floom', 'config.json');
 
@@ -154,6 +154,43 @@ async function verifyToken(apiUrl, token) {
     throw new Error(`token rejected by ${apiUrl.replace(/\/$/, '')}: HTTP ${res.status}${code}`);
   }
   return json || {};
+}
+
+// ---- whoami ---------------------------------------------------------------
+
+async function runWhoami(opts) {
+  const conf = readConfig();
+  const token = (conf && (conf.api_key || conf.agent_token)) || process.env.FLOOM_API_KEY || '';
+  const resolvedApiUrl = opts.apiUrl
+    || (conf && conf.api_url)
+    || process.env.FLOOM_API_URL
+    || DEFAULT_API_URL;
+
+  if (!token) {
+    console.log('not logged in. Run: floom auth <agent-token>');
+    process.exit(1);
+  }
+
+  let identity;
+  try {
+    identity = await verifyToken(resolvedApiUrl, token);
+  } catch (err) {
+    console.error(c.red('error:'), err && err.message ? err.message : String(err));
+    process.exit(1);
+  }
+
+  const user = identity.user || {};
+  const workspace = identity.active_workspace || identity.workspace || {};
+  const identityLabel = user.email || user.id || identity.user_id || 'unknown';
+  const workspaceLabel = workspace.name || workspace.id || identity.workspace_id || 'unknown';
+  const redacted = token.length > 18
+    ? token.slice(0, 14) + '...' + token.slice(-4)
+    : token.slice(0, 4) + '...';
+
+  console.log(`logged in  api_url: ${resolvedApiUrl}`);
+  console.log(`identity:  ${identityLabel}`);
+  console.log(`workspace: ${workspaceLabel}`);
+  console.log(`token:     ${redacted}`);
 }
 
 // ---- setup ----------------------------------------------------------------
@@ -327,6 +364,12 @@ async function main() {
 
   if (sub === 'setup') {
     await runSetup({ apiUrl });
+    return;
+  }
+
+  // `auth whoami` is implemented in Node so it works without curl/bash.
+  if (sub === 'auth' && filtered[1] === 'whoami') {
+    await runWhoami({ apiUrl });
     return;
   }
 
