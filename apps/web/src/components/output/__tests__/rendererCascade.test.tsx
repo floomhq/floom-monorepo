@@ -94,6 +94,38 @@ test('rows_field hint prefers that table when multiple json/table outputs exist'
   assert.equal(rowTable?.props?.rows[0].a, 'one');
 });
 
+test('artifact protocol renders download list above normal output', () => {
+  const app = {
+    slug: 'opendraft',
+    manifest: mkManifest({
+      outputs: [{ name: 'summary', label: 'Summary', type: 'markdown' }],
+    }),
+  };
+  const out = {
+    summary: 'Draft complete.',
+    artifacts: [
+      {
+        id: 'art_demo',
+        name: 'draft.pdf',
+        mime: 'application/pdf',
+        size: 1234,
+        url: '/api/artifacts/art_demo?sig=abc&exp=9999999999',
+      },
+    ],
+  };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  assert.equal(result.kind, 'auto');
+  assert.equal(result.element?.props?.['data-renderer'], 'artifact-output');
+  const children = result.element?.props?.children;
+  const list = Array.isArray(children) ? children[0] : null;
+  const body = Array.isArray(children) ? children[1] : null;
+  assert.equal(list?.type, OUTPUT_LIBRARY.FileDownloadList);
+  assert.equal(list?.props?.artifacts?.[0]?.name, 'draft.pdf');
+  assert.equal(list?.props?.artifacts?.[0]?.url, '/api/artifacts/art_demo?sig=abc&exp=9999999999');
+  assert.equal('data_b64' in list?.props?.artifacts?.[0], false);
+  assert.equal(body?.type, OUTPUT_LIBRARY.Markdown);
+});
+
 test('RowTable renders string[] cells as a bullet list (not stringified JSON)', () => {
   // Competitor-analyzer / resume-screener regression: fields like
   // `strengths`, `weaknesses`, `source_citations`, `gaps` are string[],

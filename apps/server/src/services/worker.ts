@@ -114,7 +114,7 @@ export async function processOneJob(): Promise<JobRecord | null> {
     `INSERT INTO runs (id, app_id, action, inputs, status) VALUES (?, ?, ?, ?, 'pending')`,
   ).run(runId, app.id, claimed.action, JSON.stringify(inputs));
 
-  dispatchRun(app, manifest, runId, claimed.action, inputs, perCallSecrets);
+  dispatchRun(app, manifest, runId, claimed.action, inputs, perCallSecrets, undefined, claimed.id);
 
   const run = await waitForRunOrTimeout(runId, claimed.timeout_ms);
 

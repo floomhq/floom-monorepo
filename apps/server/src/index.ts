@@ -18,6 +18,7 @@ import { pickRouter } from './routes/pick.js';
 import { threadRouter } from './routes/thread.js';
 import { runRouter, slugRunRouter, slugQuotaRouter, meRouter } from './routes/run.js';
 import { jobsRouter } from './routes/jobs.js';
+import { artifactsRouter } from './routes/artifacts.js';
 import { mcpRouter } from './routes/mcp.js';
 import { rendererRouter } from './routes/renderer.js';
 import { waitlistRouter } from './routes/waitlist.js';
@@ -72,6 +73,7 @@ import {
 import { resolveUserContext } from './services/session.js';
 import { getAppAccessDecision, isPublicListingVisibility } from './services/sharing.js';
 import { startJobWorker } from './services/worker.js';
+import { startArtifactSweeper } from './services/artifacts.js';
 import { startTriggersWorker } from './services/triggers-worker.js';
 import { startGithubBuildWorker } from './services/github-deploy.js';
 import { sweepZombieRuns, startZombieRunSweeper } from './services/runner.js';
@@ -197,6 +199,8 @@ app.use('/api/gh-stars/*', openCors);
 app.use('/api/gh-releases', openCors);
 app.use('/api/gh-releases/*', openCors);
 app.use('/api/run', openCors);
+app.use('/api/artifacts', openCors);
+app.use('/api/artifacts/*', openCors);
 app.use('/api/agents', openCors);
 app.use('/api/agents/*', openCors);
 app.use('/api/:slug/run', openCors);
@@ -323,6 +327,7 @@ app.route('/api/parse', parseRouter);
 app.route('/api/pick', pickRouter);
 app.route('/api/thread', threadRouter);
 app.route('/api/run', runRouter);
+app.route('/api/artifacts', artifactsRouter);
 app.route('/api/agents', agentsRouter);
 app.route('/mcp', mcpRouter);
 // Slug-based run endpoint: POST /api/:slug/run
@@ -1951,6 +1956,10 @@ async function boot(): Promise<void> {
   // worker manually via `processOneJob`.
   if (process.env.FLOOM_DISABLE_JOB_WORKER !== 'true') {
     startJobWorker();
+  }
+
+  if (process.env.FLOOM_DISABLE_ARTIFACT_SWEEPER !== 'true') {
+    startArtifactSweeper();
   }
 
   // Zombie-run recovery (#349). The run worker is fire-and-forget, so any

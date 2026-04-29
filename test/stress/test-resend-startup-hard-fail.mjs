@@ -81,6 +81,7 @@ function makeServerEnv(overrides = {}) {
     FLOOM_DISABLE_JOB_WORKER: 'true',
     FLOOM_DISABLE_TRIGGERS_WORKER: 'true',
     FLOOM_DISABLE_ZOMBIE_SWEEPER: 'true',
+    FLOOM_ARTIFACT_SIGNING_SECRET: 'test-artifact-startup-secret',
     ...overrides,
   };
   delete env.FLOOM_CLOUD_MODE;

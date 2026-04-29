@@ -192,6 +192,32 @@ console.log('v16 renderer cascade tests');
 }
 
 {
+  const app = {
+    manifest: mkManifest({
+      outputs: [{ name: 'summary', label: 'Summary', type: 'markdown' }],
+    }),
+  };
+  const out = {
+    summary: 'Draft complete.',
+    artifacts: [
+      {
+        id: 'art_demo',
+        name: 'draft.pdf',
+        mime: 'application/pdf',
+        size: 1234,
+        url: '/api/artifacts/art_demo?sig=abc&exp=9999999999',
+      },
+    ],
+  };
+  const result = pickRenderer({ app, action: 'go', runOutput: out });
+  const children = result.element?.props?.children;
+  log('Artifacts: wrapper rendered', result.element?.props?.['data-renderer'] === 'artifact-output');
+  log('Artifacts: FileDownloadList first', Array.isArray(children) && children[0]?.type === OUTPUT_LIBRARY.FileDownloadList);
+  log('Artifacts: JSON data_b64 absent from list props', !JSON.stringify(children?.[0]?.props || {}).includes('data_b64'));
+  log('Artifacts: normal output still rendered below', Array.isArray(children) && children[1]?.type === OUTPUT_LIBRARY.Markdown);
+}
+
+{
   // Issue #471 / #470 + PR #710 follow-up to #661: resume-screener output
   // (ranked array of scored candidates) used to fall into the composite
   // RowTable + Markdown path. #710 routes it to ScoredRowsTable via the

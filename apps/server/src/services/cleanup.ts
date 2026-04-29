@@ -2,6 +2,7 @@ import { db, DEFAULT_WORKSPACE_ID } from '../db.js';
 import { invalidateHubCache } from '../lib/hub-cache.js';
 import { deleteRunsForUserAccount } from './run-retention-sweeper.js';
 import { auditLog } from './audit-log.js';
+import { deleteArtifactFilesForRunIds } from './artifacts.js';
 
 /**
  * Cleanup orphaned Floom data when a user is deleted from Better Auth.
@@ -88,6 +89,10 @@ export function cleanupUserOrphans(userId: string): void {
     db.prepare('DELETE FROM agent_tokens WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM user_secrets WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM app_memory WHERE user_id = ?').run(userId);
+    const directRunRows = db.prepare('SELECT id FROM runs WHERE user_id = ?').all(userId) as {
+      id: string;
+    }[];
+    deleteArtifactFilesForRunIds(directRunRows.map((row) => row.id));
     db.prepare('DELETE FROM runs WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM run_threads WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM app_reviews WHERE user_id = ?').run(userId);

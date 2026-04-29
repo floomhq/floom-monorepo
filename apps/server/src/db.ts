@@ -473,6 +473,27 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 `);
 
+// ---------- artifacts (binary outputs returned by app runs) ----------
+// Blobs live on disk under FLOOM_ARTIFACT_DIR. SQLite stores only metadata
+// and the signed download route reads from storage_path.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS artifacts (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    job_id TEXT,
+    name TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    sha256 TEXT NOT NULL,
+    storage_path TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_artifacts_run ON artifacts(run_id);
+  CREATE INDEX IF NOT EXISTS idx_artifacts_expires ON artifacts(expires_at);
+`);
+
 // ---------- builds (Studio GitHub public-repo deploys, ADR-015) ----------
 // Each row tracks one async repo clone/build/publish attempt. Initial v1 launch
 // scope is public GitHub repos only; private-repo GitHub App support lands in a

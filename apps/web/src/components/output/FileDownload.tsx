@@ -14,6 +14,7 @@ export interface FileDownloadProps {
   bytes?: string;
   filename: string;
   mime?: string;
+  size?: number;
   /**
    * Optional HTML string to render above the download card for a
    * quick visual of what's inside the file (e.g. the slide deck HTML
@@ -49,6 +50,7 @@ export function FileDownload({
   bytes,
   filename,
   mime = 'application/octet-stream',
+  size,
   previewHtml,
 }: FileDownloadProps) {
   // Compute download href once per bytes/url change. When bytes is set we
@@ -61,7 +63,12 @@ export function FileDownload({
     return '';
   }, [url, bytes, mime]);
 
-  const sizeHint = bytes ? formatBytes(Math.floor((bytes.length * 3) / 4)) : null;
+  const sizeHint =
+    typeof size === 'number'
+      ? formatBytes(size)
+      : bytes
+      ? formatBytes(Math.floor((bytes.length * 3) / 4))
+      : null;
 
   // Sanitize the preview HTML once per change. DOMPurify strips scripts,
   // inline handlers, and javascript: URLs before it reaches the DOM.

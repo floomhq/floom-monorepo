@@ -1,10 +1,12 @@
+import { randomBytes } from 'node:crypto';
+
 interface StartupEnv {
   readonly [name: string]: string | undefined;
 }
 
 export interface StartupCheckFailure {
   ok: false;
-  code: 'missing_resend_api_key';
+  code: 'missing_resend_api_key' | 'missing_artifact_signing_secret';
   message: string;
 }
 
@@ -44,6 +46,23 @@ export function checkStartupEnvironment(
         'ADR-010 forbids silently logging password-reset and signup-verification ' +
         'emails to stdout in production.',
     };
+  }
+
+  if (isProductionEnv(env) && !env.FLOOM_ARTIFACT_SIGNING_SECRET?.trim()) {
+    return {
+      ok: false,
+      code: 'missing_artifact_signing_secret',
+      message:
+        '[startup] fatal: NODE_ENV=production requires FLOOM_ARTIFACT_SIGNING_SECRET. ' +
+        'Artifact download URLs are HMAC-signed and cannot use the dev secret in production.',
+    };
+  }
+
+  if (!env.FLOOM_ARTIFACT_SIGNING_SECRET?.trim()) {
+    process.env.FLOOM_ARTIFACT_SIGNING_SECRET = randomBytes(32).toString('hex');
+    console.warn(
+      'FLOOM_ARTIFACT_SIGNING_SECRET not set in dev/test; using ephemeral generated secret',
+    );
   }
 
   return { ok: true };
