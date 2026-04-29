@@ -39,7 +39,6 @@ import * as ws from '../services/workspaces.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import {
   AUTH_DOCS_URL,
-  AUTH_HINT_CLOUD,
   checkAppVisibility,
 } from '../lib/auth.js';
 import { buildAppSourceInfo } from '../lib/app-source.js';
@@ -87,6 +86,9 @@ import type {
 } from '../types.js';
 
 export const mcpRouter = new Hono();
+
+const MCP_AUTH_HINT_CLOUD =
+  'Authentication required. Sign in, then mint an agent token at https://floom.dev/settings/agent-tokens and send it as Authorization: Bearer <token>.';
 
 /**
  * Resolve the public origin used in MCP response bodies (permalink, mcp_url,
@@ -678,7 +680,7 @@ function createAdminMcpServer({ ctx, ip, baseUrl }: AdminToolContext): McpServer
     {
       title: 'Ingest App from OpenAPI or Docker image',
       description:
-        'Create or update a Floom app. Two ingest modes: (1) OpenAPI — supply `openapi_url` or `openapi_spec`; (2) Docker image — supply `docker_image_ref` (gated behind FLOOM_ENABLE_DOCKER_PUBLISH=true, off by default). Exactly one mode per call. Overrides: name, description, slug, category. Requires authentication in Cloud mode. Returns the persisted slug + permalink.',
+        'Create or update a Floom app. Two ingest modes: (1) OpenAPI — supply `openapi_url` or `openapi_spec`; (2) Docker image — supply `docker_image_ref` (gated behind FLOOM_ENABLE_DOCKER_PUBLISH=true, off by default). Exactly one mode per call. Overrides: name, description, slug, category. In Cloud mode anonymous callers may discover this tool, but tools/call returns auth_required until the caller signs in or supplies a valid session cookie / bearer token. OSS local mode uses the synthetic local user. Returns the persisted slug + permalink.',
       inputSchema: {
         openapi_url: z
           .string()
@@ -805,7 +807,7 @@ function createAdminMcpServer({ ctx, ip, baseUrl }: AdminToolContext): McpServer
                   error:
                     'Authentication required. Sign in (or supply a valid session cookie / bearer token) and retry.',
                   code: 'auth_required',
-                  hint: AUTH_HINT_CLOUD,
+                  hint: MCP_AUTH_HINT_CLOUD,
                   docs_url: AUTH_DOCS_URL,
                 },
                 null,

@@ -222,6 +222,13 @@ try {
     invalidBearerList.res.status === 401 && invalidBearerList.json?.code === 'invalid_token',
     invalidBearerList.text,
   );
+  log(
+    'invalid bearer hint uses canonical agent token settings path',
+    typeof invalidBearerList.json?.hint === 'string' &&
+      invalidBearerList.json.hint.includes('/settings/agent-tokens') &&
+      !invalidBearerList.json.hint.includes('/me/agent-keys'),
+    invalidBearerList.text,
+  );
 
   const writeList = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',

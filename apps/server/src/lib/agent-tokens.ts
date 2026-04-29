@@ -8,6 +8,7 @@ const TOKEN_RANDOM_LENGTH = 32;
 const PREFIX_RANDOM_LENGTH = 8;
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 const LAST_USED_DEBOUNCE_MS = 60_000;
+const AGENT_TOKEN_SETTINGS_URL = 'https://floom.dev/settings/agent-tokens';
 
 export interface AgentTokenAuthContext {
   agent_token_id: string;
@@ -179,7 +180,7 @@ export const agentTokenAuthMiddleware: MiddlewareHandler = async (c, next) => {
         {
           error: 'invalid_token',
           code: 'invalid_token',
-          hint: 'The token format is invalid. Agent tokens look like floom_agent_<32 alphanumeric chars>. Get a valid token at https://floom.dev/me/agent-keys',
+          hint: `The token format is invalid. Agent tokens look like floom_agent_<32 alphanumeric chars>. Get a valid token at ${AGENT_TOKEN_SETTINGS_URL}`,
         },
         401,
       );
@@ -193,7 +194,7 @@ export const agentTokenAuthMiddleware: MiddlewareHandler = async (c, next) => {
       {
         error: 'invalid_agent_token',
         code: 'invalid_token',
-        hint: 'Token not found, revoked, or no longer workspace-valid. Mint a new token at https://floom.dev/me/agent-keys',
+        hint: `Token not found, revoked, or no longer workspace-valid. Mint a new token at ${AGENT_TOKEN_SETTINGS_URL}`,
       },
       401,
     );

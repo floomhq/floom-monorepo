@@ -152,6 +152,12 @@ try {
   const ingestTool = tools.find((t) => t.name === 'ingest_app');
   log('ingest_app has a description', typeof ingestTool?.description === 'string');
   log(
+    'ingest_app description states Cloud unauth tools/call is auth_required',
+    ingestTool?.description?.includes('anonymous callers may discover this tool') &&
+      ingestTool.description.includes('tools/call returns auth_required'),
+    ingestTool?.description,
+  );
+  log(
     'ingest_app exposes openapi_url in inputSchema',
     Boolean(ingestTool?.inputSchema?.properties?.openapi_url),
   );
@@ -409,6 +415,13 @@ try {
   log(
     'cloud-mode unauth ingest error code is auth_required',
     unauthPayload?.code === 'auth_required',
+    JSON.stringify(unauthPayload),
+  );
+  log(
+    'cloud-mode unauth ingest hint uses canonical agent token settings path',
+    typeof unauthPayload?.hint === 'string' &&
+      unauthPayload.hint.includes('/settings/agent-tokens') &&
+      !unauthPayload.hint.includes('/me/agent-keys'),
     JSON.stringify(unauthPayload),
   );
   log(

@@ -361,6 +361,13 @@ try {
     token: 'floom_agent_00000000000000000000000000000000',
   });
   log('invalid bearer returns 401', invalid.res.status === 401 && invalid.json?.error === 'invalid_agent_token', invalid.text);
+  log(
+    'invalid agent token hint uses canonical settings path',
+    typeof invalid.json?.hint === 'string' &&
+      invalid.json.hint.includes('/settings/agent-tokens') &&
+      !invalid.json.hint.includes('/me/agent-keys'),
+    invalid.text,
+  );
 
   const publishMint = await jsonFetch(server.port, '/api/me/agent-keys', {
     method: 'POST',
