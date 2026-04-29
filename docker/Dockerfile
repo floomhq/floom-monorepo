@@ -78,12 +78,19 @@ ARG COMMIT_SHA
 ARG SENTRY_AUTH_TOKEN
 ARG SENTRY_ORG
 ARG SENTRY_PROJECT
+# PostHog build args (added 2026-04-29). Same shape as Sentry: baked into
+# the web bundle at build time so the browser knows where to POST events.
+# Unset = PostHog stays dark on the client.
+ARG VITE_POSTHOG_KEY
+ARG VITE_POSTHOG_HOST
 ENV VITE_SENTRY_WEB_DSN=${VITE_SENTRY_WEB_DSN}
 ENV VITE_COMMIT_SHA=${COMMIT_SHA}
 ENV COMMIT_SHA=${COMMIT_SHA}
 ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
 ENV SENTRY_ORG=${SENTRY_ORG}
 ENV SENTRY_PROJECT=${SENTRY_PROJECT}
+ENV VITE_POSTHOG_KEY=${VITE_POSTHOG_KEY}
+ENV VITE_POSTHOG_HOST=${VITE_POSTHOG_HOST}
 
 # Build server (TypeScript → dist/)
 RUN cd apps/server && pnpm run build

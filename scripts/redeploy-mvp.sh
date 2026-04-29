@@ -38,8 +38,18 @@ CONTAINER_PORT=3000
 HEALTH_URL="http://127.0.0.1:${HOST_PORT}/api/health"
 
 # Volume binds — match what's been live. Keep in sync if storage layout changes.
+#
+# docker.sock NOTE (2026-04-29): mvp keeps the docker.sock bind because 3 of
+# the launch-week demo apps (competitor-lens, ai-readiness-audit, pitch-coach)
+# are app_type=docker — they spawn a runner container per run via the host
+# Docker daemon. Without this bind they error with `connect ENOENT
+# /var/run/docker.sock`. PROD and PREVIEW intentionally DO NOT have this
+# bind: the security exposure is unacceptable on user-facing surfaces. Once
+# the Docker isolation pass lands (gVisor / kata-containers) we can re-add
+# it everywhere.
 BINDS=(
   "-v" "floom-mvp-data:/data"
+  "-v" "/var/run/docker.sock:/var/run/docker.sock"
   "-v" "/opt/floom-preview-apps:/apps"
   "-v" "/opt/floom-mvp-file-inputs:/floom-file-inputs"
 )
@@ -69,11 +79,16 @@ else
   log "building from current HEAD: sha=${SHA} tag=${TAG}"
 
   if ! docker image inspect "$TAG" >/dev/null 2>&1; then
-    docker build \
-      --build-arg "COMMIT_SHA=${SHA}" \
-      -t "$TAG" \
-      -f docker/Dockerfile \
-      .
+    # Build args for client-side instrumentation (baked into web bundle).
+    # All optional — if env var unset, the bundle ships without that hook.
+    BUILD_ARGS=(--build-arg "COMMIT_SHA=${SHA}")
+    [ -n "${VITE_SENTRY_WEB_DSN:-}" ] && BUILD_ARGS+=(--build-arg "VITE_SENTRY_WEB_DSN=${VITE_SENTRY_WEB_DSN}")
+    [ -n "${VITE_POSTHOG_KEY:-}" ] && BUILD_ARGS+=(--build-arg "VITE_POSTHOG_KEY=${VITE_POSTHOG_KEY}")
+    [ -n "${VITE_POSTHOG_HOST:-}" ] && BUILD_ARGS+=(--build-arg "VITE_POSTHOG_HOST=${VITE_POSTHOG_HOST}")
+    [ -n "${SENTRY_AUTH_TOKEN:-}" ] && BUILD_ARGS+=(--build-arg "SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}")
+    [ -n "${SENTRY_ORG:-}" ] && BUILD_ARGS+=(--build-arg "SENTRY_ORG=${SENTRY_ORG}")
+    [ -n "${SENTRY_PROJECT:-}" ] && BUILD_ARGS+=(--build-arg "SENTRY_PROJECT=${SENTRY_PROJECT}")
+    docker build "${BUILD_ARGS[@]}" -t "$TAG" -f docker/Dockerfile .
   else
     log "image $TAG already exists locally; skipping build"
   fi

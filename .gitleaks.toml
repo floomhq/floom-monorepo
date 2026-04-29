@@ -7,7 +7,7 @@
 useDefault = true
 
 [allowlist]
-description = "Test fixtures and example demo apps — known non-sensitive"
+description = "Test fixtures, example demo apps, and public-by-design instrumentation tokens"
 paths = [
   '''^test/stress/test-hub-runs-auth\.mjs$''',
   '''^test/stress/test-w31-auth-boundary\.mjs$''',
@@ -20,4 +20,10 @@ paths = [
   '''^examples/fast-apps/server\.mjs$''',
   '''^packages/hub-smoke/tests/fixtures\.ts$''',
   '''^apps/web/src/lib/sample-inputs\.ts$''',
+  # Canonical env files — Sentry DSN, PostHog project API key (phc_*), and
+  # OAuth client IDs are designed to be public (they ship in browser bundles).
+  # Secret values stay in shell-env passthrough — see redeploy-{mvp,prod,preview}.sh.
+  '''^scripts/mvp\.env\.canonical$''',
+  '''^scripts/prod\.env\.canonical$''',
+  '''^scripts/preview\.env\.canonical$''',
 ]
