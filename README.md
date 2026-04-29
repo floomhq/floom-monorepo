@@ -79,6 +79,7 @@ For beta publishers, the deploy output prints the web page at `https://floom.dev
 ### Self-host in one container
 
 ```bash
+docker login ghcr.io
 docker run -p 3051:3051 ghcr.io/floomhq/floom-monorepo:latest
 ```
 
@@ -158,6 +159,7 @@ apps:
 ```
 
 ```bash
+docker login ghcr.io
 docker run -d --name floom \
   -p 3051:3051 \
   -v floom_data:/data \
