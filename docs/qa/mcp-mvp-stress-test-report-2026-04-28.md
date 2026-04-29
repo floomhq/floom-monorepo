@@ -731,3 +731,125 @@ Primary reasons public launch remains lower:
 - CLI first-run path still has avoidable friction.
 - Review transitions remain state-sensitive and can fail with `illegal_transition`.
 - Concurrent burst behavior now rate-limits at this token/surface level; clients need retry guidance.
+
+---
+
+## 16) New-Token Diagnostic Rerun (Transition Matrix + Rate Envelope)
+
+Date (UTC): 2026-04-29
+Run timestamp: `20260429024835`
+
+This round re-used the new token and focused on turning prior ambiguous failures into tighter product findings.
+
+### 16.1 MCP diagnostics
+
+Summary:
+
+- MCP checks: `32`
+- Passed: `28`
+- Failed: `4`
+- Cleanup: `2/2` passed
+- Tool count: `39`
+
+Run reliability:
+
+- Sequential `run_app(base64)`: `12/12` success
+- p50 latency: `762 ms`
+- p95 latency: `769 ms`
+
+Concurrency ladder:
+
+- 4 workers / 12 runs: `12/12` success
+- 6 workers / 18 runs: `16/18` success, failures were `HTTP 429 Too Many Requests`
+- 8 workers / 24 runs: `4/24` success, failures were `HTTP 429 Too Many Requests`
+
+Interpretation:
+
+- The current agent token has a practical burst envelope below 6 parallel workers for this run shape.
+- Rate limiting is functioning, but agents need retry/backoff guidance and ideally structured retry metadata.
+
+Sharing transition matrix:
+
+- `private -> link`: passed
+- `link -> invited`: passed in this sequence
+- `invited -> private`: passed
+- repeated `private -> link -> invited`: passed
+
+Review transition matrix:
+
+- From `private`: submit succeeded, moved app to `pending_review`; withdraw succeeded, returned app to `private`
+- From `link`: submit and withdraw both failed with `409 illegal_transition`
+- From `invited`: submit and withdraw both failed with `409 illegal_transition`
+
+Interpretation:
+
+- Review actions are valid only from `private` in this observed state machine.
+- This is now deterministic enough to document. The remaining product issue is discoverability: clients need `allowed_transitions` or a clear error with valid next states.
+
+Install behavior:
+
+- Pending-review/non-public app install returned expected `409 app_not_installable`.
+
+Logs:
+
+- `get_app_logs` on the owned temp app returned an empty log set with no error.
+
+### 16.2 CLI diagnostics
+
+Summary:
+
+- CLI checks: `10`
+- Passed: `9`
+- Failed: `1`
+
+Passed / expected-policy paths:
+
+- `floom init --slug ...`
+- `floom deploy --dry-run`
+- `floom deploy`
+- `floom run uuid` returned a pending run id
+- `floom status`
+- `floom apps sharing set --state invited`
+- install returned expected `409 app_not_installable`
+- temp app delete succeeded
+
+Failure:
+
+- `floom init --name "Test App"` without explicit `--slug` still fails with:
+  - `derived slug 'test app' is invalid. Pass --slug.`
+
+CLI onboarding findings reconfirmed:
+
+- `floom --version`: `0.1.0`
+- `floom run uuid` still returns only a pending run id
+- `floom status` still emits raw JSON-heavy output
+- `floom deploy --dry-run` still prints `https://floom.dev` while authenticated to `https://mvp.floom.dev`
+
+### 16.3 Static consistency checks
+
+Static checks: `4`
+
+- Passed: `0`
+- Failed: `4`
+
+Reconfirmed issues:
+
+- README Docker quickstart maps `3000:3000`, while Dockerfile sets/exposes `3051`
+- README leads with OpenAPI wrapping, while `docs/PRODUCT.md` says repo-hosting is primary
+- `cli/floom/bin/floom` dispatches missing libraries:
+  - `floom-store.sh`
+  - `floom-runs.sh`
+  - `floom-triggers.sh`
+  - `floom-workspaces.sh`
+  - `floom-feedback.sh`
+- Installed CLI version remains `0.1.0`
+
+### 16.4 Updated recommendation
+
+The fastest path to a stronger launch score is now specific:
+
+1. Document the review state machine immediately: review submit/withdraw is valid from `private`, not from `link` or `invited`.
+2. Add transition introspection to MCP/CLI responses: `current_state`, `allowed_transitions`, and `retry_after` where relevant.
+3. Fix the CLI first-run experience: slug derivation, pending result polling, raw JSON output, and dry-run host mismatch.
+4. Align README with the actual launch promise or explicitly label OpenAPI wrapping as the current MVP path.
+5. Fix Docker quickstart ports before public users copy the command.
