@@ -1,0 +1,15 @@
+apps:
+  - slug: support-ticket-summarizer
+    display_name: Support Ticket Summarizer
+    category: business
+    description: >
+      Paste a support ticket and get root cause, urgency, owner, and reply draft.
+    runtime: node
+    entrypoint: examples/support-ticket-summarizer/server.mjs
+    port: 15406
+    visibility: public
+    env: []
+    icon: support-ticket-summarizer
+    tags:
+      - floom-build
+      - business
