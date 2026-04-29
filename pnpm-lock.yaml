@@ -186,6 +186,15 @@ importers:
         specifier: 6.4.2
         version: 6.4.2(@types/node@22.9.0)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.3)
 
+  cli-npm:
+    dependencies:
+      ajv:
+        specifier: 8.18.0
+        version: 8.18.0
+      yaml:
+        specifier: 2.8.3
+        version: 2.8.3
+
   packages/byo-providers:
     devDependencies:
       '@types/node':
