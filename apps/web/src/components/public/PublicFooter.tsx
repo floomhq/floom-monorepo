@@ -174,7 +174,7 @@ export function PublicFooter() {
               width={5}
               height={5}
               viewBox="0 0 5 5"
-              style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 2, flexShrink: 0 }}
+              style={{ display: 'inline-block', verticalAlign: 'baseline', position: 'relative', top: '-1px', marginLeft: -4, flexShrink: 0 }}
             >
               <circle cx="2.5" cy="2.5" r="2.5" fill="#10b981" />
             </svg>

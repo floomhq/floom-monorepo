@@ -298,7 +298,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
             width={compact ? 4 : 5}
             height={compact ? 4 : 5}
             viewBox="0 0 5 5"
-            style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: compact ? 1 : 2, flexShrink: 0 }}
+            style={{ display: 'inline-block', verticalAlign: 'baseline', position: 'relative', top: '-1px', marginLeft: -4, flexShrink: 0 }}
           >
             <circle cx="2.5" cy="2.5" r="2.5" fill="#10b981" />
           </svg>
