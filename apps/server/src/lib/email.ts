@@ -229,9 +229,17 @@ function baseLayout({
     : '';
 
   const assetBase = getAssetBaseUrl();
-  const logoPng = `${assetBase}/brand/logo-email.png`;
-  const logoPng2x = `${assetBase}/brand/logo-email@2x.png`;
-  const logoSvg = `${assetBase}/brand/logo-email.svg`;
+  // Cache-buster on logo URLs. R32 polish 2026-04-29: Gmail proxies images
+  // through googleusercontent.com and caches by URL. When we updated the
+  // logo bytes (gradient → flat emerald-700, Georgia serif → Inter sans)
+  // but kept the URL stable, Gmail kept serving cached old pixels for
+  // hours. Appending ?v=<COMMIT_SHA> makes each deploy a new URL key.
+  // Falls back to a stable build constant when COMMIT_SHA is unset
+  // (local dev) so test snapshots don't churn.
+  const cacheBust = process.env.COMMIT_SHA || 'dev';
+  const logoPng = `${assetBase}/brand/logo-email.png?v=${cacheBust}`;
+  const logoPng2x = `${assetBase}/brand/logo-email@2x.png?v=${cacheBust}`;
+  const logoSvg = `${assetBase}/brand/logo-email.svg?v=${cacheBust}`;
 
   // PNG-only logo for emails. We previously offered an SVG <source> so
   // crisp-display webmail clients could pick the vector, but the SVG
@@ -490,29 +498,35 @@ export function renderWaitlistConfirmationEmail(
   const subject = "You're on the Floom waitlist";
   const appsUrl = `${input.publicUrl.replace(/\/+$/, '')}/apps`;
 
+  // Apps referenced in the body must be currently visible in the public
+  // catalog. R32 polish (2026-04-29): Lead Scorer / Resume Screener /
+  // Competitor Analyzer were the original 3, but they're docker-runtime
+  // apps and are hidden across all envs until the gVisor isolation pass.
+  // The new 3 are launch-week apps that are active + visible everywhere
+  // (linkedin-roaster, yc-pitch-deck-critic, floom-this).
   const body = [
     bodyParagraph('Thanks for signing up.'),
     bodyParagraph(
-      "You're on the waitlist for publishing to floom.dev. We're rolling it out in small batches — we'll email you the moment your slot opens.",
+      "You're on the waitlist for publishing to floom.dev. We're rolling it out in small batches; we'll email you the moment your slot opens.",
     ),
     bodyParagraph(
-      "In the meantime, the featured apps on floom.dev are free to run, no signup required. Lead Scorer, Resume Screener, and Competitor Analyzer are good first stops.",
+      "In the meantime, the live apps on floom.dev are free to run, no signup required. LinkedIn Roaster, YC Pitch Deck Critic, and Floom This are good first stops.",
     ),
     ctaButton(appsUrl, 'Browse the live apps'),
     mutedParagraph(
-      "Got something specific you want to ship? Hit reply and tell us — we read every response and it genuinely shapes the waitlist order.",
+      "Got something specific you want to ship? Hit reply and tell us. We read every response and it genuinely shapes the waitlist order.",
     ),
   ].join('\n');
 
   const text = [
     'Thanks for signing up.',
     '',
-    "You're on the waitlist for publishing to floom.dev. We're rolling it out in small batches — we'll email you the moment your slot opens.",
+    "You're on the waitlist for publishing to floom.dev. We're rolling it out in small batches; we'll email you the moment your slot opens.",
     '',
-    'In the meantime, the featured apps on floom.dev are free to run, no signup required:',
+    'In the meantime, the live apps on floom.dev are free to run, no signup required:',
     appsUrl,
     '',
-    "Got something specific you want to ship? Hit reply and tell us — we read every response and it genuinely shapes the waitlist order.",
+    "Got something specific you want to ship? Hit reply and tell us. We read every response and it genuinely shapes the waitlist order.",
     '',
     'Floom, Inc. · Wilmington, DE',
     'hello@floom.dev',
