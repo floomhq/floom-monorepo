@@ -430,7 +430,7 @@ function TestItSection() {
   ];
 
   return (
-    <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: CARD, padding: '22px 24px' }}>
+    <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: 'var(--studio, #f5f4f0)', padding: '22px 24px' }}>
       <h2 style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: ACCENT, margin: '0 0 16px' }}>
         Test it in 3 steps
       </h2>

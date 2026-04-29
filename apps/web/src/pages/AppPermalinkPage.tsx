@@ -69,6 +69,19 @@ const GITHUB_REPOS: Record<string, string> = {
   'ig-nano-scout': 'https://github.com/floomhq/floom/tree/main/examples/ig-nano-scout',
 };
 
+// R36 (2026-04-29): competitor-lens, ai-readiness-audit, pitch-coach are
+// docker-runtime apps gated behind gVisor isolation. They're hidden from
+// the /apps catalog (FLOOM_STORE_HIDE_SLUGS / CLOUD_DOCKER_RUNTIME_HIDE_SLUGS)
+// but their permalinks still resolve — which means users who follow old
+// links land on a page with a broken RunSurface. Guard with a friendly
+// "launching soon" page instead of exposing the "not available right now"
+// error at run-time. Same three slugs as hub-filter.ts.
+const DOCKER_RUNTIME_COMING_SOON_SLUGS = new Set([
+  'competitor-lens',
+  'ai-readiness-audit',
+  'pitch-coach',
+]);
+
 // v23 PR-D (2026-04-26): per-slug hero subhead override for the 3 launch
 // demos. The wireframe ships a sales-tone one-liner that explains what the
 // app does + what to expect, instead of the generic markdown-stripped
@@ -777,6 +790,65 @@ export function AppPermalinkPage() {
               }}
             >
               Back to all apps
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // R36: docker-runtime apps (pitch-coach, competitor-lens, ai-readiness-audit)
+  // are not yet runnable in cloud mode. Show a friendly "launching with v1.0"
+  // page rather than letting the user hit the RunSurface and get "not available
+  // right now" after clicking Run.
+  if (DOCKER_RUNTIME_COMING_SOON_SLUGS.has(app.slug)) {
+    return (
+      <div className="page-root">
+        <TopBar />
+        <main style={{ paddingTop: 80, textAlign: 'center', maxWidth: 480, margin: '0 auto', padding: '80px 24px 80px' }}>
+          <AppIcon slug={app.slug} size={56} />
+          <h1 style={{ fontSize: 26, fontWeight: 700, margin: '20px 0 10px', color: 'var(--ink)' }}>
+            {app.name}
+          </h1>
+          <p style={{ color: 'var(--muted)', fontSize: 15, margin: '0 0 28px', lineHeight: 1.6 }}>
+            {HERO_SUBHEAD[app.slug] ?? app.description}
+          </p>
+          <div
+            style={{
+              display: 'inline-block',
+              background: '#fff5e8',
+              border: '1px solid #f5cf90',
+              borderRadius: 10,
+              padding: '14px 18px',
+              fontSize: 13.5,
+              color: '#7c5400',
+              lineHeight: 1.55,
+              textAlign: 'left',
+              maxWidth: 380,
+            }}
+          >
+            <strong>Launching with Floom v1.0.</strong> This app runs inside an isolated container and will be
+            available once sandbox hardening ships. Check back soon.
+          </div>
+          <div style={{ marginTop: 24 }}>
+            <Link
+              to="/apps"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '10px 20px',
+                background: 'var(--accent)',
+                color: '#fff',
+                borderRadius: 8,
+                border: '1px solid var(--accent)',
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Browse live apps
             </Link>
           </div>
         </main>
@@ -2043,15 +2115,32 @@ function CelebrationCard({
         justifyContent: 'space-between',
       }}
     >
-      <div style={{ minWidth: 0 }}>
+      <div style={{ minWidth: 0, flex: 1 }}>
         <strong style={{ fontSize: 15, color: 'var(--ink, #0f172a)' }}>
           Your app is live
         </strong>
-        <p style={{ margin: '4px 0 0', color: 'var(--muted, #64748b)', fontSize: 13 }}>
+        <p style={{ margin: '4px 0 8px', color: 'var(--muted, #64748b)', fontSize: 13 }}>
           This link works for anyone — send it to coworkers, Twitter, anywhere.
         </p>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 7,
+            background: '#fff5e8',
+            border: '1px solid #f5cf90',
+            borderRadius: 8,
+            padding: '8px 11px',
+            fontSize: 12,
+            color: '#7c5400',
+            lineHeight: 1.5,
+          }}
+        >
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+          <span><strong>Floom is in public beta</strong> — please don&rsquo;t put production secrets in apps you publish here. We&rsquo;re hardening secret isolation and will lift this when sandboxing is GA.</span>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignSelf: 'flex-start' }}>
         <button
           type="button"
           data-testid="celebration-copy"
