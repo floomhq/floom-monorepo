@@ -35,6 +35,10 @@ docs/docs-audit/
 docs/ax-scores/
 docs/qa/
 docs/runbooks/
+
+# Agent auth fixture — session cookies must never be committed
+/root/.config/floom-secrets/
+*.cookie
 examples/ai-readiness-audit/__pycache__/
 .claude/
 .mcp.json
