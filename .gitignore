@@ -21,6 +21,20 @@ screenshots-greenlight/
 
 # Internal planning / stash / ops material does not belong in this public repo.
 docs/internal/
+STASH-*.md
+WORK-PLAN-*.md
+ISSUES.md
+docs/V24-*.md
+docs/V26-*.md
+docs/audits/
+docs/wireframe-parity/
+docs/extended-audit/
+docs/product-audit/
+docs/repo-hygiene-audit/
+docs/docs-audit/
+docs/ax-scores/
+docs/qa/
+docs/runbooks/
 examples/ai-readiness-audit/__pycache__/
 .claude/
 .mcp.json
