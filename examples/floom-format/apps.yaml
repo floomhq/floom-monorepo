@@ -1,0 +1,15 @@
+apps:
+  - slug: floom-format
+    display_name: Floom Format
+    category: developer-tools
+    description: >
+      Paste messy text, HTML, or JSON and get clean Markdown plus structured metadata.
+    runtime: node
+    entrypoint: examples/floom-format/server.mjs
+    port: 15404
+    visibility: public
+    env: []
+    icon: floom-format
+    tags:
+      - floom-build
+      - developer-tools
