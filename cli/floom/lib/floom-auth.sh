@@ -193,13 +193,20 @@ EOF
     trap 'rm -f "$VALIDATE_FILE"' RETURN
     HTTP_CODE=$(validate_token_file "$API_URL" "$AGENT_TOKEN" "$VALIDATE_FILE")
     if [[ "$HTTP_CODE" != "200" && "${API_URL%/}" == "https://floom.dev" ]]; then
+      PRIMARY_HTTP_CODE="$HTTP_CODE"
+      PRIMARY_API_URL="$API_URL"
       for CANDIDATE_URL in "https://mvp.floom.dev" "https://v26.floom.dev"; do
-        HTTP_CODE=$(validate_token_file "$CANDIDATE_URL" "$AGENT_TOKEN" "$VALIDATE_FILE")
-        if [[ "$HTTP_CODE" == "200" ]]; then
+        CANDIDATE_HTTP_CODE=$(validate_token_file "$CANDIDATE_URL" "$AGENT_TOKEN" "$VALIDATE_FILE")
+        if [[ "$CANDIDATE_HTTP_CODE" == "200" ]]; then
           API_URL="$CANDIDATE_URL"
+          HTTP_CODE="$CANDIDATE_HTTP_CODE"
           break
         fi
       done
+      if [[ "$HTTP_CODE" != "200" ]]; then
+        API_URL="$PRIMARY_API_URL"
+        HTTP_CODE="$PRIMARY_HTTP_CODE"
+      fi
     fi
     if [[ "$HTTP_CODE" != "200" ]]; then
       echo "ERROR: Token rejected by ${API_URL} (HTTP ${HTTP_CODE})." >&2
