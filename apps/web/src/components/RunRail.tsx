@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, Play, Plus, Settings as SettingsIcon } from 'lucide-react';
+import { LayoutGrid, Play, Plus, Settings as SettingsIcon } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
 // V13 fix: rail's "Apps" count is now sourced from /api/hub/installed via
@@ -45,7 +45,7 @@ export function RunRail() {
             location.pathname === '/run/apps' ||
             location.pathname.startsWith('/run/apps/')
           }
-          icon={<Box size={15} />}
+          icon={<LayoutGrid size={15} />}
           count={appsCount ?? undefined}
         >
           Apps
@@ -88,8 +88,6 @@ export function RunRail() {
  */
 export function RailFoot() {
   const now = useRailClock();
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const tzCity = tz.split('/').pop()?.replace(/_/g, ' ') ?? tz;
   const time = now.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
@@ -102,9 +100,7 @@ export function RailFoot() {
         <SettingsIcon size={14} aria-hidden="true" />
         <span>Settings</span>
       </Link>
-      <div style={railFootMetaStyle}>
-        {time} · {tzCity}
-      </div>
+      <div style={railFootMetaStyle}>{time}</div>
     </div>
   );
 }
