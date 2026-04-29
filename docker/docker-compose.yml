@@ -1,10 +1,8 @@
-version: "3.9"
-
-# Floom self-hosted — reference compose file for the current monorepo image.
+# Floom self-hosted — reference compose file for a local checkout.
 # Usage:
 #   1. Copy docker/apps.yaml.example to docker/apps.yaml and edit it.
-#   2. docker compose -f docker/docker-compose.yml up -d
-#   3. Open http://localhost:3051
+#   2. cd docker && docker compose up -d --build
+#   3. Open http://localhost:${FLOOM_HOST_PORT:-3051}
 #
 # Proxied-only by default. The 15 historical hosted apps (flyfast, bouncer,
 # blast-radius, ...) are opt-in via FLOOM_SEED_APPS=true AND mounting
@@ -12,9 +10,12 @@ version: "3.9"
 
 services:
   floom:
-    image: ghcr.io/floomhq/floom-monorepo:latest
+    image: floom-selfhost:local
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     ports:
-      - "3051:3051"
+      - "${FLOOM_HOST:-127.0.0.1}:${FLOOM_HOST_PORT:-3051}:${PORT:-3051}"
     volumes:
       # Persist SQLite data and per-app state across restarts
       - floom_data:/data
@@ -24,7 +25,12 @@ services:
       # mounting docker.sock grants host root.
       # - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      PORT: "3051"
+      # Self-host compose defaults to local/dev mode so a fresh install can
+      # log auth emails to stdout instead of requiring a Resend production key.
+      # Set NODE_ENV=production and RESEND_API_KEY=... for a hardened public box.
+      NODE_ENV: "${NODE_ENV:-development}"
+      PORT: "${PORT:-3051}"
+      PUBLIC_URL: "${PUBLIC_URL:-http://localhost:3051}"
       DATA_DIR: "/data"
       FLOOM_APPS_CONFIG: "/app/config/apps.yaml"
       # Uncomment and choose a long random string to gate /api/*, /mcp/*,
@@ -72,7 +78,7 @@ services:
       # STRIPE_SECRET_KEY: "sk_..."
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:3051/api/health"]
+      test: ["CMD-SHELL", "curl -fsS \"http://localhost:${PORT:-3051}/api/health\""]
       interval: 30s
       timeout: 5s
       start_period: 30s

@@ -1,8 +1,8 @@
 # Self-host Floom
 
-Floom is [MIT-licensed](https://github.com/floomhq/floom/blob/main/LICENSE) and ships as a single Docker image. Run a full instance — web UI, MCP server, HTTP API — on any machine with Docker.
+Floom is [MIT-licensed](https://github.com/floomhq/floom/blob/main/LICENSE) and ships as a single Docker image built from the repo. Run a full instance — web UI, MCP server, HTTP API — on any machine with Docker.
 
-The reference container image is `ghcr.io/floomhq/floom-monorepo`. The live showcase instance lives at [docker.floom.dev](https://docker.floom.dev).
+The live showcase instance lives at [docker.floom.dev](https://docker.floom.dev).
 
 ## Quick start with Docker Compose
 
@@ -12,7 +12,7 @@ Copy the reference compose file from the repo:
 git clone https://github.com/floomhq/floom.git
 cd floom/docker
 cp apps.yaml.example apps.yaml
-docker compose up -d
+docker compose up -d --build
 ```
 
 Open `http://localhost:3051`. The web UI, MCP server, and HTTP API are all on that port.
@@ -26,18 +26,21 @@ curl http://localhost:3051/api/hub | jq 'length'
 
 ## Quick start with plain docker run
 
-If you don't want to clone the repo, a single `docker run` works:
+After building the local image, a single `docker run` works:
 
 ```bash
-# Authenticate with GitHub Container Registry first (one-time)
-docker login ghcr.io
+git clone https://github.com/floomhq/floom.git
+cd floom
+docker build -t floom-selfhost:local -f docker/Dockerfile .
 
 docker run -d --name floom \
   -p 3051:3051 \
   -v floom_data:/data \
-  -v "$(pwd)/apps.yaml:/app/config/apps.yaml:ro" \
+  -v "$(pwd)/docker/apps.yaml.example:/app/config/apps.yaml:ro" \
+  -e NODE_ENV=development \
+  -e PUBLIC_URL=http://localhost:3051 \
   -e FLOOM_APPS_CONFIG=/app/config/apps.yaml \
-  ghcr.io/floomhq/floom-monorepo:latest
+  floom-selfhost:local
 ```
 
 Point it at your own `apps.yaml` and the hub populates on boot.
@@ -113,14 +116,11 @@ Full schema including auth modes, secrets, async job configuration, and hosted D
 
 ```bash
 # Update to latest
-docker compose pull
-docker compose up -d
-
-# Pin to a specific version
-docker pull ghcr.io/floomhq/floom-monorepo:latest
+git pull --ff-only
+docker compose up -d --build
 ```
 
-Tags are published for every tagged GitHub release. Use `:latest` for the bleeding edge, or a pinned version for production.
+For production, pin the git checkout to a release tag before rebuilding.
 
 ## Gating with a shared token
 
@@ -130,8 +130,10 @@ For private single-tenant deployments, set `FLOOM_AUTH_TOKEN` to a long random s
 docker run -d --name floom \
   -p 3051:3051 \
   -v floom_data:/data \
+  -e NODE_ENV=development \
+  -e PUBLIC_URL=http://localhost:3051 \
   -e FLOOM_AUTH_TOKEN="$(openssl rand -hex 32)" \
-  ghcr.io/floomhq/floom-monorepo:latest
+  floom-selfhost:local
 ```
 
 Every request to `/api/*`, `/mcp/*`, and `/p/*` must now include `Authorization: Bearer <token>`. `/api/health` stays open for probes.

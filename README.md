@@ -79,8 +79,10 @@ For beta publishers, the deploy output prints the web page at `https://floom.dev
 ### Self-host in one container
 
 ```bash
-docker login ghcr.io
-docker run -p 3051:3051 ghcr.io/floomhq/floom-monorepo:latest
+git clone https://github.com/floomhq/floom.git
+cd floom/docker
+cp apps.yaml.example apps.yaml
+docker compose up -d --build
 ```
 
 Or try the live apps at [floom.dev/apps](https://floom.dev/apps) — no install. Full self-host walkthrough: [docs/SELF_HOST.md](./docs/SELF_HOST.md).
@@ -159,14 +161,9 @@ apps:
 ```
 
 ```bash
-docker login ghcr.io
-docker run -d --name floom \
-  -p 3051:3051 \
-  -v floom_data:/data \
-  -v "$(pwd)/apps.yaml:/app/config/apps.yaml:ro" \
-  -e FLOOM_APPS_CONFIG=/app/config/apps.yaml \
-  -e RESEND_API_KEY=re_... \
-  ghcr.io/floomhq/floom-monorepo:latest
+cd docker
+cp apps.yaml.example apps.yaml
+docker compose up -d --build
 ```
 
 Open `http://localhost:3051/p/resend`, or point your agent at `http://localhost:3051/mcp/app/resend`.

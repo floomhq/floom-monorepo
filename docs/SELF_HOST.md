@@ -2,39 +2,18 @@
 
 Run a full Floom instance — web form + output renderer, MCP server, HTTP endpoint, CLI — on any machine with Docker.
 
-## Quick start
+## Quick start with Docker Compose
 
 ```bash
-# 1. Create your apps config
-cat > apps.yaml <<'EOF'
-apps:
-  - slug: petstore
-    type: proxied
-    openapi_spec_url: https://petstore3.swagger.io/api/v3/openapi.json
-    display_name: Petstore
-    description: "OpenAPI 3.0 reference pet store."
-    category: developer-tools
+# 1. Clone and create your apps config
+git clone https://github.com/floomhq/floom.git
+cd floom/docker
+cp apps.yaml.example apps.yaml
 
-  - slug: resend
-    type: proxied
-    openapi_spec_url: https://raw.githubusercontent.com/resend/resend-openapi/main/resend.yaml
-    auth: bearer
-    secrets: [RESEND_API_KEY]
-    display_name: Resend
-    description: "Transactional email API."
-EOF
+# 2. Build and run Floom with a named volume for persistence
+docker compose up -d --build
 
-# 2. Run Floom with a named volume for persistence and the apps.yaml mount
-docker run -d --name floom \
-  -p 3051:3051 \
-  -v floom_data:/data \
-  -v "$(pwd)/apps.yaml:/app/config/apps.yaml:ro" \
-  -e FLOOM_APPS_CONFIG=/app/config/apps.yaml \
-  -e RESEND_API_KEY=re_xxx \
-  ghcr.io/floomhq/floom-monorepo:latest
-
-# 3. Verify
-sleep 5
+# 3. Verify after the health check turns green
 curl http://localhost:3051/api/health
 curl http://localhost:3051/api/hub | jq 'length'
 ```
@@ -418,16 +397,21 @@ The bundled hosted-mode demo apps (bouncer, opendraft, openpaper, etc.) are opt-
 ## Docker compose
 
 ```yaml
-version: "3.9"
 services:
   floom:
-    image: ghcr.io/floomhq/floom-monorepo:latest
+    image: floom-selfhost:local
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     ports:
-      - "3051:3051"
+      - "127.0.0.1:3051:3051"
     volumes:
       - floom_data:/data
       - ./apps.yaml:/app/config/apps.yaml:ro
     environment:
+      NODE_ENV: development
+      PORT: "3051"
+      PUBLIC_URL: http://localhost:3051
       FLOOM_APPS_CONFIG: /app/config/apps.yaml
       # FLOOM_AUTH_TOKEN: "choose_a_long_random_string"
       # RESEND_API_KEY: "re_..."
@@ -474,7 +458,11 @@ Set `FLOOM_MAX_ACTIONS_PER_APP=0` to lift the cap. Check logs for the truncation
 Embeddings-based app search needs it. Safe to ignore — picker falls back to keyword matching.
 
 **Port already in use**
-`docker run -p 8080:3051 ...`
+Set `FLOOM_HOST_PORT`, for example:
+
+```bash
+FLOOM_HOST_PORT=8080 PUBLIC_URL=http://localhost:8080 docker compose up -d --build
+```
 
 ## Multi-tenant model (v0.3.1)
 
