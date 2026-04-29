@@ -6,6 +6,7 @@ import { safeFetch } from '/root/floom-internal/launch/floom-build/lib/ssrf-guar
 
 const PORT = Number(process.env.PORT || 4390);
 const MAX_BODY_BYTES = 256 * 1024;
+const MAX_GEMINI_BODY_TEXT_CHARS = 30_000;
 const MODEL = 'gemini-2.5-flash-lite';
 
 const PANEL_SCHEMA = { type: 'OBJECT', properties: { findings: { type: 'ARRAY', items: { type: 'OBJECT', properties: { label: { type: 'STRING' }, value: { type: 'STRING' }, status: { type: 'STRING', enum: ['fail', 'warn', 'pass'] }, fix: { type: 'STRING', nullable: true }, detail: { type: 'STRING', nullable: true }, impact: { type: 'STRING', nullable: true } }, required: ['label', 'value', 'status', 'fix', 'detail', 'impact'] } }, callouts: { type: 'ARRAY', items: { type: 'OBJECT', properties: { type: { type: 'STRING', enum: ['critical', 'warn', 'info'] }, label: { type: 'STRING' }, text: { type: 'STRING' } }, required: ['type', 'label', 'text'] } } }, required: ['findings', 'callouts'] };
@@ -61,7 +62,7 @@ async function crawlUrl(url) {
     jsonLd,
     links,
     footerText: (html.match(/<footer[^>]*>([\s\S]*?)<\/footer>/i)?.[1] || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1000),
-    bodyText: textFromHtml(html).slice(0, 5000),
+    bodyText: textFromHtml(html).slice(0, MAX_GEMINI_BODY_TEXT_CHARS),
     headers,
   };
 }
@@ -77,7 +78,7 @@ JSON-LD Schemas Found: ${crawl.jsonLd.length > 0 ? crawl.jsonLd.map((s) => sanit
 Number of Links: ${crawl.links.length}
 Footer Text: ${sanitize(crawl.footerText)}
 Response Headers: ${JSON.stringify(Object.fromEntries(Object.entries(crawl.headers).filter(([k]) => ['server', 'x-powered-by', 'content-type'].includes(k.toLowerCase()))))}
-Body Text (first 3000 chars): ${sanitize(crawl.bodyText?.slice(0, 3000))}
+Body Text (first 30000 chars): ${sanitize(crawl.bodyText?.slice(0, MAX_GEMINI_BODY_TEXT_CHARS))}
 [END CRAWLED DATA ${nonce}]`;
   const systemPrompt = `You are "Signal Viewer," a highly analytical AI auditing agent specialized in digital presence and AI readiness assessments. You perform clinical, evidence-based evaluations. Do not sugarcoat findings. Be brutally honest.
 
@@ -121,7 +122,7 @@ async function callGemini(url, crawl) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw httpError(500, 'GEMINI_API_KEY not configured');
   const { systemPrompt, userPrompt } = buildPrompts(url, crawl);
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(9_000), body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: systemPrompt }] }, generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json', responseSchema: FLOOM_RESPONSE_SCHEMA, thinkingConfig: { thinkingBudget: 0 } } }) });
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(30_000), body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: systemPrompt }] }, generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json', responseSchema: FLOOM_RESPONSE_SCHEMA, thinkingConfig: { thinkingBudget: 0 } } }) });
   const text = await response.text();
   if (!response.ok) throw httpError(502, `Gemini API error ${response.status}: ${text.slice(0, 240)}`);
   const payload = JSON.parse(text);
