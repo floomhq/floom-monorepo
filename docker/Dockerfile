@@ -211,4 +211,4 @@ EXPOSE 3051
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -fsS http://localhost:${PORT}/api/health || exit 1
 
-CMD ["node", "--import", "tsx", "dist/index.js"]
+CMD ["node", "dist/index.js"]
