@@ -211,42 +211,76 @@ function FilterChipBar({
 }
 
 // ------------------------------------------------------------------
-// Compact hero metric strip (issue #913: NOT a 4-card grid)
+// Hero stat row (4 cards per wireframe run-apps.html lines 128–133)
+// Federico decision 2026-04-29: revert #913 compact pill, restore the
+// wireframe's 4-card grid. Compact pill made the dashboard feel anemic.
 // ------------------------------------------------------------------
 
-function CompactHeroStrip({
+function HeroStatRow({
   appCount,
-  runCount,
+  runCount7d,
+  runningNow,
+  p95Ms,
 }: {
   appCount: number | null;
-  runCount: number | null;
+  runCount7d: number | null;
+  runningNow: number | null;
+  p95Ms: number | null;
 }) {
-  // TODO: wire to real metrics endpoint when available (/api/workspace/stats)
+  const cards = [
+    { label: 'APPS',         value: appCount,    sub: 'installed' },
+    { label: 'RUNS · 7D',    value: runCount7d,  sub: 'this week' },
+    { label: 'RUNNING NOW',  value: runningNow,  sub: runningNow === 1 ? 'in flight' : 'in flight' },
+    { label: 'P95',          value: p95Ms,       sub: 'typical', unit: 'ms' },
+  ];
   return (
     <div
-      className="ws-compact-hero"
-      data-testid="run-apps-compact-hero"
+      data-testid="run-apps-hero-stat-row"
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '5px 12px',
-        background: 'var(--card)',
-        border: '1px solid var(--line)',
-        borderRadius: 999,
-        fontSize: 12.5,
-        fontFamily: 'var(--font-mono)',
-        fontWeight: 500,
-        color: 'var(--muted)',
-        marginBottom: 18,
-        flexWrap: 'wrap',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+        gap: 'var(--space-3)',
+        marginBottom: 'var(--space-5)',
       }}
     >
-      <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{appCount ?? '—'}</span>
-      <span>runnable app{appCount !== 1 ? 's' : ''}</span>
-      <span aria-hidden style={{ color: 'var(--line)', userSelect: 'none' }}>·</span>
-      <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{runCount ?? '—'}</span>
-      <span>runs this week</span>
+      {cards.map((c) => (
+        <div
+          key={c.label}
+          style={{
+            background: 'var(--card)',
+            border: '1px solid var(--line)',
+            borderRadius: 12,
+            padding: 'var(--space-4)',
+            boxShadow: 'var(--shadow-1)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-1)',
+          }}
+        >
+          <div style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10.5,
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            color: 'var(--muted)',
+            textTransform: 'uppercase',
+          }}>{c.label}</div>
+          <div style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 22,
+            fontWeight: 700,
+            color: 'var(--ink)',
+            lineHeight: 1,
+          }}>
+            {c.value ?? '—'}
+            {c.unit && c.value != null && <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)', marginLeft: 2 }}>{c.unit}</span>}
+          </div>
+          <div style={{
+            fontSize: 11,
+            color: 'var(--muted)',
+          }}>{c.sub}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -718,10 +752,13 @@ export function RunAppsPage() {
           </p>
         </div>
 
-        {/* Compact hero metric strip (issue #913: NOT 4-card grid) */}
-        <CompactHeroStrip
+        {/* Hero stat row — 4 cards per wireframe (reverts #913 compact pill).
+            runningNow + p95Ms render "—" until backend wires them. */}
+        <HeroStatRow
           appCount={dataReady ? appCount : null}
-          runCount={dataReady ? runCount : null}
+          runCount7d={dataReady ? runCount : null}
+          runningNow={null}
+          p95Ms={null}
         />
 
         {/* Filter chip toolbar + Browse store — always shown when data ready */}

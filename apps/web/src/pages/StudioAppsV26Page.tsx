@@ -110,80 +110,88 @@ function StudioFilterChipBar({
 }
 
 // ------------------------------------------------------------------
-// Compact hero metric strip (issue #913: NOT 4-card grid)
+// Hero stat row (4 cards per wireframe studio-apps.html).
+// Federico decision 2026-04-29: revert #913 compact pill, restore the
+// wireframe's 4-card grid for visual rhythm + SaaS-grade feel.
 // ------------------------------------------------------------------
 
 function isLiveApp(app: CreatorApp): boolean {
   return !app.publish_status || app.publish_status === 'published';
 }
 
-function CompactHeroStrip({
+function HeroStatRow({
   apps,
   totalRuns,
 }: {
   apps: CreatorApp[] | null;
   totalRuns: number | null;
 }) {
-  // TODO: success_rate + p95 require a server-side aggregates endpoint.
-  //       Only surface metrics we can verify (totalRuns, apps count).
   const appCount = apps?.length ?? 0;
   const liveCount = apps?.filter(isLiveApp).length ?? 0;
 
   if (!apps || appCount === 0) return null;
 
+  // success_rate + p95 require a server-side aggregates endpoint
+  // (TODO when /api/studio/aggregates lands). Render "—" gracefully.
+  const cards = [
+    { label: 'RUNS · 7D',   value: totalRuns,                                                sub: 'this week' },
+    { label: 'SUCCESS',     value: null as number | null,                                    sub: 'last 7d', unit: '%' },
+    { label: 'P95',         value: null as number | null,                                    sub: 'typical',  unit: 'ms' },
+    { label: 'APPS',        value: appCount,                                                 sub: liveCount > 0 ? `${liveCount} live` : 'in workspace' },
+  ];
+
   return (
     <div
-      className="ws-compact-hero"
-      data-testid="studio-apps-compact-hero"
+      data-testid="studio-apps-hero-stat-row"
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '5px 12px',
-        background: 'var(--card)',
-        border: '1px solid var(--line)',
-        borderRadius: 999,
-        fontSize: 12.5,
-        fontFamily: 'var(--font-mono)',
-        fontWeight: 500,
-        color: 'var(--muted)',
-        marginBottom: 18,
-        flexWrap: 'wrap',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+        gap: 'var(--space-3)',
+        marginBottom: 'var(--space-5)',
       }}
     >
-      <span style={{ color: 'var(--ink)', fontWeight: 700 }}>
-        {totalRuns !== null ? totalRuns.toLocaleString() : '—'}
-      </span>
-      <span>runs this week</span>
-      <span aria-hidden style={{ color: 'var(--line)', userSelect: 'none' }}>·</span>
-      <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{appCount}</span>
-      <span>app{appCount !== 1 ? 's' : ''}</span>
-      {liveCount > 0 && (
-        <>
-          <span aria-hidden style={{ color: 'var(--line)', userSelect: 'none' }}>·</span>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              color: 'var(--accent)',
-              fontWeight: 700,
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: 'var(--accent)',
-                display: 'inline-block',
-              }}
-            />
-            {liveCount} live
-          </span>
-        </>
-      )}
+      {cards.map((c) => (
+        <div
+          key={c.label}
+          style={{
+            background: 'var(--card)',
+            border: '1px solid var(--line)',
+            borderRadius: 12,
+            padding: 'var(--space-4)',
+            boxShadow: 'var(--shadow-1)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-1)',
+          }}
+        >
+          <div style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10.5,
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            color: 'var(--muted)',
+            textTransform: 'uppercase',
+          }}>{c.label}</div>
+          <div style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 22,
+            fontWeight: 700,
+            color: 'var(--ink)',
+            lineHeight: 1,
+          }}>
+            {c.value != null ? c.value.toLocaleString() : '—'}
+            {c.unit && c.value != null && (
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)', marginLeft: 2 }}>
+                {c.unit}
+              </span>
+            )}
+          </div>
+          <div style={{
+            fontSize: 11,
+            color: 'var(--muted)',
+          }}>{c.sub}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -746,9 +754,10 @@ export function StudioAppsV26Page() {
               </Link>
             </div>
 
-            {/* Compact hero metric strip (issue #913: NOT 4-card grid) */}
+            {/* Hero stat row — 4 cards per wireframe (reverts #913 compact pill).
+                SUCCESS% + P95 render "—" until /api/studio/aggregates wires them. */}
             {!appsLoading && (
-              <CompactHeroStrip apps={apps ?? null} totalRuns={totalRuns} />
+              <HeroStatRow apps={apps ?? null} totalRuns={totalRuns} />
             )}
 
             {/* Filter chip toolbar (wireframe studio-apps.html line 114) */}
