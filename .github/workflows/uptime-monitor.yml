@@ -64,9 +64,7 @@ jobs:
               echo "Issue #$EXISTING: added comment"
             else
               gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --label incident \
-                --body "**Env:** $ENV_NAME | **Detected:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
-Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-Auto-opened by uptime-monitor."
+                --body "**Env:** $ENV_NAME | **Detected:** $(date -u +%Y-%m-%dT%H:%M:%SZ) | Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID | Auto-opened by uptime-monitor."
               echo "GitHub: opened issue for $ENV_NAME"
             fi
           done
