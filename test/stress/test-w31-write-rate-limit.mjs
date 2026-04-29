@@ -213,10 +213,11 @@ try {
   log(
     'third waitlist write hits waitlist limiter (not global limiter)',
     w3.status === 429 &&
-      w3.json?.error === 'rate_limit_exceeded' &&
-      w3.json?.retry_after_seconds === 3600 &&
+      w3.json?.error === 'rate_limited' &&
+      w3.json?.reason === 'per_ip_per_hour' &&
+      typeof w3.json?.retry_after_seconds === 'number' &&
       w3.json?.retryAfter === undefined &&
-      w3.headers.get('retry-after') === '3600',
+      Number(w3.headers.get('retry-after')) === w3.json.retry_after_seconds,
     `status=${w3.status} body=${w3.text} retry-after=${w3.headers.get('retry-after')}`,
   );
 

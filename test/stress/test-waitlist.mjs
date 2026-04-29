@@ -160,7 +160,7 @@ console.log('Deploy waitlist (/api/waitlist)');
     `${r1.status}/${r2.status}/${r3.status}`);
   const r4 = await post({ email: 'c4@example.com' }, ip);
   log('4th signup from same IP returns 429',
-    r4.status === 429 && r4.json?.error === 'rate_limit_exceeded',
+    r4.status === 429 && r4.json?.error === 'rate_limited',
     `status=${r4.status} body=${r4.text}`);
   // Admin bearer bypasses the cap.
   const r5 = await post(

@@ -4,8 +4,8 @@
 // Behaviour:
 //   - Validates email (RFC-lite check: non-empty, exactly one `@`, `.` in
 //     the domain, no whitespace).
-//   - Rate-limited per-IP (10/hour) using the project's existing sliding-
-//     window implementation in lib/rate-limit.ts. Auth bearer bypass
+//   - Rate-limited per-IP (10/hour) using the shared sliding-window
+//     helper in lib/rate-limit-store.ts. Auth bearer bypass
 //     honoured for ops testing.
 //   - Idempotent: duplicate emails return 200 `{ok: true}` with the same
 //     shape. Never leak whether the email was new.
@@ -25,8 +25,8 @@ import { Hono } from 'hono';
 import { createHash, randomUUID } from 'node:crypto';
 import { db } from '../db.js';
 import { renderWaitlistConfirmationEmail, sendEmail } from '../lib/email.js';
-import { extractIp, isRateLimitDisabled } from '../lib/rate-limit.js';
-import { hasValidAdminBearer } from '../lib/auth.js';
+import { extractIp } from '../lib/rate-limit.js';
+import { createRateLimit, __resetSharedRateLimitStoreForTests } from '../lib/rate-limit-store.js';
 
 export const waitlistRouter = new Hono();
 
@@ -41,48 +41,15 @@ function getPerIpPerHour(): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : PER_IP_PER_HOUR_DEFAULT;
 }
 
-// Process-local sliding window for /api/waitlist specifically. Kept
-// separate from the runRateLimit store (which keys on 'ip:<addr>' / 'user:'
-// / 'app:') so we can use a dedicated per-hour budget without leaking
-// capacity into the run surface. Same algorithm as lib/rate-limit.ts.
-interface WindowEntry {
-  currentStart: number;
-  currentCount: number;
-  previousCount: number;
-  windowMs: number;
-}
-const waitlistStore = new Map<string, WindowEntry>();
-
 /** Reset the per-IP store. Exported for tests. */
 export function __resetWaitlistRateLimitForTests(): void {
-  waitlistStore.clear();
+  __resetSharedRateLimitStoreForTests();
 }
 
-function incrementAndCheck(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  const halfMs = windowMs / 2;
-  const entry = waitlistStore.get(key);
-  if (!entry) {
-    waitlistStore.set(key, {
-      currentStart: now,
-      currentCount: 1,
-      previousCount: 0,
-      windowMs,
-    });
-    return 1 <= limit;
-  }
-  const elapsed = now - entry.currentStart;
-  if (elapsed >= halfMs) {
-    const halves = Math.floor(elapsed / halfMs);
-    entry.previousCount = halves >= 2 ? 0 : entry.currentCount;
-    entry.currentCount = 0;
-    entry.currentStart = entry.currentStart + halves * halfMs;
-  }
-  entry.currentCount += 1;
-  const weight = Math.max(0, 1 - (now - entry.currentStart) / halfMs);
-  const count = entry.currentCount + Math.floor(entry.previousCount * weight);
-  return count <= limit;
-}
+const waitlistRateLimit = createRateLimit({
+  key: 'waitlist',
+  perIpPerHour: getPerIpPerHour(),
+});
 
 // RFC-lite email regex. Intentionally permissive — we just need to reject
 // obvious garbage ("", "no-at", "a b@c.d") before storing. A stricter
@@ -256,24 +223,10 @@ waitlistRouter.post('/', async (c) => {
     return c.json({ error: err }, 400);
   }
 
-  // Rate-limit per-IP. Admin bearer (ops tests) and the explicit
-  // FLOOM_RATE_LIMIT_DISABLED escape hatch both bypass.
+  const rateLimitResponse = await waitlistRateLimit(c, async () => undefined);
+  if (rateLimitResponse) return rateLimitResponse;
+
   const ip = extractIp(c);
-  const bypass = isRateLimitDisabled() || hasValidAdminBearer(c);
-  if (!bypass) {
-    const allowed = incrementAndCheck(
-      `waitlist:${ip}`,
-      getPerIpPerHour(),
-      3600 * 1000,
-    );
-    if (!allowed) {
-      return c.json(
-        { error: 'rate_limit_exceeded', retry_after_seconds: 3600 },
-        429,
-        { 'Retry-After': '3600' },
-      );
-    }
-  }
 
   const source = sanitizeSource(body.source);
   const userAgent = sanitizeUserAgent(c.req.header('user-agent'));
