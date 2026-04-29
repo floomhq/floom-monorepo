@@ -45,20 +45,27 @@ export function MobileDrawer({ open, onClose, onSignOut }: Props) {
         data-testid="mobile-drawer"
         style={panelStyle}
       >
-        {/* Header: workspace identity + close button */}
+        {/* Header: workspace identity (authed only) + close button.
+            Anon visitors don't have a workspace concept — surfacing
+            "Workspace · Local" to a stranger landing from a launch post
+            is just noise. R39 (2026-04-29). */}
         <div style={headStyle}>
-          <div style={wsIdStyle}>
-            <Link
-              to="/settings"
-              onClick={onClose}
-              title="Workspace settings"
-              data-testid="mobile-drawer-ws-identity"
-              style={wsLinkStyle}
-            >
-              <span style={wsEyebrowStyle}>Workspace</span>
-              <span style={wsNameStyle}>{workspaceName} <span style={wsChevStyle}>▾</span></span>
-            </Link>
-          </div>
+          {isAuthenticated ? (
+            <div style={wsIdStyle}>
+              <Link
+                to="/settings"
+                onClick={onClose}
+                title="Workspace settings"
+                data-testid="mobile-drawer-ws-identity"
+                style={wsLinkStyle}
+              >
+                <span style={wsEyebrowStyle}>Workspace</span>
+                <span style={wsNameStyle}>{workspaceName} <span style={wsChevStyle}>▾</span></span>
+              </Link>
+            </div>
+          ) : (
+            <div />
+          )}
           <button type="button" aria-label="Close menu" onClick={onClose} style={closeStyle}>
             <X size={19} aria-hidden="true" />
           </button>
