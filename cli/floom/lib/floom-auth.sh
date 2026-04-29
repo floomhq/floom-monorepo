@@ -251,6 +251,21 @@ EOF
 esac
 
 AGENT_TOKEN="$1"
-API_URL="${2:-$(default_host)}"
+shift || true
+API_URL="$(default_host)"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --api-url=*) API_URL="${1#--api-url=}" ;;
+    --api-url)   shift; API_URL="${1:-}" ;;
+    --url=*)     API_URL="${1#--url=}" ;;
+    --url)       shift; API_URL="${1:-}" ;;
+    http://*|https://*) API_URL="$1" ;;
+    *)
+      echo "floom auth: unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 exec bash "$0" login "--token=$AGENT_TOKEN" "--api-url=$API_URL"
