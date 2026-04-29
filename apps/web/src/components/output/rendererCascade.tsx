@@ -42,8 +42,10 @@ import { CodeBlock } from './CodeBlock';
 import { CompetitorTiles, looksLikeCompetitorOutput } from './CompetitorTiles';
 import { CompositeOutputCard } from './CompositeOutputCard';
 import { FileDownload } from './FileDownload';
+import { FileDownloadList, type ArtifactDownload } from './FileDownloadList';
 import { HeadlineWithMeta } from './HeadlineWithMeta';
 import { ImageView } from './ImageView';
+import { JsonRaw } from './JsonRaw';
 import { KeyValueTable } from './KeyValueTable';
 import { Markdown } from './Markdown';
 import { RowTable } from './RowTable';
@@ -62,6 +64,7 @@ export const OUTPUT_LIBRARY: Record<string, LibraryComponent> = {
   CodeBlock: CodeBlock as unknown as LibraryComponent,
   Markdown: Markdown as unknown as LibraryComponent,
   FileDownload: FileDownload as unknown as LibraryComponent,
+  FileDownloadList: FileDownloadList as unknown as LibraryComponent,
   UrlLink: UrlLink as unknown as LibraryComponent,
   ImageView: ImageView as unknown as LibraryComponent,
   StringList: StringList as unknown as LibraryComponent,
@@ -170,6 +173,38 @@ export interface CascadeResult {
 }
 
 const MARKDOWN_FIELD_NAMES = ['markdown', 'summary', 'report', 'article'];
+
+function readArtifacts(runOutput: unknown): ArtifactDownload[] {
+  if (!runOutput || typeof runOutput !== 'object' || Array.isArray(runOutput)) return [];
+  const artifacts = (runOutput as Record<string, unknown>).artifacts;
+  if (!Array.isArray(artifacts)) return [];
+  return artifacts.filter((artifact): artifact is ArtifactDownload => {
+    if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) return false;
+    const a = artifact as Record<string, unknown>;
+    return (
+      typeof a.name === 'string' &&
+      a.name.length > 0 &&
+      typeof a.url === 'string' &&
+      a.url.length > 0 &&
+      (a.mime === undefined || typeof a.mime === 'string') &&
+      (a.size === undefined || typeof a.size === 'number')
+    );
+  }).map((artifact) => ({
+    id: typeof artifact.id === 'string' ? artifact.id : undefined,
+    name: artifact.name,
+    url: artifact.url,
+    mime: typeof artifact.mime === 'string' ? artifact.mime : undefined,
+    size: typeof artifact.size === 'number' ? artifact.size : undefined,
+    sha256: typeof artifact.sha256 === 'string' ? artifact.sha256 : undefined,
+    expires_at: typeof artifact.expires_at === 'string' ? artifact.expires_at : undefined,
+  }));
+}
+
+function stripArtifacts(runOutput: unknown): unknown {
+  if (!runOutput || typeof runOutput !== 'object' || Array.isArray(runOutput)) return runOutput;
+  const { artifacts: _artifacts, ...rest } = runOutput as Record<string, unknown>;
+  return Object.keys(rest).length > 0 ? rest : null;
+}
 
 // Shared "· CACHED" suffix mirror of ScoredRowsTable.tsx (PR #578).
 // competitor-analyzer uses the composite auto-pick (RowTable + Markdown)
@@ -735,6 +770,23 @@ export function shapePick(
   if (!runOutput || typeof runOutput !== 'object') return null;
   const appSlug = ctx?.appSlug;
   const runId = ctx?.runId;
+  const artifacts = readArtifacts(runOutput);
+  if (artifacts.length > 0) {
+    const strippedOutput = stripArtifacts(runOutput);
+    const inner = strippedOutput === null ? null : shapePick(strippedOutput, ctx);
+    return (
+      <div
+        data-renderer="artifact-output"
+        style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+      >
+        <FileDownloadList artifacts={artifacts} />
+        {inner ??
+          (strippedOutput !== null && strippedOutput !== undefined ? (
+            <JsonRaw data={strippedOutput} />
+          ) : null)}
+      </div>
+    );
+  }
 
   // Arrays at the top level. Array of strings → StringList, array of
   // flat objects → RowTable. Anything else falls through.
@@ -894,6 +946,38 @@ export function pickRenderer({
   onShare,
 }: CascadeArgs): CascadeResult {
   const appSlug = app.slug;
+  const artifacts = readArtifacts(runOutput);
+  if (artifacts.length > 0) {
+    const strippedOutput = stripArtifacts(runOutput);
+    const inner =
+      strippedOutput === null
+        ? null
+        : pickRenderer({
+            app,
+            action,
+            runOutput: strippedOutput,
+            runId,
+            appName,
+            durationLabel,
+          });
+    const innerElement =
+      inner?.element ??
+      (strippedOutput !== null && strippedOutput !== undefined ? (
+        <JsonRaw data={strippedOutput} />
+      ) : null);
+    return {
+      kind: inner?.kind === 'fallback' ? 'auto' : inner?.kind ?? 'auto',
+      element: (
+        <div
+          data-renderer="artifact-output"
+          style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+        >
+          <FileDownloadList artifacts={artifacts} />
+          {innerElement}
+        </div>
+      ),
+    };
+  }
   const render = app.manifest?.render;
   if (render && typeof render.output_component === 'string') {
     const Component = OUTPUT_LIBRARY[render.output_component];
