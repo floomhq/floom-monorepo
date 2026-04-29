@@ -75,6 +75,7 @@ const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 export function __resetStoreForTests(): void {
   store.clear();
   lastSweep = 0;
+  __resetAbuseStoreForTests();
 }
 
 function maybeSweep(now: number): void {
@@ -98,11 +99,13 @@ interface CheckResult {
 
 export interface RunRateLimitBlock {
   ok: false;
-  status: 429;
+  status: 429 | 503;
   body: {
-    error: 'rate_limit_exceeded';
+    error: 'rate_limit_exceeded' | 'server_overloaded';
     retry_after_seconds: number;
-    scope: Scope;
+    scope?: Scope;
+    code?: 'abuse_fuse_active';
+    message?: string;
   };
   headers: Record<string, string>;
 }
@@ -197,8 +200,74 @@ interface AbuseWindow {
 }
 const abuseStore = new Map<string, AbuseWindow>();
 const ABUSE_WINDOW_MS = 5 * 60 * 1000;
-const ABUSE_THRESHOLD = 10;
+const ABUSE_THRESHOLD = envNumber('FLOOM_ABUSE_FUSE_429_THRESHOLD', 10);
 const ABUSE_ALERT_COOLDOWN_MS = 60 * 60 * 1000;
+const ABUSE_FUSE_TTL_MS = envNumber('FLOOM_ABUSE_FUSE_TTL_SECONDS', 15 * 60) * 1000;
+
+let abuseFuseUntil = 0;
+let abuseFuseReason = '';
+
+function isAbuseFuseDisabled(): boolean {
+  return process.env.FLOOM_ABUSE_FUSE_DISABLED === 'true';
+}
+
+export function getAbuseFuseStatus(now = Date.now()): {
+  active: boolean;
+  retryAfterSec: number;
+  reason: string;
+  until: string | null;
+} {
+  if (isAbuseFuseDisabled() || abuseFuseUntil <= now) {
+    return { active: false, retryAfterSec: 0, reason: '', until: null };
+  }
+  return {
+    active: true,
+    retryAfterSec: Math.max(1, Math.ceil((abuseFuseUntil - now) / 1000)),
+    reason: abuseFuseReason,
+    until: new Date(abuseFuseUntil).toISOString(),
+  };
+}
+
+export function armAbuseFuse(reason: string, now = Date.now()): void {
+  if (isAbuseFuseDisabled()) return;
+  const nextUntil = now + ABUSE_FUSE_TTL_MS;
+  const wasActive = abuseFuseUntil > now;
+  abuseFuseUntil = Math.max(abuseFuseUntil, nextUntil);
+  abuseFuseReason = reason;
+  if (!wasActive) {
+    sendDiscordAlert(
+      'Floom abuse fuse armed',
+      `Expensive run/MCP/write surfaces are temporarily returning 503 for ${Math.round(ABUSE_FUSE_TTL_MS / 1000)}s.`,
+      { reason },
+    );
+  }
+}
+
+export function __resetAbuseFuseForTests(): void {
+  abuseFuseUntil = 0;
+  abuseFuseReason = '';
+}
+
+function abuseFuseBlock(now = Date.now()): RunRateLimitBlock | null {
+  const status = getAbuseFuseStatus(now);
+  if (!status.active) return null;
+  const retryAfter = clampRetryAfter(status.retryAfterSec);
+  return {
+    ok: false,
+    status: 503,
+    body: {
+      error: 'server_overloaded',
+      code: 'abuse_fuse_active',
+      message: 'Server temporarily unavailable due to unusually high request volume. Please retry shortly.',
+      retry_after_seconds: retryAfter,
+    },
+    headers: {
+      'Retry-After': String(retryAfter),
+      'Cache-Control': 'no-store',
+      'X-Floom-Abuse-Fuse': 'active',
+    },
+  };
+}
 
 function noteRateLimitHitForAbuse(ip: string, scope: Scope, now: number): void {
   // Skip authed-user 429s (misconfigured client, not abuse) and unknown IPs.
@@ -210,18 +279,21 @@ function noteRateLimitHitForAbuse(ip: string, scope: Scope, now: number): void {
     abuseStore.set(ip, entry);
   }
   entry.count += 1;
-  if (entry.count >= ABUSE_THRESHOLD && now - entry.lastAlertAt > ABUSE_ALERT_COOLDOWN_MS) {
-    entry.lastAlertAt = now;
+  if (entry.count >= ABUSE_THRESHOLD) {
     // Mask IPv4 last octet; truncate IPv6. Actionable signal without
     // splashing raw PII into Discord.
     const masked = ip.includes('.')
       ? ip.replace(/\.\d+$/, '.xxx')
       : ip.replace(/(:[0-9a-f]+){5,}$/i, ':xxxx');
-    sendDiscordAlert(
-      'Floom abuse: repeated 429s',
-      `IP \`${masked}\` tripped ${entry.count} rate-limits in ${Math.round(ABUSE_WINDOW_MS / 60000)}m.`,
-      { scope },
-    );
+    armAbuseFuse(`ip=${masked} scope=${scope} rate_limits=${entry.count}`);
+    if (now - entry.lastAlertAt > ABUSE_ALERT_COOLDOWN_MS) {
+      entry.lastAlertAt = now;
+      sendDiscordAlert(
+        'Floom abuse: repeated 429s',
+        `IP \`${masked}\` tripped ${entry.count} rate-limits in ${Math.round(ABUSE_WINDOW_MS / 60000)}m.`,
+        { scope },
+      );
+    }
   }
   if (entry.count > 10_000) entry.count = 10_000;
 }
@@ -229,6 +301,7 @@ function noteRateLimitHitForAbuse(ip: string, scope: Scope, now: number): void {
 /** Reset the abuse store. Exported for tests. */
 export function __resetAbuseStoreForTests(): void {
   abuseStore.clear();
+  __resetAbuseFuseForTests();
 }
 
 function buildRateLimitBlock(
@@ -379,6 +452,8 @@ export function checkRunRateLimit(
   // server operator without opening the limit up publicly. Returns false
   // when no token is configured, so OSS mode still enforces the caps.
   if (hasValidAdminBearer(c)) return { ok: true };
+  const fuse = abuseFuseBlock();
+  if (fuse) return fuse;
   const now = Date.now();
   const windowMs = 3600 * 1000;
   const ip = extractIp(c);
@@ -426,6 +501,18 @@ export function checkRunRateLimit(
   }
 
   return { ok: true };
+}
+
+export function abuseFuseMiddleware(options: { writesOnly?: boolean } = {}): MiddlewareHandler {
+  return async (c, next) => {
+    if (options.writesOnly && !WRITE_METHODS.has(c.req.method.toUpperCase())) {
+      return next();
+    }
+    if (isRateLimitDisabled() || hasValidAdminBearer(c)) return next();
+    const fuse = abuseFuseBlock();
+    if (!fuse) return next();
+    return c.json(fuse.body, fuse.status, fuse.headers);
+  };
 }
 
 /**

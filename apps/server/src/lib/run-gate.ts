@@ -28,7 +28,7 @@ export type RunGateResult =
   | { ok: true }
   | {
       ok: false;
-      status: 413 | 429;
+      status: 413 | 429 | 503;
       body: Record<string, unknown>;
       headers?: Record<string, string>;
     };

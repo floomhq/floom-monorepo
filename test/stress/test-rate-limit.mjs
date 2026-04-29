@@ -234,6 +234,27 @@ log(
   Number(second.headers.get('retry-after')) <= 300,
 );
 
+// 5b. Abuse fuse: repeated 429s from one source arm a short global brake for
+// expensive run/MCP/write surfaces. This is the launch-night sleep fuse: once
+// abuse is detected, subsequent run checks return 503 instead of spending more
+// work on app execution.
+rl.__resetStoreForTests();
+process.env.FLOOM_RATE_LIMIT_IP_PER_HOUR = '1';
+const mw5b = rl.runRateLimitMiddleware(anonResolve);
+await mw5b(makeCtx({ ip: '6.6.6.7' }), async () => undefined);
+let fuseArmed = null;
+for (let i = 0; i < 11; i++) {
+  fuseArmed = await mw5b(makeCtx({ ip: '6.6.6.7' }), async () => undefined);
+}
+log('abuse fuse returns 503 after repeated 429s', fuseArmed?.status === 503);
+const fuseBody = fuseArmed?.status === 503 ? await fuseArmed.json() : null;
+log('abuse fuse body is server_overloaded', fuseBody?.error === 'server_overloaded');
+log(
+  'abuse fuse sets Retry-After header',
+  Number(fuseArmed?.headers.get('retry-after')) > 0,
+);
+rl.__resetStoreForTests();
+
 // 6. authed user bucket
 rl.__resetStoreForTests();
 process.env.FLOOM_RATE_LIMIT_IP_PER_HOUR = '1';

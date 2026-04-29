@@ -58,7 +58,11 @@ import {
 } from './lib/better-auth.js';
 import { sanitizeAuthResponse } from './lib/auth-response.js';
 import { padToFloor, shouldPadAuthTiming } from './lib/auth-response-guard.js';
-import { runRateLimitMiddleware, writeRateLimitMiddleware } from './lib/rate-limit.js';
+import {
+  abuseFuseMiddleware,
+  runRateLimitMiddleware,
+  writeRateLimitMiddleware,
+} from './lib/rate-limit.js';
 import { createRateLimit } from './lib/rate-limit-store.js';
 import {
   applyProgressiveSigninDelayFromContext,
@@ -272,14 +276,16 @@ if (process.env.FLOOM_AUTH_TOKEN) {
 //   - POST /mcp and /mcp/* body-size guard (run_app rate gates inline)
 const rateLimit = runRateLimitMiddleware(resolveUserContext);
 const writeRateLimit = writeRateLimitMiddleware(resolveUserContext);
+const abuseFuse = abuseFuseMiddleware();
+const writeAbuseFuse = abuseFuseMiddleware({ writesOnly: true });
 // Body-size guard runs BEFORE the rate-limit check so an attacker can't
 // burn rate-limit budget with oversized bodies (we reject 413 before
 // incrementing the counter). Launch-hardening 2026-04-23 for the 3 hero
 // demo apps; all run surfaces share the same 8 MiB cap. /mcp root needs the
 // guard here because MCP transports parse the JSON-RPC body before a tool
 // handler can inspect whether the call is run_app.
-app.use('/mcp', runBodyLimit);
-app.use('/mcp/*', runBodyLimit);
+app.use('/mcp', abuseFuse, runBodyLimit);
+app.use('/mcp/*', abuseFuse, runBodyLimit);
 app.use('/api/:slug/jobs', runBodyLimit, rateLimit);
 // Security H2 (audit 2026-04-23): /api/hub/ingest was the only
 // unauthenticated-in-OSS write surface missing from the run-rate-limit
@@ -291,7 +297,7 @@ app.use('/api/hub/ingest', runBodyLimit, rateLimit);
 // Security launch-week #600: global write limiter for all /api mutations.
 // Existing per-route limiters are explicitly skipped inside the middleware
 // to avoid double-throttling (run surfaces, feedback, waitlist).
-app.use('/api/*', writeRateLimit);
+app.use('/api/*', writeAbuseFuse, writeRateLimit);
 
 // API routes
 app.route('/api/health', healthRouter);
