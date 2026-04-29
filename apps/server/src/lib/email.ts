@@ -283,7 +283,7 @@ ${body}
 </td></tr>
 
 <tr><td style="padding:24px 4px 4px;font-family:${SANS};font-size:12px;line-height:1.6;color:${EMAIL_MUTED};">
-<strong style="color:${EMAIL_INK};font-weight:600;">Floom</strong>: infrastructure for agentic work.<br>
+<strong style="color:${EMAIL_INK};font-weight:600;">Floom</strong>: the runtime for agentic work.<br>
 <a href="https://floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">floom.dev</a> &middot; Floom, Inc. &middot; Wilmington, DE<br>
 Questions? Just reply to this email, or write <a href="mailto:hello@floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">hello@floom.dev</a>.${unsubscribeBlock}
 </td></tr>
@@ -438,7 +438,7 @@ export function renderWelcomeEmail(input: WelcomeTemplateInput): {
   const body = [
     bodyParagraph(greeting),
     bodyParagraph(
-      'Your account is live. Your first app is one URL paste away — point Floom at a GitHub repo or an OpenAPI spec and it does the rest.',
+      'Your account is live. Your first app is one URL paste away: point Floom at a GitHub repo or an OpenAPI spec and it does the rest.',
     ),
     ctaButton(buildUrl, 'Build your first app'),
     mutedParagraph(
@@ -464,7 +464,7 @@ export function renderWelcomeEmail(input: WelcomeTemplateInput): {
       heading: 'Welcome to Floom',
       body,
       preheader:
-        'Your account is live. Paste a repo, ship an app — your first one is on us.',
+        'Your account is live. Paste a repo, ship an app. Your first one is on us.',
       unsubscribeUrl: input.unsubscribeUrl,
     }),
     text,
