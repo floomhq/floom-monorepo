@@ -489,16 +489,98 @@
   }
 }
 
-/* origin: PublicFooter.tsx (R13 2026-04-28 CSP migration — residual) */
-@media (max-width: 760px) {
-  [data-testid="footer-columns"] {
-    grid-template-columns: 1fr 1fr !important;
-    gap: 28px !important;
+/* origin: PublicFooter.tsx (R13 2026-04-28 CSP migration — residual)
+   R39 (2026-04-29): mobile footer clean-up — column hierarchy, spacing, social row */
+
+/* ── Tablet & below: "Built in SF" must not wrap in brand column ── */
+@media (max-width: 800px) {
+  .public-footer-sf {
+    white-space: nowrap !important;
+    font-size: 11px !important;
   }
 }
+
+/* ── Tablet: 2-col grid, tighter gap ── */
+@media (max-width: 760px) {
+  .public-footer {
+    padding: 40px 20px 24px !important;
+  }
+  [data-testid="footer-columns"] {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 28px 24px !important;
+    padding: 0 !important;
+    margin-bottom: 24px !important;
+  }
+  /* Brand column spans full width on 2-col grid */
+  .public-footer-brand {
+    grid-column: 1 / -1 !important;
+    gap: 8px !important;
+    padding-bottom: 4px !important;
+  }
+  /* Section labels become visual dividers */
+  .public-footer-col-label {
+    border-top: 1px solid var(--line) !important;
+    padding-top: 20px !important;
+    margin-top: 0 !important;
+    width: 100% !important;
+  }
+  /* Bottom row: keep side-by-side, reduce gap */
+  .public-footer-bottom {
+    padding-top: 16px !important;
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+  }
+  /* Tighten inner wrapper of footer-columns container */
+  [data-testid="public-footer"] > div:last-of-type {
+    padding: 0 !important;
+  }
+}
+
+/* ── Mobile: 1-col grid ── */
 @media (max-width: 480px) {
+  .public-footer {
+    padding: 36px 20px 20px !important;
+  }
   [data-testid="footer-columns"] {
     grid-template-columns: 1fr !important;
+    gap: 0 !important;
+    margin-bottom: 20px !important;
+  }
+  /* Brand block: compact gap, keep logo+tagline tight */
+  .public-footer-brand {
+    grid-column: 1 !important;
+    gap: 6px !important;
+    padding-bottom: 8px !important;
+  }
+  /* "Built in SF" line: allow natural wrap, no orphan on 320px */
+  .public-footer-sf {
+    white-space: nowrap !important;
+    font-size: 11px !important;
+  }
+  /* Each link-column: thin top border + padding acts as section divider */
+  .public-footer-col-label {
+    border-top: 1px solid var(--line) !important;
+    padding-top: 20px !important;
+    margin-bottom: 2px !important;
+    width: 100% !important;
+  }
+  /* Reduce vertical gap between links within each column */
+  [data-testid="footer-columns"] > div {
+    gap: 8px !important;
+    padding-bottom: 4px !important;
+  }
+  /* Bottom row: social icons inline with copyright, minimal gap */
+  .public-footer-bottom {
+    padding-top: 14px !important;
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+  }
+  /* Shrink social icon buttons slightly on tiny screens */
+  .public-footer-bottom a[aria-label] {
+    width: 34px !important;
+    height: 34px !important;
   }
 }
 
