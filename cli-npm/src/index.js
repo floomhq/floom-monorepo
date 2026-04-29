@@ -26,7 +26,7 @@ const path = require('path');
 const readline = require('readline');
 const { execSync, spawn } = require('child_process');
 
-const VERSION = '0.2.5';
+const VERSION = '0.2.6';
 const DEFAULT_API_URL = process.env.FLOOM_API_URL || 'https://floom.dev';
 const CONFIG_PATH = process.env.FLOOM_CONFIG || path.join(os.homedir(), '.floom', 'config.json');
 
@@ -262,12 +262,15 @@ ${c.bold('usage:')}
   floom auth <agent-token>     ${c.dim('# save token non-interactively')}
   floom auth login --token=... ${c.dim('# validate token, then save config non-interactively')}
   floom auth whoami            ${c.dim('# print identity for current token')}
-  floom run <slug> [json]      ${c.dim('# run a Floom app by slug and wait for result')}
+  floom run <slug> [json]      ${c.dim('# run a Floom app by slug, poll, and print result')}
+  floom run <slug> --input k=v ${c.dim('# pass repeatable key=value inputs')}
+  floom run <slug> --json      ${c.dim('# print raw final run JSON')}
   floom apps list [--json]     ${c.dim('# list workspace apps')}
   floom deploy                 ${c.dim('# validate + publish current floom.yaml')}
   floom init                   ${c.dim('# scaffold floom.yaml in current dir')}
   floom status [--json]        ${c.dim('# list apps and recent runs')}
   floom account                ${c.dim('# manage secrets; agent-token commands need a browser session')}
+  floom api <METHOD> <PATH>    ${c.dim('# call raw API endpoints with saved auth')}
 
 ${c.bold('options:')}
   --help, -h                   show this help
