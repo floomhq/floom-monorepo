@@ -32,6 +32,7 @@ floom auth login --token=... # validate token, then save config non-interactivel
 floom auth whoami            # print identity for current token
 floom run <slug> [json]      # run a Floom app by slug and wait for result
 floom run <slug> --input k=v # pass repeatable key=value inputs
+floom run <slug> --user-api-key $KEY # pass a BYOK key for gated launch apps
 floom run <slug> --json      # print raw JSON
 floom apps list [--json]     # list workspace apps
 floom deploy                 # validate + publish current floom.yaml
@@ -51,6 +52,12 @@ runs. Authenticated runs still use your saved Agent token when one is present.
 | `FLOOM_API_URL` | `https://floom.dev`             | API host (use mvp.floom.dev for the MVP cloud) |
 | `FLOOM_CONFIG`  | `~/.floom/config.json`          | Config file location     |
 | `FLOOM_CLI_NO_BROWSER` | unset                    | Set to `1` to print login URLs without opening a browser |
+| `FLOOM_USER_API_KEY` | unset                       | BYOK key forwarded as `X-User-Api-Key` for gated launch app runs |
+
+Agent-token management commands under `floom account agent-tokens` require a
+signed-in browser session on the server. Agent tokens are rejected for creating,
+listing, or revoking other Agent tokens; use `/me/agent-keys` in a signed-in
+browser for that flow.
 
 ## What this package is
 

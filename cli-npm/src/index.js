@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @floomhq/cli v0.2.11 — pure-Node implementation, no curl/bash/python3/jq deps.
+ * @floomhq/cli — pure-Node implementation, no curl/bash/python3/jq deps.
  *
  * All HTTP calls use Node's built-in fetch (Node 18+).
  * Origin header is sent on every request (Better Auth requirement).
@@ -24,10 +24,12 @@ const os = require('os');
 const path = require('path');
 const readline = require('readline');
 const { spawn } = require('child_process');
+const pkg = require('../package.json');
 
-const VERSION = '0.2.11';
+const VERSION = pkg.version;
 const DEFAULT_API_URL = process.env.FLOOM_API_URL || 'https://floom.dev';
 const CONFIG_PATH = process.env.FLOOM_CONFIG || path.join(os.homedir(), '.floom', 'config.json');
+const USER_API_KEY_HEADER = 'X-User-Api-Key';
 
 // ---- color helpers (no deps) -----------------------------------------------
 
@@ -1293,7 +1295,11 @@ async function runRun(opts, args) {
       "  floom run <slug> '<json>'           run app with JSON body",
       '  floom run <slug> --input key=val    run app with key=value pairs (repeatable)',
       '  floom run <slug> --use-context      fill missing inputs from profiles',
+      '  floom run <slug> --user-api-key KEY pass BYOK key as X-User-Api-Key',
       '  floom run <slug> --json             print raw JSON',
+      '',
+      'env:',
+      '  FLOOM_USER_API_KEY                  BYOK key for gated launch apps',
       '',
       'examples:',
       '  floom run uuid',
@@ -1311,6 +1317,7 @@ async function runRun(opts, args) {
   const inputPairs = [];
   let useContext = false;
   let jsonOutput = false;
+  let userApiKey = process.env.FLOOM_USER_API_KEY || '';
   const waitSeconds = parseInt(process.env.FLOOM_RUN_WAIT_SECONDS || '60', 10);
 
   for (let i = 0; i < rest.length; i++) {
@@ -1319,6 +1326,8 @@ async function runRun(opts, args) {
     else if (a.startsWith('--input=')) { inputPairs.push(a.slice(8)); }
     else if (a === '--use-context') { useContext = true; }
     else if (a === '--json') { jsonOutput = true; }
+    else if (a === '--user-api-key' && rest[i+1]) { userApiKey = rest[++i]; }
+    else if (a.startsWith('--user-api-key=')) { userApiKey = a.slice(15); }
     else if (!a.startsWith('-')) {
       // Raw JSON body
       try { body = JSON.parse(a); } catch (e) {
@@ -1342,6 +1351,7 @@ async function runRun(opts, args) {
   }
 
   if (useContext) body.use_context = true;
+  userApiKey = String(userApiKey || '').trim();
 
   // POST to start run
   let initial;
@@ -1349,6 +1359,7 @@ async function runRun(opts, args) {
     initial = await authFetch(opts.apiUrl, `/api/${slug}/run`, {
       method: 'POST',
       body: JSON.stringify(body),
+      headers: userApiKey ? { [USER_API_KEY_HEADER]: userApiKey } : undefined,
     });
   } catch (e) {
     process.stderr.write(`floom run: ${e.message}\n`);
@@ -1994,6 +2005,11 @@ usage:
   floom account agent-tokens list
   floom account agent-tokens create --label <label> --scope <read|read-write|publish-only>
   floom account agent-tokens revoke <token-id>
+
+note:
+  Agent-token management requires a browser session. Agent tokens are rejected
+  for creating, listing, or revoking other Agent tokens; open /me/agent-keys in
+  a signed-in browser for that flow.
 `);
 }
 
@@ -2009,6 +2025,7 @@ ${c.bold('usage:')}
   floom auth whoami            ${c.dim('# print identity for current token')}
   floom run <slug> [json]      ${c.dim('# run a Floom app by slug, poll, and print result')}
   floom run <slug> --input k=v ${c.dim('# pass repeatable key=value inputs')}
+  floom run <slug> --user-api-key KEY ${c.dim('# pass BYOK key for gated apps')}
   floom run <slug> --json      ${c.dim('# print raw final run JSON')}
   floom apps list [--json]     ${c.dim('# list workspace apps')}
   floom deploy                 ${c.dim('# validate + publish current floom.yaml')}
@@ -2124,7 +2141,7 @@ async function main() {
         default:
           // floom auth <token> [api-url]
           if (authSub && authSub !== '') {
-            await runAuthSaveToken(authSub, rest[1]);
+            await runAuthSaveToken(authSub, apiUrl || rest[1]);
           } else {
             process.stderr.write('floom auth: missing subcommand\n');
             process.exit(1);

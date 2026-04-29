@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json') as { version: string };
 
 const program = new Command();
 program
   .name('floom')
-  .description('Production layer for AI apps that do real work')
-  .version('0.1.0');
+  .description('Deprecated compatibility stub. Use the published @floomhq/cli package for the supported Floom CLI.')
+  .version(version)
+  .addHelpText(
+    'after',
+    '\nThis @floom/cli workspace package is deprecated and only kept so monorepo builds stay green. Install @floomhq/cli for the supported CLI.\n',
+  );
 
 program
   .command('deploy <repo>')
