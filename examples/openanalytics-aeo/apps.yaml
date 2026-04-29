@@ -1,0 +1,15 @@
+apps:
+  - slug: openanalytics-aeo
+    display_name: AEO Analytics
+    category: marketing
+    description: >
+      Brand + competitors -> AI answer visibility score and recommendations.
+    runtime: node
+    entrypoint: examples/openanalytics-aeo/server.mjs
+    port: 15403
+    visibility: public
+    env: []
+    icon: openanalytics-aeo
+    tags:
+      - floom-build
+      - marketing
