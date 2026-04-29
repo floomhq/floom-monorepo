@@ -144,8 +144,8 @@ export function LandingMVPPage() {
                 whiteSpace: 'nowrap',
               }}
             >
-              Get your MCP token \u2192
-            </Link>
+              Get your MCP token →
+</Link>
             <Link
               to="/login"
               style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}
