@@ -43,6 +43,13 @@ export const TEST_FIXTURE_SLUG =
 export const TEST_FIXTURE_DESC =
   /^(This is a sample Pet Store Server|GitHub's v3 REST API\.|A simple HTTP Request & Response Service)/i;
 
+// R37 (2026-04-29): docker-runtime hide list (CLOUD_DOCKER_RUNTIME_HIDE_SLUGS)
+// is no longer needed — competitor-lens, ai-readiness-audit, pitch-coach now
+// run as proxy-runtime Python sidecars via launch-week-sidecars.ts and are
+// visible in the public catalog. The cloud-hide gate logic was removed in the
+// v26 hub-filter refactor; this comment is the only trace of R37's metadata
+// change since the gate it patched no longer exists.
+
 export function isTestFixture(app: HubFilterApp): boolean {
   if (TEST_FIXTURE_SLUG.test(app.slug)) return true;
   if (app.description && TEST_FIXTURE_DESC.test(app.description)) return true;

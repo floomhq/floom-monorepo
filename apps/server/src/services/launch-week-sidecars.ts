@@ -31,6 +31,12 @@ interface LaunchWeekSidecar {
   port: number;
   healthPath: string;
   apps: LaunchWeekApp[];
+  /**
+   * Optional command override for non-Node sidecars. Defaults to
+   * `[process.execPath, script]` (Node.js). For Python sidecars set to
+   * e.g. `['python3', script]`.
+   */
+  cmd?: readonly string[];
 }
 
 const SIDECARS: LaunchWeekSidecar[] = [
@@ -124,6 +130,64 @@ const SIDECARS: LaunchWeekSidecar[] = [
           'Paste a GitHub repo URL and get the Floom app shape: inputs, outputs, build plan, and next step.',
         category: 'developer-tools',
         openapiPath: '/floom-this/openapi.json',
+        featured: true,
+      },
+    ],
+  },
+  // R37 (2026-04-29): pitch-coach, competitor-lens, ai-readiness-audit ported
+  // from docker-runtime to proxy-runtime. Python FastAPI sidecars forked here
+  // instead of building Docker images. Unhides the 3 slugs from the public
+  // catalog and removes the /p/:slug "launching soon" gate in AppPermalinkPage.
+  {
+    name: 'pitch-coach',
+    script: 'examples/pitch-coach/server.py',
+    cmd: ['python3', 'examples/pitch-coach/server.py'],
+    port: Number(process.env.PITCH_COACH_PORT || 4130),
+    healthPath: '/health',
+    apps: [
+      {
+        slug: 'pitch-coach',
+        display_name: 'Pitch Coach',
+        description:
+          'Paste a 20-500 char startup pitch. Get 3 direct critiques, 3 angle-specific rewrites, and a 1-line TL;DR of the biggest issue. Under 5 seconds.',
+        category: 'writing',
+        openapiPath: '/openapi.json',
+        featured: true,
+      },
+    ],
+  },
+  {
+    name: 'competitor-lens',
+    script: 'examples/competitor-lens/server.py',
+    cmd: ['python3', 'examples/competitor-lens/server.py'],
+    port: Number(process.env.COMPETITOR_LENS_PORT || 4131),
+    healthPath: '/health',
+    apps: [
+      {
+        slug: 'competitor-lens',
+        display_name: 'Competitor Lens',
+        description:
+          'Paste 2 URLs (yours + one competitor). Get the positioning, pricing, and angle diff in under 5 seconds.',
+        category: 'research',
+        openapiPath: '/openapi.json',
+        featured: true,
+      },
+    ],
+  },
+  {
+    name: 'ai-readiness-audit',
+    script: 'examples/ai-readiness-audit/server.py',
+    cmd: ['python3', 'examples/ai-readiness-audit/server.py'],
+    port: Number(process.env.AI_READINESS_AUDIT_PORT || 4132),
+    healthPath: '/health',
+    apps: [
+      {
+        slug: 'ai-readiness-audit',
+        display_name: 'AI Readiness Audit',
+        description:
+          'Paste a company URL. Get a readiness score, 3 risks, 3 opportunities, and one concrete next step.',
+        category: 'research',
+        openapiPath: '/openapi.json',
         featured: true,
       },
     ],
@@ -238,7 +302,13 @@ export async function startLaunchWeekApps(): Promise<LaunchWeekBootResult> {
     }
 
     console.log(`[launch-week] forking ${sidecar.name}: ${scriptPath}`);
-    const child = spawn(process.execPath, [scriptPath], {
+    // Python sidecars supply their own `cmd` array; Node sidecars default to
+    // `[process.execPath, scriptPath]`. The first element is the executable,
+    // the rest are argv (scriptPath is substituted for the path placeholder).
+    const [exe, ...args] = sidecar.cmd
+      ? sidecar.cmd.map((part) => (part === sidecar.script ? scriptPath : part))
+      : [process.execPath, scriptPath];
+    const child = spawn(exe, args, {
       env: {
         ...process.env,
         PORT: String(sidecar.port),

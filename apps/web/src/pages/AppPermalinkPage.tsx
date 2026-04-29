@@ -66,6 +66,12 @@ const GITHUB_REPOS: Record<string, string> = {
   'ig-nano-scout': 'https://github.com/floomhq/floom/tree/main/examples/ig-nano-scout',
 };
 
+// R37 (2026-04-29): competitor-lens, ai-readiness-audit, pitch-coach were
+// removed. They now run as proxy-runtime Python sidecars via
+// launch-week-sidecars.ts. The /p/:slug page renders the real RunSurface.
+// Keeping the Set empty so the guard below is a no-op for these three slugs.
+const DOCKER_RUNTIME_COMING_SOON_SLUGS = new Set<string>([]);
+
 // v23 PR-D (2026-04-26): per-slug hero subhead override for the 3 launch
 // demos. The wireframe ships a sales-tone one-liner that explains what the
 // app does + what to expect, instead of the generic markdown-stripped
