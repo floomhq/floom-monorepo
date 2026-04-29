@@ -293,7 +293,7 @@ export function CopyForClaudeButton({ variant = 'desktop' }: Props = {}) {
       >
         <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--accent)', display: 'inline-block' }} />
         <ClipboardIcon />
-        Get install snippet
+        Copy for Claude
       </button>
       {open && (
         <div role="menu" data-testid="mcp-popover" style={{ ...popoverBaseStyle, top: 'calc(100% + 8px)', right: 0 }}>
