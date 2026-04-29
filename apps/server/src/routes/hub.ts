@@ -65,6 +65,17 @@ function appLibraryError(c: Context, err: unknown): Response {
   return c.json({ error: (err as Error).message, code: 'app_library_failed' }, 500);
 }
 
+function forwardGet(c: Context, pathname: string): Promise<Response> {
+  const url = new URL(c.req.url);
+  url.pathname = pathname;
+  return Promise.resolve(hubRouter.fetch(
+    new Request(url, {
+      method: 'GET',
+      headers: c.req.raw.headers,
+    }),
+  ));
+}
+
 /**
  * Pull just the host out of a proxied app's base_url, for the
  * `/api/hub/:slug` response. Used by the /p/:slug runner surface to
@@ -459,6 +470,10 @@ hubRouter.get('/installed', async (c) => {
     })),
   });
 });
+
+// Compatibility alias used by pre-0.2.7 scripts. The canonical store list is
+// GET /api/hub; keep /api/hub/store from falling through to /api/hub/:slug.
+hubRouter.get('/store', (c) => forwardGet(c, '/'));
 
 hubRouter.post('/:slug/fork', async (c) => {
   const ctx = await resolveUserContext(c);

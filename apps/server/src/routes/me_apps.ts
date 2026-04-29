@@ -110,6 +110,47 @@ function publicUrl(): string {
   return (process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3051}`).replace(/\/+$/, '');
 }
 
+// Compatibility alias for older scripts that listed creator apps at
+// GET /api/me/apps. The canonical endpoint is GET /api/hub/mine.
+meAppsRouter.get('/', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const rows = db
+    .prepare(
+      `SELECT apps.*, (
+         SELECT COUNT(*) FROM runs WHERE runs.app_id = apps.id
+       ) AS run_count,
+       (
+         SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
+       ) AS last_run_at
+         FROM apps
+        WHERE apps.workspace_id = ?
+        ORDER BY apps.updated_at DESC`,
+    )
+    .all(ctx.workspace_id) as Array<AppRecord & { run_count: number; last_run_at: string | null }>;
+
+  return c.json({
+    apps: rows.map((row) => ({
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      category: row.category,
+      icon: row.icon,
+      author: row.author,
+      status: row.status,
+      app_type: row.app_type,
+      openapi_spec_url: row.openapi_spec_url,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      run_count: row.run_count || 0,
+      last_run_at: row.last_run_at,
+      visibility: row.visibility,
+      is_async: row.is_async === 1,
+      run_rate_limit_per_hour: row.run_rate_limit_per_hour ?? null,
+      publish_status: row.publish_status,
+    })),
+  });
+});
+
 const SharingPatchBody = z.object({
   state: z.enum(['private', 'link', 'invited']),
   comment: z.string().max(5000).optional(),

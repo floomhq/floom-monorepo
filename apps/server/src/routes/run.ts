@@ -17,6 +17,7 @@ import {
 } from '../lib/auth.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import { resolveUserContext } from '../services/session.js';
+import * as ws from '../services/workspaces.js';
 import { applyProfileContext } from '../services/profile_context.js';
 import { parseJsonBody, bodyParseError } from '../lib/body.js';
 import {
@@ -779,6 +780,20 @@ slugQuotaRouter.get('/', async (c) => {
 // Browser/device callers keep the legacy owner filter for compatibility.
 // Agent-token callers are workspace principals, so they list workspace runs.
 export const meRouter = new Hono();
+
+// Compatibility alias for older clients that used GET /api/me before the
+// richer session payload moved to /api/session/me.
+meRouter.get('/', async (c) => {
+  const ctx = await resolveUserContext(c);
+  try {
+    return c.json(ws.me(ctx, isCloudMode()));
+  } catch (err) {
+    return c.json(
+      { error: (err as Error).message || 'session_failed', code: 'session_failed' },
+      500,
+    );
+  }
+});
 
 meRouter.get('/invites', async (c) => {
   const ctx = await resolveUserContext(c);
