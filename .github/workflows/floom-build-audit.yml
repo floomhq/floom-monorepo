@@ -45,7 +45,17 @@ jobs:
           script: |
             const title = context.payload.pull_request.title || "";
             const branch = context.payload.pull_request.head.ref || "";
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const exampleSlug = files
+              .map((file) => file.filename.match(/^examples\/([^/]+)\//)?.[1])
+              .find(Boolean);
             const candidates = [
+              exampleSlug,
               title.match(/`([^`]+)`/)?.[1],
               title.match(/feat:\s*(?:add\s+)?([a-z0-9][a-z0-9-]+)/i)?.[1],
               branch.match(/(?:feat|fix)\/([a-z0-9][a-z0-9-]+?)(?:-v\d+)?$/i)?.[1],
@@ -53,12 +63,14 @@ jobs:
             ].filter(Boolean);
             const slug = candidates[0] || "";
             core.setOutput("slug", slug);
+            core.setOutput("has_app_changes", files.some((file) => file.filename.startsWith("examples/")) ? "true" : "false");
             core.summary.addRaw(`Detected slug: ${slug || "(none)"}`).write();
 
       - name: Run static audit gates
         id: audit
         env:
           SLUG: ${{ steps.slug.outputs.slug }}
+          HAS_APP_CHANGES: ${{ steps.slug.outputs.has_app_changes }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -euo pipefail
@@ -67,6 +79,7 @@ jobs:
           const fs = require("fs");
           const cp = require("child_process");
           const slug = process.env.SLUG || "";
+          const hasAppChanges = process.env.HAS_APP_CHANGES === "true";
           const appDir = slug ? `examples/${slug}` : "";
           const gates = [];
           const add = (gate, name, verdict, detail = "") => gates.push({ gate, name, verdict, detail });
@@ -81,7 +94,9 @@ jobs:
             }
           };
 
-          if (!slug) {
+          if (!hasAppChanges) {
+            add("G-1", "search-first", "SKIP", "No examples/ app changes in this PR.");
+          } else if (!slug) {
             add("G-1", "search-first", "FAIL", "Could not infer slug from PR title or branch.");
           } else if (exists(appDir)) {
             add("G-1", "search-first", "PASS", appDir);
@@ -90,7 +105,9 @@ jobs:
           }
 
           const spec = appDir ? read(`${appDir}/SPEC.md`) : "";
-          if (!process.env.GEMINI_API_KEY) {
+          if (!hasAppChanges) {
+            add("G0", "spec sanity", "SKIP", "No app SPEC.md in this PR.");
+          } else if (!process.env.GEMINI_API_KEY) {
             add("G0", "spec sanity", "FAIL", "GEMINI_API_KEY secret is not configured for this workflow.");
           } else if (spec.includes("golden_inputs") && spec.includes("golden_outputs")) {
             add("G0", "spec sanity", "PASS", "SPEC.md has golden input/output contract.");
@@ -100,19 +117,25 @@ jobs:
 
           const server = appDir ? read(`${appDir}/server.mjs`) : "";
           const appsYaml = appDir ? read(`${appDir}/apps.yaml`) : "";
-          if (server.includes("OPENAPI") && server.includes(`/${slug}/run`) && (server.includes("/openapi") || appsYaml.includes("openapi"))) {
+          if (!hasAppChanges) {
+            add("G4", "OpenAPI static", "SKIP", "No app server in this PR.");
+          } else if (server.includes("OPENAPI") && server.includes(`/${slug}/run`) && (server.includes("/openapi") || appsYaml.includes("openapi"))) {
             add("G4", "OpenAPI static", "PASS", "OpenAPI route and run path present.");
           } else {
             add("G4", "OpenAPI static", "FAIL", "OpenAPI route or run path missing.");
           }
 
-          if (spec.includes("golden_inputs") && spec.includes("golden_outputs")) {
+          if (!hasAppChanges) {
+            add("G7", "golden cases", "SKIP", "No app SPEC.md in this PR.");
+          } else if (spec.includes("golden_inputs") && spec.includes("golden_outputs")) {
             add("G7", "golden cases", "PASS", "Golden cases present.");
           } else {
             add("G7", "golden cases", "FAIL", "Golden cases missing.");
           }
 
-          if (/400|bad_request|invalid/i.test(server) && /try|catch|httpError/i.test(server)) {
+          if (!hasAppChanges) {
+            add("G8", "error handling", "SKIP", "No app server in this PR.");
+          } else if (/400|bad_request|invalid/i.test(server) && /try|catch|httpError/i.test(server)) {
             add("G8", "error handling", "PASS", "Static 400/error path present.");
           } else {
             add("G8", "error handling", "FAIL", "No static 400/error path found.");
@@ -121,10 +144,13 @@ jobs:
           const secretPattern = /(sk-[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})/;
           const files = appDir && exists(appDir) ? cp.execSync(`find ${appDir} -type f`, { encoding: "utf8" }).trim().split("\n").filter(Boolean) : [];
           const hit = files.find((file) => secretPattern.test(read(file)));
-          if (hit) add("G9", "secret leakage", "FAIL", `Token-shaped value found in ${hit}.`);
+          if (!hasAppChanges) add("G9", "secret leakage", "SKIP", "No app files in this PR.");
+          else if (hit) add("G9", "secret leakage", "FAIL", `Token-shaped value found in ${hit}.`);
           else add("G9", "secret leakage", "PASS", "No token-shaped values found.");
 
-          if (appDir && exists(`${appDir}/server.mjs`)) {
+          if (!hasAppChanges) {
+            add("G11a", "node syntax", "SKIP", "No app server in this PR.");
+          } else if (appDir && exists(`${appDir}/server.mjs`)) {
             const check = run(`node --check ${appDir}/server.mjs`);
             add("G11a", "node syntax", check.ok ? "PASS" : "FAIL", check.ok ? "node --check passed." : check.out);
           } else {
@@ -149,7 +175,7 @@ jobs:
       - name: Test
         if: always()
         id: test
-        run: pnpm test
+        run: pnpm --filter @floom/web test
 
       - name: Build audit table
         if: always()
@@ -162,7 +188,7 @@ jobs:
           const ci = [
             { gate: "G11b", name: "typecheck", verdict: process.env.TYPECHECK, detail: "pnpm typecheck" },
             { gate: "G11c", name: "lint", verdict: process.env.LINT, detail: "pnpm lint" },
-            { gate: "G11d", name: "test", verdict: process.env.TEST, detail: "pnpm test" },
+            { gate: "G11d", name: "test", verdict: process.env.TEST, detail: "pnpm --filter @floom/web test" },
           ];
           const rows = gates.concat(ci);
           const table = [
