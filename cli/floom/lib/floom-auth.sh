@@ -55,6 +55,10 @@ validate_token_file() {
     "${api_url%/}/api/session/me" 2>/dev/null || echo "000"
 }
 
+looks_like_agent_token() {
+  [[ "$1" =~ ^floom_agent_[0-9A-Za-z]{32}$ ]]
+}
+
 case "${1:-}" in
   --show)
     if [[ ! -f "$CONFIG" ]]; then
@@ -178,6 +182,12 @@ EOF
       echo "Then run:"
       echo "  floom auth login --token=<agent_token> --api-url=${API_URL}"
       exit 0
+    fi
+    if ! looks_like_agent_token "$AGENT_TOKEN"; then
+      echo "ERROR: Invalid Agent token format." >&2
+      echo "Agent tokens look like floom_agent_<32 alphanumeric chars>." >&2
+      echo "Mint a fresh token at ${API_URL%/}/me/agent-keys and try again." >&2
+      exit 1
     fi
     VALIDATE_FILE=$(mktemp)
     trap 'rm -f "$VALIDATE_FILE"' RETURN

@@ -132,13 +132,16 @@ async function callMcp(port, token, body) {
 }
 
 async function callMcpAt(port, path, token, body) {
+  const headers = {
+    accept: 'application/json, text/event-stream',
+    'content-type': 'application/json',
+  };
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
   const res = await fetch(`http://localhost:${port}${path}`, {
     method: 'POST',
-    headers: {
-      accept: 'application/json, text/event-stream',
-      'content-type': 'application/json',
-      authorization: `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify(body),
   });
   const text = await res.text();
@@ -199,6 +202,26 @@ try {
   log('tools/list returns HTTP 200', readList.res.status === 200, readList.text);
   log('tools/list returns JSON-RPC 2.0', readList.json?.jsonrpc === '2.0', readList.text);
   log('read token /mcp exposes read/run/app-page tools', JSON.stringify(readNames) === JSON.stringify(readExpected), JSON.stringify(readNames));
+
+  const publicList = await callMcp(server.port, null, {
+    jsonrpc: '2.0',
+    id: 101,
+    method: 'tools/list',
+    params: {},
+  });
+  log('no-token /mcp remains public', publicList.res.status === 200, publicList.text);
+
+  const invalidBearerList = await callMcp(server.port, 'invalid_token_shape', {
+    jsonrpc: '2.0',
+    id: 102,
+    method: 'tools/list',
+    params: {},
+  });
+  log(
+    'non-Floom bearer on /mcp returns 401 invalid_token',
+    invalidBearerList.res.status === 401 && invalidBearerList.json?.code === 'invalid_token',
+    invalidBearerList.text,
+  );
 
   const writeList = await callMcp(server.port, writeToken, {
     jsonrpc: '2.0',
@@ -473,6 +496,25 @@ try {
   const installPayload = parseToolText(installCall);
   const installRowCount = db.prepare(`SELECT COUNT(*) AS n FROM app_installs WHERE app_id = 'app_install_fixture' AND workspace_id = 'local'`).get().n;
   log('studio_install_app pins public app without ownership', installPayload?.installed === true && installRowCount === 1, installCall.text);
+
+  db.prepare(
+    `INSERT INTO apps (id, slug, name, description, manifest, status, code_path, author, workspace_id, visibility, publish_status)
+     VALUES ('app_install_pending_fixture', 'agent-install-pending-fixture', 'Pending Install Fixture', 'Owned pending app', ?, 'active', 'proxied:agent-install-pending-fixture', 'local', 'local', 'pending_review', 'pending_review')`,
+  ).run(publishedRow.manifest);
+  const pendingInstallCall = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 461,
+    method: 'tools/call',
+    params: { name: 'studio_install_app', arguments: { slug: 'agent-install-pending-fixture' } },
+  });
+  const pendingInstallPayload = parseToolText(pendingInstallCall);
+  log(
+    'studio_install_app returns 409 app_not_installable for owned pending-review app',
+    pendingInstallCall.json?.result?.isError === true &&
+      pendingInstallPayload?.status === 409 &&
+      pendingInstallPayload?.details?.code === 'app_not_installable',
+    pendingInstallCall.text,
+  );
 
   const uninstallCall = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',

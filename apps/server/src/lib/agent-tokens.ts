@@ -19,12 +19,16 @@ export interface AgentTokenAuthContext {
 
 const agentTokenContext = new WeakMap<Context, AgentTokenAuthContext>();
 
-export function getPresentedAgentToken(c: Context): string | null {
+function getPresentedBearer(c: Context): string | null {
   const header = c.req.header('authorization') || c.req.header('Authorization');
   if (!header) return null;
-  const match = /^Bearer\s+(.+)$/.exec(header);
-  if (!match) return null;
-  const token = match[1].trim();
+  const match = /^Bearer\s+(.+)$/i.exec(header);
+  return match ? match[1].trim() : null;
+}
+
+export function getPresentedAgentToken(c: Context): string | null {
+  const token = getPresentedBearer(c);
+  if (!token) return null;
   return isAgentTokenString(token) ? token : null;
 }
 
@@ -126,18 +130,36 @@ export function touchAgentTokenLastUsed(row: AgentTokenRecord, now = new Date())
 
 /**
  * Returns true when an Authorization header is present and looks like a
- * Floom agent token attempt (starts with `floom_agent_` or `floom_`).
+ * Floom agent token attempt (starts with `floom_agent_`).
  * Used to detect mis-formatted tokens that should return 401 instead of
  * silently routing to the admin/anon MCP server (item 7 fix).
  */
 function looksLikeAgentTokenAttempt(c: Context): boolean {
-  const header = c.req.header('authorization') || c.req.header('Authorization');
-  if (!header) return false;
-  const match = /^Bearer\s+(.+)$/i.exec(header);
-  if (!match) return false;
+  const token = getPresentedBearer(c);
+  if (!token) return false;
   // Any floom_agent_* bearer that doesn't pass the strict format check is a
   // malformed/invalid token — return 401 rather than treating as anonymous.
-  return match[1].startsWith('floom_agent_') || match[1].startsWith('floom_');
+  return token.startsWith('floom_agent_');
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+function hasPresentedAdminBearer(c: Context): boolean {
+  const expected = process.env.FLOOM_AUTH_TOKEN;
+  if (!expected) return false;
+  const token = getPresentedBearer(c);
+  return token !== null && constantTimeEqual(token, expected);
+}
+
+function isMcpRequest(c: Context): boolean {
+  return new URL(c.req.url).pathname.startsWith('/mcp');
 }
 
 export const agentTokenAuthMiddleware: MiddlewareHandler = async (c, next) => {
@@ -148,7 +170,11 @@ export const agentTokenAuthMiddleware: MiddlewareHandler = async (c, next) => {
   // clients know their token is bad rather than silently routing to the admin
   // MCP server (closes item 7 / checklist 7.5).
   if (!rawToken) {
-    if (looksLikeAgentTokenAttempt(c)) {
+    const bearer = getPresentedBearer(c);
+    if (
+      looksLikeAgentTokenAttempt(c) ||
+      (bearer && isMcpRequest(c) && !hasPresentedAdminBearer(c))
+    ) {
       return c.json(
         {
           error: 'invalid_token',
@@ -182,4 +208,87 @@ export const agentTokenAuthMiddleware: MiddlewareHandler = async (c, next) => {
   });
   touchAgentTokenLastUsed(row);
   return next();
+};
+
+function isReadMethod(method: string): boolean {
+  return method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+}
+
+function isAgentReadPath(path: string): boolean {
+  if (path === '/api/session/me' || path === '/api/session/me/') return true;
+  if (path === '/api/hub' || path === '/api/hub/') return true;
+  if (/^\/api\/hub\/[^/]+\/?$/.test(path)) return true;
+  if (/^\/api\/hub\/[^/]+\/(source|openapi\.json|runs|runs-by-day)\/?$/.test(path)) return true;
+  if (/^\/api\/agents\/runs(\/[^/]+)?\/?$/.test(path)) return true;
+  if (/^\/api\/run\/[^/]+\/?$/.test(path)) return true;
+  if (/^\/api\/apps\/[^/]+\/reviews\/?$/.test(path)) return true;
+  if (/^\/api\/[^/]+\/quota\/?$/.test(path)) return true;
+  return false;
+}
+
+function isStudioReadPath(path: string): boolean {
+  if (path === '/api/session/me' || path === '/api/session/me/') return true;
+  if (path === '/api/hub/mine' || path === '/api/hub/mine/') return true;
+  if (/^\/api\/hub\/[^/]+\/?$/.test(path)) return true;
+  if (/^\/api\/hub\/[^/]+\/(source|openapi\.json)\/?$/.test(path)) return true;
+  if (/^\/api\/me\/apps\/[^/]+\/.+/.test(path)) return true;
+  return false;
+}
+
+function isAgentRunWrite(method: string, path: string): boolean {
+  if (method !== 'POST') return false;
+  if (path === '/api/run' || path === '/api/run/') return true;
+  if (/^\/api\/[^/]+\/run\/?$/.test(path)) return true;
+  if (/^\/api\/[^/]+\/jobs\/?$/.test(path)) return true;
+  return false;
+}
+
+function isStudioWritePath(method: string, path: string): boolean {
+  if (method === 'POST' && path === '/api/hub/ingest') return true;
+  if (/^\/api\/hub\/[^/]+\/(fork|claim|install|renderer)\/?$/.test(path)) {
+    return method === 'POST' || method === 'DELETE';
+  }
+  if (/^\/api\/hub\/[^/]+\/?$/.test(path)) {
+    return method === 'PATCH' || method === 'DELETE';
+  }
+  if (/^\/api\/me\/apps\/[^/]+\/.+/.test(path)) {
+    return method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+  }
+  return false;
+}
+
+/**
+ * Enforce agent-token scopes on REST/HTTP APIs. MCP has per-tool scope checks,
+ * but HTTP routes share the normal session context, so a read token must not
+ * inherit every mutating browser/API capability.
+ */
+export const agentTokenHttpScopeMiddleware: MiddlewareHandler = async (c, next) => {
+  const auth = getAgentTokenContext(c);
+  if (!auth) return next();
+
+  const method = c.req.method.toUpperCase();
+  const path = new URL(c.req.url).pathname;
+
+  if (auth.scope === 'read-write') return next();
+  if (auth.scope === 'read') {
+    if (isReadMethod(method) && isAgentReadPath(path)) return next();
+    if (isAgentRunWrite(method, path)) return next();
+  }
+  if (auth.scope === 'publish-only') {
+    if (isReadMethod(method) && isStudioReadPath(path)) return next();
+    if (isStudioWritePath(method, path)) return next();
+  }
+
+  return c.json(
+    {
+      error: 'Agent token scope does not allow this HTTP API action.',
+      code: 'forbidden_scope',
+      required_scope:
+        auth.scope === 'read'
+          ? 'read-write'
+          : 'read or read-write for run actions; read-write for account actions',
+      current_scope: auth.scope,
+    },
+    403,
+  );
 };

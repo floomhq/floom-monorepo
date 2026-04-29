@@ -48,7 +48,7 @@ import { startFastApps } from './services/fast-apps-sidecar.js';
 import { startLaunchWeekApps } from './services/launch-week-sidecars.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
 import { globalAuthMiddleware } from './lib/auth.js';
-import { agentTokenAuthMiddleware } from './lib/agent-tokens.js';
+import { agentTokenAuthMiddleware, agentTokenHttpScopeMiddleware } from './lib/agent-tokens.js';
 import {
   getAuth,
   getAuthForRequest,
@@ -257,6 +257,7 @@ app.use('/p/*', globalAuthMiddleware);
 app.use('/api/*', agentTokenAuthMiddleware);
 app.use('/mcp/*', agentTokenAuthMiddleware);
 app.use('/p/*', agentTokenAuthMiddleware);
+app.use('/api/*', agentTokenHttpScopeMiddleware);
 if (process.env.FLOOM_AUTH_TOKEN) {
   console.log('[auth] FLOOM_AUTH_TOKEN is set — bearer auth required on all /api, /mcp, /p routes');
 }

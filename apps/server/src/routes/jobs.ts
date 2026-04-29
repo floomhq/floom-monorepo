@@ -9,6 +9,7 @@
 // The background worker (services/worker.ts) drains the queue and fires the
 // creator's webhook_url on completion.
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { db } from '../db.js';
 import { newJobId } from '../lib/ids.js';
 import { createJob, formatJob, getJobBySlug, cancelJob } from '../services/jobs.js';
@@ -17,7 +18,7 @@ import { checkAppVisibility } from '../lib/auth.js';
 import { resolveUserContext } from '../services/session.js';
 import { parseJsonBody, bodyParseError } from '../lib/body.js';
 import { runGate } from '../lib/run-gate.js';
-import type { AppRecord, NormalizedManifest } from '../types.js';
+import type { AppRecord, NormalizedManifest, SessionContext } from '../types.js';
 
 export const jobsRouter = new Hono<{ Variables: { slug: string } }>();
 
@@ -27,6 +28,30 @@ function buildJobUrls(publicUrl: string, slug: string, jobId: string) {
     webhook_url_template: `${publicUrl}/api/${slug}/jobs/${jobId}`,
     cancel_url: `${publicUrl}/api/${slug}/jobs/${jobId}/cancel`,
   };
+}
+
+function isPublicLiveApp(app: AppRecord): boolean {
+  const visibility = app.visibility || 'public';
+  const publishStatus = app.publish_status || 'published';
+  return (
+    app.status === 'active' &&
+    (visibility === 'public_live' || visibility === 'public' || visibility === null) &&
+    publishStatus === 'published'
+  );
+}
+
+function enforceAgentRunScope(c: Context, ctx: SessionContext, app: AppRecord): Response | null {
+  if (ctx.agent_token_scope !== 'read') return null;
+  if (isPublicLiveApp(app)) return null;
+  return c.json(
+    {
+      error: 'Read-scoped Agent tokens can only run public live apps.',
+      code: 'forbidden_scope',
+      required_scope: 'read-write',
+      current_scope: 'read',
+    },
+    403,
+  );
 }
 
 /**
@@ -54,6 +79,8 @@ jobsRouter.post('/', async (c) => {
     ctx,
   });
   if (blocked) return blocked;
+  const scopeBlocked = enforceAgentRunScope(c, ctx, row);
+  if (scopeBlocked) return scopeBlocked;
 
   if (!row.is_async) {
     return c.json(

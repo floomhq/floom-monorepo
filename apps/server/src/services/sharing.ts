@@ -139,8 +139,9 @@ export function canAccessApp(
 ): boolean {
   const visibility = canonicalVisibility(app.visibility);
   if (visibility === 'public_live') return true;
+  if (readOwnerMatches(app, ctx)) return true;
   if (visibility === 'private' || visibility === 'pending_review' || visibility === 'changes_requested') {
-    return readOwnerMatches(app, ctx);
+    return false;
   }
   if (visibility === 'link') {
     const validToken = app.slug
@@ -168,6 +169,7 @@ export function getAppAccessDecision(
   linkToken?: string | null,
 ): AppAccessDecision {
   const visibility = canonicalVisibility(app.visibility);
+  if (readOwnerMatches(app, ctx)) return { ok: true };
   if (visibility !== 'link') {
     return canAccessApp(app, ctx, linkToken) ? { ok: true } : { ok: false, status: 404 };
   }

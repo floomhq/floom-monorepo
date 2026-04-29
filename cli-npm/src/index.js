@@ -26,7 +26,7 @@ const path = require('path');
 const readline = require('readline');
 const { execSync, spawn } = require('child_process');
 
-const VERSION = '0.2.0';
+const VERSION = '0.2.2';
 const DEFAULT_API_URL = process.env.FLOOM_API_URL || 'https://floom.dev';
 const CONFIG_PATH = process.env.FLOOM_CONFIG || path.join(os.homedir(), '.floom', 'config.json');
 

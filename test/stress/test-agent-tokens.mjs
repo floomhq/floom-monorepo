@@ -239,6 +239,104 @@ try {
   log('agent context carries token id', probeJson.agent_token_id === publishMint.json?.id);
   log('agent context carries workspace id', probeJson.workspace_id === 'local');
 
+  const readMint = await jsonFetch(server.port, '/api/me/agent-keys', {
+    method: 'POST',
+    body: { label: 'read-api-scope', scope: 'read', rate_limit_per_minute: 1000 },
+  });
+  const readToken = readMint.json?.raw_token;
+  const readSecretWrite = await jsonFetch(server.port, '/api/secrets', {
+    method: 'POST',
+    token: readToken,
+    body: { key: 'READ_SCOPE_LEAK', value: 'blocked' },
+  });
+  log('read agent token cannot mutate HTTP secrets API', readSecretWrite.res.status === 403 && readSecretWrite.json?.code === 'forbidden_scope', readSecretWrite.text);
+  const readSecretList = await jsonFetch(server.port, '/api/secrets', { token: readToken });
+  log('read agent token cannot list HTTP account secrets API', readSecretList.res.status === 403 && readSecretList.json?.code === 'forbidden_scope', readSecretList.text);
+  const writeSecretWrite = await jsonFetch(server.port, '/api/secrets', {
+    method: 'POST',
+    token: rawToken,
+    body: { key: 'WRITE_SCOPE_OK', value: 'stored' },
+  });
+  log('read-write agent token can mutate HTTP secrets API', writeSecretWrite.res.status === 200 && writeSecretWrite.json?.ok === true, writeSecretWrite.text);
+  const leakedSecret = await jsonFetch(server.port, '/api/secrets', { token: rawToken });
+  const secretKeys = Array.isArray(leakedSecret.json?.entries)
+    ? leakedSecret.json.entries.map((entry) => entry.key)
+    : [];
+  log('blocked read-scope secret was not persisted', !secretKeys.includes('READ_SCOPE_LEAK'), leakedSecret.text);
+  const readRun = await jsonFetch(server.port, '/api/run', {
+    method: 'POST',
+    token: readToken,
+    body: { app_slug: 'missing-agent-token-scope-run' },
+  });
+  log('read agent token can still reach HTTP run surface', readRun.res.status !== 403, readRun.text);
+  const readIngest = await jsonFetch(server.port, '/api/hub/ingest', {
+    method: 'POST',
+    token: readToken,
+    body: {},
+  });
+  log('read agent token cannot mutate HTTP studio ingest API', readIngest.res.status === 403 && readIngest.json?.code === 'forbidden_scope', readIngest.text);
+  const linkManifest = {
+    name: 'Owned Link App',
+    description: 'link visibility owner regression',
+    runtime: 'python',
+    actions: {
+      run: {
+        label: 'Run',
+        inputs: [],
+        outputs: [{ name: 'ok', type: 'json', label: 'OK' }],
+        secrets_needed: [],
+      },
+    },
+    secrets_needed: [],
+  };
+  db.prepare(
+    `INSERT INTO apps
+       (id, slug, name, description, manifest, status, code_path, app_type, author,
+        workspace_id, visibility, link_share_token, link_share_requires_auth, publish_status, is_async)
+     VALUES ('app_owned_link_scope', 'owned-link-scope', 'Owned Link Scope',
+        'link owner access fixture', ?, 'active', 'proxied:owned-link-scope',
+        'proxied', 'local', 'local', 'link', 'LinkScopeToken123456789012', 0,
+        'pending_review', 1)`,
+  ).run(JSON.stringify(linkManifest));
+  const ownedLinkDetail = await jsonFetch(server.port, '/api/hub/owned-link-scope', { token: rawToken });
+  log('owner agent token can read own link app without share key', ownedLinkDetail.res.status === 200 && ownedLinkDetail.json?.slug === 'owned-link-scope', ownedLinkDetail.text);
+  const readOwnedLinkRun = await jsonFetch(server.port, '/api/run', {
+    method: 'POST',
+    token: readToken,
+    body: { app_slug: 'owned-link-scope' },
+  });
+  log('read agent token cannot run owned pending/link app via /api/run', readOwnedLinkRun.res.status === 403 && readOwnedLinkRun.json?.code === 'forbidden_scope', readOwnedLinkRun.text);
+  const readOwnedLinkSlugRun = await jsonFetch(server.port, '/api/owned-link-scope/run', {
+    method: 'POST',
+    token: readToken,
+    body: {},
+  });
+  log('read agent token cannot run owned pending/link app via /api/:slug/run', readOwnedLinkSlugRun.res.status === 403 && readOwnedLinkSlugRun.json?.code === 'forbidden_scope', readOwnedLinkSlugRun.text);
+  const readOwnedLinkJob = await jsonFetch(server.port, '/api/owned-link-scope/jobs', {
+    method: 'POST',
+    token: readToken,
+    body: {},
+  });
+  log('read agent token cannot enqueue owned pending/link app via /api/:slug/jobs', readOwnedLinkJob.res.status === 403 && readOwnedLinkJob.json?.code === 'forbidden_scope', readOwnedLinkJob.text);
+  const ownedLinkRun = await jsonFetch(server.port, '/api/run', {
+    method: 'POST',
+    token: rawToken,
+    body: { app_slug: 'owned-link-scope' },
+  });
+  log('owner agent token can run own link app without share key', ownedLinkRun.res.status === 200 && /^run_/.test(ownedLinkRun.json?.run_id || ''), ownedLinkRun.text);
+  const publishSecretWrite = await jsonFetch(server.port, '/api/secrets', {
+    method: 'POST',
+    token: publishToken,
+    body: { key: 'PUBLISH_SCOPE_LEAK', value: 'blocked' },
+  });
+  log('publish-only agent token cannot mutate HTTP account secrets API', publishSecretWrite.res.status === 403 && publishSecretWrite.json?.code === 'forbidden_scope', publishSecretWrite.text);
+  const publishIngest = await jsonFetch(server.port, '/api/hub/ingest', {
+    method: 'POST',
+    token: publishToken,
+    body: {},
+  });
+  log('publish-only agent token can reach HTTP studio ingest API', publishIngest.res.status !== 403, publishIngest.text);
+
   let rateLimited = null;
   for (let i = 0; i < 61; i++) {
     rateLimited = await jsonFetch(server.port, '/api/run', {

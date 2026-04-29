@@ -1,7 +1,7 @@
 import { db } from '../db.js';
 import { newAppId, newAppInstallId } from '../lib/ids.js';
 import { auditLog } from './audit-log.js';
-import { canAccessApp } from './sharing.js';
+import { canAccessApp, isAppOwner } from './sharing.js';
 import type { AppRecord, SessionContext } from '../types.js';
 
 export class AppLibraryError extends Error {
@@ -153,6 +153,13 @@ export function claimApp(ctx: SessionContext, slug: string): { app: AppRecord; c
 export function installApp(ctx: SessionContext, slug: string): { installed: boolean; app: AppRecord } {
   const app = appBySlug(slug);
   if (!isInstallable(app)) {
+    if (isAppOwner(app, ctx)) {
+      throw new AppLibraryError(
+        409,
+        'app_not_installable',
+        'Only public Store apps can be installed. This app is already available in Studio until it is approved.',
+      );
+    }
     throw new AppLibraryError(404, 'not_found', 'App not found');
   }
   const existing = db

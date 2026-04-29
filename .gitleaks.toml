@@ -15,6 +15,7 @@ paths = [
   '''^test/stress/test-workspace-secrets\.mjs$''',
   '''^test/stress/test-workspace-secrets-backfill\.mjs$''',
   '''^test/stress/test-launch-demo-http-smoke\.mjs$''',
+  '''^test/stress/test-proxied-response-hardening\.mjs$''',
   '''^examples/fast-apps/README\.md$''',
   '''^examples/fast-apps/server\.mjs$''',
   '''^packages/hub-smoke/tests/fixtures\.ts$''',

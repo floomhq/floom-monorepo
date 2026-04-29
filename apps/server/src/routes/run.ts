@@ -55,6 +55,30 @@ function runGateResponse(c: Context, gate: Exclude<RunGateResult, { ok: true }>)
   return c.json(gate.body, gate.status, gate.headers);
 }
 
+function isPublicLiveApp(app: AppRecord): boolean {
+  const visibility = app.visibility || 'public';
+  const publishStatus = app.publish_status || 'published';
+  return (
+    app.status === 'active' &&
+    (visibility === 'public_live' || visibility === 'public' || visibility === null) &&
+    publishStatus === 'published'
+  );
+}
+
+function enforceAgentRunScope(c: Context, ctx: SessionContext, app: AppRecord): Response | null {
+  if (ctx.agent_token_scope !== 'read') return null;
+  if (isPublicLiveApp(app)) return null;
+  return c.json(
+    {
+      error: 'Read-scoped Agent tokens can only run public live apps.',
+      code: 'forbidden_scope',
+      required_scope: 'read-write',
+      current_scope: 'read',
+    },
+    403,
+  );
+}
+
 type RunAppAccessRow = {
   id: string;
   slug: string;
@@ -233,6 +257,8 @@ runRouter.post('/', async (c) => {
     ctx,
   });
   if (blocked) return blocked;
+  const scopeBlocked = enforceAgentRunScope(c, ctx, row);
+  if (scopeBlocked) return scopeBlocked;
 
   let manifest: NormalizedManifest;
   try {
@@ -583,6 +609,8 @@ slugRunRouter.post('/', async (c) => {
     ctx,
   });
   if (blocked) return blocked;
+  const scopeBlocked = enforceAgentRunScope(c, ctx, row);
+  if (scopeBlocked) return scopeBlocked;
 
   let manifest: NormalizedManifest;
   try {

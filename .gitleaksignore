@@ -29,3 +29,10 @@ ade72f9a99b684afd1e93bf8ba144c43aa731a90:test/stress/test-hub-runs-auth.mjs:gene
 # for the jwt-decoder app. R15ui's HEAD splits it into 3 placeholder strings with `gitleaks:allow`,
 # but the historical commit 5d7b51a5 contains the joined form. Non-sensitive by design.
 5d7b51a54cf54658401292344e642dc841f34786:apps/web/src/lib/sample-inputs.ts:jwt:57
+
+# Launch QA false positives:
+# - test-proxied-response-hardening.mjs uses a literal fixture string to verify redaction.
+# - mcp-mvp-stress-test-report redacts a temporary token row id and lists a temporary vault key name, not a secret value.
+16cccf8c6e453dcd139cf0a379d615856befa0b8:test/stress/test-proxied-response-hardening.mjs:generic-api-key:63
+c3f936b1c5b50aee5dbba13889f511845683376d:docs/qa/mcp-mvp-stress-test-report-2026-04-28.md:generic-api-key:216
+c3f936b1c5b50aee5dbba13889f511845683376d:docs/qa/mcp-mvp-stress-test-report-2026-04-28.md:generic-api-key:217
