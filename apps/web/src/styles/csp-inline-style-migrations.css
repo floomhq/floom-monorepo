@@ -4,6 +4,8 @@
 
 @media (max-width: 720px) {
   .about-who-cards { grid-template-columns: 1fr !important; }
+  /* about-why-floom-grid: collapse 2-col to 1-col on tablet */
+  .about-why-floom-grid { grid-template-columns: 1fr !important; }
 }
 
 @media (max-width: 640px) {
@@ -14,6 +16,16 @@
   }
 
   .about-triad { grid-template-columns: 1fr !important; gap: 6px !important; }
+
+  /* About hero: scale down H1 + stat strip on mobile */
+  [data-testid="about-hero"] h1 { font-size: 34px !important; line-height: 1.1 !important; }
+  [data-testid="about-hero"] { padding: 40px 0 28px !important; }
+  [data-testid="about-hero-stats"] {
+    flex-direction: column !important;
+    gap: 14px !important;
+    align-items: flex-start !important;
+    padding: 16px 20px !important;
+  }
 }
 
 @media (max-width: 640px) {

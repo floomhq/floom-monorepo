@@ -235,13 +235,17 @@ export function HelpPage() {
           fontFamily: "'Inter', system-ui, sans-serif",
         }}
       >
-        {/* Hero */}
+        {/* Hero — sits inside PageShell's 1080px <main>. The gradient
+            from var(--card) to var(--bg) is subtle enough that the
+            content-width band reads as a deliberate design surface
+            rather than a breakout full-bleed. Keeps layout simple. */}
         <div
           style={{
             background: 'linear-gradient(180deg, var(--card) 0%, var(--bg) 100%)',
             borderBottom: '1px solid var(--line)',
             padding: '64px 24px 56px',
             textAlign: 'center',
+            margin: '0 -24px',
           }}
         >
           <h1
@@ -261,9 +265,8 @@ export function HelpPage() {
           </p>
         </div>
 
-        {/* 4-column card grid (R11b: widen container so all cards fit
-            in one row at 1440px). */}
-        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '56px 24px 0' }}>
+        {/* 4-column card grid — matches the page max-width. */}
+        <div style={{ padding: '56px 0 0' }}>
           {/* R11b (2026-04-28): 4-col grid at desktop so all 4 support
               cards (Docs, Discord, Email, DM Federico) sit on one row
               and Gemini doesn't think DM Federico is missing a CTA

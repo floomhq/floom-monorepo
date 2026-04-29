@@ -450,10 +450,14 @@ export function AboutPage() {
           page mentioned Federico textually but had no face; WhosBehind
           is already rendered on the landing page, reuse it here.
           Wrapped in a top-bordered section so the vertical rhythm
-          matches the other /about sections. */}
+          matches the other /about sections.
+          R25 (2026-04-29): WhosBehind has its own internal padding
+          of 28px horizontal. Cancel it with negative horizontal margin
+          so the photo/text grid aligns with the other sections at 1080px
+          rather than being pinched to a narrower 900px band. */}
       <section
         data-testid="about-whos-behind-wrap"
-        style={{ ...SECTION_BORDERED, padding: '24px 0 24px' }}
+        style={{ ...SECTION_BORDERED, padding: '0' }}
       >
         <WhosBehind />
       </section>
