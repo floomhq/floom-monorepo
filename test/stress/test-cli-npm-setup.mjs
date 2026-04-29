@@ -4,7 +4,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer as createNetServer } from 'node:net';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -186,6 +186,60 @@ try {
     'cli-npm forwards top-level --api-url to bundled auth',
     forwarded.status === 0 && forwardedJson.api_url === apiUrl && forwardedJson.api_key === token,
     forwarded.stdout + forwarded.stderr + JSON.stringify(forwardedJson),
+  );
+
+  const { FLOOM_CONFIG: _outerFloomConfig, ...envWithoutConfig } = process.env;
+
+  const loginHome = join(tmp, 'login-home');
+  mkdirSync(loginHome, { recursive: true });
+  const login = run(
+    'node',
+    [join(REPO_ROOT, 'cli-npm/src/index.js'), 'login', '--api-url', 'https://mvp.floom.dev'],
+    {
+      ...envWithoutConfig,
+      HOME: loginHome,
+      FLOOM_CLI_NO_BROWSER: '1',
+      NO_COLOR: '1',
+    },
+  );
+  log('cli-npm login prints MVP agent key URL', login.status === 0 && login.stdout.includes('https://mvp.floom.dev/me/agent-keys'), login.stdout + login.stderr);
+  log('cli-npm login does not write config', !existsSync(join(loginHome, '.floom', 'config.json')), login.stdout + login.stderr);
+
+  const virginHome = join(tmp, 'virgin-home');
+  mkdirSync(virginHome, { recursive: true });
+  const virginSetup = run(
+    'node',
+    [join(REPO_ROOT, 'cli-npm/src/index.js'), 'setup', '--api-url', apiUrl],
+    {
+      ...envWithoutConfig,
+      HOME: virginHome,
+      FLOOM_CLI_NO_BROWSER: '1',
+      NO_COLOR: '1',
+    },
+    `${token}\n`,
+  );
+  const virginConfigPath = join(virginHome, '.floom', 'config.json');
+  const virginConfig = JSON.parse(readFileSync(virginConfigPath, 'utf8'));
+  log(
+    'cli-npm setup works from virgin HOME with browser disabled',
+    virginSetup.status === 0 &&
+      virginSetup.stdout.includes(`${apiUrl}/me/agent-keys`) &&
+      virginSetup.stdout.includes('Could not auto-open a browser') &&
+      virginConfig.api_key === token &&
+      virginConfig.api_url === apiUrl,
+    virginSetup.stdout + virginSetup.stderr + JSON.stringify(virginConfig),
+  );
+
+  const invalidLoginConfig = join(tmp, 'invalid-login-config.json');
+  const invalidLogin = run(
+    'bash',
+    [join(REPO_ROOT, 'cli/floom/bin/floom'), 'auth', 'login', `--token=${agentTokens.generateAgentToken()}`, `--api-url=${apiUrl}`],
+    { ...env, FLOOM_CONFIG: invalidLoginConfig },
+  );
+  log(
+    'floom auth login rejects invalid token without writing config',
+    invalidLogin.status !== 0 && invalidLogin.stderr.includes('Token rejected') && !existsSync(invalidLoginConfig),
+    invalidLogin.stdout + invalidLogin.stderr,
   );
 } finally {
   server.proc.kill('SIGTERM');

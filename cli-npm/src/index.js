@@ -6,9 +6,9 @@
  *  - Most subcommands forward straight to vendor/floom/bin/floom (the bash
  *    implementation, copied at build time from cli/floom/ in the floomhq/floom
  *    monorepo).
- *  - The `setup` subcommand is implemented in Node so it can run on any
- *    platform (including Windows), launch a browser, and prompt the user
- *    for a token interactively without requiring bash.
+ *  - The `login` and `setup` subcommands are implemented in Node so they can
+ *    run on any platform (including Windows), launch a browser, and guide the
+ *    user without requiring bash.
  *
  * Quickstart:
  *   npx @floomhq/cli@latest setup
@@ -91,6 +91,32 @@ function openInBrowser(url) {
   return false;
 }
 
+function agentKeysUrl(apiUrl) {
+  return `${apiUrl.replace(/\/$/, '')}/me/agent-keys`;
+}
+
+function printBrowserLogin(apiUrl) {
+  const normalizedApiUrl = apiUrl.replace(/\/$/, '');
+  const loginUrl = agentKeysUrl(apiUrl);
+
+  console.log('');
+  console.log(c.bold('  Floom · browser login'));
+  console.log('');
+
+  const opened = openInBrowser(loginUrl);
+  if (opened) {
+    console.log(c.green('  Opened ') + c.cyan(loginUrl));
+  } else {
+    console.log('  Open this URL to mint an Agent token:');
+    console.log('  ' + c.cyan(loginUrl));
+  }
+
+  console.log('');
+  console.log('  Then run:');
+  console.log('  ' + c.cyan(`floom auth login --token=<agent_token> --api-url=${normalizedApiUrl}`));
+  console.log('');
+}
+
 function ask(question) {
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -134,7 +160,7 @@ async function verifyToken(apiUrl, token) {
 
 async function runSetup(opts) {
   const apiUrl = opts.apiUrl || DEFAULT_API_URL;
-  const tokenUrl = `${apiUrl.replace(/\/$/, '')}/me/agent-keys`;
+  const tokenUrl = agentKeysUrl(apiUrl);
 
   console.log('');
   console.log(c.bold('  Floom · setup'));
@@ -232,7 +258,9 @@ ${c.bold('floom')} — one command to set up Floom and run AI apps from any agen
 
 ${c.bold('usage:')}
   floom setup                  ${c.dim('# interactive: mint a token, save config, print next steps')}
+  floom login                  ${c.dim('# open token page + print noninteractive login command')}
   floom auth <agent-token>     ${c.dim('# save token non-interactively')}
+  floom auth login --token=... ${c.dim('# validate token, then save config non-interactively')}
   floom auth whoami            ${c.dim('# print identity for current token')}
   floom run <slug> [json]      ${c.dim('# run a Floom app by slug')}
   floom apps list              ${c.dim('# list workspace apps')}
@@ -245,6 +273,7 @@ ${c.bold('options:')}
   --help, -h                   show this help
   --version, -v                print version
   --api-url <url>              override API host (default: ${DEFAULT_API_URL})
+  --api-url=<url>              same as above
 
 ${c.bold('config:')}  ${CONFIG_PATH}
 ${c.bold('docs:')}    https://floom.dev/docs
@@ -268,7 +297,7 @@ async function main() {
     return;
   }
 
-  // Parse --api-url if present. For setup we handle it in Node; for all
+  // Parse --api-url if present. For login/setup we handle it in Node; for all
   // bundled bash subcommands we forward it as FLOOM_API_URL.
   let apiUrl = DEFAULT_API_URL;
   let explicitApiUrl = false;
@@ -278,12 +307,20 @@ async function main() {
       apiUrl = argv[i + 1];
       explicitApiUrl = true;
       i++;
+    } else if (argv[i].startsWith('--api-url=')) {
+      apiUrl = argv[i].slice('--api-url='.length);
+      explicitApiUrl = true;
     } else {
       filtered.push(argv[i]);
     }
   }
 
   const sub = filtered[0];
+
+  if (sub === 'login') {
+    printBrowserLogin(apiUrl);
+    return;
+  }
 
   if (sub === 'setup') {
     await runSetup({ apiUrl });

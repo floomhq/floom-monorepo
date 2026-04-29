@@ -36,6 +36,7 @@ floom --help
 ```text
 floom auth <agent-token> [url]       save an Agent token to ~/.floom/config.json
 floom login                          open the token page + print login command
+floom setup                          open the token page + print login command
 floom auth login                     open the token page + print login command
 floom auth login --token=<token>     save an Agent token with explicit flags
 floom auth whoami                    print identity for the current token
@@ -97,12 +98,22 @@ Order of resolution:
 2. `~/.floom/config.json` with `{"api_key": "...", "api_url": "https://floom.dev"}`
 3. Legacy `~/.claude/floom-skill-config.json` (from the old Claude Code skill)
 
-Get your Agent token at https://floom.dev/me/agent-keys, then:
+Get your Agent token in the browser, then save it from the CLI:
 
 ```bash
-floom login
+floom login --api-url https://mvp.floom.dev
 # then paste the printed command:
-floom auth login --token=floom_agent_...
+floom auth login --token=floom_agent_... --api-url=https://mvp.floom.dev
+```
+
+`floom login` and `floom setup` open the Agent token page when a browser is
+available. In headless shells, or with `FLOOM_CLI_NO_BROWSER=1`, they print the
+same URL instead.
+
+Noninteractive token save:
+
+```bash
+floom auth login --token=floom_agent_... --api-url=https://mvp.floom.dev
 ```
 
 Self-host:

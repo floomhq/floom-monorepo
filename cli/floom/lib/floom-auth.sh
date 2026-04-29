@@ -180,7 +180,7 @@ EOF
       fi
       echo
       echo "Then run:"
-      echo "  floom auth login --token=<agent_token> --api-url=${API_URL}"
+      echo "  floom auth login --token=<agent_token> --api-url=${API_URL%/}"
       exit 0
     fi
     if ! looks_like_agent_token "$AGENT_TOKEN"; then
@@ -203,7 +203,7 @@ EOF
     fi
     if [[ "$HTTP_CODE" != "200" ]]; then
       echo "ERROR: Token rejected by ${API_URL} (HTTP ${HTTP_CODE})." >&2
-      echo "Mint a fresh token at ${API_URL}/me/agent-keys and try again." >&2
+      echo "Mint a fresh token at ${API_URL%/}/me/agent-keys and try again." >&2
       exit 1
     fi
     mkdir -p "$(dirname "$CONFIG")"

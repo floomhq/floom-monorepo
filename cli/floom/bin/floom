@@ -14,6 +14,7 @@
 #   feedback  submit product feedback
 #   status    list your apps and recent runs
 #   login     open the token page and print login instructions
+#   setup     open the token page and print login instructions
 #   auth      save an Agent token to ~/.floom/config.json
 #   --help    show this help
 #   --version print version
@@ -35,6 +36,7 @@ usage:
 
 commands:
   login               open the token page and print login instructions
+  setup               open the token page and print login instructions
   auth <agent-token>  save an Agent token to ~/.floom/config.json
   account             manage workspace secrets and agent tokens
   apps list           list your workspace apps

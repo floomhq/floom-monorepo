@@ -10,10 +10,24 @@ npx @floomhq/cli@latest setup
 
 This opens https://floom.dev/me/agent-keys in your browser, asks you to paste an Agent token, verifies it against the API, saves it to `~/.floom/config.json`, and prints the MCP config snippet.
 
+For the MVP cloud:
+
+```bash
+floom login --api-url https://mvp.floom.dev
+```
+
+This opens or prints https://mvp.floom.dev/me/agent-keys and then prints the
+noninteractive save command:
+
+```bash
+floom auth login --token=<agent_token> --api-url=https://mvp.floom.dev
+```
+
 ## Other commands
 
 ```bash
 floom auth <agent-token>     # save token non-interactively
+floom auth login --token=... # validate token, then save config non-interactively
 floom auth whoami            # print identity for current token
 floom run <slug> [json]      # run a Floom app by slug
 floom apps list              # list workspace apps
@@ -29,6 +43,7 @@ floom account                # manage workspace secrets and tokens
 |-----------------|---------------------------------|--------------------------|
 | `FLOOM_API_URL` | `https://floom.dev`             | API host (use mvp.floom.dev for the MVP cloud) |
 | `FLOOM_CONFIG`  | `~/.floom/config.json`          | Config file location     |
+| `FLOOM_CLI_NO_BROWSER` | unset                    | Set to `1` to print login URLs without opening a browser |
 
 ## What this package is
 
