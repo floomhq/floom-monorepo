@@ -42,6 +42,7 @@ Backends land; the UI to drive them is re-enabled incrementally.
 ### P1 — Week one
 
 - End-to-end functional test suite in CI (currently manual)
+- Canonical runtime canary: continuously run featured public apps and suppress broken listings before users/agents discover them
 - URL-to-run restore (`?run=<id>` loads prior run state)
 - Responsive output renderer (embedded deck / long tables)
 - Per-app custom renderers for the top five JSON-heavy apps
@@ -49,11 +50,16 @@ Backends land; the UI to drive them is re-enabled incrementally.
 - Uptime monitoring
 - Lighthouse / Core Web Vitals pass
 - Real docs content (shell is live; copy is thin)
+- App organization: folders and labels for owned/installed apps across Studio, CLI, MCP, and API
 
 ### P2 — Month one
 
 - Workspace switcher UI (re-enable)
 - Composio connections UI (re-enable)
+- Composio runtime actions: creator apps can declare integration needs and execute connected-account actions safely
+- Workspace profile context: JSON profile plus optional business URL crawl to prefill company address, ICP, markets, languages, and operating context
+- User profile context: JSON profile plus optional LinkedIn/profile URL enrichment to prefill role, preferences, and personal defaults
+- Creator audience quotas: per-customer / per-user / per-tier run budgets on top of per-app global rate limits
 - App memory UI
 - Stripe Connect UI
 - Per-app OG images (render pipeline)

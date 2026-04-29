@@ -142,6 +142,41 @@ export function getPublicBaseUrl(c: Context): string {
   }
 }
 
+function publicAppWebBaseUrl(baseUrl: string): string {
+  const clean = baseUrl.replace(/\/+$/, '');
+  try {
+    const parsed = new URL(clean);
+    if (parsed.hostname === 'mcp.floom.dev') {
+      return 'https://floom.dev';
+    }
+  } catch {
+    // Fall through to the caller-provided origin for local test URLs.
+  }
+  return clean;
+}
+
+export function buildPublicMcpAppUrl(baseUrl: string, slug: string): string {
+  const clean = baseUrl.replace(/\/+$/, '');
+  try {
+    const parsed = new URL(clean);
+    if (parsed.hostname === 'mcp.floom.dev') {
+      return `https://mcp.floom.dev/app/${encodeURIComponent(slug)}`;
+    }
+  } catch {
+    // Fall through to the mounted /mcp/app route shape.
+  }
+  return `${clean}/mcp/app/${encodeURIComponent(slug)}`;
+}
+
+function buildPublicAppUrls(baseUrl: string, slug: string) {
+  const webBaseUrl = publicAppWebBaseUrl(baseUrl);
+  return {
+    permalink: `${webBaseUrl}/p/${encodeURIComponent(slug)}`,
+    install_url: `${webBaseUrl}/install/${encodeURIComponent(slug)}`,
+    mcp_url: buildPublicMcpAppUrl(baseUrl, slug),
+  };
+}
+
 function formatRun(row: RunRecord) {
   return {
     id: row.id,
@@ -475,6 +510,7 @@ function serializeHubApp(
   manifest: NormalizedManifest | null,
   baseUrl: string,
 ) {
+  const urls = buildPublicAppUrls(baseUrl, row.slug);
   return {
     slug: row.slug,
     name: row.name,
@@ -489,8 +525,7 @@ function serializeHubApp(
     avg_run_ms: row.avg_run_ms,
     max_run_retention_days: row.max_run_retention_days,
     created_at: row.created_at,
-    permalink: `${baseUrl}/p/${row.slug}`,
-    mcp_url: `${baseUrl}/mcp/app/${row.slug}`,
+    ...urls,
   };
 }
 
@@ -568,7 +603,16 @@ function loadAccessibleAgentApp(
 
 function serializeAgentAppDetail(app: AppRecord, baseUrl: string): Record<string, unknown> {
   const manifest = safeParseManifest(app.manifest);
-  const source = buildAppSourceInfo(app, manifest, baseUrl);
+  const urls = buildPublicAppUrls(baseUrl, app.slug);
+  const webBaseUrl = publicAppWebBaseUrl(baseUrl);
+  const sourceInfo = buildAppSourceInfo(app, manifest, webBaseUrl);
+  const source = {
+    ...sourceInfo,
+    install: {
+      ...sourceInfo.install,
+      mcp_url: urls.mcp_url,
+    },
+  };
   const actions = manifest
     ? Object.entries(manifest.actions).map(([key, action]) => ({
         key,
@@ -612,9 +656,10 @@ function serializeAgentAppDetail(app: AppRecord, baseUrl: string): Record<string
       timeout_ms: app.timeout_ms ?? null,
     },
     links: {
-      permalink: `${baseUrl}/p/${app.slug}`,
-      mcp_url: `${baseUrl}/mcp/app/${app.slug}`,
-      owner_url: `${baseUrl}/studio/${app.slug}`,
+      permalink: urls.permalink,
+      install_url: urls.install_url,
+      mcp_url: urls.mcp_url,
+      owner_url: `${webBaseUrl}/studio/${app.slug}`,
     },
     created_at: app.created_at,
     updated_at: app.updated_at,
@@ -885,6 +930,7 @@ function createAdminMcpServer({ ctx, ip, baseUrl }: AdminToolContext): McpServer
             auth_required: args.auth_required as boolean | undefined,
           });
         }
+        const urls = buildPublicAppUrls(baseUrl, result.slug);
         return {
           content: [
             {
@@ -895,8 +941,9 @@ function createAdminMcpServer({ ctx, ip, baseUrl }: AdminToolContext): McpServer
                   slug: result.slug,
                   name: result.name,
                   created: result.created,
-                  permalink: `${baseUrl}/p/${result.slug}`,
-                  mcp_url: `${baseUrl}/mcp/app/${result.slug}`,
+                  permalink: urls.permalink,
+                  install_url: urls.install_url,
+                  mcp_url: urls.mcp_url,
                 },
                 null,
                 2,
@@ -1155,8 +1202,7 @@ function createAdminMcpServer({ ctx, ip, baseUrl }: AdminToolContext): McpServer
             text: JSON.stringify(
               results.map((r) => ({
                 ...r,
-                permalink: `${baseUrl}/p/${r.slug}`,
-                mcp_url: `${baseUrl}/mcp/app/${r.slug}`,
+                ...buildPublicAppUrls(baseUrl, r.slug),
               })),
               null,
               2,
@@ -1249,7 +1295,7 @@ function createSearchMcpServer(baseUrl: string): McpServer {
             text: JSON.stringify(
               results.map((r) => ({
                 ...r,
-                mcp_url: `${baseUrl}/mcp/app/${r.slug}`,
+                ...buildPublicAppUrls(baseUrl, r.slug),
               })),
               null,
               2,
@@ -1499,7 +1545,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
           const app = loadAccessibleAgentApp(ctx, slug, link_key);
           const manifest = safeParseManifest(app.manifest);
           const baseUrl = getPublicBaseUrl(c);
-          const source = buildAppSourceInfo(app, manifest, baseUrl);
+          const source = buildAppSourceInfo(app, manifest, publicAppWebBaseUrl(baseUrl));
           const readmeRaw = (app.description ?? '').trim();
           const manifestReadme = manifest as unknown as { readme_md?: unknown } | null;
           const readmeMd =
@@ -1515,7 +1561,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             repo_url: source.repository_url,
             runtime: manifest?.runtime ?? null,
             manifest_version: manifest?.manifest_version ?? null,
-            permalink: `${baseUrl}/p/${app.slug}`,
+            permalink: buildPublicAppUrls(baseUrl, app.slug).permalink,
           };
           if (!readmeMd) {
             payload.note = 'README not available — see repo_url for project docs.';
@@ -1543,8 +1589,20 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
         recordMcpToolCall('get_app_source');
         try {
           const app = loadAccessibleAgentApp(ctx, slug, link_key);
+          const baseUrl = getPublicBaseUrl(c);
+          const sourceInfo = buildAppSourceInfo(
+            app,
+            safeParseManifest(app.manifest),
+            publicAppWebBaseUrl(baseUrl),
+          );
           const payload: Record<string, unknown> = {
-            source: buildAppSourceInfo(app, safeParseManifest(app.manifest), getPublicBaseUrl(c)),
+            source: {
+              ...sourceInfo,
+              install: {
+                ...sourceInfo.install,
+                mcp_url: buildPublicMcpAppUrl(baseUrl, app.slug),
+              },
+            },
           };
           if (include_openapi_spec) {
             payload.openapi_spec = app.openapi_spec_cached ? JSON.parse(app.openapi_spec_cached) : null;
@@ -1917,7 +1975,8 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
           }
           invalidateHubCache();
           const publishOrigin = getPublicBaseUrl(c);
-          const permalink = `${publishOrigin}/p/${result.slug}`;
+          const urls = buildPublicAppUrls(publishOrigin, result.slug);
+          const webBaseUrl = publicAppWebBaseUrl(publishOrigin);
           return mcpJson({
             ok: true,
             slug: result.slug,
@@ -1926,15 +1985,16 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             publish_status: 'pending_review',
             review_note:
               'New user-published apps are visible to the owner immediately and enter manual review before public Store listing.',
-            permalink,
-            mcp_url: `${publishOrigin}/mcp/app/${result.slug}`,
-            owner_url: `${publishOrigin}/studio/${result.slug}`,
+            permalink: urls.permalink,
+            install_url: urls.install_url,
+            mcp_url: urls.mcp_url,
+            owner_url: `${webBaseUrl}/studio/${result.slug}`,
             next_steps: [
-              `Your app is live at ${permalink}`,
-              `View install snippet at ${permalink}?tab=install`,
+              `Your app is live at ${urls.permalink}`,
+              `View install snippet at ${urls.permalink}?tab=install`,
               `Run it via CLI: floom apps run ${result.slug}`,
-              `Add the MCP endpoint to any agent: ${publishOrigin}/mcp/app/${result.slug}`,
-              `Source view: ${permalink}?tab=source`,
+              `Add the MCP endpoint to any agent: ${urls.mcp_url}`,
+              `Source view: ${urls.permalink}?tab=source`,
             ],
           });
         } catch (err) {
@@ -2039,6 +2099,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
           const listOrigin = getPublicBaseUrl(c);
           return mcpJson({
             apps: rows.map((row) => ({
+              ...buildPublicAppUrls(listOrigin, row.slug),
               slug: row.slug,
               name: row.name,
               description: row.description,
@@ -2047,9 +2108,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
               publish_status: row.publish_status,
               run_count: row.run_count || 0,
               last_run_at: row.last_run_at,
-              permalink: `${listOrigin}/p/${row.slug}`,
-              mcp_url: `${listOrigin}/mcp/app/${row.slug}`,
-              owner_url: `${listOrigin}/studio/${row.slug}`,
+              owner_url: `${publicAppWebBaseUrl(listOrigin)}/studio/${row.slug}`,
               // Esteban feedback: hard to find run history after deploy.
               // Surface the run-list landing per-app so agents can hand it
               // back to users (or fetch via get_app_logs below).
@@ -2377,7 +2436,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             link_share_token: visibility === 'link' ? app.link_share_token : null,
             link_url:
               visibility === 'link' && app.link_share_token
-                ? `${baseUrl}/p/${slug}?key=${app.link_share_token}`
+                ? `${publicAppWebBaseUrl(baseUrl)}/p/${slug}?key=${app.link_share_token}`
                 : null,
             invites: listInvites(app.id).map(serializeInviteForMcp),
             review: {
@@ -2439,7 +2498,7 @@ function createAgentMcpServer(c: Context, ctx: SessionContext): McpServer {
             link_share_token: visibility === 'link' ? next.link_share_token : null,
             link_url:
               visibility === 'link' && next.link_share_token
-                ? `${baseUrl}/p/${slug}?key=${next.link_share_token}`
+                ? `${publicAppWebBaseUrl(baseUrl)}/p/${slug}?key=${next.link_share_token}`
                 : null,
           });
         } catch (err) {

@@ -564,20 +564,52 @@ async function runActionWorker(opts: {
     // the UI can render "This app isn't available" instead of the
     // misleading "Something broke inside Floom" card.
     const e = err as Error & { floom_error_class?: string };
-    const klass = e.floom_error_class;
+    const mapped = classifyDockerRuntimeException(e);
     updateRun(opts.runId, {
       status: 'error',
-      error: e.message || 'Runner crashed',
-      error_type: klass === 'app_unavailable' ? 'app_unavailable' : 'floom_internal_error',
-      logs: e.stack || '',
+      error: mapped.error,
+      error_type: mapped.error_type,
+      logs: mapped.logs,
       finished: true,
     });
-    if (klass === 'app_unavailable') {
-      noteAppUnavailable(opts.slug, e.message || 'Runner crashed');
+    if (mapped.error_type === 'app_unavailable') {
+      noteAppUnavailable(opts.slug, mapped.error);
     }
   } finally {
     logStream.finish();
   }
+}
+
+export function isDockerInfrastructureError(message: string): boolean {
+  return /(?:docker\.sock|\/var\/run\/docker\.sock|Cannot connect to the Docker daemon|connect (?:ENOENT|EACCES|ECONNREFUSED).*docker|\/\/\.\/pipe\/docker_engine)/i.test(
+    message,
+  );
+}
+
+export function classifyDockerRuntimeException(
+  err: Error & { floom_error_class?: string },
+): { error: string; error_type: ErrorType; logs: string } {
+  const message = err.message || 'Runner crashed';
+  if (err.floom_error_class === 'app_unavailable') {
+    return {
+      error: message,
+      error_type: 'app_unavailable',
+      logs: err.stack || '',
+    };
+  }
+  if (isDockerInfrastructureError(message)) {
+    return {
+      error:
+        "This app isn't available on this Floom instance. The app creator needs to republish it.",
+      error_type: 'app_unavailable',
+      logs: '',
+    };
+  }
+  return {
+    error: message,
+    error_type: 'floom_internal_error',
+    logs: err.stack || '',
+  };
 }
 
 export function getRun(runId: string): RunRecord | undefined {

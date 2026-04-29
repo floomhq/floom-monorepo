@@ -1,7 +1,7 @@
 // Embeddings service. Used by the app picker.
 // Falls back to keyword scoring when OPENAI_API_KEY is missing.
 import { db } from '../db.js';
-import { isTestFixture } from '../lib/hub-filter.js';
+import { isPublicCatalogSuppressed } from '../lib/hub-filter.js';
 import type { AppRecord } from '../types.js';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -124,7 +124,7 @@ export async function pickApps(query: string, limit = 3): Promise<PickResult[]> 
   // results so MCP clients (Claude Desktop, Cursor, /mcp/search) never
   // recommend a "Swagger Petstore" fixture when a user asks for a real
   // capability.
-  const allApps = allAppsRaw.filter((a) => !isTestFixture(a));
+  const allApps = allAppsRaw.filter((a) => !isPublicCatalogSuppressed(a));
 
   if (allApps.length === 0) return [];
 

@@ -56,6 +56,13 @@ function runGateResponse(c: Context, gate: Exclude<RunGateResult, { ok: true }>)
   return c.json(gate.body, gate.status, gate.headers);
 }
 
+function parsePositiveIntParam(value: string | undefined, fallback: number, max: number): number {
+  if (value === undefined) return fallback;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(max, Math.trunc(n)));
+}
+
 function isPublicLiveApp(app: AppRecord): boolean {
   const visibility = app.visibility || 'public';
   const publishStatus = app.publish_status || 'published';
@@ -228,7 +235,7 @@ runRouter.post('/', async (c) => {
   // parseJsonBody distinguishes "no body" (OK, treat as {}) from "truncated
   // or otherwise invalid JSON" (error, must 400). We keep the empty-body
   // fallback for ergonomic `curl -X POST` calls on zero-input actions.
-  const parsed = await parseJsonBody(c);
+  const parsed = await parseJsonBody(c, { requireJsonContentType: true });
   if (parsed.kind === 'error') return bodyParseError(c, parsed);
   const body = parsed.value as {
     app_slug?: unknown;
@@ -622,7 +629,7 @@ slugRunRouter.post('/', async (c) => {
 
   // 2026-04-20 (P2 #146): reject malformed JSON at the edge instead of
   // silently coercing to {}. See the same rationale on POST /api/run above.
-  const parsed = await parseJsonBody(c);
+  const parsed = await parseJsonBody(c, { requireJsonContentType: true });
   if (parsed.kind === 'error') return bodyParseError(c, parsed);
   const body = parsed.value as {
     action?: unknown;
@@ -1082,7 +1089,8 @@ meRouter.get('/runs', async (c) => {
   const ctx = await resolveUserContext(c);
   const gate = requireAuthenticatedInCloud(c, ctx);
   if (gate) return gate;
-  const limit = Math.max(1, Math.min(200, Number(c.req.query('limit') || 50)));
+  const limit = Math.max(1, parsePositiveIntParam(c.req.query('limit'), 50, 200));
+  const offset = parsePositiveIntParam(c.req.query('offset'), 0, 10_000);
 
   const scopeClause = ctx.agent_token_id
     ? 'runs.workspace_id = ?'
@@ -1102,10 +1110,10 @@ meRouter.get('/runs', async (c) => {
          FROM runs
          LEFT JOIN apps ON apps.id = runs.app_id
         WHERE ${scopeClause}
-        ORDER BY runs.started_at DESC
-        LIMIT ?`,
+        ORDER BY runs.started_at DESC, runs.id DESC
+        LIMIT ? OFFSET ?`,
     )
-    .all(...scopeParams, limit) as Array<{
+    .all(...scopeParams, limit, offset) as Array<{
     id: string;
     action: string;
     status: string;

@@ -27,14 +27,23 @@ export type ParsedBody =
   | { kind: 'ok'; value: Record<string, unknown> }
   | {
       kind: 'error';
-      reason: 'malformed_json' | 'wrong_shape' | 'body_too_large';
+      reason: 'malformed_json' | 'wrong_shape' | 'body_too_large' | 'unsupported_media_type';
       raw?: string;
       parseMessage?: string;
       limitBytes?: number;
       observedBytes?: number;
+      contentType?: string;
     };
 
-export async function parseJsonBody(c: Context): Promise<ParsedBody> {
+function isJsonContentType(contentType: string): boolean {
+  const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase() || '';
+  return mediaType === 'application/json' || mediaType.endsWith('+json');
+}
+
+export async function parseJsonBody(
+  c: Context,
+  options: { requireJsonContentType?: boolean } = {},
+): Promise<ParsedBody> {
   let raw: string;
   try {
     raw = await readRequestTextWithLimit(c.req.raw);
@@ -56,6 +65,19 @@ export async function parseJsonBody(c: Context): Promise<ParsedBody> {
   // required inputs.
   if (raw.trim().length === 0) {
     return { kind: 'ok', value: {} };
+  }
+
+  if (options.requireJsonContentType) {
+    const contentType = c.req.header('content-type') || '';
+    if (!isJsonContentType(contentType)) {
+      return {
+        kind: 'error',
+        reason: 'unsupported_media_type',
+        raw,
+        contentType,
+        parseMessage: 'Content-Type must be application/json for a non-empty JSON body',
+      };
+    }
   }
 
   let parsed: unknown;
@@ -95,6 +117,19 @@ export function bodyParseError(c: Context, err: Extract<ParsedBody, { kind: 'err
         limit_bytes: err.limitBytes,
       },
       413,
+    );
+  }
+  if (err.reason === 'unsupported_media_type') {
+    return c.json(
+      {
+        error: 'Content-Type must be application/json',
+        code: 'unsupported_media_type',
+        details: {
+          reason: err.reason,
+          content_type: err.contentType || null,
+        },
+      },
+      415,
     );
   }
   const message =

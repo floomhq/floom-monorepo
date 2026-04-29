@@ -955,11 +955,11 @@ function safeParse(raw: string | null): unknown {
 }
 
 // FLOOM_STORE_HIDE_SLUGS (lock-in 2026-04-18): comma-separated list of app
-// slugs that the public store feed should suppress. Default empty, no
-// filtering. Useful for creators who want to temporarily take a published
-// app out of the directory without deleting it (e.g. `flyfast` while its
-// upstream integration is being rotated). Parsed once at module load;
-// change the env var and restart the server to pick up new values.
+// slugs that the public store feed suppresses. Useful for creators who
+// want to temporarily take a published app out of the directory without
+// deleting it (e.g. `flyfast` while its upstream integration is being
+// rotated). Parsed once at module load; change the env var and restart
+// the server to pick up new values.
 //
 // INVARIANT (audit 2026-04-18, bug #1): this filter applies ONLY to the
 // public directory list endpoint below (hubRouter.get('/')). It MUST NOT
@@ -968,12 +968,12 @@ function safeParse(raw: string | null): unknown {
 // If you add another endpoint that surfaces the full apps list, filter
 // it here too; if you add one that serves a single-app record, leave the
 // hide list alone. Direct permalinks keep working for hidden apps.
-const HIDDEN_SLUGS: Set<string> = new Set(
-  (process.env.FLOOM_STORE_HIDE_SLUGS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean),
-);
+const configuredHiddenSlugs = (process.env.FLOOM_STORE_HIDE_SLUGS || '')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
+const HIDDEN_SLUGS: Set<string> = new Set(configuredHiddenSlugs);
 
 hubRouter.get('/', (c) => {
   const category = c.req.query('category');

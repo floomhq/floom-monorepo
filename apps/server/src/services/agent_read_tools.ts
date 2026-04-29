@@ -14,6 +14,7 @@ import { isByokGated } from '../lib/byok-gate.js';
 import { validateInputs, ManifestError } from './manifest.js';
 import { dispatchRun, getRun } from './runner.js';
 import { applyProfileContext } from './profile_context.js';
+import { isPublicCatalogSuppressed } from '../lib/hub-filter.js';
 import type {
   AppRecord,
   NormalizedManifest,
@@ -134,7 +135,7 @@ function isOwnedByContext(app: AppRecord, ctx: SessionContext): boolean {
 }
 
 function canDiscoverApp(app: AppRecord, ctx: SessionContext): boolean {
-  if (isPublicLive(app)) return true;
+  if (isPublicLive(app) && !isPublicCatalogSuppressed(app)) return true;
   return isOwnedByContext(app, ctx);
 }
 
@@ -204,8 +205,35 @@ function publicBaseUrl(c: Context): string {
   }
 }
 
+function publicAppWebBaseUrl(baseUrl: string): string {
+  const clean = baseUrl.replace(/\/+$/, '');
+  try {
+    const parsed = new URL(clean);
+    if (parsed.hostname === 'mcp.floom.dev') {
+      return 'https://floom.dev';
+    }
+  } catch {
+    // Keep malformed/local test origins untouched.
+  }
+  return clean;
+}
+
+function publicMcpAppUrl(baseUrl: string, slug: string): string {
+  const clean = baseUrl.replace(/\/+$/, '');
+  try {
+    const parsed = new URL(clean);
+    if (parsed.hostname === 'mcp.floom.dev') {
+      return `https://mcp.floom.dev/app/${encodeURIComponent(slug)}`;
+    }
+  } catch {
+    // Keep malformed/local test origins on the mounted route shape.
+  }
+  return `${clean}/mcp/app/${encodeURIComponent(slug)}`;
+}
+
 function appSummary(app: AppRecord, baseUrl: string): Record<string, unknown> {
   const manifest = parseManifest(app);
+  const webBaseUrl = publicAppWebBaseUrl(baseUrl);
   return {
     slug: app.slug,
     name: app.name,
@@ -213,7 +241,9 @@ function appSummary(app: AppRecord, baseUrl: string): Record<string, unknown> {
     category: app.category,
     visibility: visibilityLabel(app),
     runtime: manifest.runtime,
-    public_link: `${baseUrl}/p/${app.slug}`,
+    public_link: `${webBaseUrl}/p/${app.slug}`,
+    install_url: `${webBaseUrl}/install/${app.slug}`,
+    mcp_url: publicMcpAppUrl(baseUrl, app.slug),
   };
 }
 
@@ -291,6 +321,8 @@ export function getAppSkill(
     (manifest.actions.run ? 'run' : actionNames[0]) ||
     'run';
   const baseUrl = publicBaseUrl(c);
+  const webBaseUrl = publicAppWebBaseUrl(baseUrl);
+  const mcpUrl = publicMcpAppUrl(baseUrl, app.slug);
   const skillMd = [
     `# ${app.name}`,
     '',
@@ -298,8 +330,8 @@ export function getAppSkill(
     '',
     `Slug: \`${app.slug}\``,
     `Primary action: \`${action}\``,
-    `MCP: \`${baseUrl}/mcp/app/${app.slug}\``,
-    `HTTP: \`${baseUrl}/api/${app.slug}/run\``,
+    `MCP: \`${mcpUrl}\``,
+    `HTTP: \`${webBaseUrl}/api/${app.slug}/run\``,
     '',
     'Call this app through Floom with `{ action, inputs }`.',
     '',

@@ -43,10 +43,37 @@ export const TEST_FIXTURE_SLUG =
 export const TEST_FIXTURE_DESC =
   /^(This is a sample Pet Store Server|GitHub's v3 REST API\.|A simple HTTP Request & Response Service)/i;
 
+const CLOUD_DOCKER_RUNTIME_HIDE_SLUGS = new Set([
+  'competitor-lens',
+  'ai-readiness-audit',
+  'pitch-coach',
+]);
+
+function isCloudModeEnv(): boolean {
+  const raw = (process.env.FLOOM_CLOUD_MODE || '').trim().toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes';
+}
+
+function configuredHiddenSlugs(): Set<string> {
+  return new Set(
+    (process.env.FLOOM_STORE_HIDE_SLUGS || '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 export function isTestFixture(app: HubFilterApp): boolean {
   if (TEST_FIXTURE_SLUG.test(app.slug)) return true;
   if (app.description && TEST_FIXTURE_DESC.test(app.description)) return true;
   return false;
+}
+
+export function isPublicCatalogSuppressed(app: HubFilterApp): boolean {
+  const slug = app.slug.toLowerCase();
+  if (configuredHiddenSlugs().has(slug)) return true;
+  if (isCloudModeEnv() && CLOUD_DOCKER_RUNTIME_HIDE_SLUGS.has(slug)) return true;
+  return isTestFixture(app);
 }
 
 /**
@@ -59,5 +86,5 @@ export function isTestFixture(app: HubFilterApp): boolean {
  * their own half-published drafts.
  */
 export function filterTestFixtures<T extends HubFilterApp>(apps: T[]): T[] {
-  return apps.filter((a) => !isTestFixture(a));
+  return apps.filter((a) => !isPublicCatalogSuppressed(a));
 }

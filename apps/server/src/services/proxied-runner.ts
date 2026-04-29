@@ -803,6 +803,9 @@ export async function runProxied(input: ProxiedRunInput): Promise<ProxiedRunResu
 function redactUrlForLogs(rawUrl: string): string {
   try {
     const url = new URL(rawUrl);
+    if (isInternalHostname(url.hostname)) {
+      return `${url.protocol}//[internal]${url.pathname}`;
+    }
     for (const key of Array.from(url.searchParams.keys())) {
       if (isSensitiveKey(key)) url.searchParams.set(key, '[redacted]');
     }
@@ -810,6 +813,16 @@ function redactUrlForLogs(rawUrl: string): string {
   } catch {
     return rawUrl;
   }
+}
+
+function isInternalHostname(rawHostname: string): boolean {
+  const hostname = rawHostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (hostname === 'localhost' || hostname === '::1') return true;
+  if (/^127\./.test(hostname)) return true;
+  if (/^10\./.test(hostname)) return true;
+  if (/^192\.168\./.test(hostname)) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) return true;
+  return false;
 }
 
 function isSensitiveKey(key: string): boolean {

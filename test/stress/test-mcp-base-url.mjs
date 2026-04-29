@@ -160,6 +160,92 @@ try {
   );
 
   // -------------------------------------------------------------------
+  // Scenario 1b: mcp.floom.dev is mounted at /app/:slug in production.
+  // Metadata generated from that host must not echo the incoming http
+  // origin or add a second /mcp prefix.
+  // -------------------------------------------------------------------
+  const mcpHostRes = await callIngestAt('http://mcp.floom.dev/', {
+    jsonrpc: '2.0',
+    id: 11,
+    method: 'tools/call',
+    params: {
+      name: 'ingest_app',
+      arguments: {
+        openapi_url: specUrl,
+        slug: 'url-correctness-live',
+        name: 'MCP Subdomain URL',
+        visibility: 'public',
+      },
+    },
+  });
+  log(
+    'mcp subdomain ingest: response is not an error',
+    mcpHostRes.json?.result?.isError !== true,
+    JSON.stringify(mcpHostRes.payload),
+  );
+  log(
+    'mcp subdomain ingest: mcp_url uses live /app/<slug> shape',
+    mcpHostRes.payload?.mcp_url ===
+      'https://mcp.floom.dev/app/url-correctness-live',
+    mcpHostRes.payload?.mcp_url,
+  );
+  log(
+    'mcp subdomain ingest: web links use floom.dev',
+    mcpHostRes.payload?.permalink ===
+      'https://floom.dev/p/url-correctness-live' &&
+      mcpHostRes.payload?.install_url ===
+        'https://floom.dev/install/url-correctness-live',
+    JSON.stringify(mcpHostRes.payload),
+  );
+  log(
+    'mcp subdomain ingest: no broken http://mcp.floom.dev/mcp/app shape',
+    typeof mcpHostRes.payload?.mcp_url === 'string' &&
+      !mcpHostRes.payload.mcp_url.startsWith('http://') &&
+      !mcpHostRes.payload.mcp_url.includes('mcp.floom.dev/mcp/app/'),
+    mcpHostRes.payload?.mcp_url,
+  );
+
+  const mcpHostList = await callIngestAt('http://mcp.floom.dev/', {
+    jsonrpc: '2.0',
+    id: 12,
+    method: 'tools/call',
+    params: {
+      name: 'list_apps',
+      arguments: { keyword: 'subdomain', limit: 20 },
+    },
+  });
+  const listMatch = (mcpHostList.payload?.apps || []).find(
+    (app) => app.slug === 'url-correctness-live',
+  );
+  log(
+    'mcp subdomain list_apps: app metadata URLs are live shapes',
+    listMatch?.mcp_url === 'https://mcp.floom.dev/app/url-correctness-live' &&
+      listMatch?.permalink === 'https://floom.dev/p/url-correctness-live' &&
+      listMatch?.install_url === 'https://floom.dev/install/url-correctness-live',
+    JSON.stringify(listMatch),
+  );
+
+  const mcpHostSearch = await callIngestAt('http://mcp.floom.dev/search', {
+    jsonrpc: '2.0',
+    id: 13,
+    method: 'tools/call',
+    params: {
+      name: 'search_apps',
+      arguments: { query: 'subdomain url', limit: 20 },
+    },
+  });
+  const searchMatch = (mcpHostSearch.payload || []).find(
+    (app) => app.slug === 'url-correctness-live',
+  );
+  log(
+    'mcp subdomain search_apps: result URLs are live shapes',
+    searchMatch?.mcp_url === 'https://mcp.floom.dev/app/url-correctness-live' &&
+      searchMatch?.permalink === 'https://floom.dev/p/url-correctness-live' &&
+      searchMatch?.install_url === 'https://floom.dev/install/url-correctness-live',
+    JSON.stringify(searchMatch || mcpHostSearch.payload),
+  );
+
+  // -------------------------------------------------------------------
   // Scenario 2: with FLOOM_PUBLIC_ORIGIN set, responses use that origin
   // REGARDLESS of the request's Host header. This is the prod pin-to-
   // canonical mode.
