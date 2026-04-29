@@ -1,0 +1,240 @@
+name: floom-build audit
+
+on:
+  pull_request:
+    branches:
+      - feat/floom-build
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  audit:
+    name: Static audit gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Identify slug
+        id: slug
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.pull_request.title || "";
+            const branch = context.payload.pull_request.head.ref || "";
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const exampleSlug = files
+              .map((file) => file.filename.match(/^examples\/([^/]+)\//)?.[1])
+              .find(Boolean);
+            const candidates = [
+              exampleSlug,
+              title.match(/`([^`]+)`/)?.[1],
+              title.match(/feat:\s*(?:add\s+)?([a-z0-9][a-z0-9-]+)/i)?.[1],
+              branch.match(/(?:feat|fix)\/([a-z0-9][a-z0-9-]+?)(?:-v\d+)?$/i)?.[1],
+              branch.match(/([a-z0-9][a-z0-9-]+?)(?:-v\d+)?$/i)?.[1],
+            ].filter(Boolean);
+            const slug = candidates[0] || "";
+            core.setOutput("slug", slug);
+            core.setOutput("has_app_changes", files.some((file) => file.filename.startsWith("examples/")) ? "true" : "false");
+            core.summary.addRaw(`Detected slug: ${slug || "(none)"}`).write();
+
+      - name: Run static audit gates
+        id: audit
+        env:
+          SLUG: ${{ steps.slug.outputs.slug }}
+          HAS_APP_CHANGES: ${{ steps.slug.outputs.has_app_changes }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/floom-build-audit
+          node <<'NODE' > /tmp/floom-build-audit/gates.json
+          const fs = require("fs");
+          const cp = require("child_process");
+          const slug = process.env.SLUG || "";
+          const hasAppChanges = process.env.HAS_APP_CHANGES === "true";
+          const appDir = slug ? `examples/${slug}` : "";
+          const gates = [];
+          const add = (gate, name, verdict, detail = "") => gates.push({ gate, name, verdict, detail });
+          const exists = (p) => fs.existsSync(p);
+          const read = (p) => exists(p) ? fs.readFileSync(p, "utf8") : "";
+          const run = (cmd) => {
+            try {
+              cp.execSync(cmd, { stdio: "pipe", encoding: "utf8" });
+              return { ok: true, out: "" };
+            } catch (err) {
+              return { ok: false, out: `${err.stdout || ""}${err.stderr || ""}`.trim().slice(0, 2000) };
+            }
+          };
+
+          if (!hasAppChanges) {
+            add("G-1", "search-first", "SKIP", "No examples/ app changes in this PR.");
+          } else if (!slug) {
+            add("G-1", "search-first", "FAIL", "Could not infer slug from PR title or branch.");
+          } else if (exists(appDir)) {
+            add("G-1", "search-first", "PASS", appDir);
+          } else {
+            add("G-1", "search-first", "FAIL", `${appDir} not found.`);
+          }
+
+          const spec = appDir ? read(`${appDir}/SPEC.md`) : "";
+          if (!hasAppChanges) {
+            add("G0", "spec sanity", "SKIP", "No app SPEC.md in this PR.");
+          } else if (!process.env.GEMINI_API_KEY) {
+            add("G0", "spec sanity", "FAIL", "GEMINI_API_KEY secret is not configured for this workflow.");
+          } else if (spec.includes("golden_inputs") && spec.includes("golden_outputs")) {
+            add("G0", "spec sanity", "PASS", "SPEC.md has golden input/output contract.");
+          } else {
+            add("G0", "spec sanity", "FAIL", "SPEC.md missing golden_inputs or golden_outputs.");
+          }
+
+          const server = appDir ? read(`${appDir}/server.mjs`) : "";
+          const appsYaml = appDir ? read(`${appDir}/apps.yaml`) : "";
+          if (!hasAppChanges) {
+            add("G4", "OpenAPI static", "SKIP", "No app server in this PR.");
+          } else if (server.includes("OPENAPI") && server.includes(`/${slug}/run`) && (server.includes("/openapi") || appsYaml.includes("openapi"))) {
+            add("G4", "OpenAPI static", "PASS", "OpenAPI route and run path present.");
+          } else {
+            add("G4", "OpenAPI static", "FAIL", "OpenAPI route or run path missing.");
+          }
+
+          if (!hasAppChanges) {
+            add("G7", "golden cases", "SKIP", "No app SPEC.md in this PR.");
+          } else if (spec.includes("golden_inputs") && spec.includes("golden_outputs")) {
+            add("G7", "golden cases", "PASS", "Golden cases present.");
+          } else {
+            add("G7", "golden cases", "FAIL", "Golden cases missing.");
+          }
+
+          if (!hasAppChanges) {
+            add("G8", "error handling", "SKIP", "No app server in this PR.");
+          } else if (/400|bad_request|invalid/i.test(server) && /try|catch|httpError/i.test(server)) {
+            add("G8", "error handling", "PASS", "Static 400/error path present.");
+          } else {
+            add("G8", "error handling", "FAIL", "No static 400/error path found.");
+          }
+
+          const secretPattern = /(sk-[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})/;
+          const files = appDir && exists(appDir) ? cp.execSync(`find ${appDir} -type f`, { encoding: "utf8" }).trim().split("\n").filter(Boolean) : [];
+          const hit = files.find((file) => secretPattern.test(read(file)));
+          if (!hasAppChanges) add("G9", "secret leakage", "SKIP", "No app files in this PR.");
+          else if (hit) add("G9", "secret leakage", "FAIL", `Token-shaped value found in ${hit}.`);
+          else add("G9", "secret leakage", "PASS", "No token-shaped values found.");
+
+          if (!hasAppChanges) {
+            add("G11a", "node syntax", "SKIP", "No app server in this PR.");
+          } else if (appDir && exists(`${appDir}/server.mjs`)) {
+            const check = run(`node --check ${appDir}/server.mjs`);
+            add("G11a", "node syntax", check.ok ? "PASS" : "FAIL", check.ok ? "node --check passed." : check.out);
+          } else {
+            add("G11a", "node syntax", "FAIL", "server.mjs missing.");
+          }
+
+          fs.writeFileSync("/tmp/floom-build-audit/gates.json", JSON.stringify(gates, null, 2));
+          const fail = gates.some((g) => g.verdict === "FAIL");
+          process.exitCode = fail ? 1 : 0;
+          NODE
+
+      - name: Typecheck
+        if: always()
+        id: typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        if: always()
+        id: lint
+        run: pnpm lint
+
+      - name: Test
+        if: always()
+        id: test
+        run: pnpm --filter @floom/web test
+
+      - name: Build audit table
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const gates = fs.existsSync("/tmp/floom-build-audit/gates.json")
+            ? JSON.parse(fs.readFileSync("/tmp/floom-build-audit/gates.json", "utf8"))
+            : [];
+          const ci = [
+            { gate: "G11b", name: "typecheck", verdict: process.env.TYPECHECK, detail: "pnpm typecheck" },
+            { gate: "G11c", name: "lint", verdict: process.env.LINT, detail: "pnpm lint" },
+            { gate: "G11d", name: "test", verdict: process.env.TEST, detail: "pnpm --filter @floom/web test" },
+          ];
+          const rows = gates.concat(ci);
+          const table = [
+            "| Gate | Name | Verdict | Detail |",
+            "|------|------|---------|--------|",
+            ...rows.map((r) => `| ${r.gate} | ${r.name} | ${r.verdict} | ${(r.detail || "").replace(/\n/g, " ").replace(/\|/g, "\\|")} |`),
+          ].join("\n");
+          fs.writeFileSync("/tmp/floom-build-audit/comment.md", [
+            "## floom-build CI audit",
+            "",
+            `Slug: \`${process.env.SLUG || "unknown"}\``,
+            "",
+            table,
+            "",
+            "Server-runtime gates G1, G2, G3, G5, and G6 are skipped in CI because they require a running preview sidecar.",
+          ].join("\n"));
+          NODE
+        env:
+          SLUG: ${{ steps.slug.outputs.slug }}
+          TYPECHECK: ${{ steps.typecheck.outcome == 'success' && 'PASS' || 'FAIL' }}
+          LINT: ${{ steps.lint.outcome == 'success' && 'PASS' || 'FAIL' }}
+          TEST: ${{ steps.test.outcome == 'success' && 'PASS' || 'FAIL' }}
+
+      - name: Comment on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const body = fs.readFileSync("/tmp/floom-build-audit/comment.md", "utf8");
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
+
+      - name: Final verdict
+        if: always()
+        env:
+          AUDIT: ${{ steps.audit.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TEST: ${{ steps.test.outcome }}
+        run: |
+          test "$AUDIT" = success
+          test "$TYPECHECK" = success
+          test "$LINT" = success
+          test "$TEST" = success
