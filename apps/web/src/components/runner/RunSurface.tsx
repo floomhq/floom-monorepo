@@ -1751,61 +1751,6 @@ interface InputCardProps {
   onTrySample?: () => void;
 }
 
-function InputOutputGuide({ actionSpec }: { actionSpec: ActionSpec }) {
-  return (
-    <details
-      data-testid="run-surface-io-guide"
-      style={{
-        marginBottom: 12,
-        border: '1px solid var(--line)',
-        borderRadius: 10,
-        background: 'var(--bg)',
-      }}
-    >
-      <summary
-        style={{
-          cursor: 'pointer',
-          padding: '10px 12px',
-          fontSize: 12.5,
-          fontWeight: 600,
-          color: 'var(--ink)',
-          listStyle: 'none',
-        }}
-      >
-        Input & output
-      </summary>
-      <div style={{ padding: '0 12px 12px' }}>
-        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Input
-        </div>
-        <ul style={{ margin: '6px 0 10px', paddingLeft: 16 }}>
-          {actionSpec.inputs.map((inp) => (
-            <li key={inp.name} style={{ fontSize: 12.5, color: 'var(--ink)', marginBottom: 4 }}>
-              {(inp.label || inp.name) + (inp.required ? '' : ' (optional)')}
-              {inp.description ? (
-                <span style={{ color: 'var(--muted)' }}> — {inp.description}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Output
-        </div>
-        <ul style={{ margin: '6px 0 0', paddingLeft: 16 }}>
-          {actionSpec.outputs.map((out) => (
-            <li key={out.name} style={{ fontSize: 12.5, color: 'var(--ink)', marginBottom: 4 }}>
-              {out.label || out.name}
-              {out.description ? (
-                <span style={{ color: 'var(--muted)' }}> — {out.description}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </details>
-  );
-}
-
 function InputCard({
   app,
   actionSpec,
@@ -1989,7 +1934,11 @@ function InputCard({
           <RunningEyebrowTimer startedAt={runStartedAt} />
         )}
       </div>
-      <InputOutputGuide actionSpec={actionSpec} />
+      {/* Federico 2026-04-29: dropped the InputOutputGuide block from the
+          input column. Input fields are self-explanatory via labels +
+          (i) tooltip on each row. The OUTPUT side of the spec moved to
+          the output column (see OutputSpecPlaceholder render in the
+          idle-output state of RunSurface). */}
       {hasInputs ? (
         <form
           style={dimWrapStyle}
@@ -2529,11 +2478,37 @@ function EmptyOutputCard({
             <SampleOutputPreview slug={slug} />
           </div>
         ) : null}
-        {/* R10 polish (Gemini audit): the no-sample fallback used to
-            render a fake RESULT/SCORE skeleton table. That was confusing
-            (read as "loading" not "empty"). The clear instructional
-            copy above is enough — no skeleton when we don't have real
-            sample data. */}
+        {/* Federico 2026-04-29: surface the OUTPUT spec on the OUTPUT
+            column (not the input column where it used to live). Lists
+            every output the action returns + its description. Only
+            renders when there's >0 output AND we don't already have a
+            curated sample preview (which is richer). */}
+        {!hasSample && actionSpec.outputs.length > 0 && (
+          <ul
+            data-testid="run-surface-output-spec-list"
+            style={{
+              marginTop: 16,
+              paddingLeft: 16,
+              listStyle: 'disc',
+              fontSize: 12.5,
+              lineHeight: 1.5,
+              color: 'var(--muted)',
+              textAlign: 'left',
+              maxWidth: 360,
+            }}
+          >
+            {actionSpec.outputs.map((out) => (
+              <li key={out.name} style={{ marginBottom: 6 }}>
+                <span style={{ color: 'var(--ink)', fontWeight: 600 }}>
+                  {out.label || out.name}
+                </span>
+                {out.description ? (
+                  <span> — {out.description}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -3209,11 +3184,23 @@ function FriendlyStartupError({
 
 // ── Past runs disclosure ───────────────────────────────────────────────────
 
-export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
+export function PastRunsDisclosure({
+  appSlug,
+  defaultOpen = false,
+}: {
+  appSlug: string;
+  /** Federico 2026-04-29: when rendered inside the dedicated "Earlier runs"
+   * tab on /p/:slug, the user has already clicked through to get here, so the
+   * inner <details> opens by default. The caller (AppPermalinkPage) passes
+   * defaultOpen=true on that tab. Other surfaces (inline below-fold on /home,
+   * etc.) can keep defaultOpen=false to preserve the collapsed-by-default
+   * disclosure behavior. */
+  defaultOpen?: boolean;
+}) {
   const { isAuthenticated } = useSession();
   const deployEnabled = useDeployEnabled();
   const location = useLocation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [runs, setRuns] = useState<MeRunSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
   const loginHref = useMemo(
@@ -3247,6 +3234,7 @@ export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
       <details
         className="run-surface-past"
         data-testid="run-surface-past"
+        open={defaultOpen}
         onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
       >
         <summary className="run-surface-past-summary">Earlier runs</summary>
@@ -3278,6 +3266,7 @@ export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
     <details
       className="run-surface-past"
       data-testid="run-surface-past"
+      open={defaultOpen}
       onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
     >
       <summary className="run-surface-past-summary">Earlier runs</summary>

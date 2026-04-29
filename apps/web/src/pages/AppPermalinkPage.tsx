@@ -1696,7 +1696,7 @@ export function AppPermalinkPage() {
             >
               Earlier runs
             </div>
-            <PastRunsDisclosure appSlug={app.slug} />
+            <PastRunsDisclosure appSlug={app.slug} defaultOpen />
           </section>
         )}
           </div>

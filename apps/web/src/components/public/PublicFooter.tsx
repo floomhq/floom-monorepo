@@ -63,7 +63,7 @@ const SOCIAL_ICON_STYLE: React.CSSProperties = {
 //   Legal: Terms · Privacy
 // Removed: Cookies (covered by Privacy), Legal (Terms covers it),
 //   Runtime limits + Security (moved to Docs). Removed "Built in SF"
-//   tagline (X1: misleading, Federico in Hamburg moving to SF).
+//   tagline (X1: misleading — moved to SF, was previously "Hamburg + SF").
 
 const COL_STYLE: React.CSSProperties = {
   display: 'flex',
@@ -190,7 +190,7 @@ export function PublicFooter() {
               maxWidth: 280,
             }}
           >
-            Built in Hamburg + SF ·{' '}
+            Built in SF ·{' '}
             <a
               href="https://f.inc"
               target="_blank"

@@ -178,7 +178,7 @@ const SAMPLE_BY_NAME: Record<string, string> = {
   // click ("quick brown fox" is not valid JSON -> parse error). The `text`
   // key is too ambiguous (JSON for json-format, prose for word-count), so
   // leave it to each app's manifest `default`/`example` + input placeholder.
-  city: 'Hamburg',
+  city: 'San Francisco',
   location: 'San Francisco',
   email: 'hello@floom.dev',
   domain: 'floom.dev',

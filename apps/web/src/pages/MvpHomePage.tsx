@@ -320,9 +320,29 @@ function TokenCard({ onTokenReady }: { onTokenReady?: (rawToken: string) => void
             onClick={() => void handleMint()}
             disabled={minting}
             data-testid="mint-token"
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '11px 24px', borderRadius: 999, background: INK, color: '#fff', fontSize: 14, fontWeight: 700, cursor: minting ? 'not-allowed' : 'pointer', border: 'none', fontFamily: 'inherit', opacity: minting ? 0.7 : 1 }}
+            /* Federico 2026-04-29: primary CTA goes green to match the
+               Run button on /p/:slug. Black-on-light-bg read as muted /
+               low-affordance for the "first thing the user does" action. */
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '13px 28px',
+              borderRadius: 999,
+              background: ACCENT,
+              color: '#fff',
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: minting ? 'not-allowed' : 'pointer',
+              border: 'none',
+              fontFamily: 'inherit',
+              opacity: minting ? 0.7 : 1,
+              boxShadow: minting ? 'none' : '0 1px 0 rgba(4, 120, 87, 0.25), 0 4px 12px rgba(4, 120, 87, 0.18)',
+              letterSpacing: '-0.01em',
+            }}
           >
-            {minting ? 'Minting...' : 'Mint your token'}
+            {minting ? 'Minting...' : 'Mint your token →'}
           </button>
         </div>
       )}

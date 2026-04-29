@@ -113,18 +113,30 @@ function InputLabel({
           <span style={{ fontWeight: 400, color: 'var(--muted)' }}> (optional)</span>
         )}
       </label>
-      {hasDescription && (
-        <p
+      {/* Federico 2026-04-29: removed the inline <p> description block —
+          too much text on the left column for fields whose label already
+          says what they are (e.g. "Your URL", "Competitor URL"). The
+          description still lives on the (i) icon's title attribute, so
+          hovering reveals it. Screen readers still get it via the visually
+          hidden span below (descriptionId) wired to aria-describedby on the
+          input. */}
+      {hasDescription && descriptionId && (
+        <span
           id={descriptionId}
           style={{
-            margin: inline ? '4px 0 0' : '0 0 6px',
-            fontSize: 11,
-            color: 'var(--muted)',
-            lineHeight: 1.4,
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: 'hidden',
+            clip: 'rect(0, 0, 0, 0)',
+            whiteSpace: 'nowrap',
+            border: 0,
           }}
         >
           {description}
-        </p>
+        </span>
       )}
     </>
   );
