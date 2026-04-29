@@ -65,7 +65,11 @@ export function LoginPage() {
     rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
       ? rawNext
       : null;
-  const nextPath = safeNext || (mode === 'signup' ? '/studio/build' : '/run');
+  // M3 (#1059): post-auth default landing is /me/agent-keys (the canonical
+  // Agent tokens page — v26's wedge surface). Sign-in AND sign-up both default
+  // here; the `?next=...` deep-link override (safeNext above) still wins so
+  // users clicking a workspace link land where they intended.
+  const nextPath = safeNext || '/me/agent-keys';
 
   // If the user is already logged in (cloud mode) redirect away.
   useEffect(() => {
