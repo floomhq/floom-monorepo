@@ -113,6 +113,7 @@ export function PublicFooter() {
   return (
     <footer
       data-testid="public-footer"
+      className="public-footer"
       style={{
         padding: '56px 24px 28px',
         background: 'var(--card)',
@@ -140,7 +141,7 @@ export function PublicFooter() {
         }}
       >
         {/* Brand column: logo + integrated tagline + Founders Inc */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+        <div className="public-footer-brand" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <Link
             to="/"
             data-testid="footer-brand"
@@ -188,6 +189,7 @@ export function PublicFooter() {
             The protocol + runtime for agentic work.
           </p>
           <p
+            className="public-footer-sf"
             style={{
               fontSize: 12,
               color: 'var(--muted)',
@@ -209,7 +211,7 @@ export function PublicFooter() {
         </div>
 
         <div style={COL_STYLE}>
-          <div style={COL_LABEL_STYLE}>Product</div>
+          <div className="public-footer-col-label" style={COL_LABEL_STYLE}>Product</div>
           <FootLink to="/apps">Apps</FootLink>
           <FootLink to="/docs">Docs</FootLink>
           <FootLink to="/help">Help</FootLink>
@@ -219,7 +221,7 @@ export function PublicFooter() {
         </div>
 
         <div style={COL_STYLE}>
-          <div style={COL_LABEL_STYLE}>Company</div>
+          <div className="public-footer-col-label" style={COL_LABEL_STYLE}>Company</div>
           <FootLink to="/about">About</FootLink>
           <FootLink href="https://github.com/floomhq/floom">GitHub</FootLink>
           <FootLink href="https://discord.gg/8fXGXjxcRz">Discord</FootLink>
@@ -227,7 +229,7 @@ export function PublicFooter() {
         </div>
 
         <div style={COL_STYLE}>
-          <div style={COL_LABEL_STYLE}>Legal</div>
+          <div className="public-footer-col-label" style={COL_LABEL_STYLE}>Legal</div>
           <FootLink to="/terms">Terms</FootLink>
           <FootLink to="/privacy">Privacy</FootLink>
           <FootLink to="/imprint">Imprint</FootLink>
@@ -243,6 +245,7 @@ export function PublicFooter() {
         }}
       >
         <div
+          className="public-footer-bottom"
           style={{
             borderTop: '1px solid var(--line)',
             paddingTop: 20,
