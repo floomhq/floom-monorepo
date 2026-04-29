@@ -401,17 +401,18 @@ function AppCard({ app }: { app: RunApp }) {
 }
 
 function AppsGrid({ apps }: { apps: RunApp[] }) {
-  // Odd-count grids: show a "+ Install app" placeholder in the last slot so
-  // the 2-col layout doesn't look broken with a lone card.
+  // Auto-fill grid: cards flow into as many columns as fit at minmax(280px, 1fr).
+  // At 1440 viewport this yields 4-5 cols; on narrow viewports it collapses
+  // gracefully without needing the explicit max-width media query.
+  // Placeholder shown when the count is odd so the trailing row isn't lonely.
   const showPlaceholder = apps.length % 2 !== 0;
   return (
     <>
-      <style>{`@media (max-width: 760px) { [data-testid="run-apps-grid"] { grid-template-columns: 1fr !important; } }`}</style>
       <div
         data-testid="run-apps-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: 'var(--space-4)',
           marginBottom: 'var(--space-5)',
         }}
@@ -773,7 +774,7 @@ export function RunAppsPage() {
         {!dataReady ? (
           <div
             data-testid="run-apps-loading"
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)' }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--space-4)' }}
           >
             {[1, 2].map((i) => (
               <div
