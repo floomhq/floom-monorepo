@@ -61,7 +61,7 @@ export function DocsPageShell({ sidebar, children, banner }: Props) {
   return (
     <div className="docs-shell-v26">
       {banner}
-      <main className="docs-shell-v26__grid" style={containerStyle}>
+      <main id="main" className="docs-shell-v26__grid" style={containerStyle}>
         {/* R13 (2026-04-28): inline <style> migrated to
             styles/csp-inline-style-migrations.css for CSP compliance. */}
         <div className="docs-shell-v26__sidebar" style={sidebarWrapStyle}>

@@ -570,7 +570,7 @@ function Tracker({
                 color: on ? 'var(--ink, #0e0e0c)' : 'var(--muted, #8b8680)',
               }}
             >
-              <span style={TRACKER_NUM}>{`0${i + 1}`}</span>
+              <span style={TRACKER_NUM} aria-hidden="true">{`0${i + 1}`}</span>
               <span style={{ marginLeft: 6 }}>{s.toUpperCase()}</span>
             </button>
           );

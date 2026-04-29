@@ -127,7 +127,8 @@ const heroCodeBlockStyle: CSSProperties = {
 };
 
 const heroCodeCommentStyle: CSSProperties = {
-  color: '#8a877f',
+  // Darkened from #8a877f (3.26:1) to #6e6b63 (≥4.5:1) — WCAG AA fix (r39)
+  color: '#6e6b63',
 };
 
 const heroCodePromptStyle: CSSProperties = {
@@ -608,9 +609,10 @@ curl -X POST https://api.floom.dev/api/lead-scorer/run \\
           {/* Discord */}
           <div style={discordFootStyle}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h4 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>
+              {/* Reclassified h4→h3 to fix H2→H4 skip — WCAG 1.3.1 fix (r39) */}
+              <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>
                 Stuck? Ask in Discord.
-              </h4>
+              </h3>
               <p
                 style={{
                   fontSize: 13,

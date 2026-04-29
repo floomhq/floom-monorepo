@@ -331,7 +331,7 @@ export function AppsDirectoryPage() {
           inline <style> elements are blocked by the CSP style-src-elem
           directive (PR #781). */}
 
-      <main>
+      <main id="main">
         {/* HEADER · v17 store.html alignment (2026-04-25).
             Previously a huge centered hero (72px top padding, 48px serif H1
             "Apps on Floom", 640px search pill). The v17 wireframe calls for

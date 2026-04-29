@@ -583,7 +583,8 @@ export function PricingPage() {
           }}
         >
           <div>
-            <h3
+            {/* Reclassified h3→h2 to maintain heading order (H1→H2) — WCAG 1.3.1 fix (r39) */}
+            <h2
               style={{
                 ...SERIF,
                 fontSize: 22,
@@ -594,7 +595,7 @@ export function PricingPage() {
               }}
             >
               Prefer to run it yourself?
-            </h3>
+            </h2>
             <p
               style={{
                 fontSize: 13.5,
@@ -683,7 +684,8 @@ export function PricingPage() {
             }}
           >
             Paid plans coming post-launch.{' '}
-            <span style={{ color: MUTED, fontWeight: 400 }}>
+            {/* Darkened from MUTED #6b7280 (4.38:1) to #5e6672 (≥4.5:1) — WCAG AA fix (r39) */}
+            <span style={{ color: '#5e6672', fontWeight: 400 }}>
               Free forever for self-host.
             </span>
           </p>
