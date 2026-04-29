@@ -1,0 +1,38 @@
+name: Launch surface smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base Floom URL'
+        required: false
+        default: 'https://floom.dev'
+      preview_url:
+        description: 'Optional preview Floom URL'
+        required: false
+        default: 'https://preview.floom.dev'
+  schedule:
+    - cron: '20 7 * * *'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Smoke public launch surfaces
+        env:
+          FLOOM_BASE_URL: ${{ inputs.base_url || vars.FLOOM_BASE_URL || 'https://floom.dev' }}
+          FLOOM_PREVIEW_URL: ${{ inputs.preview_url || vars.FLOOM_PREVIEW_URL || 'https://preview.floom.dev' }}
+        run: pnpm test:launch-surface-smoke
