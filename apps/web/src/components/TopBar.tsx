@@ -44,7 +44,7 @@ const BG = '#fafaf8';
 // horizontal strip where no element dominates. Compact mode (/p/:slug
 // run view) still hides the wordmark entirely and shrinks the mark.
 const WORDMARK_SIZE = 17;
-const WORDMARK_WEIGHT = 600;
+// WORDMARK_WEIGHT removed — unified lockup (#980) always uses Inter 900
 const MARK_SIZE_DEFAULT = 22;
 const MARK_SIZE_COMPACT = 18;
 
@@ -282,7 +282,7 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           <span
             style={{
               fontSize: compact ? 15 : WORDMARK_SIZE,
-              fontWeight: WORDMARK_WEIGHT,
+              fontWeight: 900,
               letterSpacing: '-0.02em',
               lineHeight: 1,
               color: INK,
@@ -290,6 +290,18 @@ export function TopBar({ compact = false, onStudioMenuOpen }: Props = {}) {
           >
             floom
           </span>
+          {/* Trailing emerald dot — unified brand lockup (#980).
+              Inline SVG circle so it scales with the wordmark size and
+              stays crisp at any DPR. baseline-align via relative/top nudge. */}
+          <svg
+            aria-hidden="true"
+            width={compact ? 4 : 5}
+            height={compact ? 4 : 5}
+            viewBox="0 0 5 5"
+            style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: compact ? 1 : 2, flexShrink: 0 }}
+          >
+            <circle cx="2.5" cy="2.5" r="2.5" fill="#10b981" />
+          </svg>
         </Link>
 
         {/* Studio-only mobile sidebar toggle */}

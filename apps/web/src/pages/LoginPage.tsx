@@ -631,9 +631,9 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 600,
-  color: 'var(--muted)',
+  color: 'var(--ink)',
   marginBottom: 6,
   marginTop: 12,
 };

@@ -434,9 +434,9 @@ function TestItSection() {
       <h2 style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: ACCENT, margin: '0 0 16px' }}>
         Test it in 3 steps
       </h2>
-      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 16 }}>
-        {steps.map((s) => (
-          <div key={s.num} style={{ display: 'flex', gap: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 0 }}>
+        {steps.map((s, i) => (
+          <div key={s.num} style={{ display: 'flex', gap: 14, ...(i > 0 ? { borderTop: '1px solid rgba(14,14,12,0.08)', paddingTop: 14, marginTop: 14 } : {}) }}>
             <div style={{
               flexShrink: 0,
               width: 24,
@@ -697,7 +697,7 @@ export function MvpHomePage() {
               }} />
             </div>
 
-            <h2 style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: INK, margin: '28px 0 12px' }}>
+            <h2 style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: ACCENT, margin: '28px 0 12px' }}>
               Install
             </h2>
             {liveRawToken ? (
