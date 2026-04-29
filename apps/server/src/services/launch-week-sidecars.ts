@@ -13,6 +13,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '../db.js';
 import { ingestOpenApiApps } from './openapi-ingest.js';
+import type { NormalizedManifest, OutputSpec } from '../types.js';
 
 const HOST = process.env.FLOOM_LAUNCH_WEEK_HOST || '127.0.0.1';
 
@@ -23,6 +24,16 @@ interface LaunchWeekApp {
   category: string;
   openapiPath: string;
   featured?: boolean;
+  /**
+   * R38 fix: when present, the first action's outputs in the DB manifest
+   * are replaced with these declared specs after OpenAPI ingest. This is
+   * required for Python FastAPI sidecars whose auto-generated operationIds
+   * (e.g. `analyze_route_analyze_post`) cause `openapi-ingest` to store
+   * `outputs: [{name:'response',type:'json'}]` — a generic fallback that
+   * prevents the renderer cascade from picking the multi-section composite
+   * card and loses the Download CSV button.
+   */
+  manifestOutputs?: OutputSpec[];
 }
 
 interface LaunchWeekSidecar {
@@ -153,6 +164,13 @@ const SIDECARS: LaunchWeekSidecar[] = [
         category: 'writing',
         openapiPath: '/openapi.json',
         featured: true,
+        // R38 fix: same as competitor-lens — restore declared outputs.
+        manifestOutputs: [
+          { name: 'harsh_truth', label: 'Harsh Truth', type: 'json' },
+          { name: 'rewrites', label: 'Rewrites', type: 'json' },
+          { name: 'one_line_tldr', label: 'Biggest Issue', type: 'text' },
+          { name: 'model', label: 'Model', type: 'text' },
+        ],
       },
     ],
   },
@@ -171,6 +189,20 @@ const SIDECARS: LaunchWeekSidecar[] = [
         category: 'research',
         openapiPath: '/openapi.json',
         featured: true,
+        // R38 fix: restore declared outputs so the renderer cascade picks the
+        // multi-section CompositeOutputCard (positioning table + pricing table
+        // + pricing_insight text + unique arrays) instead of falling through to
+        // the generic KeyValueTable. Without this, autoPick looks for
+        // outObj['response'] (the generic OpenAPI fallback) which is always
+        // undefined, and the Download CSV button never renders.
+        manifestOutputs: [
+          { name: 'positioning', label: 'Positioning', type: 'table' },
+          { name: 'pricing', label: 'Pricing', type: 'table' },
+          { name: 'pricing_insight', label: 'Pricing Insight', type: 'text' },
+          { name: 'unique_to_you', label: 'Unique To You', type: 'json' },
+          { name: 'unique_to_competitor', label: 'Unique To Competitor', type: 'json' },
+          { name: 'meta', label: 'Meta', type: 'json' },
+        ],
       },
     ],
   },
@@ -189,6 +221,17 @@ const SIDECARS: LaunchWeekSidecar[] = [
         category: 'research',
         openapiPath: '/openapi.json',
         featured: true,
+        // R38 fix: same as competitor-lens — restore declared outputs so the
+        // renderer cascade picks the multi-section composite card.
+        manifestOutputs: [
+          { name: 'company_url', label: 'Audited URL', type: 'text' },
+          { name: 'readiness_score', label: 'Readiness Score', type: 'number' },
+          { name: 'score_rationale', label: 'Score Rationale', type: 'text' },
+          { name: 'risks', label: 'Risks', type: 'json' },
+          { name: 'opportunities', label: 'Opportunities', type: 'json' },
+          { name: 'next_action', label: 'Next Action', type: 'text' },
+          { name: 'model', label: 'Model', type: 'text' },
+        ],
       },
     ],
   },
@@ -253,6 +296,52 @@ function writeRuntimeAppsYaml(sidecars: LaunchWeekSidecar[]): string {
   }
   writeFileSync(path, lines.join('\n') + '\n', 'utf-8');
   return path;
+}
+
+/**
+ * R38 fix: after OpenAPI ingest, replace the first action's `outputs` in the
+ * stored manifest for each app that declares `manifestOutputs`. The ingest
+ * pipeline always stores `outputs: [{name:'response',type:'json'}]` because it
+ * cannot derive the correct output shape from an arbitrary API's response
+ * schema. For our first-party Python sidecars we know the exact output shape,
+ * so we patch it in after ingest so the renderer cascade can pick the
+ * multi-section CompositeOutputCard instead of falling through to KeyValueTable.
+ */
+function patchManifestOutputs(sidecars: LaunchWeekSidecar[]): number {
+  const getApp = db.prepare<[string], { id: string; manifest: string }>(
+    `SELECT id, manifest FROM apps WHERE slug = ? AND status = 'active' LIMIT 1`,
+  );
+  const setManifest = db.prepare(
+    `UPDATE apps SET manifest = ?, updated_at = datetime('now') WHERE id = ?`,
+  );
+
+  let patched = 0;
+  for (const sidecar of sidecars) {
+    for (const app of sidecar.apps) {
+      if (!app.manifestOutputs || app.manifestOutputs.length === 0) continue;
+      const row = getApp.get(app.slug);
+      if (!row) continue;
+      let manifest: NormalizedManifest;
+      try {
+        manifest = JSON.parse(row.manifest) as NormalizedManifest;
+      } catch {
+        console.warn(`[launch-week] patchManifestOutputs: invalid manifest JSON for ${app.slug}`);
+        continue;
+      }
+      const actions = manifest.actions;
+      if (!actions || Object.keys(actions).length === 0) continue;
+      // Patch every action in the manifest. For these single-action Python
+      // sidecars there's exactly one action (e.g. `analyze_route_analyze_post`);
+      // patching all is safe even if there are multiple.
+      for (const actionKey of Object.keys(actions)) {
+        actions[actionKey]!.outputs = app.manifestOutputs;
+      }
+      setManifest.run(JSON.stringify(manifest), row.id);
+      patched++;
+      console.log(`[launch-week] patched manifest outputs for ${app.slug} (${Object.keys(actions).join(', ')})`);
+    }
+  }
+  return patched;
 }
 
 function markFeatured(slugs: string[]): number {
@@ -366,8 +455,11 @@ export async function startLaunchWeekApps(): Promise<LaunchWeekBootResult> {
     const result = await ingestOpenApiApps(runtimeYaml);
     const featured = ready.flatMap((s) => s.apps.filter((a) => a.featured).map((a) => a.slug));
     const pinned = markFeatured(featured);
+    // R38 fix: patch manifest outputs AFTER ingest so the renderer cascade
+    // picks the multi-section CompositeOutputCard for Python FastAPI sidecars.
+    const patchCount = patchManifestOutputs(ready);
     console.log(
-      `[launch-week] ingested ${result.apps_ingested} apps (${result.apps_failed} failed), marked ${pinned} featured`,
+      `[launch-week] ingested ${result.apps_ingested} apps (${result.apps_failed} failed), marked ${pinned} featured, patched ${patchCount} manifest outputs`,
     );
     return {
       enabled: true,
