@@ -64,7 +64,10 @@ export function SettingsTabBar() {
   return (
     <nav style={wrapStyle} aria-label="Settings tabs" data-testid="settings-tab-bar">
       {TABS.map((tab) => {
-        const active = location.pathname === tab.match;
+        // /settings (no trailing path) renders the General tab — keep it active there too.
+        const active =
+          location.pathname === tab.match ||
+          (tab.match === '/settings/general' && location.pathname === '/settings');
         if (tab.soon) {
           return (
             <span

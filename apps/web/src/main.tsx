@@ -88,6 +88,7 @@ const StudioAppSecretsPage = lazy(() => import('./pages/StudioAppSecretsPage').t
 const StudioAppAccessPage = lazy(() => import('./pages/StudioAppAccessPage').then(m => ({ default: m.StudioAppAccessPage })));
 const StudioAppRendererPage = lazy(() => import('./pages/StudioAppRendererPage').then(m => ({ default: m.StudioAppRendererPage })));
 const StudioAppAnalyticsPage = lazy(() => import('./pages/StudioAppAnalyticsPage').then(m => ({ default: m.StudioAppAnalyticsPage })));
+const StudioAppFeedbackPage = lazy(() => import('./pages/StudioAppFeedbackPage').then(m => ({ default: m.StudioAppFeedbackPage })));
 const StudioTriggersTab = lazy(() => import('./pages/StudioTriggersTab').then(m => ({ default: m.StudioTriggersTab })));
 const StudioSettingsPage = lazy(() => import('./pages/StudioSettingsPage').then(m => ({ default: m.StudioSettingsPage })));
 const ImprintPage = lazy(() => import('./pages/ImprintPage').then(m => ({ default: m.ImprintPage })));
@@ -384,6 +385,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/studio/:slug/renderer" element={<WaitlistGuard source="studio"><StudioAppRendererPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/analytics" element={<WaitlistGuard source="studio"><StudioAppAnalyticsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/triggers" element={<WaitlistGuard source="studio"><StudioTriggersTab /></WaitlistGuard>} />
+        <Route path="/studio/:slug/feedback" element={<WaitlistGuard source="studio"><StudioAppFeedbackPage /></WaitlistGuard>} />
         {/* Legacy creator-context redirects into Studio (preserve old links). */}
         <Route path="/build" element={<Navigate to="/studio/build" replace />} />
         <Route path="/creator" element={<Navigate to="/studio" replace />} />
