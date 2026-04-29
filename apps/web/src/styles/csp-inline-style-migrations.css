@@ -85,6 +85,8 @@
   .apps-search-kbd { display: none !important; }
   /* Results section: smaller gutter, smaller bottom padding. */
   [data-testid="apps-directory"] main > section:last-of-type { padding: 20px 16px 48px !important; }
+  /* R34 #4: prevent search form from causing horizontal scroll at 390px */
+  [data-testid="apps-toolbar"] form { min-width: 160px !important; flex: 1 1 auto !important; }
 }
 
 /* Mirror AppGrid breakpoints so the loading skeleton collapses the
@@ -117,8 +119,10 @@
   [data-testid="pricing-hero"] h1 { font-size: 34px !important; line-height: 1.08 !important; }
   [data-testid="pricing-hero"] p { font-size: 15px !important; }
   [data-testid="pricing-free-card"] { padding: 0 16px !important; margin: 24px auto 36px !important; }
-  [data-testid="pricing-free-card"] > div { padding: 28px 20px 24px !important; }
+  [data-testid="pricing-free-card"] > div { padding: 28px 20px 24px !important; border-radius: 12px !important; }
   [data-testid="pricing-free-card"] > div > div:first-of-type { font-size: 56px !important; }
+  /* R34 #6: target $0 by testid for a more robust selector */
+  [data-testid="pricing-price"] { font-size: 56px !important; }
 }
 
 .not-found-pop-card:hover {
@@ -169,9 +173,11 @@
   }
 }
 
+/* R34: #3 — "How it works" steps: add visual separator in 1-col mobile layout */
 @media (max-width: 1040px) {
   .landing-v17 .hero-headline { font-size: 56px !important; }
   .landing-v17 .steps { grid-template-columns: 1fr !important; gap: 14px !important; }
+  .landing-v17 .step + .step { border-top: 1px solid var(--line); padding-top: 20px; }
 }
 @media (max-width: 780px) {
   .landing-v17 .hero-headline { font-size: 44px !important; }
@@ -566,4 +572,14 @@
     flex-wrap:wrap !important;
     row-gap:4px !important;
   }
+}
+
+/* R34 #7: hero npx command box — reduce paddingRight so Copy btn doesn't crowd on mobile */
+@media (max-width: 640px) {
+  [data-testid="hero-npx-command"] { padding-right: 64px !important; font-size: 12px !important; }
+}
+
+/* R34 #5: AmbientStatus pills — hide API pill on very narrow viewports to prevent messy wrap */
+@media (max-width: 480px) {
+  [data-testid="home-ambient-status"] span:last-child { display: none !important; }
 }

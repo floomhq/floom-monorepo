@@ -374,6 +374,7 @@ export function PricingPage() {
         >
           {/* Price */}
           <div
+            data-testid="pricing-price"
             style={{
               ...SERIF,
               fontSize: 72,
