@@ -222,7 +222,7 @@ function HeroStatRow({
   p95Ms: number | null;
 }) {
   const cards = [
-    { label: 'APPS',         value: appCount,    sub: 'installed' },
+    { label: 'APPS',         value: appCount,    sub: 'in workspace' },
     { label: 'RUNS · 7D',    value: runCount7d,  sub: 'this week' },
     { label: 'RUNNING NOW',  value: runningNow,  sub: runningNow === 1 ? 'in flight' : 'in flight' },
     { label: 'P95',          value: p95Ms,       sub: 'typical', unit: 'ms' },
@@ -624,7 +624,7 @@ function EmptyState() {
           color: 'var(--ink)',
         }}
       >
-        No apps installed yet.
+        No apps in your workspace yet.
       </h3>
       <p
         style={{
@@ -635,8 +635,8 @@ function EmptyState() {
           lineHeight: 1.55,
         }}
       >
-        Browse the store to install your first app. It will appear here —
-        ready to run from your browser, Claude, Cursor, or the CLI.
+        Browse the store and try one — it lands here automatically. Ready
+        to run from your browser, Claude, Cursor, or the CLI.
       </p>
       <Link to="/apps" className="btn-ink" data-testid="run-apps-empty-cta">
         Browse the store →
@@ -747,7 +747,7 @@ export function RunAppsPage() {
           <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.55 }}>
             {appCount > 0
               ? `${appCount} runnable app${appCount !== 1 ? 's' : ''} in your workspace. Available in browser, Claude, Cursor, and HTTP.`
-              : 'Install apps from the store to run them here.'}
+              : 'Browse the store and try one — it lands here automatically.'}
           </p>
         </div>
 
