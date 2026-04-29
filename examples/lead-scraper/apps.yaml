@@ -1,0 +1,15 @@
+apps:
+  - slug: lead-scraper
+    display_name: Lead Scraper
+    category: sales
+    description: >
+      Country + business type -> public lead table with emails as CSV-ready JSON.
+    runtime: node
+    entrypoint: examples/lead-scraper/server.mjs
+    port: 15401
+    visibility: public
+    env: []
+    icon: lead-scraper
+    tags:
+      - floom-build
+      - sales
