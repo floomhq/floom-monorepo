@@ -1,0 +1,15 @@
+apps:
+  - slug: openapi-auditor
+    display_name: OpenAPI Spec Auditor
+    category: developer-tools
+    description: >
+      Paste an OpenAPI document and get ingest readiness, blockers, and fixes.
+    runtime: node
+    entrypoint: examples/openapi-auditor/server.mjs
+    port: 15402
+    visibility: public
+    env: []
+    icon: openapi-auditor
+    tags:
+      - floom-build
+      - developer-tools
