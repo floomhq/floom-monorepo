@@ -39,6 +39,7 @@ import * as ws from '../services/workspaces.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import {
   AUTH_DOCS_URL,
+  AUTH_HINT_CLOUD as MCP_AUTH_HINT_CLOUD,
   checkAppVisibility,
 } from '../lib/auth.js';
 import { buildAppSourceInfo } from '../lib/app-source.js';
@@ -86,9 +87,6 @@ import type {
 } from '../types.js';
 
 export const mcpRouter = new Hono();
-
-const MCP_AUTH_HINT_CLOUD =
-  'Authentication required. Sign in, then mint an agent token at https://floom.dev/settings/agent-tokens and send it as Authorization: Bearer <token>.';
 
 /**
  * Resolve the public origin used in MCP response bodies (permalink, mcp_url,
@@ -598,7 +596,7 @@ function loadAccessibleAgentApp(
       access.status === 401 ? 'auth_required' : 'not_found',
       access.status === 401 ? 'Authentication required for this app.' : `App not found: ${slug}`,
       access.status,
-      access.status === 401 ? { hint: AUTH_HINT_CLOUD, docs_url: AUTH_DOCS_URL } : undefined,
+      access.status === 401 ? { hint: MCP_AUTH_HINT_CLOUD, docs_url: AUTH_DOCS_URL } : undefined,
     );
   }
   return app;
@@ -1357,7 +1355,7 @@ function requireStudioScope(ctx: SessionContext): void {
       'auth_required',
       'Authorization: Bearer floom_agent_<token> is required.',
       401,
-      { hint: AUTH_HINT_CLOUD, docs_url: AUTH_DOCS_URL },
+      { hint: MCP_AUTH_HINT_CLOUD, docs_url: AUTH_DOCS_URL },
     );
   }
   if (ctx.agent_token_scope === 'read-write' || ctx.agent_token_scope === 'publish-only') {
@@ -1376,7 +1374,7 @@ function requireAccountScope(ctx: SessionContext): void {
       'auth_required',
       'Authorization: Bearer floom_agent_<token> is required.',
       401,
-      { hint: AUTH_HINT_CLOUD, docs_url: AUTH_DOCS_URL },
+      { hint: MCP_AUTH_HINT_CLOUD, docs_url: AUTH_DOCS_URL },
     );
   }
   if (ctx.agent_token_scope === 'read-write') {
