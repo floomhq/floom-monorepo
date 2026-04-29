@@ -1,6 +1,6 @@
 {
   "name": "@floomhq/cli",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "One command to set up Floom: mints a token, configures MCP, and you're live.",
   "type": "commonjs",
   "bin": {

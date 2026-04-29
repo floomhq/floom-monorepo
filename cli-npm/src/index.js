@@ -26,7 +26,7 @@ const path = require('path');
 const readline = require('readline');
 const { execSync, spawn } = require('child_process');
 
-const VERSION = '0.2.2';
+const VERSION = '0.2.3';
 const DEFAULT_API_URL = process.env.FLOOM_API_URL || 'https://floom.dev';
 const CONFIG_PATH = process.env.FLOOM_CONFIG || path.join(os.homedir(), '.floom', 'config.json');
 
@@ -206,7 +206,7 @@ async function runSetup(opts) {
 
 // ---- bash forwarder -------------------------------------------------------
 
-function forwardToBash(args) {
+function forwardToBash(args, opts = {}) {
   if (!fs.existsSync(BUNDLED_BASH)) {
     console.error(c.red(`error: bundled CLI not found at ${BUNDLED_BASH}`));
     console.error('this is a packaging bug — please report at https://github.com/floomhq/floom/issues');
@@ -219,7 +219,8 @@ function forwardToBash(args) {
     process.exit(2);
   }
   // On unix, exec bash with the bundled script. Pass args through verbatim.
-  const result = spawn('bash', [BUNDLED_BASH, ...args], { stdio: 'inherit' });
+  const childEnv = opts.apiUrl ? { ...process.env, FLOOM_API_URL: opts.apiUrl } : process.env;
+  const result = spawn('bash', [BUNDLED_BASH, ...args], { stdio: 'inherit', env: childEnv });
   result.on('exit', (code) => process.exit(code ?? 0));
 }
 
@@ -267,12 +268,15 @@ async function main() {
     return;
   }
 
-  // Parse --api-url if present (for setup).
+  // Parse --api-url if present. For setup we handle it in Node; for all
+  // bundled bash subcommands we forward it as FLOOM_API_URL.
   let apiUrl = DEFAULT_API_URL;
+  let explicitApiUrl = false;
   const filtered = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--api-url' && argv[i + 1]) {
       apiUrl = argv[i + 1];
+      explicitApiUrl = true;
       i++;
     } else {
       filtered.push(argv[i]);
@@ -287,7 +291,7 @@ async function main() {
   }
 
   // Forward everything else to bundled bash CLI.
-  forwardToBash(filtered);
+  forwardToBash(filtered, explicitApiUrl ? { apiUrl } : {});
 }
 
 main().catch((err) => {

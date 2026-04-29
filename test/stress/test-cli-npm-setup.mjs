@@ -174,6 +174,19 @@ try {
     { ...env, FLOOM_CONFIG: legacyConfig },
   );
   log('floom auth whoami accepts legacy agent_token config', legacy.status === 0 && legacy.stdout.includes('logged in'), legacy.stdout + legacy.stderr);
+
+  const forwardedConfig = join(tmp, 'forwarded-config.json');
+  const forwarded = run(
+    'node',
+    [join(REPO_ROOT, 'cli-npm/src/index.js'), '--api-url', apiUrl, 'auth', token],
+    { ...env, FLOOM_CONFIG: forwardedConfig },
+  );
+  const forwardedJson = JSON.parse(readFileSync(forwardedConfig, 'utf8'));
+  log(
+    'cli-npm forwards top-level --api-url to bundled auth',
+    forwarded.status === 0 && forwardedJson.api_url === apiUrl && forwardedJson.api_key === token,
+    forwarded.stdout + forwarded.stderr + JSON.stringify(forwardedJson),
+  );
 } finally {
   server.proc.kill('SIGTERM');
   await new Promise((resolve) => setTimeout(resolve, 150));
