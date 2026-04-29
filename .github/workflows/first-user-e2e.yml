@@ -1,0 +1,132 @@
+name: First-user E2E
+
+# Catches CLI/API regressions that only surface on a fresh machine with
+# no curl, jq, git, or bash.  Mirrors the Kushagra + Rohan launch-day bugs.
+#
+# Runs:
+#   - Every PR into main (gate: must pass before merge)
+#   - Every push to main (post-land smoke)
+#   - Every 6 hours (cron: alerts on prod regressions between deploys)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  fresh-machine-onboarding:
+    name: Fresh-machine onboarding (Alpine)
+    runs-on: ubuntu-latest
+    # Alpine 3.20 — intentionally minimal, no curl/jq/git/bash pre-installed.
+    # Only Node + npm are added by the step below.
+    container:
+      image: alpine:3.20
+
+    steps:
+      - name: Install Node + npm (only allowed dependencies)
+        run: apk add --no-cache nodejs npm
+
+      - name: Checkout (uses apk git added by actions/checkout internally)
+        # actions/checkout needs git; we add it only for checkout then rely on
+        # the test script's explicit no-dependency contract.
+        run: apk add --no-cache git
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Verify no curl/jq in container
+        run: |
+          if command -v curl >/dev/null 2>&1; then echo "ERROR: curl found in container" && exit 1; fi
+          if command -v jq   >/dev/null 2>&1; then echo "ERROR: jq found in container"   && exit 1; fi
+          echo "ok: curl/jq absent"
+
+      - name: Run first-user E2E
+        run: node test/stress/test-first-user-onboarding.mjs
+        env:
+          FLOOM_PROD_URL: https://floom.dev
+          TEST_USER_PREFIX: ci-e2e-
+          REPORT_FILE: /tmp/r37-first-user-e2e.md
+          # Pre-issued agent token stored as a repo secret.
+          # Required for CLI auth/whoami steps (Part C).
+          # The test skips Part C gracefully when the secret is absent
+          # (e.g., on forks/external PRs that can't access org secrets).
+          FLOOM_TEST_AGENT_TOKEN: ${{ secrets.FLOOM_TEST_AGENT_TOKEN }}
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: first-user-e2e-report
+          path: /tmp/r37-first-user-e2e.md
+          retention-days: 14
+
+      - name: Post Discord alert on failure
+        if: failure() && (github.event_name == 'schedule' || github.ref == 'refs/heads/main')
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_ALERT_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "DISCORD_ALERT_WEBHOOK_URL not set; skipping alert"
+            exit 0
+          fi
+          REPORT_PREVIEW=""
+          if [ -f /tmp/r37-first-user-e2e.md ]; then
+            REPORT_PREVIEW=$(head -40 /tmp/r37-first-user-e2e.md | tr '\n' ' ' | cut -c1-1500)
+          fi
+          node -e "
+            const hook = process.env.DISCORD_WEBHOOK;
+            const body = {
+              content: [
+                '**First-user E2E FAILED** on \`${{ github.ref_name }}\`',
+                'Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}',
+                '',
+                process.env.REPORT_PREVIEW ? process.env.REPORT_PREVIEW.slice(0, 1500) : '(no report)',
+              ].join('\n'),
+            };
+            fetch(hook, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(body),
+            }).then(r => { console.log('Discord status:', r.status); process.exit(r.ok ? 0 : 1); })
+              .catch(e => { console.error('Discord alert failed:', e.message); process.exit(0); });
+          "
+        continue-on-error: true
+
+      - name: Open GH issue on cron failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          apk add --no-cache github-cli 2>/dev/null || true
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "gh CLI not available; skipping issue creation"
+            exit 0
+          fi
+          STEP="unknown"
+          if [ -f /tmp/r37-first-user-e2e.md ]; then
+            STEP=$(grep '✗ FAIL' /tmp/r37-first-user-e2e.md | head -1 | awk '{print $2}' | tr -d '|' || echo "unknown")
+          fi
+          gh issue create \
+            --title "First-user E2E broke at step: ${STEP}" \
+            --label "bug,launch-week" \
+            --body "$(cat <<'BODY'
+          ## First-user E2E test failed (cron)
+
+          **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          **Branch:** ${{ github.ref_name }}
+          **Triggered by:** scheduled cron
+
+          The first-user E2E test (`test/stress/test-first-user-onboarding.mjs`) failed on the
+          Alpine container (no curl/jq/git pre-installed).  This simulates a fresh-laptop
+          onboarding and catches CLI dependency drift.
+
+          Check the uploaded artifact `first-user-e2e-report` for the full step-by-step report.
+
+          ### Triage checklist
+          - [ ] Is the failure in the CLI layer (Part A) or API layer (Part B)?
+          - [ ] Did a recent deploy break the endpoint?
+          - [ ] Is a new bash/curl dependency silently added to the Node CLI wrapper?
+          BODY
+          )"
