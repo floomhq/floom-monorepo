@@ -603,3 +603,131 @@ Run timestamp: `20260429003725`
 3. Runtime network canary
 - Keep a lightweight canary running `base64/hash` every minute for 30-60 minutes to detect intermittent `network_unreachable` regressions.
 
+---
+
+## 15) New-Token Deep Audit (Runtime + Onboarding + Static Consistency)
+
+Date (UTC): 2026-04-29
+Run timestamp: `20260429020326`
+
+Token scope observed through `account_get`: `read-write`.
+
+### 15.1 MCP runtime audit
+
+Tool surface:
+
+- `tools/list`: `39` tools
+- New/changed surface vs earlier rounds:
+  - `get_app_logs`
+  - `account_get_context`
+  - `account_set_user_context`
+  - `account_set_workspace_context`
+  - `account_create_agent_token` / `account_revoke_agent_token` no longer exposed for this token
+
+Live checks:
+
+- MCP checks: `45`
+- Passed: `42`
+- Failed: `3`
+- Cleanup: `3/3` passed
+
+Run reliability:
+
+- Sequential `run_app(base64)`: `20/20` success
+- p50 latency: `767 ms`
+- p95 latency: `811 ms`
+- Concurrent `run_app(hash)`: `24/30` success
+- Concurrent failures: `HTTP 429 Too Many Requests`
+
+Interpretation:
+
+- Single-run reliability is currently healthy.
+- The 30-way burst exceeded the active token/server rate envelope. This is a useful launch finding, not necessarily a backend bug, but responses need clear client-facing retry semantics.
+
+Lifecycle checks:
+
+- `studio_publish_app`: passed
+- `studio_set_app_sharing`: `private`, `link`, `invited`, `private`, `link` all passed in this sequence
+- `studio_install_app`: returned expected policy response `409 app_not_installable`
+- `studio_submit_app_review`: failed with `409 illegal_transition`
+- `studio_withdraw_app_review`: failed with `409 illegal_transition`
+- Secret policy contract:
+  - `ApiKeyAuth` accepted
+  - `X-API-Key` rejected with `400` and `valid_keys: ["ApiKeyAuth"]`
+- Account secrets:
+  - set/list/delete passed
+
+New read-only tool checks:
+
+- `account_get_context`: returned empty `user_profile` and `workspace_profile`
+- `get_app_logs(base64)`: returned no logs with reason `not_owned_or_not_found`
+
+### 15.2 CLI audit with new token
+
+CLI checks: `12`
+
+- Passed: `11`
+- Failed: `1`
+
+Passed / expected-policy paths:
+
+- `floom auth` with new token succeeded
+- `floom init --slug ...` succeeded
+- `floom deploy --dry-run` succeeded
+- `floom deploy` succeeded
+- `floom run uuid` returned a pending run id
+- sharing `link`, `invited`, `private` succeeded
+- install returned expected policy response `409 app_not_installable`
+- agent-token list returned expected auth-mode response `401 session_required`
+- temp app delete and absence verification succeeded
+
+Failure:
+
+- `floom init --name "Test App"` without explicit `--slug` still fails:
+  - `derived slug 'test app' is invalid. Pass --slug.`
+
+CLI onboarding findings still open:
+
+- Installed CLI reports version `0.1.0` while repo package is `0.3.2` and package CLI internals are newer.
+- `floom run uuid` still does not print the completed result; it only returns a pending run id.
+- `floom deploy --dry-run` still prints `POST https://floom.dev/api/hub/ingest` while authenticated to `https://mvp.floom.dev`.
+
+### 15.3 Static consistency findings reconfirmed
+
+Product promise mismatch:
+
+- `docs/PRODUCT.md` positions repo-hosting as primary: user pastes a repo URL and Floom hosts it.
+- `README.md` leads with OpenAPI wrapping in the hero and quickstart.
+
+Docker quickstart mismatch:
+
+- `README.md` maps `3000:3000`.
+- `docker/Dockerfile` sets `PORT=3051` and exposes `3051`.
+
+CLI command drift:
+
+- `cli/floom/bin/floom` advertises/dispatches commands such as `store`, `runs`, `triggers`, `workspaces`, and `feedback`.
+- Installed CLI help is narrower and the broader command set remains inconsistent with what a new user can rely on.
+
+### 15.4 Local verification
+
+`pnpm typecheck` passed:
+
+- Packages in scope: `@floom/cli`, `@floom/detect`, `@floom/hub-smoke`, `@floom/manifest`, `@floom/renderer`, `@floom/runtime`, `@floom/server`, `@floom/web`
+- Result: `7 successful, 7 total`
+
+### 15.5 Updated launch interpretation
+
+Runtime/API readiness remains stronger than public onboarding readiness.
+
+Current score after this round:
+
+- Controlled beta / internal agent users: `7/10`
+- Public launch readiness: `5/10`
+
+Primary reasons public launch remains lower:
+
+- Onboarding docs and product promise still conflict.
+- CLI first-run path still has avoidable friction.
+- Review transitions remain state-sensitive and can fail with `illegal_transition`.
+- Concurrent burst behavior now rate-limits at this token/surface level; clients need retry guidance.
