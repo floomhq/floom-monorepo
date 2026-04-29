@@ -167,13 +167,21 @@ PY
 log "merged env file: $MERGED_ENV"
 
 # --- 3b. Append FLOOM_STORE_HIDE_SLUGS from kill list ---
+#
+# PROD adds the 3 docker-runtime apps on top of the shared kill list, because
+# prod intentionally does NOT mount /var/run/docker.sock (security stance).
+# The shared kill list (scripts/launch-kill-list.txt) hides ~100 SaaS-relay
+# apps; the prod-extra list adds the docker apps so they don't surface in the
+# directory and visitors don't click into a guaranteed-error.
+PROD_EXTRA_HIDE="competitor-lens,ai-readiness-audit,pitch-coach"
 
 if [ -f "$KILL_LIST" ] && ! grep -q '^FLOOM_STORE_HIDE_SLUGS=' "$MERGED_ENV"; then
   KILL_CSV=$(grep -v '^[[:space:]]*#' "$KILL_LIST" | grep -v '^[[:space:]]*$' | paste -sd, -)
-  if [ -n "$KILL_CSV" ]; then
-    echo "FLOOM_STORE_HIDE_SLUGS=${KILL_CSV}" >> "$MERGED_ENV"
-    KILL_COUNT=$(echo "$KILL_CSV" | tr ',' '\n' | wc -l)
-    log "appended FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs from kill list)"
+  COMBINED="${KILL_CSV},${PROD_EXTRA_HIDE}"
+  if [ -n "$COMBINED" ]; then
+    echo "FLOOM_STORE_HIDE_SLUGS=${COMBINED}" >> "$MERGED_ENV"
+    KILL_COUNT=$(echo "$COMBINED" | tr ',' '\n' | wc -l)
+    log "appended FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs: kill-list + prod docker apps)"
   fi
 fi
 
