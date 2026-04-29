@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { db } from '../db.js';
 import { sendDiscordAlert } from '../lib/alerts.js';
+import { deleteArtifactFilesForRunIds } from './artifacts.js';
 import type { SessionContext } from '../types.js';
 
 const DEFAULT_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
@@ -98,6 +99,7 @@ export function deleteRunForOwner(
   }
 
   const tx = db.transaction(() => {
+    deleteArtifactFilesForRunIds([runId]);
     const result = db.prepare('DELETE FROM runs WHERE id = ?').run(runId);
     auditRunDeletion({
       actor_user_id: ctx.user_id,
@@ -123,6 +125,15 @@ export function bulkDeleteRunsForOwner(
   }
   const scope = ownerScope(ctx);
   const tx = db.transaction(() => {
+    const rows = db
+      .prepare(
+        `SELECT id FROM runs
+          WHERE app_id = ?
+            AND started_at < ?
+            AND ${scope.clause}`,
+      )
+      .all(args.app_id, beforeTs, ctx.workspace_id, scope.param) as { id: string }[];
+    deleteArtifactFilesForRunIds(rows.map((row) => row.id));
     const result = db
       .prepare(
         `DELETE FROM runs
@@ -149,6 +160,15 @@ export function deleteWorkspaceRuns(
   workspaceId: string,
 ): { deleted_count: number } {
   const tx = db.transaction(() => {
+    const rows = db
+      .prepare(
+        `SELECT id FROM runs
+          WHERE app_id IN (
+            SELECT id FROM apps WHERE workspace_id = ?
+          )`,
+      )
+      .all(workspaceId) as { id: string }[];
+    deleteArtifactFilesForRunIds(rows.map((row) => row.id));
     const result = db
       .prepare(
         `DELETE FROM runs
@@ -170,6 +190,10 @@ export function deleteWorkspaceRuns(
 
 export function deleteRunsForUserAccount(userId: string): number {
   const tx = db.transaction(() => {
+    const rows = db.prepare('SELECT id FROM runs WHERE user_id = ?').all(userId) as {
+      id: string;
+    }[];
+    deleteArtifactFilesForRunIds(rows.map((row) => row.id));
     const result = db.prepare('DELETE FROM runs WHERE user_id = ?').run(userId);
     auditRunDeletion({
       actor_user_id: userId,
@@ -208,6 +232,15 @@ export function sweepRunRetention(): RetentionSweepResult {
     for (const app of apps) {
       const days = normalizeMaxRunRetentionDays(app.max_run_retention_days);
       if (days === null) continue;
+      const rows = db
+        .prepare(
+          `SELECT id FROM runs
+            WHERE app_id = ?
+              AND finished_at IS NOT NULL
+              AND finished_at < datetime('now', ?)`,
+        )
+        .all(app.id, `-${days} days`) as { id: string }[];
+      deleteArtifactFilesForRunIds(rows.map((row) => row.id));
       const result = db
         .prepare(
           `DELETE FROM runs

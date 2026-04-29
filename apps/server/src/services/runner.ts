@@ -6,6 +6,10 @@ import { runProxied } from './proxied-runner.js';
 import { getOrCreateStream } from '../lib/log-stream.js';
 import { invalidateHubCache } from '../lib/hub-cache.js';
 import { noteAppUnavailable } from '../lib/alerts.js';
+import {
+  captureArtifactsForRun,
+  outputWithArtifacts,
+} from './artifacts.js';
 import * as userSecrets from './user_secrets.js';
 import * as creatorSecrets from './app_creator_secrets.js';
 import type { SecretPolicy } from '../types.js';
@@ -143,6 +147,7 @@ function refreshAppAvgRunMs(runId: string): void {
 interface EntrypointResult {
   ok: boolean;
   outputs?: unknown;
+  artifacts?: unknown;
   error?: string;
   error_type?: ErrorType;
   logs?: string;
@@ -172,6 +177,26 @@ function parseEntrypointOutput(stdout: string): EntrypointResult | null {
     }
   }
   return null;
+}
+
+function normalizeProxiedResult(outputs: unknown): EntrypointResult {
+  if (outputs && typeof outputs === 'object' && !Array.isArray(outputs)) {
+    const obj = outputs as Record<string, unknown>;
+    if (
+      typeof obj.ok === 'boolean' &&
+      ('outputs' in obj || 'artifacts' in obj || 'error' in obj)
+    ) {
+      return {
+        ok: obj.ok,
+        outputs: obj.outputs,
+        artifacts: obj.artifacts,
+        error: typeof obj.error === 'string' ? obj.error : undefined,
+        error_type: typeof obj.error_type === 'string' ? (obj.error_type as ErrorType) : undefined,
+        logs: typeof obj.logs === 'string' ? obj.logs : undefined,
+      };
+    }
+  }
+  return { ok: true, outputs };
 }
 
 /**
@@ -268,6 +293,7 @@ export function dispatchRun(
   inputs: Record<string, unknown>,
   perCallSecrets?: Record<string, string>,
   ctx?: SessionContext,
+  jobId?: string | null,
 ): void {
   // Load secrets: merge global (app_id IS NULL) + per-app (app_id = this app).
   const globalRows = db
@@ -363,7 +389,7 @@ export function dispatchRun(
   updateRun(runId, { status: 'running' });
 
   if (app.app_type === 'proxied') {
-    void runProxiedWorker({ app, manifest, runId, action, inputs, secrets });
+    void runProxiedWorker({ app, manifest, runId, action, inputs, secrets, jobId });
   } else {
     void runActionWorker({
       slug: app.slug,
@@ -374,6 +400,7 @@ export function dispatchRun(
       secrets,
       manifest,
       image: app.docker_image ?? undefined,
+      jobId,
     });
   }
 }
@@ -385,6 +412,7 @@ async function runProxiedWorker(opts: {
   action: string;
   inputs: Record<string, unknown>;
   secrets: Record<string, string>;
+  jobId?: string | null;
 }): Promise<void> {
   const logStream = getOrCreateStream(opts.runId);
   try {
@@ -398,6 +426,46 @@ async function runProxiedWorker(opts: {
     for (const line of result.logs.split('\n')) {
       if (line) logStream.append(line, 'stdout');
     }
+    const normalized = normalizeProxiedResult(result.outputs);
+
+    if (result.status === 'success' && normalized.ok === false) {
+      updateRun(opts.runId, {
+        status: 'error',
+        outputs: normalized.outputs ?? null,
+        error: normalized.error || 'Proxied app returned ok=false',
+        error_type: normalized.error_type || 'runtime_error',
+        upstream_status: result.upstream_status ?? null,
+        logs: (normalized.logs ? normalized.logs + '\n' : '') + result.logs,
+        duration_ms: result.duration_ms,
+        finished: true,
+      });
+      return;
+    }
+
+    let storedOutputs = normalized.outputs;
+    if (result.status === 'success' && normalized.ok === true) {
+      try {
+        const artifacts = captureArtifactsForRun({
+          runId: opts.runId,
+          jobId: opts.jobId ?? null,
+          artifacts: normalized.artifacts,
+        });
+        storedOutputs = outputWithArtifacts(normalized.outputs, artifacts);
+      } catch (err) {
+        updateRun(opts.runId, {
+          status: 'error',
+          outputs: normalized.outputs ?? null,
+          error: `Artifact capture failed: ${(err as Error).message}`,
+          error_type: 'runtime_error',
+          upstream_status: result.upstream_status ?? null,
+          logs: result.logs,
+          duration_ms: result.duration_ms,
+          finished: true,
+        });
+        return;
+      }
+    }
+
     // Error taxonomy (2026-04-20): proxied-runner classifies the
     // failure at source (auth_error / user_input_error / upstream_outage
     // / network_unreachable / timeout / missing_secret). We persist its
@@ -406,7 +474,7 @@ async function runProxiedWorker(opts: {
     // runtime_error only when the runner couldn't pick a class.
     updateRun(opts.runId, {
       status: result.status,
-      outputs: result.outputs,
+      outputs: storedOutputs,
       error: result.error || null,
       error_type:
         result.status === 'error'
@@ -448,6 +516,7 @@ async function runActionWorker(opts: {
   secrets: Record<string, string>;
   manifest: NormalizedManifest;
   image?: string;
+  jobId?: string | null;
 }): Promise<void> {
   const logStream = getOrCreateStream(opts.runId);
 
@@ -516,9 +585,28 @@ async function runActionWorker(opts: {
         });
         return;
       }
+      let artifacts: ReturnType<typeof captureArtifactsForRun>;
+      try {
+        artifacts = captureArtifactsForRun({
+          runId: opts.runId,
+          jobId: opts.jobId ?? null,
+          artifacts: parsed.artifacts,
+        });
+      } catch (err) {
+        updateRun(opts.runId, {
+          status: 'error',
+          outputs: parsed.outputs ?? null,
+          error: `Artifact capture failed: ${(err as Error).message}`,
+          error_type: 'runtime_error',
+          logs: userLogs,
+          duration_ms: result.durationMs,
+          finished: true,
+        });
+        return;
+      }
       updateRun(opts.runId, {
         status: 'success',
-        outputs: parsed.outputs ?? null,
+        outputs: outputWithArtifacts(parsed.outputs ?? null, artifacts),
         logs: userLogs,
         duration_ms: result.durationMs,
         finished: true,
