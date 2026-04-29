@@ -6,6 +6,7 @@
 #   floom run <slug> '{"key":"value"}'      run with JSON body
 #   floom run <slug> --input key=value      run with key=value pairs
 #   floom run <slug> --use-context          fill missing inputs from profiles
+#   floom run <slug> --json                 print raw JSON
 #   floom run --help                        show this help
 
 set -euo pipefail
@@ -22,6 +23,7 @@ usage:
   floom run <slug> '<json>'           run app with JSON body
   floom run <slug> --input key=val    run app with key=value pairs (repeatable)
   floom run <slug> --use-context      fill missing inputs from profiles
+  floom run <slug> --json             print raw JSON
 
 examples:
   floom run uuid
@@ -40,6 +42,8 @@ shift
 BODY="{}"
 INPUT_PAIRS=()
 USE_CONTEXT=0
+JSON_OUTPUT=0
+WAIT_SECONDS="${FLOOM_RUN_WAIT_SECONDS:-60}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -55,6 +59,9 @@ while [[ $# -gt 0 ]]; do
       shift ;;
     --use-context)
       USE_CONTEXT=1
+      shift ;;
+    --json)
+      JSON_OUTPUT=1
       shift ;;
     *)
       # Treat as raw JSON body
@@ -96,4 +103,74 @@ PY
 )
 fi
 
-exec bash "$LIB_DIR/floom-api.sh" POST "/api/${SLUG}/run" "$BODY"
+INITIAL="$(bash "$LIB_DIR/floom-api.sh" POST "/api/${SLUG}/run" "$BODY")"
+RUN_ID="$(python3 - "$INITIAL" <<'PY'
+import json, sys
+try:
+    payload = json.loads(sys.argv[1])
+except Exception:
+    print("")
+    raise SystemExit
+print(payload.get("run_id") or payload.get("id") or "")
+PY
+)"
+
+if [[ -z "$RUN_ID" ]]; then
+  printf '%s\n' "$INITIAL"
+  exit 0
+fi
+
+FINAL="$INITIAL"
+deadline=$((SECONDS + WAIT_SECONDS))
+while [[ $SECONDS -le $deadline ]]; do
+  SNAPSHOT="$(bash "$LIB_DIR/floom-api.sh" GET "/api/me/runs/${RUN_ID}" 2>/dev/null || true)"
+  if python3 - "$SNAPSHOT" <<'PY'
+import json, sys
+try:
+    status = json.loads(sys.argv[1]).get("status")
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if status in {"success", "succeeded", "error", "failed", "timeout"} else 1)
+PY
+  then
+    FINAL="$SNAPSHOT"
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$JSON_OUTPUT" == "1" ]]; then
+  printf '%s\n' "$FINAL"
+  exit 0
+fi
+
+python3 - "$FINAL" "$RUN_ID" <<'PY'
+import json
+import sys
+
+raw, run_id = sys.argv[1], sys.argv[2]
+try:
+    payload = json.loads(raw)
+except Exception:
+    print(raw)
+    raise SystemExit
+
+status = payload.get("status") or "pending"
+app = payload.get("app_slug") or payload.get("slug") or ""
+label = f" ({app})" if app else ""
+
+if status in {"success", "succeeded"}:
+    print(f"Run succeeded: {run_id}{label}")
+    out = payload.get("outputs", payload.get("output"))
+    if out is not None:
+        print("Output:")
+        print(json.dumps(out, indent=2))
+elif status in {"error", "failed", "timeout"}:
+    print(f"Run failed: {run_id}{label}", file=sys.stderr)
+    err = payload.get("error") or payload.get("message") or "unknown error"
+    print(err, file=sys.stderr)
+    raise SystemExit(2)
+else:
+    print(f"Run pending: {run_id}{label}")
+    print(f"Check it with: floom api GET /api/me/runs/{run_id}")
+PY

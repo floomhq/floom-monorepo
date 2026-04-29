@@ -10,6 +10,9 @@ usage() {
   cat <<'EOF'
 floom account - manage workspace secrets and agent tokens.
 
+Agent-token management requires a browser user session with workspace admin
+access. Agent tokens cannot create, list, or revoke other Agent tokens.
+
 usage:
   floom account secrets list
   floom account secrets set <key> <value>
@@ -22,8 +25,11 @@ usage:
   floom account context set-workspace --json '{"company":{"name":"Floom"}}'
 
   floom account agent-tokens list
+      browser session required; Agent tokens are rejected by the API
   floom account agent-tokens create --label <label> --scope <read|read-write|publish-only> [--workspace-id <id>] [--rate-limit-per-minute <n>]
+      browser session required; Agent tokens are rejected by the API
   floom account agent-tokens revoke <token-id>
+      browser session required; Agent tokens are rejected by the API
 
 EOF
 }

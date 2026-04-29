@@ -13,7 +13,7 @@ floom apps - manage your Floom apps.
 usage:
   floom apps get <slug>
   floom apps about <slug>
-  floom apps list
+  floom apps list [--json]
   floom apps installed
   floom apps fork <slug> [--slug <new-slug>] [--name <name>]
   floom apps claim <slug>
@@ -182,9 +182,94 @@ list_cmd() {
   shift || true
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
     echo "floom apps list - list all apps in your workspace"
+    echo
+    echo "usage:"
+    echo "  floom apps list          show a readable table"
+    echo "  floom apps list --json   print raw API JSON"
     exit 0
   fi
-  exec bash "$LIB_DIR/floom-api.sh" GET /api/hub/mine
+  local raw_json=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json)
+        raw_json=1
+        shift
+        ;;
+      *)
+        echo "floom apps list: unknown option '$1'" >&2
+        exit 1
+        ;;
+    esac
+  done
+  if [[ "$raw_json" == "1" ]]; then
+    exec bash "$LIB_DIR/floom-api.sh" GET /api/hub/mine
+  fi
+  if [[ "${FLOOM_DRY_RUN:-}" == "1" ]]; then
+    exec bash "$LIB_DIR/floom-api.sh" GET /api/hub/mine
+  fi
+  local response
+  local err_file
+  local code
+  err_file=$(mktemp)
+  set +e
+  response=$(bash "$LIB_DIR/floom-api.sh" GET /api/hub/mine 2>"$err_file")
+  code=$?
+  set -e
+  if [[ "$code" != "0" ]]; then
+    [[ -n "$response" ]] && printf '%s\n' "$response"
+    cat "$err_file" >&2
+    rm -f "$err_file"
+    exit "$code"
+  fi
+  rm -f "$err_file"
+  APPS_RESPONSE="$response" python3 - <<'PY'
+import json
+import os
+import sys
+
+try:
+    data = json.loads(os.environ["APPS_RESPONSE"])
+except Exception as exc:
+    print(f"floom apps list: could not parse API response: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+apps = data.get("apps") if isinstance(data, dict) else data
+if not isinstance(apps, list):
+    print(json.dumps(data, indent=2))
+    sys.exit(0)
+
+if not apps:
+    print("No apps found.")
+    sys.exit(0)
+
+rows = []
+for app in apps:
+    if not isinstance(app, dict):
+        continue
+    rows.append((
+        str(app.get("slug") or ""),
+        str(app.get("name") or ""),
+        str(app.get("status") or ""),
+        str(app.get("visibility") or ""),
+        str(app.get("run_count") if app.get("run_count") is not None else ""),
+        str(app.get("last_run_at") or ""),
+    ))
+
+headers = ("slug", "name", "status", "visibility", "runs", "last run")
+widths = [len(h) for h in headers]
+for row in rows:
+    for i, cell in enumerate(row):
+        widths[i] = min(max(widths[i], len(cell)), 32 if i < 2 else 24)
+
+def clip(value, width):
+    return value if len(value) <= width else value[: max(0, width - 3)] + "..."
+
+print("Your apps")
+print("  " + "  ".join(headers[i].ljust(widths[i]) for i in range(len(headers))))
+print("  " + "  ".join("-" * widths[i] for i in range(len(headers))))
+for row in rows:
+    print("  " + "  ".join(clip(row[i], widths[i]).ljust(widths[i]) for i in range(len(row))))
+PY
 }
 
 source_cmd() {

@@ -56,9 +56,14 @@ prompt() {
 }
 
 derive_slug() {
-  echo "$1" | tr '[:upper:]' '[:lower:]' \
-    | sed 's/[^a-z0-9]\+/-/g; s/^-\+//; s/-\+$//' \
-    | cut -c1-48
+  python3 - "$1" <<'PY'
+import re
+import sys
+
+slug = re.sub(r"[^a-z0-9]+", "-", sys.argv[1].lower()).strip("-")
+slug = slug[:48].strip("-")
+print(slug)
+PY
 }
 
 [[ -z "$NAME" ]] && NAME=$(prompt "App name (e.g. Lead Scorer)")
