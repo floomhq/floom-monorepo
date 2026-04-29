@@ -1,0 +1,74 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check /api/health on all envs
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENVS=("prod:https://floom.dev" "mvp:https://mvp.floom.dev" "preview:https://preview.floom.dev")
+          FAILED=()
+
+          for entry in "${ENVS[@]}"; do
+            ENV_NAME="${entry%%:*}"; URL="${entry#*:}/api/health"
+            HTTP_BODY=$(curl -sf --max-time 15 "$URL" 2>/dev/null) || { echo "FAIL [$ENV_NAME]: curl error"; FAILED+=("$ENV_NAME"); continue; }
+            STATUS=$(echo "$HTTP_BODY" | jq -r '.status // empty' 2>/dev/null)
+            if [ "$STATUS" != "ok" ]; then
+              echo "FAIL [$ENV_NAME]: status='$STATUS' body=$HTTP_BODY"; FAILED+=("$ENV_NAME")
+            else
+              echo "OK [$ENV_NAME]"
+            fi
+          done
+
+          [ ${#FAILED[@]} -eq 0 ] && { echo "All envs healthy."; exit 0; }
+
+          for ENV_NAME in "${FAILED[@]}"; do
+            TITLE="Uptime: $ENV_NAME /api/health failing"
+
+            # Sentry envelope (DSN-only, no auth token needed)
+            if [ -n "${SENTRY_DSN:-}" ]; then
+              DSN_KEY="${SENTRY_DSN#https://}"; DSN_KEY="${DSN_KEY%%@*}"
+              DSN_HOST="${SENTRY_DSN#*@}"; DSN_HOST="${DSN_HOST%%/*}"
+              DSN_PROJECT="${SENTRY_DSN##*/}"
+              EVENT_ID=$(cat /proc/sys/kernel/random/uuid | tr -d '-')
+              ENVELOPE_HEADER="{\"dsn\":\"$SENTRY_DSN\",\"sent_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+              ITEM_HEADER="{\"type\":\"event\",\"content_type\":\"application/json\"}"
+              EVENT_BODY="{\"event_id\":\"$EVENT_ID\",\"timestamp\":$(date -u +%s),\"level\":\"error\",\"message\":\"$TITLE\",\"logger\":\"uptime-monitor\",\"tags\":{\"env\":\"$ENV_NAME\",\"monitor\":\"uptime\"}}"
+              printf '%s\n%s\n%s' "$ENVELOPE_HEADER" "$ITEM_HEADER" "$EVENT_BODY" \
+                | curl -s -X POST "https://$DSN_HOST/api/$DSN_PROJECT/envelope/" \
+                    -H "Content-Type: application/x-sentry-envelope" \
+                    -H "X-Sentry-Auth: Sentry sentry_key=$DSN_KEY, sentry_version=7" \
+                    --data-binary @- -o /dev/null || echo "Sentry report failed (non-fatal)"
+              echo "Sentry: reported $ENV_NAME"
+            fi
+
+            # GitHub issue: idempotent — comment on existing, open if none
+            EXISTING=$(gh issue list \
+              --repo "$GITHUB_REPOSITORY" --state open --label incident \
+              --search "$TITLE" --json number,title \
+              --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+            if [ -n "$EXISTING" ]; then
+              gh issue comment "$EXISTING" --repo "$GITHUB_REPOSITORY" \
+                --body "Still failing at $(date -u +%Y-%m-%dT%H:%M:%SZ) — run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              echo "Issue #$EXISTING: added comment"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --label incident \
+                --body "**Env:** $ENV_NAME | **Detected:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
+Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+Auto-opened by uptime-monitor."
+              echo "GitHub: opened issue for $ENV_NAME"
+            fi
+          done
+
+          echo "Failures: ${FAILED[*]}"; exit 1
