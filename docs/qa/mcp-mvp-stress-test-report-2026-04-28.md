@@ -853,3 +853,113 @@ The fastest path to a stronger launch score is now specific:
 3. Fix the CLI first-run experience: slug derivation, pending result polling, raw JSON output, and dry-run host mismatch.
 4. Align README with the actual launch promise or explicitly label OpenAPI wrapping as the current MVP path.
 5. Fix Docker quickstart ports before public users copy the command.
+
+---
+
+## 17) Round 17 Audit (Rate-Limit Payloads + Review State Proof)
+
+Date (UTC): 2026-04-29
+Run timestamp: `20260429030958`
+
+This round focused on evidence quality: exact rate-limit payloads, app-log behavior, repo CLI command availability, and review state transitions with before/after state capture.
+
+### 17.1 MCP checks
+
+Summary:
+
+- Checks: `29`
+- Passed: `17`
+- Failed: `12`
+- Cleanup: `1/1` passed
+- Tool count: `39`
+
+Read checks:
+
+- `account_get`: passed; token rate limit reported as `60/min`
+- `account_get_context`: passed; both profiles empty
+- `get_app_logs(petstore)`: passed; owned app logs returned recent run summaries
+- `get_app_logs(base64)`: passed with `not_owned_or_not_found`
+
+Run reliability:
+
+- Sequential `run_app(hash)`: `4/8` success
+- Failures: four consecutive `HTTP 502 Bad Gateway`
+- Cooldown retry after 20 seconds: `4/4` success
+
+Interpretation:
+
+- The `502` behavior was transient under the tested traffic pattern, not a deterministic `hash` app failure.
+- Runtime/proxy reliability still needs a canary because transient 5xx responses are launch-visible.
+
+Concurrency:
+
+- 5 workers / 15 runs: `15/15` success
+- 6 workers / 18 runs: `14/18` success
+- 6-worker failures were `HTTP 429 Too Many Requests`
+
+Exact 429 response sample:
+
+- Body was nginx HTML, not JSON:
+  - `<html><head><title>429 Too Many Requests</title></head>...<center>nginx</center>`
+- Headers included standard security headers but no observed structured retry metadata:
+  - `Server: nginx`
+  - `Content-Type: text/html`
+  - `X-Frame-Options: SAMEORIGIN`
+  - `X-Content-Type-Options: nosniff`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+
+Interpretation:
+
+- Rate limiting works, but agent callers receive an HTML proxy response instead of a machine-readable MCP/JSON error with `retry_after`.
+
+### 17.2 Review state proof
+
+Temporary app: `mcp-round17-29030958`
+
+Observed matrix:
+
+- From `private`:
+  - `studio_submit_app_review` passed and moved visibility to `pending_review`
+  - `studio_withdraw_app_review` passed and returned visibility to `private`
+- From `link`:
+  - submit failed with `409 illegal_transition`
+  - withdraw failed with `409 illegal_transition`
+- From `invited`:
+  - submit failed with `409 illegal_transition`
+  - withdraw failed with `409 illegal_transition`
+
+Conclusion:
+
+- Review submit/withdraw is valid from `private` only in this observed state model.
+- This is acceptable if intentional, but it must be surfaced as an allowed-transition list or documented precondition.
+
+### 17.3 CLI and static checks
+
+CLI checks:
+
+- `floom --version`: `0.1.0`
+- `floom init --name "Test App"` without `--slug`: failed with invalid derived slug
+- Repo CLI direct checks:
+  - `bash cli/floom/bin/floom runs --help`: unknown command
+  - `bash cli/floom/bin/floom store --help`: unknown command
+  - `bash cli/floom/bin/floom feedback --help`: unknown command
+
+Static checks reconfirmed:
+
+- CLI library files still missing in the audited checkout:
+  - `floom-store.sh`
+  - `floom-runs.sh`
+  - `floom-triggers.sh`
+  - `floom-workspaces.sh`
+  - `floom-feedback.sh`
+- Docker quickstart and product-promise consistency remain launch-readiness risks from prior rounds.
+
+### 17.4 Round 17 recommendation
+
+Priority fixes from this pass:
+
+1. Convert proxy-level `429` HTML into JSON/MCP errors with retry metadata.
+2. Add a canary for transient 5xx on simple built-in apps.
+3. Document review preconditions: submit/withdraw requires `private` visibility.
+4. Remove, hide, or implement CLI commands that are absent in the shipped/repo CLI surface.
+5. Fix CLI slug derivation and first-run result polling before public CLI onboarding.
