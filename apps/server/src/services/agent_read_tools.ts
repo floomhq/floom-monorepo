@@ -206,6 +206,7 @@ function publicBaseUrl(c: Context): string {
 
 function appSummary(app: AppRecord, baseUrl: string): Record<string, unknown> {
   const manifest = parseManifest(app);
+  const base = baseUrl.replace(/\/+$/, '');
   return {
     slug: app.slug,
     name: app.name,
@@ -213,7 +214,8 @@ function appSummary(app: AppRecord, baseUrl: string): Record<string, unknown> {
     category: app.category,
     visibility: visibilityLabel(app),
     runtime: manifest.runtime,
-    public_link: `${baseUrl}/p/${app.slug}`,
+    public_link: `${base}/p/${encodeURIComponent(app.slug)}`,
+    mcp_url: `${base}/mcp/app/${encodeURIComponent(app.slug)}`,
   };
 }
 
