@@ -13,10 +13,7 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+import { join } from 'node:path';
 
 const tmp = mkdtempSync(join(tmpdir(), 'floom-r18a1-anon-review-'));
 const webDist = join(tmp, 'web-dist');
@@ -35,7 +32,7 @@ function getFreePort() {
   });
 }
 
-async function waitForHttp(url, timeoutMs, getDebugOutput = () => '') {
+async function waitForHttp(url, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -44,7 +41,7 @@ async function waitForHttp(url, timeoutMs, getDebugOutput = () => '') {
     } catch {}
     await new Promise((r) => setTimeout(r, 200));
   }
-  throw new Error(`Timed out waiting for ${url}\n--- server output ---\n${getDebugOutput().slice(-4000)}`);
+  throw new Error(`Timed out waiting for ${url}`);
 }
 
 const port = await getFreePort();
@@ -69,8 +66,8 @@ const env = {
   FLOOM_RATE_LIMIT_DISABLED: 'true',
 };
 
-const server = spawn(process.execPath, [join(repoRoot, 'apps/server/dist/index.js')], {
-  cwd: repoRoot,
+const server = spawn(process.execPath, ['apps/server/dist/index.js'], {
+  cwd: process.cwd(),
   env,
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -92,7 +89,7 @@ function log(label, ok, detail = '') {
 }
 
 try {
-  await waitForHttp(`http://127.0.0.1:${port}/api/health`, 45_000, () => out);
+  await waitForHttp(`http://127.0.0.1:${port}/api/health`, 15_000);
 
   console.log('POST /api/apps/:slug/reviews anonymous block (Cloud mode)');
 

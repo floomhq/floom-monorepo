@@ -77,7 +77,6 @@ async function bootServer(deployEnabled) {
     FLOOM_CLOUD_MODE: 'true',
     BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: `http://localhost:${port}`,
-    WAITLIST_IP_HASH_SECRET: 'test-waitlist-ip-hash-secret',
     FLOOM_SEED_APPS: 'false',
     FLOOM_SEED_LAUNCH_DEMOS: 'false',
     FLOOM_FAST_APPS: 'false',
