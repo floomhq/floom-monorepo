@@ -135,8 +135,11 @@ export function StatusPage() {
     return () => clearInterval(id);
   }, []);
 
-  const allOk = Object.values(results).every((r) => r.status === 'ok');
-  const anyLoading = Object.values(results).some((r) => r.status === 'loading');
+  // Aggregate reflects Production only — internal envs (MVP, Preview) can
+  // be degraded during deploys without impacting public-facing status.
+  const prodResult = results['prod'];
+  const allOk = prodResult?.status === 'ok';
+  const anyLoading = prodResult?.status === 'loading';
   const overallLabel = anyLoading ? 'Checking…' : allOk ? 'All systems operational' : 'One or more systems degraded';
   const overallColor = anyLoading ? '#f59e0b' : allOk ? 'var(--success, #10b981)' : 'var(--danger, #dc2626)';
 
