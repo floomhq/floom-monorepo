@@ -1120,7 +1120,7 @@ if (webDist) {
     new RegExp(`^/install/${SLUG}/?$`),
     new RegExp(`^/docs/${SLUG}/?$`),
     new RegExp(`^/run/apps/${SLUG}/?$`),
-    new RegExp(`^/run/apps/${SLUG}/(run|secrets|triggers)/?$`),
+    new RegExp(`^/run/apps/${SLUG}/(run|secrets|triggers|feedback|history)/?$`),
     new RegExp(`^/run/apps/${SLUG}/triggers/(schedule|webhook)/?$`),
     new RegExp(`^/run/runs/${RUN_ID}/?$`),
     new RegExp(`^/me/runs/${RUN_ID}/?$`),

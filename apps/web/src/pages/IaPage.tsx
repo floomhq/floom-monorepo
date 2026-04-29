@@ -24,6 +24,8 @@ const runRows: IaRow[] = [
   { url: '/run/apps', name: 'Apps + tags + filter', file: 'apps' },
   { url: '/run/apps/:slug/run', name: 'Run an installed app', file: 'app-run' },
   { url: '/run/apps/:slug/triggers', name: 'Per-user triggers', file: 'triggers' },
+  { url: '/run/apps/:slug/history', name: 'Per-app run history', file: 'app-history' },
+  { url: '/run/apps/:slug/feedback', name: 'Per-app feedback', file: 'app-feedback' },
   { url: '/run/runs', name: 'Run history', file: 'runs' },
   { url: '/run/runs/:id', name: 'Run detail', file: 'detail' },
   { url: '/settings/byok-keys', name: 'BYOK keys', file: 'byok' },

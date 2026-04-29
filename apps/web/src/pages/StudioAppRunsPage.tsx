@@ -1,15 +1,18 @@
 // /studio/:slug/runs — full list of runs scoped to a single app. The
 // Studio Overview tab shows only the most recent 5; this page is the
 // "see all" destination. Owner-only.
+//
+// Table rendering is delegated to <AppRunsList /> so the consumer-side
+// /run/apps/:slug/history (issue #1084) renders the exact same UI.
 
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { StudioAppTabs } from '../components/StudioAppTabs';
+import { AppRunsList, type AppRunRow } from '../components/AppRunsList';
 import { AppHeader } from './MeAppPage';
 import * as api from '../api/client';
 import type { AppDetail, CreatorRun } from '../lib/types';
-import { formatTime } from '../lib/time';
 
 export function StudioAppRunsPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -46,6 +49,17 @@ export function StudioAppRunsPage() {
     };
   }, [slug, nav]);
 
+  const rows: AppRunRow[] | null = runs
+    ? runs.map((r) => ({
+        id: r.id,
+        started_at: r.started_at,
+        action: r.action,
+        status: r.status,
+        duration_ms: r.duration_ms,
+        href: `/me/runs/${r.id}`,
+      }))
+    : null;
+
   return (
     <WorkspacePageShell
       mode="studio"
@@ -57,51 +71,16 @@ export function StudioAppRunsPage() {
         <>
           <AppHeader app={app} />
           <h2 style={sectionHeader}>All runs</h2>
-          {!runs && <div style={{ fontSize: 13, color: 'var(--muted)' }}>Loading…</div>}
-          {runs && runs.length === 0 && (
-            <div data-testid="studio-app-runs-empty" style={emptyState}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>
-                No runs yet
-              </div>
-              <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+          <AppRunsList
+            rows={rows}
+            emptyTitle="No runs yet"
+            emptyBody={
+              <>
                 Share <code style={{ fontFamily: 'var(--font-mono)' }}>/p/{app.slug}</code> to drive your first run.
-              </p>
-            </div>
-          )}
-          {runs && runs.length > 0 && (
-            <div
-              data-testid="studio-app-runs-list"
-              style={{
-                border: '1px solid var(--line)',
-                borderRadius: 10,
-                background: 'var(--card)',
-                overflow: 'hidden',
-              }}
-            >
-              <div style={tableHeaderStyle}>
-                <span>Started</span>
-                <span>Action</span>
-                <span>Status</span>
-                <span style={{ textAlign: 'right' }}>Time</span>
-              </div>
-              {runs.map((r) => (
-                <Link
-                  key={r.id}
-                  to={`/me/runs/${r.id}`}
-                  style={tableRowStyle}
-                >
-                  <span>{formatTime(r.started_at)}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>
-                    {r.action}
-                  </span>
-                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>{r.status}</span>
-                  <span style={{ textAlign: 'right', fontSize: 12, color: 'var(--muted)' }}>
-                    {r.duration_ms ? `${Math.round(r.duration_ms)}ms` : '-'}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
+              </>
+            }
+            testId="studio-app-runs"
+          />
         </>
       )}
     </WorkspacePageShell>
@@ -123,37 +102,4 @@ const errorStyle: React.CSSProperties = {
   borderRadius: 8,
   fontSize: 13,
   marginBottom: 20,
-};
-
-const emptyState: React.CSSProperties = {
-  border: '1px dashed var(--line)',
-  borderRadius: 10,
-  padding: '24px 20px',
-  background: 'var(--card)',
-};
-
-const tableHeaderStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1.5fr 1fr 1fr 80px',
-  gap: 8,
-  padding: '10px 16px',
-  background: 'var(--bg)',
-  borderBottom: '1px solid var(--line)',
-  fontSize: 11,
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-  color: 'var(--muted)',
-  fontWeight: 700,
-};
-
-const tableRowStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1.5fr 1fr 1fr 80px',
-  gap: 8,
-  padding: '12px 16px',
-  borderBottom: '1px solid var(--line)',
-  fontSize: 13,
-  color: 'var(--ink)',
-  textDecoration: 'none',
-  alignItems: 'center',
 };
