@@ -486,15 +486,16 @@ export function AboutPage() {
         >
           {deployEnabled ? (
             <>
-              Point Floom at an OpenAPI spec or a GitHub repo. You get a live
-              URL, auth, logs, and a page your colleagues can actually open.
+              Point Floom at an OpenAPI spec, or let Floom discover one from a
+              GitHub repo. You get a live URL, auth, logs, and a page your
+              colleagues can actually open.
             </>
           ) : (
             <>
-              Point Floom at an OpenAPI spec or a GitHub repo to publish when
-              the workspace has access on floom.dev, or run without limits on
-              your own hardware. Until publish opens for you here, run catalog
-              apps, use MCP, and self-host your own.
+              Point Floom at an OpenAPI spec, or let Floom discover one from a
+              GitHub repo, when the workspace has access on floom.dev. Until
+              publish opens for you here, run catalog apps, use MCP, and
+              self-host your own.
             </>
           )}
         </p>
