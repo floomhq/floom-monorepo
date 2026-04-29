@@ -669,6 +669,30 @@ export function MvpHomePage() {
           The grid uses CSS class `.mvp-home-grid` with a media query in
           globals.css so we don't have to thread a viewport hook. */}
       <div className="mvp-home-shell" style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 24px 64px' }}>
+        {/* R37 beta warning — inline strip, non-dismissable. Lifted once
+            sandbox hardening (gVisor isolation) ships as GA. */}
+        <div
+          data-testid="beta-warning-strip"
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 9,
+            background: '#fff5e8',
+            border: '1px solid #f5cf90',
+            borderRadius: 10,
+            padding: '11px 14px',
+            margin: '0 0 24px',
+            fontSize: 13,
+            color: '#7c5400',
+            lineHeight: 1.55,
+          }}
+        >
+          <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+          <span>
+            <strong>Floom is in public beta</strong> — please don&rsquo;t put production secrets in apps you publish here.
+            We&rsquo;re hardening secret isolation and will lift this when sandboxing is GA.
+          </span>
+        </div>
         <HomeHero name={greetingName} hasToken={hasToken || liveRawToken !== null} />
         <AmbientStatus
           workspaceName={workspace?.name ?? null}
