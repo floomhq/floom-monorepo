@@ -8,6 +8,8 @@ const PORT = Number(process.env.PORT || 4390);
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_GEMINI_BODY_TEXT_CHARS = 30_000;
 const MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_API_KEY_PAID = process.env.GEMINI_API_KEY_PAID || '';
 
 const PANEL_SCHEMA = { type: 'OBJECT', properties: { findings: { type: 'ARRAY', items: { type: 'OBJECT', properties: { label: { type: 'STRING' }, value: { type: 'STRING' }, status: { type: 'STRING', enum: ['fail', 'warn', 'pass'] }, fix: { type: 'STRING', nullable: true }, detail: { type: 'STRING', nullable: true }, impact: { type: 'STRING', nullable: true } }, required: ['label', 'value', 'status', 'fix', 'detail', 'impact'] } }, callouts: { type: 'ARRAY', items: { type: 'OBJECT', properties: { type: { type: 'STRING', enum: ['critical', 'warn', 'info'] }, label: { type: 'STRING' }, text: { type: 'STRING' } }, required: ['type', 'label', 'text'] } } }, required: ['findings', 'callouts'] };
 const AUDIT_RESPONSE_SCHEMA = { type: 'OBJECT', properties: { company_name: { type: 'STRING' }, url: { type: 'STRING' }, overall_score: { type: 'INTEGER' }, severity: { type: 'STRING', enum: ['critical', 'warning', 'moderate', 'good', 'excellent'] }, scores: { type: 'OBJECT', properties: { kg_density: { type: 'INTEGER' }, sentiment_delta: { type: 'INTEGER' }, nap_consistency: { type: 'INTEGER' }, eeat_strength: { type: 'INTEGER' }, disambiguation: { type: 'INTEGER' } }, required: ['kg_density', 'sentiment_delta', 'nap_consistency', 'eeat_strength', 'disambiguation'] }, diagnosis: { type: 'STRING' }, verdict: { type: 'STRING' }, quick_stats: { type: 'OBJECT', properties: { critical_count: { type: 'INTEGER' }, critical_summary: { type: 'STRING' }, high_count: { type: 'INTEGER' }, high_summary: { type: 'STRING' }, action_count: { type: 'INTEGER' }, action_summary: { type: 'STRING' } }, required: ['critical_count', 'critical_summary', 'high_count', 'high_summary', 'action_count', 'action_summary'] }, panels: { type: 'OBJECT', properties: { entity: PANEL_SCHEMA, ugc: PANEL_SCHEMA, nap: PANEL_SCHEMA, kg: PANEL_SCHEMA }, required: ['entity', 'ugc', 'nap', 'kg'] }, gaps: { type: 'ARRAY', items: { type: 'OBJECT', properties: { gap: { type: 'STRING' }, finding: { type: 'STRING' }, priority: { type: 'STRING', enum: ['critical', 'high', 'medium'] } }, required: ['gap', 'finding', 'priority'] } }, remediation: { type: 'ARRAY', items: { type: 'OBJECT', properties: { timeframe: { type: 'STRING' }, action: { type: 'STRING' }, priority: { type: 'STRING', enum: ['critical', 'high', 'medium', 'low'], nullable: true } }, required: ['timeframe', 'action'] } } }, required: ['company_name', 'url', 'overall_score', 'severity', 'scores', 'diagnosis', 'verdict', 'quick_stats', 'panels', 'gaps', 'remediation'] };
@@ -118,13 +120,29 @@ Return JSON with these fields:
   return { systemPrompt, userPrompt };
 }
 
-async function callGemini(url, crawl) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw httpError(500, 'GEMINI_API_KEY not configured');
-  const { systemPrompt, userPrompt } = buildPrompts(url, crawl);
+async function fetchGemini(systemPrompt, userPrompt, apiKey) {
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(30_000), body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: systemPrompt }] }, generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json', responseSchema: FLOOM_RESPONSE_SCHEMA, thinkingConfig: { thinkingBudget: 0 } } }) });
-  const text = await response.text();
-  if (!response.ok) throw httpError(502, `Gemini API error ${response.status}: ${text.slice(0, 240)}`);
+  return { response, text: await response.text() };
+}
+
+async function fetchGeminiWithFallback(systemPrompt, userPrompt) {
+  const primaryKey = GEMINI_API_KEY || GEMINI_API_KEY_PAID;
+  if (!primaryKey) throw httpError(500, 'GEMINI_API_KEY not configured');
+  const primary = await fetchGemini(systemPrompt, userPrompt, primaryKey);
+  if (primary.response.ok) return primary.text;
+  const primaryError = httpError(502, `Gemini API error ${primary.response.status}: ${primary.text.slice(0, 240)}`);
+  if (!GEMINI_API_KEY || !GEMINI_API_KEY_PAID || ![429, 503].includes(primary.response.status)) throw primaryError;
+  console.log('[ai-visibility] free quota hit, falling back to paid key');
+  try {
+    const paid = await fetchGemini(systemPrompt, userPrompt, GEMINI_API_KEY_PAID);
+    if (paid.response.ok) return paid.text;
+  } catch { throw primaryError; }
+  throw primaryError;
+}
+
+async function callGemini(url, crawl) {
+  const { systemPrompt, userPrompt } = buildPrompts(url, crawl);
+  const text = await fetchGeminiWithFallback(systemPrompt, userPrompt);
   const payload = JSON.parse(text);
   const jsonText = payload.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!jsonText) throw httpError(502, 'Gemini returned an empty response');
