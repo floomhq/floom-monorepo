@@ -36,6 +36,14 @@ import * as userSecrets from '../services/user_secrets.js';
 import * as creatorSecrets from '../services/app_creator_secrets.js';
 import * as profileContext from '../services/profile_context.js';
 import * as ws from '../services/workspaces.js';
+import {
+  composioConnect,
+  listComposioIntegrations,
+} from '../services/composio-runtime.js';
+import {
+  ComposioClientError,
+  ComposioConfigError,
+} from '../services/composio.js';
 import { isCloudMode } from '../lib/better-auth.js';
 import {
   AUTH_DOCS_URL,
@@ -1043,6 +1051,85 @@ function createAdminMcpServer({ ctx, ip, baseUrl }: AdminToolContext): McpServer
                   error: (err as Error).message || 'detect_inline_failed',
                   hint_url: `${baseUrl}/api/hub/detect/hint`,
                 },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+    },
+  );
+
+  // ---- connect_integration ------------------------------------------
+  server.registerTool(
+    'connect_integration',
+    {
+      title: 'Connect a Composio integration',
+      description:
+        'Start OAuth for a Composio-backed integration such as Gmail, Slack, Notion, GitHub, or Stripe. Returns a redirect URL the user opens to complete consent.',
+      inputSchema: {
+        slug: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[a-z0-9_-]+$/)
+          .describe('Composio integration slug, for example gmail, slack, notion, github, or stripe.'),
+      },
+    },
+    async ({ slug }) => {
+      if (isCloudMode() && !ctx.is_authenticated) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  error: 'auth_required',
+                  message: 'Authentication required to connect integrations.',
+                  hint: AUTH_HINT_CLOUD,
+                  docs_url: AUTH_DOCS_URL,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+      try {
+        const result = await composioConnect(ctx.workspace_id, ctx.user_id, slug);
+        const integrations = listComposioIntegrations(ctx.workspace_id);
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  ...result,
+                  connected: integrations.find((item) => item.slug === result.integration)?.connected ?? false,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        const code =
+          err instanceof ComposioConfigError
+            ? 'composio_config_missing'
+            : err instanceof ComposioClientError
+              ? 'composio_failed'
+              : 'unexpected_error';
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                { error: code, message: (err as Error).message },
                 null,
                 2,
               ),

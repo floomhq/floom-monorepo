@@ -133,6 +133,13 @@ interface OpenApiAppSpec {
    * reads "UUID format" in the form while still submitting `version: "v4"`.
    */
   input_labels?: Record<string, string>;
+  /**
+   * Runtime integrations declared by operator-authored apps.yaml entries.
+   * Example:
+   *   integrations:
+   *     - composio: gmail
+   */
+  integrations?: NormalizedManifest['integrations'];
 }
 
 type PublishVisibility = 'public' | 'private' | 'link';
@@ -920,6 +927,9 @@ export function specToManifest(
     python_dependencies: [],
     node_dependencies: {},
     secrets_needed: secretNames,
+    ...(appSpec.integrations && appSpec.integrations.length > 0
+      ? { integrations: appSpec.integrations }
+      : {}),
     manifest_version: '2.0',
     ...(appSpec.blocked_reason ? { blocked_reason: appSpec.blocked_reason } : {}),
     ...(license ? { license } : {}),

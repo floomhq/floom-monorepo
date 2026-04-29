@@ -156,6 +156,76 @@ async function verifyToken(apiUrl, token) {
   return json || {};
 }
 
+function readApiAuth() {
+  const conf = readConfig() || {};
+  const apiUrl = process.env.FLOOM_API_URL || conf.api_url || DEFAULT_API_URL;
+  const token = process.env.FLOOM_API_KEY || process.env.FLOOM_API_TOKEN || conf.api_key || conf.token || '';
+  if (!token) {
+    throw new Error(`no Floom token found. Run floom setup or set FLOOM_API_KEY.`);
+  }
+  return { apiUrl, token };
+}
+
+async function apiJson(apiUrl, token, method, pathName) {
+  const url = `${apiUrl.replace(/\/$/, '')}${pathName}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+  const text = await res.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    // status handling below includes the raw body when JSON parsing fails
+  }
+  if (!res.ok) {
+    const detail = json && (json.error || json.code) ? `${json.error || json.code}` : text;
+    throw new Error(`${method} ${pathName} failed: HTTP ${res.status}${detail ? ` — ${detail}` : ''}`);
+  }
+  return json || {};
+}
+
+async function runIntegrations(args) {
+  const sub = args[0];
+  const { apiUrl, token } = readApiAuth();
+  if (sub === 'list') {
+    const json = await apiJson(apiUrl, token, 'GET', '/api/integrations/composio');
+    const rows = Array.isArray(json.integrations) ? json.integrations : [];
+    for (const row of rows) {
+      const status = row.connected ? c.green('connected') : c.dim('available');
+      console.log(`${String(row.slug).padEnd(18)} ${status}`);
+    }
+    return;
+  }
+  if (sub === 'connect') {
+    const name = args[1];
+    if (!name) {
+      throw new Error('usage: floom integrations connect <name>');
+    }
+    const json = await apiJson(
+      apiUrl,
+      token,
+      'POST',
+      `/api/integrations/composio/${encodeURIComponent(name)}/connect`,
+    );
+    if (!json.auth_url) {
+      throw new Error('server response did not include auth_url');
+    }
+    const opened = openInBrowser(json.auth_url);
+    if (opened) {
+      console.log(c.green('Opened ') + c.cyan(json.auth_url));
+    } else {
+      console.log(c.cyan(json.auth_url));
+    }
+    return;
+  }
+  throw new Error('usage: floom integrations list | floom integrations connect <name>');
+}
+
 // ---- setup ----------------------------------------------------------------
 
 async function runSetup(opts) {
@@ -270,6 +340,8 @@ ${c.bold('usage:')}
   floom init                   ${c.dim('# scaffold floom.yaml in current dir')}
   floom status [--json]        ${c.dim('# list apps and recent runs')}
   floom account                ${c.dim('# manage secrets; agent-token commands need a browser session')}
+  floom integrations list      ${c.dim('# list Composio integrations and connection status')}
+  floom integrations connect <name> ${c.dim('# open Composio OAuth for Gmail/Slack/etc')}
   floom api <METHOD> <PATH>    ${c.dim('# call raw API endpoints with saved auth')}
 
 ${c.bold('options:')}
@@ -327,6 +399,11 @@ async function main() {
 
   if (sub === 'setup') {
     await runSetup({ apiUrl });
+    return;
+  }
+
+  if (sub === 'integrations') {
+    await runIntegrations(filtered.slice(1));
     return;
   }
 
