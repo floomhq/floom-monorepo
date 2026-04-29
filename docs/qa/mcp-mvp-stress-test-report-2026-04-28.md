@@ -498,3 +498,108 @@ New instability signal:
 - API error contracts for sharing/install are substantially clearer than initial audit.
 - Main remaining reliability concern: intermittent app runtime network failure (`fetch failed`) seen in MCP run path.
 
+
+---
+
+## 14) Deep Round (Higher-Depth Stress)
+
+Date (UTC): 2026-04-29
+
+This round added deeper coverage beyond prior suites:
+
+- transition chains instead of one-step mutations
+- repeated review submit/withdraw loops
+- sequential latency metrics and concurrent burst success rates
+- strict secret-key contract checks against declared security scheme names
+- parity validation of CLI behavior under repeated state transitions and run bursts
+
+### 14.1 MCP deep round
+
+Run timestamp: `20260429003622`
+
+- Temp apps:
+  - `mcp-deep-29003622`
+  - `mcp-deep-29003622-sec`
+- Total checks: `41`
+- Passed: `34`
+- Failed: `7`
+- Cleanup: ✅ both temp apps deleted
+
+#### Reliability metrics
+
+- Sequential `run_app(base64)` trials: `15/15` success
+  - success rate: `100%`
+  - p50 latency: `785 ms`
+  - p95 latency: `906 ms`
+- Concurrent `run_app(hash)` burst: `24/24` success
+  - success rate: `100%`
+
+#### Deep findings
+
+1. Sharing transitions are state-dependent, not globally blocked.
+- Direct `private -> invited` failed (`409 illegal_transition`).
+- In chain `private -> link -> private -> invited`, invited succeeded.
+- Interpretation: invited is allowed only from specific prior states.
+
+2. Install gate is now explicit and consistent across states.
+- For `private`, `link`, and `invited`, install returned:
+  - `409`
+  - `code: app_not_installable`
+  - clear policy message about public Store eligibility.
+
+3. Review submit/withdraw loops failed repeatedly under tested state.
+- In this deep run, three submit/withdraw cycles each returned `409 illegal_transition`.
+- This conflicts with earlier re-audit where these actions succeeded.
+- Interpretation: transition preconditions are brittle or context-sensitive.
+
+4. Secret key contract is deterministic.
+- For security scheme app (`ApiKeyAuth`), only `ApiKeyAuth` key is valid.
+- Header name (`X-API-Key`) is rejected with `400` and `valid_keys` guidance.
+
+### 14.2 CLI deep round
+
+Run timestamp: `20260429003725`
+
+- Temp app: `cli-deep-29003725`
+- Total checks: `34`
+- Passed: `33`
+- Failed: `1`
+- Cleanup: ✅ app deleted and absence verified
+
+#### Reliability metrics
+
+- Sequential run enqueue (`floom run hash`): `10/10` success (run IDs returned)
+- Concurrent enqueue burst: `18/18` success
+
+#### Deep findings
+
+1. Sharing transitions all succeeded in this run.
+- `link`, `private`, `invited`, back to `private`, then `link`: all `ok`.
+
+2. Install gate remains the only functional failure.
+- `floom apps install <slug>` returned:
+  - `409`
+  - `code: app_not_installable`
+- This is now clear and stable policy behavior.
+
+3. Agent-token list behavior remains auth-mode gated.
+- `floom account agent-tokens list` returns `401 session_required` under agent-token auth.
+- Treated as expected in this round.
+
+### 14.3 Deep-round interpretation
+
+- Positive: run-path reliability was strong in this round (100% success in measured bursts).
+- Positive: install errors are now policy-explicit (`app_not_installable`) instead of ambiguous not-found.
+- Watch item: review-transition behavior remains inconsistent across rounds; in this deep pass it failed repeatedly with `illegal_transition`.
+
+### 14.4 Recommended next test slice
+
+1. Transition-state observability test
+- Capture and log exact visibility/review state before each review action.
+
+2. Deterministic review-transition matrix
+- Enumerate allowed submit/withdraw transitions from every visibility state (`private`, `link`, `invited`, `pending_review`) and verify contract outputs.
+
+3. Runtime network canary
+- Keep a lightweight canary running `base64/hash` every minute for 30-60 minutes to detect intermittent `network_unreachable` regressions.
+
