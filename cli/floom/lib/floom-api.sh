@@ -16,6 +16,8 @@
 #   FLOOM_API_KEY         API key (overrides config file)
 #   FLOOM_API_URL         base URL (overrides config file, default https://floom.dev)
 #   FLOOM_CONFIG          path to config json (default ~/.floom/config.json)
+#   FLOOM_API_ALLOW_ANON=1 allow requests without an API key
+#   FLOOM_COOKIE_JAR      curl cookie jar path to read/write between calls
 #   FLOOM_DRY_RUN=1       print the request instead of sending
 #
 # Exit codes:
@@ -82,7 +84,7 @@ if [[ -z "$API_KEY" && -f "$LEGACY_CONFIG" ]]; then
   TOKEN_TYPE=$(python3 -c "import json; c=json.load(open('$LEGACY_CONFIG')); print(c.get('token_type','bearer'))")
 fi
 
-if [[ -z "$API_KEY" ]]; then
+if [[ -z "$API_KEY" && "${FLOOM_API_ALLOW_ANON:-}" != "1" ]]; then
   cat >&2 <<EOF
 floom: not authenticated.
 
@@ -102,10 +104,15 @@ URL="${API_URL%/}${PATH_}"
 # Pick auth header. Default: Authorization: Bearer. Legacy session_cookie
 # users get a Cookie header so old configs keep working.
 AUTH_ARGS=()
-if [[ "$TOKEN_TYPE" == "session_cookie" ]]; then
+if [[ -n "$API_KEY" && "$TOKEN_TYPE" == "session_cookie" ]]; then
   AUTH_ARGS+=("-H" "Cookie: better-auth.session_token=$API_KEY")
-else
+elif [[ -n "$API_KEY" ]]; then
   AUTH_ARGS+=("-H" "Authorization: Bearer $API_KEY")
+fi
+
+COOKIE_ARGS=()
+if [[ -n "${FLOOM_COOKIE_JAR:-}" ]]; then
+  COOKIE_ARGS+=("-b" "$FLOOM_COOKIE_JAR" "-c" "$FLOOM_COOKIE_JAR")
 fi
 
 # Build curl invocation. -w prints the HTTP code on the last line so we can
@@ -118,11 +125,13 @@ if [[ -n "$BODY" ]]; then
     -X "$METHOD" "$URL" \
     -H "Content-Type: application/json" \
     "${AUTH_ARGS[@]}" \
+    "${COOKIE_ARGS[@]}" \
     --data-raw "$BODY")
 else
   HTTP_CODE=$(curl -sS -o "$RESP_FILE" -w "%{http_code}" \
     -X "$METHOD" "$URL" \
-    "${AUTH_ARGS[@]}")
+    "${AUTH_ARGS[@]}" \
+    "${COOKIE_ARGS[@]}")
 fi
 
 cat "$RESP_FILE"

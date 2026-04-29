@@ -26,7 +26,7 @@ const path = require('path');
 const readline = require('readline');
 const { execSync, spawn } = require('child_process');
 
-const VERSION = '0.2.9';
+const VERSION = '0.2.10';
 const DEFAULT_API_URL = process.env.FLOOM_API_URL || 'https://floom.dev';
 const CONFIG_PATH = process.env.FLOOM_CONFIG || path.join(os.homedir(), '.floom', 'config.json');
 
@@ -250,6 +250,23 @@ function forwardToBash(args, opts = {}) {
   result.on('exit', (code) => process.exit(code ?? 0));
 }
 
+function hasExplicitEmptyLoginToken(args) {
+  if (args[0] !== 'auth' || args[1] !== 'login') return false;
+  for (let i = 2; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--token=') return true;
+    if (arg === '--token' && (args[i + 1] ?? '') === '') return true;
+  }
+  return false;
+}
+
+function printInvalidTokenAndExit(apiUrl = DEFAULT_API_URL) {
+  console.error('ERROR: Invalid Agent token format.');
+  console.error('Agent tokens look like floom_agent_<32 alphanumeric chars>.');
+  console.error(`Mint a fresh token at ${apiUrl.replace(/\/$/, '')}/me/agent-keys and try again.`);
+  process.exit(1);
+}
+
 // ---- help -----------------------------------------------------------------
 
 function printHelp() {
@@ -328,6 +345,10 @@ async function main() {
   if (sub === 'setup') {
     await runSetup({ apiUrl });
     return;
+  }
+
+  if (hasExplicitEmptyLoginToken(filtered)) {
+    printInvalidTokenAndExit(apiUrl);
   }
 
   // Forward everything else to bundled bash CLI.

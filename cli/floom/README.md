@@ -117,8 +117,10 @@ floom run lead-scorer --input lead=https://example.com
 
 `floom deploy` posts OpenAPI/proxied manifests to `/api/hub/ingest`. True repo-code hosting is not wired in this shell CLI path.
 
-`floom run` waits for completion by default. Multi-action apps pass the
-operation in the JSON body, for example:
+`floom run` works without an Agent token for public apps that allow anonymous
+runs. Authenticated runs still use your saved Agent token when one is present.
+The CLI waits for completion by default. Multi-action apps pass the operation
+in the JSON body, for example:
 
 ```bash
 floom run petstore '{"action":"getInventory"}'

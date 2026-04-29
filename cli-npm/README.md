@@ -41,6 +41,9 @@ floom account                # manage secrets; agent-token commands need a brows
 floom api GET /api/me/runs   # call raw API endpoints for advanced surfaces
 ```
 
+`floom run` works without an Agent token for public apps that allow anonymous
+runs. Authenticated runs still use your saved Agent token when one is present.
+
 ## Configuration
 
 | Variable        | Default                         | Purpose                  |

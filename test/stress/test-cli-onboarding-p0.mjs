@@ -55,6 +55,7 @@ function run(args, opts = {}) {
 
 function startMockApi() {
   let runPolls = 0;
+  let publicRunPolls = 0;
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
     res.setHeader('content-type', 'application/json');
@@ -88,6 +89,34 @@ function startMockApi() {
 
     if (req.method === 'POST' && url.pathname === '/api/uuid/run') {
       res.end(JSON.stringify({ run_id: 'run_uuid', status: 'pending' }));
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/public-uuid/run') {
+      if (req.headers.authorization) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: 'public run test expected no auth header' }));
+        return;
+      }
+      res.setHeader('set-cookie', 'floom_device_id=dev_public_cli; Path=/; HttpOnly; SameSite=Lax');
+      res.end(JSON.stringify({ run_id: 'run_public_uuid', status: 'pending' }));
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/run/run_public_uuid') {
+      if (!String(req.headers.cookie || '').includes('floom_device_id=dev_public_cli')) {
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: 'missing device cookie' }));
+        return;
+      }
+      publicRunPolls++;
+      res.end(JSON.stringify({
+        id: 'run_public_uuid',
+        app_slug: 'public-uuid',
+        status: publicRunPolls >= 1 ? 'success' : 'pending',
+        outputs: { uuid: '11111111-1111-4111-8111-111111111111' },
+        duration_ms: 5,
+      }));
       return;
     }
 
@@ -162,6 +191,37 @@ try {
   {
     const res = await run(['run', 'uuid'], { apiUrl: mock.apiUrl });
     log('run polls pending run to completion', res.status === 0 && res.stdout.includes('Run succeeded: run_uuid') && res.stdout.includes('00000000-0000-4000-8000-000000000000'), res.stdout + res.stderr);
+  }
+
+  {
+    const tmp = mkdtempSync(join(tmpdir(), 'floom-public-run-'));
+    try {
+      const res = await run(['run', 'public-uuid'], {
+        apiUrl: mock.apiUrl,
+        env: {
+          FLOOM_API_KEY: '',
+          FLOOM_CONFIG: join(tmp, 'missing-config.json'),
+        },
+      });
+      log(
+        'run supports unauthenticated public apps with cookie polling',
+        res.status === 0 &&
+          res.stdout.includes('Run succeeded: run_public_uuid') &&
+          res.stdout.includes('11111111-1111-4111-8111-111111111111'),
+        res.stdout + res.stderr,
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+
+  {
+    const res = await run(['auth', 'login', '--token='], { apiUrl: mock.apiUrl });
+    log(
+      'auth login --token= rejects explicit empty token',
+      res.status === 1 && res.stderr.includes('Invalid Agent token format'),
+      res.stdout + res.stderr,
+    );
   }
 
   {

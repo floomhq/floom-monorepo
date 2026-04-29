@@ -148,6 +148,7 @@ PY
     AGENT_TOKEN=""
     API_URL="$(default_host)"
     shift
+    TOKEN_FLAG_SEEN=0
     while [[ $# -gt 0 ]]; do
       arg="$1"
       case "$arg" in
@@ -167,8 +168,8 @@ options:
 
 EOF
           exit 0 ;;
-        --token=*)   AGENT_TOKEN="${arg#--token=}" ;;
-        --token)     shift; AGENT_TOKEN="${1:-}" ;;
+        --token=*)   TOKEN_FLAG_SEEN=1; AGENT_TOKEN="${arg#--token=}" ;;
+        --token)     TOKEN_FLAG_SEEN=1; shift; AGENT_TOKEN="${1:-}" ;;
         --api-url=*) API_URL="${arg#--api-url=}" ;;
         --api-url)   shift; API_URL="${1:-}" ;;
         --url=*)     API_URL="${arg#--url=}" ;;
@@ -177,6 +178,12 @@ EOF
       esac
       shift
     done
+    if [[ -z "$AGENT_TOKEN" && "$TOKEN_FLAG_SEEN" == "1" ]]; then
+      echo "ERROR: Invalid Agent token format." >&2
+      echo "Agent tokens look like floom_agent_<32 alphanumeric chars>." >&2
+      echo "Mint a fresh token at ${API_URL%/}/me/agent-keys and try again." >&2
+      exit 1
+    fi
     if [[ -z "$AGENT_TOKEN" ]]; then
       LOGIN_URL="${API_URL%/}/me/agent-keys"
       if open_login_page "$LOGIN_URL"; then

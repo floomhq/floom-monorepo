@@ -103,7 +103,10 @@ PY
 )
 fi
 
-INITIAL="$(bash "$LIB_DIR/floom-api.sh" POST "/api/${SLUG}/run" "$BODY")"
+COOKIE_JAR="$(mktemp)"
+trap 'rm -f "$COOKIE_JAR"' EXIT
+
+INITIAL="$(FLOOM_API_ALLOW_ANON=1 FLOOM_COOKIE_JAR="$COOKIE_JAR" bash "$LIB_DIR/floom-api.sh" POST "/api/${SLUG}/run" "$BODY")"
 RUN_ID="$(python3 - "$INITIAL" <<'PY'
 import json, sys
 try:
@@ -123,7 +126,18 @@ fi
 FINAL="$INITIAL"
 deadline=$((SECONDS + WAIT_SECONDS))
 while [[ $SECONDS -le $deadline ]]; do
-  SNAPSHOT="$(bash "$LIB_DIR/floom-api.sh" GET "/api/me/runs/${RUN_ID}" 2>/dev/null || true)"
+  SNAPSHOT="$(FLOOM_API_ALLOW_ANON=1 FLOOM_COOKIE_JAR="$COOKIE_JAR" bash "$LIB_DIR/floom-api.sh" GET "/api/run/${RUN_ID}" 2>/dev/null || true)"
+  if ! python3 - "$SNAPSHOT" <<'PY'
+import json, sys
+try:
+    status = json.loads(sys.argv[1]).get("status")
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if status in {"success", "succeeded", "error", "failed", "timeout"} else 1)
+PY
+  then
+    SNAPSHOT="$(FLOOM_COOKIE_JAR="$COOKIE_JAR" bash "$LIB_DIR/floom-api.sh" GET "/api/me/runs/${RUN_ID}" 2>/dev/null || true)"
+  fi
   if python3 - "$SNAPSHOT" <<'PY'
 import json, sys
 try:
