@@ -164,16 +164,19 @@ PY
 
 log "merged env file: $MERGED_ENV"
 
-# --- 3b. Set FLOOM_STORE_HIDE_SLUGS = kill list + docker-runtime apps ---
-DOCKER_RUNTIME_HIDE="competitor-lens,ai-readiness-audit,pitch-coach"
+# --- 3b. Set FLOOM_STORE_HIDE_SLUGS = kill list only ---
+# R37 (2026-04-29): competitor-lens, ai-readiness-audit, pitch-coach no longer
+# need docker.sock — they run as Python FastAPI sidecars forked by
+# launch-week-sidecars.ts (FLOOM_LAUNCH_WEEK_APPS=true). Remove them from
+# FLOOM_STORE_HIDE_SLUGS so they appear in the public hub.
 
 if [ -f "$KILL_LIST" ]; then
   KILL_CSV=$(grep -v '^[[:space:]]*#' "$KILL_LIST" | grep -v '^[[:space:]]*$' | paste -sd, -)
-  COMBINED="${KILL_CSV},${DOCKER_RUNTIME_HIDE}"
+  COMBINED="${KILL_CSV}"
   grep -v '^FLOOM_STORE_HIDE_SLUGS=' "$MERGED_ENV" > "${MERGED_ENV}.tmp" && mv "${MERGED_ENV}.tmp" "$MERGED_ENV"
   echo "FLOOM_STORE_HIDE_SLUGS=${COMBINED}" >> "$MERGED_ENV"
   KILL_COUNT=$(echo "$COMBINED" | tr ',' '\n' | wc -l)
-  log "set FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs: kill-list + 3 docker-runtime apps)"
+  log "set FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs from kill-list)"
 fi
 
 # --- 4. Stop + remove old container ---

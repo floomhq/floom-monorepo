@@ -105,10 +105,26 @@ FROM node:20-slim AS runtime
 WORKDIR /app
 
 # System deps
+# python3 + pip required for the Python FastAPI launch-week sidecars
+# (pitch-coach, competitor-lens, ai-readiness-audit) forked by
+# launch-week-sidecars.ts when FLOOM_LAUNCH_WEEK_APPS=true.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
+      python3 \
+      python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps for the 3 launch-week Python sidecars in one layer.
+# google-genai covers pitch-coach + ai-readiness-audit;
+# fastapi/uvicorn/httpx/beautifulsoup4 cover competitor-lens + ai-readiness-audit.
+RUN pip3 install --no-cache-dir --break-system-packages \
+      "google-genai>=1.64.0,<2" \
+      "fastapi==0.135.1" \
+      "uvicorn==0.34.0" \
+      "httpx==0.28.1" \
+      "beautifulsoup4==4.14.3" \
+      "pydantic>=2"
 
 ENV NODE_ENV=production
 ENV DATA_DIR=/data
@@ -150,8 +166,11 @@ COPY --from=builder /app/packages/renderer/src ./packages/renderer/src
 # empty hub.
 COPY --from=builder /app/examples/fast-apps ./examples/fast-apps
 
-# Launch Week proxied sidecars. Pure Node.js, no deps, forked at server boot.
-# Set FLOOM_LAUNCH_WEEK_APPS=true to enable on preview/test environments.
+# Launch Week proxied sidecars. Forked at server boot when
+# FLOOM_LAUNCH_WEEK_APPS=true. Node.js sidecars (launch-scorecards,
+# claude-wrapped, session-recall, hook-stats, floom-this) are dep-free;
+# Python sidecars (pitch-coach, competitor-lens, ai-readiness-audit) require
+# python3 + packages installed above.
 COPY --from=builder /app/examples/launch-scorecards ./examples/launch-scorecards
 COPY --from=builder /app/examples/claude-wrapped ./examples/claude-wrapped
 COPY --from=builder /app/examples/session-recall ./examples/session-recall

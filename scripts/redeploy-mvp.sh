@@ -196,24 +196,21 @@ log "merged env file: $MERGED_ENV"
 # data/launch-kill-list.txt is the durable in-repo source of truth for which
 # SaaS-relay apps to suppress from the public directory. The server reads
 # FLOOM_STORE_HIDE_SLUGS at boot (apps/server/src/routes/hub.ts), so we
-# materialize it into the merged env file here. Canonical env wins on
-# conflict — if the file already declares FLOOM_STORE_HIDE_SLUGS we leave
-# it alone.
-
-# Apps that need /var/run/docker.sock at runtime (app_type=docker). Hidden
-# from every env's public directory until the docker-runtime isolation pass
-# (gVisor / kata-containers) lands. mvp / preview / prod no longer mount the
-# host docker socket on user-facing containers.
-DOCKER_RUNTIME_HIDE="competitor-lens,ai-readiness-audit,pitch-coach"
+# materialize it into the merged env file here.
+#
+# R37 (2026-04-29): competitor-lens, ai-readiness-audit, pitch-coach were
+# previously hidden here because they required docker.sock (docker-runtime).
+# They now run as Python FastAPI sidecars (FLOOM_LAUNCH_WEEK_APPS=true),
+# so they are removed from the hide list.
 
 if [ -f "$KILL_LIST" ]; then
   KILL_CSV=$(grep -v '^[[:space:]]*#' "$KILL_LIST" | grep -v '^[[:space:]]*$' | paste -sd, -)
-  COMBINED="${KILL_CSV},${DOCKER_RUNTIME_HIDE}"
+  COMBINED="${KILL_CSV}"
   # Drop any existing FLOOM_STORE_HIDE_SLUGS line, then append the fresh one.
   grep -v '^FLOOM_STORE_HIDE_SLUGS=' "$MERGED_ENV" > "${MERGED_ENV}.tmp" && mv "${MERGED_ENV}.tmp" "$MERGED_ENV"
   echo "FLOOM_STORE_HIDE_SLUGS=${COMBINED}" >> "$MERGED_ENV"
   KILL_COUNT=$(echo "$COMBINED" | tr ',' '\n' | wc -l)
-  log "set FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs: kill-list + 3 docker-runtime apps)"
+  log "set FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs from kill-list)"
 fi
 
 # --- 4. Stop + remove old container ---
