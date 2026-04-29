@@ -59,6 +59,7 @@ import {
 import { sanitizeAuthResponse } from './lib/auth-response.js';
 import { padToFloor, shouldPadAuthTiming } from './lib/auth-response-guard.js';
 import { runRateLimitMiddleware, writeRateLimitMiddleware } from './lib/rate-limit.js';
+import { createAuthRateLimit } from './lib/auth-rate-limit.js';
 import {
   applyProgressiveSigninDelayFromContext,
   parseEmailForSigninProgressiveDelay,
@@ -416,6 +417,23 @@ if (isCloudMode()) {
       return c.json({ error: 'auth_failed', code: error }, 400);
     });
 
+    // Per-IP rate limiting on the 2 transactional-email auth endpoints.
+    // R26-A (2026-04-29): the day floom.dev opened public signup, OpenRouter
+    // sidecar review flagged this as the highest-probability week-1 incident:
+    // bot signup spam → Resend quota exhaustion → real users can't get
+    // verification emails. 5/hr per IP for signup, 3/hr for password reset.
+    // Global daily caps leave plenty of headroom under Resend's 3k/day plan.
+    const signupRateLimit = createAuthRateLimit({
+      scope: 'auth_signup',
+      perIpPerHour: Number(process.env.FLOOM_SIGNUP_RATE_PER_IP_PER_HOUR ?? 5),
+      globalPerDay: Number(process.env.FLOOM_SIGNUP_RATE_GLOBAL_PER_DAY ?? 500),
+    });
+    const resetRateLimit = createAuthRateLimit({
+      scope: 'auth_password_reset',
+      perIpPerHour: Number(process.env.FLOOM_RESET_RATE_PER_IP_PER_HOUR ?? 3),
+      globalPerDay: Number(process.env.FLOOM_RESET_RATE_GLOBAL_PER_DAY ?? 200),
+    });
+
     // Issue #767 (waitlist bypass): in waitlist mode (`isDeployEnabled()`
     // false), block account-creation auth endpoints before Better Auth runs.
     // Keep GET /auth/* reachable (session checks, callbacks, etc.).
@@ -435,6 +453,15 @@ if (isCloudMode()) {
       const isSignupPath = /^\/auth\/(?:sign-up|signup)(?:\/|$)/.test(pathname);
       if (method === 'POST' && isSignupPath && !isDeployEnabled()) {
         return c.json({ error: 'sign-up disabled — join the waitlist' }, 403);
+      }
+      // Apply per-endpoint rate limits BEFORE Better Auth's handler so a
+      // bot can't waste cycles on bcrypt + Resend just to be 429'd later.
+      if (method === 'POST' && isSignupPath) {
+        return signupRateLimit(c, next);
+      }
+      const isResetPath = /^\/auth\/(?:request-password-reset|forget-password)(?:\/|$)/.test(pathname);
+      if (method === 'POST' && isResetPath) {
+        return resetRateLimit(c, next);
       }
       return next();
     });
