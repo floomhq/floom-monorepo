@@ -2068,6 +2068,22 @@ async function main() {
       return;
 
     case 'setup':
+      if (rest[0] === '-h' || rest[0] === '--help') {
+        console.log([
+          'floom setup — interactive: mint a token, save config, print next steps.',
+          '',
+          'usage:',
+          '  floom setup                           run the interactive setup wizard',
+          '  floom setup --api-url=<url>           connect to a self-hosted instance',
+          '',
+          'The wizard opens your browser to mint an Agent token, then prompts you to',
+          'paste it. On success it writes ~/.floom/config.json and verifies the token.',
+          '',
+          'Get your Agent token:',
+          '  https://floom.dev/me/agent-keys',
+        ].join('\n'));
+        return;
+      }
       await runSetup(opts);
       return;
 

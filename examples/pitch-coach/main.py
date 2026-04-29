@@ -51,12 +51,13 @@ from typing import Any
 
 DEFAULT_MODEL_ID = "gemini-2.5-flash-lite"
 # Benchmarked 2026-04-25: gemini-2.5-flash-lite with JSON schema returns in
-# 1.4-2.1s on comparable prompts. Gemini enforces a 10s minimum request
-# deadline at the API layer (reject <10000ms with INVALID_ARGUMENT), so we
-# set 10500ms as a floor. Actual wall-clock is still 2-3s; TOTAL_BUDGET_S
-# kicks in if the server is the bottleneck.
-HTTP_TIMEOUT_MS = int(os.environ.get("FLOOM_APP_HTTP_TIMEOUT_MS", "10500"))
-TOTAL_BUDGET_S = 8.0
+# 1.4-2.1s on fast paths. Under MCP load the API can take up to ~20s before
+# returning DEADLINE_EXCEEDED. Gemini enforces a 10s minimum request deadline
+# (rejects <10000ms with INVALID_ARGUMENT), so we use 28s to give the model
+# enough headroom. TOTAL_BUDGET_S is the outer wall-clock cap; set to 25s
+# so we fail fast before the Gemini HTTP timeout fires.
+HTTP_TIMEOUT_MS = int(os.environ.get("FLOOM_APP_HTTP_TIMEOUT_MS", "28000"))
+TOTAL_BUDGET_S = 25.0
 MIN_PITCH_CHARS = 20
 MAX_PITCH_CHARS = 500
 REWRITE_ANGLES = ("user-outcome", "market-size", "technical-moat")
