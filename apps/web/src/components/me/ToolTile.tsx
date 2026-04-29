@@ -1,7 +1,10 @@
 // ToolTile — used on /me "Your apps" grid. One tile per distinct app the
 // user has previously run, sorted by last-used desc. The card body opens
-// the app surface; the primary CTA deep-links to the user's last run so
-// the form opens prefilled with the previous inputs when available.
+// the workspace's private app view (/run/apps/:slug, which redirects into
+// /run/apps/:slug/run); the primary CTA deep-links to the user's last
+// run so the form opens prefilled with the previous inputs when available.
+// (V12 fix: previously linked to /p/:slug — the public permalink — which
+// bounced authenticated workspace users out into the public store.)
 //
 // Kept the "ToolTile" component name for file-level stability — it ships
 // the same visual primitive the curated apps row also uses. The v18 IA
@@ -126,7 +129,7 @@ export function ToolTile({
 
   return (
     <article style={s.tile}>
-      <Link to={`/p/${slug}`} data-testid={`me-tool-tile-${suffix}`} style={s.contentLink}>
+      <Link to={`/run/apps/${slug}`} data-testid={`me-tool-tile-${suffix}`} style={s.contentLink}>
         <span aria-hidden style={s.iconWrap}>
           <AppIcon slug={slug} size={20} />
         </span>
