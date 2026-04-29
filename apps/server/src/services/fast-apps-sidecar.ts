@@ -291,6 +291,10 @@ async function waitForHealthy(url: string, timeoutMs = 5000): Promise<boolean> {
 }
 
 let sidecarProcess: ChildProcess | null = null;
+let shuttingDown = false;
+let restartTimer: NodeJS.Timeout | null = null;
+let signalHandlersInstalled = false;
+let healWatcher: NodeJS.Timeout | null = null;
 
 export interface FastAppsBootResult {
   enabled: boolean;
@@ -344,19 +348,22 @@ export async function startFastApps(): Promise<FastAppsBootResult> {
   child.on('exit', (code, signal) => {
     console.warn(`[fast-apps] sidecar exited code=${code} signal=${signal}`);
     sidecarProcess = null;
+    if (!shuttingDown && isEnabled() && !restartTimer) {
+      restartTimer = setTimeout(() => {
+        restartTimer = null;
+        startFastApps().catch((err) => {
+          console.error('[fast-apps] restart failed:', err);
+        });
+      }, 1000);
+      restartTimer.unref?.();
+    }
   });
 
   sidecarProcess = child;
 
   // Kill sidecar on parent shutdown so we do not orphan node on :4200.
-  const shutdown = () => {
-    if (sidecarProcess && !sidecarProcess.killed) {
-      sidecarProcess.kill('SIGTERM');
-    }
-  };
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
-  process.once('exit', shutdown);
+  installSignalHandlers();
+  ensureHealWatcher();
 
   const healthy = await waitForHealthy(`http://${FAST_APPS_HOST}:${FAST_APPS_PORT}/health`);
   if (!healthy) {
@@ -420,8 +427,74 @@ export async function startFastApps(): Promise<FastAppsBootResult> {
  * Stop the sidecar. Exposed for tests that need a clean shutdown.
  */
 export function stopFastApps(): void {
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
+  if (healWatcher) {
+    clearInterval(healWatcher);
+    healWatcher = null;
+  }
   if (sidecarProcess && !sidecarProcess.killed) {
     sidecarProcess.kill('SIGTERM');
     sidecarProcess = null;
   }
+}
+
+/**
+ * Sidecar status snapshot for /api/health/sidecars observability.
+ */
+export function getFastAppsStatus(): { enabled: boolean; alive: boolean } {
+  const enabled = isEnabled();
+  const alive = !!(
+    sidecarProcess &&
+    !sidecarProcess.killed &&
+    sidecarProcess.exitCode === null
+  );
+  return { enabled, alive };
+}
+
+/**
+ * Periodic self-heal watcher (30s interval). Belt-and-suspenders against
+ * the case where the per-child `exit` 1s respawn timer was cancelled
+ * (e.g. parent received a stray SIGTERM that latched shuttingDown=true
+ * but the parent did not actually exit — observed during AX41 OOM event
+ * 2026-04-29).
+ */
+function ensureHealWatcher(): void {
+  if (healWatcher) return;
+  if (!isEnabled()) return;
+  healWatcher = setInterval(() => {
+    if (shuttingDown) return;
+    const alive =
+      sidecarProcess &&
+      !sidecarProcess.killed &&
+      sidecarProcess.exitCode === null;
+    if (!alive) {
+      console.warn('[fast-apps:heal] sidecar not alive, triggering respawn');
+      shuttingDown = false;
+      startFastApps().catch((err) => {
+        console.error('[fast-apps:heal] respawn failed:', err);
+      });
+    }
+  }, 30_000);
+  healWatcher.unref?.();
+}
+
+function installSignalHandlers(): void {
+  if (signalHandlersInstalled) return;
+  signalHandlersInstalled = true;
+
+  const shutdown = (signal: 'SIGINT' | 'SIGTERM') => {
+    shuttingDown = true;
+    stopFastApps();
+    setTimeout(() => process.exit(signal === 'SIGINT' ? 130 : 143), 50).unref();
+  };
+
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('exit', () => {
+    shuttingDown = true;
+    stopFastApps();
+  });
 }

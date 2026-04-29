@@ -40,7 +40,6 @@ HEALTH_URL="http://127.0.0.1:${HOST_PORT}/api/health"
 # Volume binds — match what's been live. Keep in sync if storage layout changes.
 BINDS=(
   "-v" "floom-mvp-data:/data"
-  "-v" "/var/run/docker.sock:/var/run/docker.sock"
   "-v" "/opt/floom-preview-apps:/apps"
   "-v" "/opt/floom-mvp-file-inputs:/floom-file-inputs"
 )
@@ -212,9 +211,19 @@ fi
 # --- 5. Run new container ---
 
 log "starting new container with image $TAG"
+# Memory protection (added 2026-04-29 after AX41 OOM event killed sidecars):
+#   --memory 6g            hard cap (prevent floom from runaway)
+#   --memory-reservation 2g  soft floor (kernel kills others first)
+#   --oom-score-adj -500   make this container the LAST thing OOM killer picks
+# Without these, when AX41 hits memory pressure, the container's child sidecars
+# (fast-apps, launch-week) get SIGTERM'd by OOM and demo apps go down.
 docker run -d \
   --name "$CONTAINER" \
   --restart unless-stopped \
+  --memory 6g \
+  --memory-reservation 2g \
+  --memory-swap 6g \
+  --oom-score-adj -500 \
   -p "127.0.0.1:${HOST_PORT}:${CONTAINER_PORT}" \
   --env-file "$MERGED_ENV" \
   "${BINDS[@]}" \
@@ -242,6 +251,10 @@ if [ $HEALTHY -ne 1 ]; then
     docker run -d \
       --name "$CONTAINER" \
       --restart unless-stopped \
+      --memory 6g \
+      --memory-reservation 2g \
+      --memory-swap 6g \
+      --oom-score-adj -500 \
       -p "127.0.0.1:${HOST_PORT}:${CONTAINER_PORT}" \
       --env-file "$MERGED_ENV" \
       "${BINDS[@]}" \

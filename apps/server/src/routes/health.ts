@@ -3,6 +3,8 @@ import { SERVER_VERSION } from '../lib/server-version.js';
 import { db } from '../db.js';
 import { noteHealthStatus } from '../lib/alerts.js';
 import { isDeployEnabled } from '../services/workspaces.js';
+import { getFastAppsStatus } from '../services/fast-apps-sidecar.js';
+import { getLaunchWeekStatus } from '../services/launch-week-sidecars.js';
 
 export const healthRouter = new Hono();
 
@@ -49,4 +51,26 @@ healthRouter.get('/', (c) => {
       500,
     );
   }
+});
+
+// GET /api/health/sidecars — fast-apps + launch-week sidecar liveness.
+// Returns 200 when all expected sidecars are alive, 503 when degraded so
+// uptime monitors can alert. Powers post-launch observability after the
+// AX41 OOM event 2026-04-29 left sidecars dead with no surface signal.
+healthRouter.get('/sidecars', (c) => {
+  const fastApps = getFastAppsStatus();
+  const launchWeek = getLaunchWeekStatus();
+  const fastAppsHealthy = !fastApps.enabled || fastApps.alive;
+  const launchWeekHealthy =
+    !launchWeek.enabled || launchWeek.dead.length === 0;
+  const ok = fastAppsHealthy && launchWeekHealthy;
+  return c.json(
+    {
+      status: ok ? 'ok' : 'degraded',
+      fast_apps: fastApps,
+      launch_week: launchWeek,
+      timestamp: new Date().toISOString(),
+    },
+    ok ? 200 : 503,
+  );
 });

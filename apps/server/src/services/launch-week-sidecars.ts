@@ -131,6 +131,10 @@ const SIDECARS: LaunchWeekSidecar[] = [
 ];
 
 const children = new Map<string, ChildProcess>();
+let shuttingDown = false;
+let restartTimer: NodeJS.Timeout | null = null;
+let signalHandlersInstalled = false;
+let healWatcher: NodeJS.Timeout | null = null;
 
 function isEnabled(): boolean {
   const raw = process.env.FLOOM_LAUNCH_WEEK_APPS;
@@ -255,6 +259,15 @@ export async function startLaunchWeekApps(): Promise<LaunchWeekBootResult> {
     child.on('exit', (code, signal) => {
       console.warn(`[launch-week] ${sidecar.name} exited code=${code} signal=${signal}`);
       children.delete(sidecar.name);
+      if (!shuttingDown && isEnabled() && !restartTimer) {
+        restartTimer = setTimeout(() => {
+          restartTimer = null;
+          startLaunchWeekApps().catch((err) => {
+            console.error('[launch-week] restart failed:', err);
+          });
+        }, 1000);
+        restartTimer.unref?.();
+      }
     });
 
     children.set(sidecar.name, child);
@@ -269,10 +282,8 @@ export async function startLaunchWeekApps(): Promise<LaunchWeekBootResult> {
   }
 
   if (children.size > 0) {
-    const shutdown = () => stopLaunchWeekApps();
-    process.once('SIGINT', shutdown);
-    process.once('SIGTERM', shutdown);
-    process.once('exit', shutdown);
+    installSignalHandlers();
+    ensureHealWatcher();
   }
 
   if (ready.length === 0) {
@@ -309,8 +320,91 @@ export async function startLaunchWeekApps(): Promise<LaunchWeekBootResult> {
 }
 
 export function stopLaunchWeekApps(): void {
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
+  if (healWatcher) {
+    clearInterval(healWatcher);
+    healWatcher = null;
+  }
   for (const child of children.values()) {
     if (!child.killed) child.kill('SIGTERM');
   }
   children.clear();
+}
+
+/**
+ * Sidecar status snapshot for /api/health/sidecars observability.
+ */
+export function getLaunchWeekStatus(): {
+  enabled: boolean;
+  expected: string[];
+  alive: string[];
+  dead: string[];
+} {
+  const enabled = isEnabled();
+  const expected = SIDECARS.map((s) => s.name);
+  const alive: string[] = [];
+  const dead: string[] = [];
+  for (const name of expected) {
+    const c = children.get(name);
+    if (c && !c.killed && c.exitCode === null) alive.push(name);
+    else dead.push(name);
+  }
+  return { enabled, expected, alive, dead };
+}
+
+/**
+ * Periodic self-heal watcher (30s interval). The per-child `exit` handler
+ * already schedules a 1s respawn; this is belt-and-suspenders against
+ * race conditions where the timer was cancelled (e.g. the parent received
+ * a stray SIGTERM but didn't actually exit, which sets `shuttingDown=true`
+ * permanently — we reset it here when we detect the parent is still alive).
+ *
+ * Was: a respawn-bug observed during AX41 OOM event 2026-04-29 left all 5
+ * launch-week sidecars dead with no respawn. This watcher would have caught
+ * it within 30s.
+ */
+function ensureHealWatcher(): void {
+  if (healWatcher) return;
+  if (!isEnabled()) return;
+  healWatcher = setInterval(() => {
+    if (shuttingDown) return;
+    const expected = SIDECARS.map((s) => s.name);
+    const aliveCount = expected.filter((n) => {
+      const c = children.get(n);
+      return c && !c.killed && c.exitCode === null;
+    }).length;
+    if (aliveCount < expected.length) {
+      console.warn(
+        `[launch-week:heal] ${aliveCount}/${expected.length} sidecars alive, triggering respawn`,
+      );
+      // If shuttingDown got latched true by a stray signal, but we're clearly
+      // still running, reset it so respawn can proceed.
+      shuttingDown = false;
+      startLaunchWeekApps().catch((err) => {
+        console.error('[launch-week:heal] respawn failed:', err);
+      });
+    }
+  }, 30_000);
+  healWatcher.unref?.();
+}
+
+function installSignalHandlers(): void {
+  if (signalHandlersInstalled) return;
+  signalHandlersInstalled = true;
+
+  const shutdown = (signal: 'SIGINT' | 'SIGTERM') => {
+    shuttingDown = true;
+    stopLaunchWeekApps();
+    setTimeout(() => process.exit(signal === 'SIGINT' ? 130 : 143), 50).unref();
+  };
+
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('exit', () => {
+    shuttingDown = true;
+    stopLaunchWeekApps();
+  });
 }
