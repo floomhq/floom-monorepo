@@ -13,13 +13,13 @@
 // so an operator can copy/paste it. Production boot fails fast in startup
 // checks when the key is absent.
 //
-// Sender: `Floom <noreply@send.floom.dev>`. The `send.floom.dev` subdomain
+// Sender: `Floom <team@send.floom.dev>`. The `send.floom.dev` subdomain
 // carries the Resend DKIM key (resend._domainkey.floom.dev). Root floom.dev
 // SPF already includes amazonses.com, which is what Resend routes through.
 
 import { Resend } from 'resend';
 
-const DEFAULT_FROM = 'Floom <noreply@send.floom.dev>';
+const DEFAULT_FROM = 'Floom <team@send.floom.dev>';
 
 export interface EmailPayload {
   to: string;
