@@ -43,11 +43,10 @@ export const TEST_FIXTURE_SLUG =
 export const TEST_FIXTURE_DESC =
   /^(This is a sample Pet Store Server|GitHub's v3 REST API\.|A simple HTTP Request & Response Service)/i;
 
-const CLOUD_DOCKER_RUNTIME_HIDE_SLUGS = new Set([
-  'competitor-lens',
-  'ai-readiness-audit',
-  'pitch-coach',
-]);
+// R37 (2026-04-29): competitor-lens, ai-readiness-audit, pitch-coach were
+// removed from this set. They now run as proxy-runtime Python sidecars via
+// launch-week-sidecars.ts and are visible in the public catalog.
+const CLOUD_DOCKER_RUNTIME_HIDE_SLUGS = new Set<string>([]);
 
 function isCloudModeEnv(): boolean {
   const raw = (process.env.FLOOM_CLOUD_MODE || '').trim().toLowerCase();
