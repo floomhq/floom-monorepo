@@ -11,6 +11,12 @@ process.env.DATA_DIR = tmp;
 process.env.FLOOM_DISABLE_JOB_WORKER = 'true';
 process.env.FLOOM_MASTER_KEY =
   '0'.repeat(16) + '1'.repeat(16) + '2'.repeat(16) + '3'.repeat(16);
+
+// Preserve any real key from the environment; fall back to fake for unit tests.
+const REAL_API_KEY = process.env.COMPOSIO_API_KEY && !process.env.COMPOSIO_API_KEY.startsWith('composio_test')
+  ? process.env.COMPOSIO_API_KEY
+  : null;
+
 process.env.COMPOSIO_API_KEY = 'composio_test_master';
 process.env.COMPOSIO_AUTH_CONFIG_GMAIL = 'ac_gmail_test';
 process.env.PUBLIC_URL = 'https://floom.test';
@@ -138,8 +144,89 @@ try {
   rmSync(tmp, { recursive: true, force: true });
 }
 
+// --- Section 2: manifest validation for demo apps ---
+console.log('\nComposio demo-app manifest tests');
+const manifestSvc2 = await import('../../apps/server/dist/services/manifest.js');
+
+const inboxManifest = manifestSvc2.normalizeManifest({
+  manifest_version: '2.0',
+  name: 'inbox-summarizer',
+  description: 'Summarizes Gmail inbox',
+  runtime: 'python',
+  integrations: [{ composio: 'gmail' }],
+  actions: {
+    summarize: {
+      label: 'Summarize',
+      inputs: [{ name: 'max_emails', label: 'Max emails', type: 'number' }],
+      outputs: [{ name: 'summary', label: 'Summary', type: 'markdown' }],
+    },
+  },
+});
+log(
+  'inbox-summarizer: gmail integration normalized',
+  inboxManifest.integrations?.[0]?.slug === 'gmail' &&
+    inboxManifest.integrations?.[0]?.provider === 'composio',
+);
+
+const slackManifest = manifestSvc2.normalizeManifest({
+  manifest_version: '2.0',
+  name: 'slack-poster',
+  description: 'Posts to Slack channels',
+  runtime: 'python',
+  integrations: [{ composio: 'slack' }],
+  actions: {
+    post: {
+      label: 'Post',
+      inputs: [
+        { name: 'channel', label: 'Channel', type: 'text' },
+        { name: 'message', label: 'Message', type: 'textarea' },
+      ],
+      outputs: [{ name: 'ok', label: 'Success', type: 'text' }],
+    },
+  },
+});
+log(
+  'slack-poster: slack integration normalized',
+  slackManifest.integrations?.[0]?.slug === 'slack' &&
+    slackManifest.integrations?.[0]?.provider === 'composio',
+);
+
+// --- Section 3: real-network smoke test (skipped without real API key) ---
+if (REAL_API_KEY) {
+  console.log('\nComposio real-network smoke tests');
+
+  process.env.COMPOSIO_API_KEY = REAL_API_KEY;
+  delete process.env.COMPOSIO_AUTH_CONFIG_GMAIL;
+
+  const composioReal = await import('../../apps/server/dist/services/composio.js');
+  composioReal.clearAuthConfigCache();
+
+  let authConfigId = null;
+  let resolveErr = null;
+  try {
+    authConfigId = await composioReal.resolveOrProvisionAuthConfigId('gmail');
+  } catch (err) {
+    resolveErr = err;
+  }
+  log(
+    'real-network: resolveOrProvisionAuthConfigId returns id for gmail',
+    typeof authConfigId === 'string' && authConfigId.startsWith('ac_'),
+    resolveErr?.message,
+  );
+  log(
+    'real-network: cached on second call',
+    authConfigId === await composioReal.resolveOrProvisionAuthConfigId('gmail'),
+  );
+
+  process.env.COMPOSIO_API_KEY = 'composio_test_master';
+  process.env.COMPOSIO_AUTH_CONFIG_GMAIL = 'ac_gmail_test';
+  composioReal.clearAuthConfigCache();
+} else {
+  console.log('\n  (skipping real-network smoke tests — set COMPOSIO_API_KEY to a live key to enable)');
+}
+
 if (failed > 0) {
   console.error(`Composio runtime tests failed: ${failed} failed, ${passed} passed`);
   process.exit(1);
 }
-console.log(`Composio runtime tests passed: ${passed} checks`);
+console.log(`\nComposio runtime tests passed: ${passed} checks`);

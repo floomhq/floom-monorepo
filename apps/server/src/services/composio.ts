@@ -11,13 +11,13 @@
 // The prefix is opaque to Composio; on our side, `rekeyDevice` flips
 // device rows to user rows when Better Auth lands (W3.1).
 //
-// Auth config IDs: each Composio toolkit (gmail, notion, stripe, ...)
-// requires a pre-created auth_config in the Composio dashboard. Floom
-// reads these from env:
-//   COMPOSIO_AUTH_CONFIG_GMAIL=ac_xxx
+// Auth config IDs: Floom uses Composio's default managed OAuth apps by
+// default — no per-integration registration in the Composio dashboard and
+// no COMPOSIO_AUTH_CONFIG_<SLUG> env vars required.
+// Optional env override for custom OAuth apps (e.g. self-hosted Floom):
+//   COMPOSIO_AUTH_CONFIG_GMAIL=ac_xxx   ← takes precedence over auto-provisioned
 //   COMPOSIO_AUTH_CONFIG_NOTION=ac_xxx
-//   ...
-// Missing env for a provider → `CompsioConfigError` (not a 500 crash).
+// See `resolveOrProvisionAuthConfigId()` for the full priority chain.
 //
 // Test injection: when `COMPOSIO_FAKE=1` is set (or `setComposioClient`
 // is called explicitly), the service uses an in-memory fake that supports
@@ -83,22 +83,126 @@ export type KnownProvider = (typeof KNOWN_PROVIDERS)[number];
 
 /**
  * Resolve a Composio auth_config_id for a provider by reading the
- * `COMPOSIO_AUTH_CONFIG_<UPPERCASE_PROVIDER>` env var. Throws
- * ComposioConfigError if unset so the route handler can return a clean
- * 400 with a pointer to SELF_HOST.md.
+ * `COMPOSIO_AUTH_CONFIG_<UPPERCASE_PROVIDER>` env var.
+ *
+ * Returns null when the env var is unset. Callers that want the automatic
+ * Composio-managed OAuth flow should use `resolveOrProvisionAuthConfigId()`.
  */
-export function resolveAuthConfigId(provider: string): string {
+export function resolveAuthConfigId(provider: string): string | null {
   if (!provider || typeof provider !== 'string' || provider.length === 0) {
     throw new ComposioConfigError('provider must be a non-empty string');
   }
   const key = `COMPOSIO_AUTH_CONFIG_${provider.toUpperCase()}`;
   const value = process.env[key];
-  if (!value || value.length === 0) {
+  return value && value.length > 0 ? value : null;
+}
+
+// In-memory cache: toolkit slug → Composio auth_config_id provisioned this
+// process lifetime. Avoids a round-trip on every connect call.
+const _authConfigCache = new Map<string, string>();
+
+// Composio v3 REST base for auth_config CRUD (separate from @composio/core SDK).
+function _composioApiBase(): string {
+  return (process.env.COMPOSIO_API_BASE_URL || 'https://backend.composio.dev').replace(/\/+$/, '');
+}
+
+/**
+ * Resolve or auto-provision a Composio-managed auth config for a toolkit slug.
+ *
+ * Priority order:
+ *   1. `COMPOSIO_AUTH_CONFIG_<SLUG>` env var — use it directly (custom OAuth app).
+ *   2. In-memory session cache — reuse the ID provisioned earlier this process.
+ *   3. Composio `GET /api/v3/auth_configs` — pick the first Composio-managed
+ *      config for this toolkit.
+ *   4. Composio `POST /api/v3/auth_configs` — auto-create on first use.
+ *      No dashboard action required — Composio handles the OAuth app.
+ *
+ * Throws ComposioConfigError if COMPOSIO_API_KEY is missing or the API fails.
+ */
+export async function resolveOrProvisionAuthConfigId(slug: string): Promise<string> {
+  if (!slug || slug.length === 0) {
+    throw new ComposioConfigError('slug must be non-empty');
+  }
+  const normalized = slug.trim().toLowerCase();
+
+  // 1. Explicit env override (custom OAuth app / self-hosted scenario).
+  const fromEnv = resolveAuthConfigId(normalized);
+  if (fromEnv) return fromEnv;
+
+  // 2. In-process cache.
+  const cached = _authConfigCache.get(normalized);
+  if (cached) return cached;
+
+  const apiKey = process.env.COMPOSIO_API_KEY;
+  if (!apiKey || apiKey.length === 0) {
     throw new ComposioConfigError(
-      `${key} is not set. Create a Composio auth config for ${provider} in the Composio dashboard and set this env var. See docs/connections.md.`,
+      'COMPOSIO_API_KEY is not set. Get a free key from https://composio.dev.',
     );
   }
-  return value;
+  const base = _composioApiBase();
+  const headers: Record<string, string> = {
+    'x-api-key': apiKey,
+    'Content-Type': 'application/json',
+  };
+
+  // 3. Look for an existing Composio-managed config for this toolkit.
+  let existingId: string | null = null;
+  try {
+    const listRes = await fetch(
+      `${base}/api/v3/auth_configs?toolkitSlug=${encodeURIComponent(normalized)}&page=1&pageSize=20`,
+      { headers },
+    );
+    if (listRes.ok) {
+      const body = (await listRes.json()) as {
+        items?: Array<{ id: string; is_composio_managed?: boolean }>;
+      };
+      const managed = (body.items || []).find((c) => c.is_composio_managed);
+      if (managed?.id) existingId = managed.id;
+    }
+  } catch {
+    // Network failure — fall through to creation attempt.
+  }
+
+  if (existingId) {
+    _authConfigCache.set(normalized, existingId);
+    return existingId;
+  }
+
+  // 4. Auto-provision a Composio-managed auth config. Idempotent: concurrent
+  //    requests may also create one; the next list call will find it.
+  const createRes = await fetch(`${base}/api/v3/auth_configs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      toolkit: { slug: normalized },
+      authScheme: 'OAUTH2',
+      useComposioManagedOAuth: true,
+    }),
+  });
+  if (!createRes.ok) {
+    let detail = '';
+    try {
+      const errBody = (await createRes.json()) as { error?: unknown };
+      detail = JSON.stringify(errBody.error);
+    } catch { /* ignore */ }
+    throw new ComposioConfigError(
+      `Failed to provision Composio auth config for ${normalized}: HTTP ${createRes.status}${detail ? ' — ' + detail : ''}`,
+    );
+  }
+  const created = (await createRes.json()) as { auth_config?: { id: string } };
+  const newId = created.auth_config?.id;
+  if (!newId) {
+    throw new ComposioConfigError(
+      `Composio auth config creation for ${normalized} did not return an id`,
+    );
+  }
+  _authConfigCache.set(normalized, newId);
+  return newId;
+}
+
+/** Exposed for tests: clear the in-process auth config cache. */
+export function clearAuthConfigCache(): void {
+  _authConfigCache.clear();
 }
 
 // ---------- owner key derivation ----------
@@ -367,15 +471,16 @@ export interface InitiateConnectionResult {
  * redirect URL, returns it to the caller (which either redirects the user
  * or opens a popup). The flow completes via `finishConnection`.
  *
- * Throws ComposioConfigError if the provider has no auth config env var
- * or the SDK is unavailable.
+ * Throws ComposioConfigError if COMPOSIO_API_KEY is unset or the SDK is
+ * unavailable. Uses Composio-managed OAuth by default; no per-provider
+ * env vars required.
  */
 export async function initiateConnection(
   ctx: SessionContext,
   provider: string,
   callbackUrl?: string,
 ): Promise<InitiateConnectionResult> {
-  const authConfigId = resolveAuthConfigId(provider);
+  const authConfigId = await resolveOrProvisionAuthConfigId(provider);
   const client = await getComposioClient();
   const { owner_kind, owner_id } = contextOwner(ctx);
   const composioUserId = buildComposioUserId(owner_kind, owner_id);

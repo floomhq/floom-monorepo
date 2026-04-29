@@ -1,0 +1,37 @@
+name: Slack Poster
+slug: slack-poster
+description: |
+  Connect your Slack workspace and post messages to any channel.
+  Powered by Composio (Slack OAuth). No credentials to manage — Floom
+  handles the OAuth connection for you.
+category: productivity
+integrations:
+  - composio: slack
+
+actions:
+  post:
+    label: Post to Slack
+    description: |
+      Post a message to a Slack channel using the connected workspace.
+    inputs:
+      - name: channel
+        label: Channel
+        type: text
+        required: true
+        placeholder: "#general"
+        description: The Slack channel to post to (with or without #).
+      - name: message
+        label: Message
+        type: textarea
+        required: true
+        placeholder: "Hello from Floom!"
+        description: The message text to post.
+    outputs:
+      - name: ok
+        label: Success
+        type: text
+        description: "true if message was posted successfully."
+      - name: message_ts
+        label: Message Timestamp
+        type: text
+        description: Slack message timestamp (thread ID).

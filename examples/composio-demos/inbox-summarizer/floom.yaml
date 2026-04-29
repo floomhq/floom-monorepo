@@ -1,0 +1,31 @@
+name: Inbox Summarizer
+slug: inbox-summarizer
+description: |
+  Connect your Gmail inbox and get an AI summary of your recent unread emails.
+  Powered by Composio (Gmail) + Gemini. No credentials to manage — Floom
+  handles the OAuth connection for you.
+category: productivity
+integrations:
+  - composio: gmail
+
+actions:
+  summarize:
+    label: Summarize Inbox
+    description: |
+      Fetch up to N recent unread Gmail messages and summarize them with Gemini.
+      Returns a markdown digest grouped by sender/thread.
+    inputs:
+      - name: max_emails
+        label: Max emails to fetch
+        type: number
+        required: false
+        default: 10
+        description: How many recent unread emails to include (max 50).
+    outputs:
+      - name: summary
+        label: Inbox Summary
+        type: markdown
+        description: AI-generated digest of your recent unread emails.
+      - name: email_count
+        label: Emails Processed
+        type: number

@@ -8,7 +8,7 @@ import {
   KNOWN_PROVIDERS,
   buildComposioUserId,
   getComposioClient,
-  resolveAuthConfigId,
+  resolveOrProvisionAuthConfigId,
 } from './composio.js';
 
 const CALLBACK_TTL_MS = 15 * 60 * 1000;
@@ -62,8 +62,13 @@ export interface ComposioCallbackResult {
 
 function assertKnownIntegration(slug: string): string {
   const normalized = slug.trim().toLowerCase();
-  if (!/^[a-z0-9_-]{1,64}$/.test(normalized) || !KNOWN_SET.has(normalized)) {
-    throw new ComposioConfigError(`unknown Composio integration: ${slug}`);
+  if (!/^[a-z0-9_-]{1,64}$/.test(normalized)) {
+    throw new ComposioConfigError(`invalid Composio integration slug: ${slug}`);
+  }
+  // Soft allowlist: unknown slugs are allowed — Composio's default OAuth flow
+  // supports any toolkit slug without Floom-side pre-registration.
+  if (!KNOWN_SET.has(normalized)) {
+    console.warn(`[composio] unlisted slug "${normalized}" — forwarding to Composio`);
   }
   return normalized;
 }
@@ -135,7 +140,9 @@ export async function composioConnect(
   callbackUrl?: string,
 ): Promise<ComposioConnectResult> {
   const integration = assertKnownIntegration(integration_name);
-  const authConfigId = resolveAuthConfigId(integration);
+  // Resolves Composio-managed OAuth app ID — no per-integration env vars needed.
+  // COMPOSIO_AUTH_CONFIG_<SLUG> env var can override for custom OAuth apps.
+  const authConfigId = await resolveOrProvisionAuthConfigId(integration);
   const userId = buildComposioUserId('user', user_id);
   const client = await getComposioClient();
   const callback = callbackUrl || `${process.env.PUBLIC_URL || 'http://localhost:3051'}/api/integrations/composio/callback`;
