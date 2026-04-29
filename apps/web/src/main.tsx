@@ -24,6 +24,7 @@ const DocsPage = lazy(() => import('./pages/DocsPage').then(m => ({ default: m.D
 // content moved from wireframe to live markdown.
 const DocsLandingPage = lazy(() => import('./pages/DocsLandingPage').then(m => ({ default: m.DocsLandingPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const SignupPage = lazy(() => import('./pages/SignupPage').then(m => ({ default: m.SignupPage })));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then(m => ({ default: m.ForgotPasswordPage })));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })));
 const MePage = lazy(() => import('./pages/MePage').then(m => ({ default: m.MePage })));
@@ -40,6 +41,9 @@ const MeAgentKeysPage = lazy(() => import('./pages/MeAgentKeysPage').then(m => (
 // exports (AppHeader, TabBar) used by the Studio pages; the routes that
 // mounted them directly now redirect into /studio/*.
 const MeAppRunPage = lazy(() => import('./pages/MeAppRunPage').then(m => ({ default: m.MeAppRunPage })));
+const MeAppTriggersPage = lazy(() => import('./pages/MeAppTriggersPage').then(m => ({ default: m.MeAppTriggersPage })));
+const MeAppTriggerSchedulePage = lazy(() => import('./pages/MeAppTriggerSchedulePage').then(m => ({ default: m.MeAppTriggerSchedulePage })));
+const MeAppTriggerWebhookPage = lazy(() => import('./pages/MeAppTriggerWebhookPage').then(m => ({ default: m.MeAppTriggerWebhookPage })));
 const MeInstallPage = lazy(() => import('./pages/MeInstallPage').then(m => ({ default: m.MeInstallPage })));
 // 2026-04-20 (PRR tail cleanup): public /install stub — separate from
 // /me/install which is the authenticated "Install to Claude" flow.
@@ -56,6 +60,8 @@ const AboutPage = lazy(() => import('./pages/AboutPage').then(m => ({ default: m
 // Free during beta, self-host free forever, paid plans TBD. Fixes the
 // commercial-visitor dead-end called out in the product audit (pd-12).
 const PricingPage = lazy(() => import('./pages/PricingPage').then(m => ({ default: m.PricingPage })));
+const IaPage = lazy(() => import('./pages/IaPage').then(m => ({ default: m.IaPage })));
+const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage').then(m => ({ default: m.ArchitecturePage })));
 const BuildPage = lazy(() => import('./pages/BuildPage').then(m => ({ default: m.BuildPage })));
 const CreatorPage = lazy(() => import('./pages/CreatorPage').then(m => ({ default: m.CreatorPage })));
 const CreatorAppPage = lazy(() => import('./pages/CreatorAppPage').then(m => ({ default: m.CreatorAppPage })));
@@ -95,6 +101,7 @@ const ImprintPage = lazy(() => import('./pages/ImprintPage').then(m => ({ defaul
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
 const TermsPage = lazy(() => import('./pages/TermsPage').then(m => ({ default: m.TermsPage })));
 const CookiesPage = lazy(() => import('./pages/CookiesPage').then(m => ({ default: m.CookiesPage })));
+const StatusPage = lazy(() => import('./pages/StatusPage').then(m => ({ default: m.StatusPage })));
 // /changelog (PR #405 ripple, 2026-04-22): TopBar advertises a Changelog
 // link in the centre nav; previously it was a dead `#` anchor. This
 // page is a minimal landing that points at GitHub Releases + Discord.
@@ -164,15 +171,21 @@ function PSlugDashboardRedirect() {
 // redirects keep old bookmarks + shared links alive.
 function MeAppRedirect() {
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/me/apps/${slug ?? ''}`} replace />;
+  return <Navigate to={`/run/apps/${slug ?? ''}`} replace />;
 }
 function MeAppSecretsRedirect() {
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/me/apps/${slug ?? ''}/secrets`} replace />;
+  return <Navigate to={`/run/apps/${slug ?? ''}/secrets`} replace />;
 }
 function MeAppRunRedirect() {
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/me/apps/${slug ?? ''}/run`} replace />;
+  return <Navigate to={`/run/apps/${slug ?? ''}/run`} replace />;
+}
+
+// V12: /run/apps/:slug (workspace view) → /run/apps/:slug/run
+function SlugToRunRedirect() {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/run/apps/${slug ?? ''}/run`} replace />;
 }
 
 // Studio restructure 2026-04-18: Store/Studio split. These redirects
@@ -184,11 +197,41 @@ function StudioSlugRedirect({ subpath }: { subpath?: string }) {
   return <Navigate to={`/studio/${slug ?? ''}${tail}`} replace />;
 }
 
+function LegacyWorkspaceUiRedirect() {
+  const location = useLocation();
+  const pathname = location.pathname.replace(/\/$/, '') || '/';
+  // v26: /run now redirects to /run/apps, so legacy /me → /run/apps directly.
+  let target = '/run/apps';
+  if (pathname === '/me/install') target = '/run/install';
+  else if (pathname === '/me/secrets') target = '/settings/byok-keys';
+  else if (pathname === '/me/agent-keys' || pathname === '/me/api-keys') {
+    target = '/settings/agent-tokens';
+  } else if (pathname === '/me/settings' || pathname === '/me/settings/tokens') {
+    target = '/settings/general';
+  } else if (pathname === '/studio/settings') {
+    target = '/settings/studio';
+  } else if (pathname === '/me/apps') {
+    target = '/run/apps';
+  } else if (pathname.startsWith('/me/apps/')) {
+    target = pathname.replace(/^\/me\/apps/, '/run/apps');
+  } else if (pathname === '/me/runs') {
+    target = '/run/runs';
+  } else if (pathname.startsWith('/me/runs/')) {
+    target = pathname.replace(/^\/me\/runs/, '/run/runs');
+  }
+  return <Navigate to={`${target}${location.search}${location.hash}`} replace />;
+}
+
 // Design-audit fix 2026-04-22: /apps/:slug and /store/:slug funnel into the
 // canonical app permalink at /p/:slug. The top-nav "Store" label and the
 // "Try on Floom" CTAs on app cards point at these URLs, so the redirect
 // keeps deep links from external pages (wireframes, shared links) alive.
 function AppSlugToPermalinkRedirect() {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/p/${slug ?? ''}`} replace />;
+}
+
+function EmbedSlugToPermalinkRedirect() {
   const { slug } = useParams<{ slug: string }>();
   return <Navigate to={`/p/${slug ?? ''}`} replace />;
 }
@@ -256,6 +299,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/store/:slug" element={<AppSlugToPermalinkRedirect />} />
         {/* Standalone app permalink */}
         <Route path="/p/:slug" element={<AppPermalinkPage />} />
+        <Route path="/embed/:slug" element={<EmbedSlugToPermalinkRedirect />} />
         <Route path="/r/:runId" element={<PublicRunPermalinkPage />} />
         {/* Protocol spec page */}
         <Route path="/protocol" element={<ProtocolPage />} />
@@ -276,7 +320,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             unreachable — visitors land on /waitlist instead. On preview
             (DEPLOY_ENABLED=true) this renders normally. */}
         <Route path="/login" element={<WaitlistGuard source="login"><LoginPage /></WaitlistGuard>} />
-        <Route path="/signup" element={<WaitlistGuard source="signup"><LoginPage /></WaitlistGuard>} />
+        <Route path="/signup" element={<WaitlistGuard source="signup"><SignupPage /></WaitlistGuard>} />
         {/* Pre-launch P0: real password-reset flow. Replaces the old
             mailto link that dropped into Federico's inbox. Better Auth's
             `sendResetPassword` hook emails the reset link; this page
@@ -345,11 +389,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             v23 /me/apps (MeAppsPage with staggered grid + sparklines) is preserved above.
             Per spec, /me/apps will redirect here in a future PR. */}
         <Route path="/run/apps" element={<WaitlistGuard source="me"><RunAppsPage /></WaitlistGuard>} />
+        {/* V12 fix: /run/apps/:slug → SlugToRunRedirect (workspace card click
+            lands on private workspace view, not /p/:slug). */}
+        <Route path="/run/apps/:slug" element={<SlugToRunRedirect />} />
         {/* v26 Wave 3c: per-app sub-surface pages under /run/apps/:slug/.
             /me/apps/:slug/run (MeAppRunPage) is preserved untouched (COEXIST strategy).
             Server knownPaths already registers the /run/apps/:slug/(run|triggers|secrets) patterns. */}
         <Route path="/run/apps/:slug/run" element={<WaitlistGuard source="me"><RunAppRunPage /></WaitlistGuard>} />
         <Route path="/run/apps/:slug/triggers" element={<WaitlistGuard source="me"><RunAppTriggersPage /></WaitlistGuard>} />
+        <Route path="/run/apps/:slug/triggers/schedule" element={<WaitlistGuard source="me"><MeAppTriggerSchedulePage /></WaitlistGuard>} />
+        <Route path="/run/apps/:slug/triggers/webhook" element={<WaitlistGuard source="me"><MeAppTriggerWebhookPage /></WaitlistGuard>} />
         <Route path="/run/apps/:slug/secrets" element={<WaitlistGuard source="me"><RunAppSecretsPage /></WaitlistGuard>} />
         {/* v26 /run/runs + /run/runs/:runId — workspace runs list + detail (WorkspaceShell).
             v23 /me/runs (MeRunsPage) is preserved untouched (COEXIST strategy). */}
@@ -377,13 +426,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             sidebar copy, and no external URL references
             /studio/my-apps. Revisit if we ever start emitting that URL
             from docs / marketing. */}
-        <Route path="/studio/settings" element={<WaitlistGuard source="studio"><StudioSettingsPage /></WaitlistGuard>} />
+        <Route path="/studio/settings" element={<LegacyWorkspaceUiRedirect />} />
         <Route path="/studio/:slug" element={<WaitlistGuard source="studio"><StudioAppPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/runs" element={<WaitlistGuard source="studio"><StudioAppRunsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/secrets" element={<WaitlistGuard source="studio"><StudioAppSecretsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/access" element={<WaitlistGuard source="studio"><StudioAppAccessPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/renderer" element={<WaitlistGuard source="studio"><StudioAppRendererPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/analytics" element={<WaitlistGuard source="studio"><StudioAppAnalyticsPage /></WaitlistGuard>} />
+        <Route path="/studio/:slug/feedback" element={<WaitlistGuard source="studio"><StudioAppFeedbackPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/triggers" element={<WaitlistGuard source="studio"><StudioTriggersTab /></WaitlistGuard>} />
         <Route path="/studio/:slug/feedback" element={<WaitlistGuard source="studio"><StudioAppFeedbackPage /></WaitlistGuard>} />
         {/* Legacy creator-context redirects into Studio (preserve old links). */}
@@ -424,8 +474,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             linked from post-signup flows. No standalone page yet — redirect
             to /me?welcome=1 so the dashboard shows a one-shot welcome
             banner ("Welcome to Floom — try an app ↓"). */}
-        <Route path="/onboarding" element={<Navigate to="/me?welcome=1" replace />} />
+        <Route path="/onboarding" element={<Navigate to="/run/apps?welcome=1" replace />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/ia" element={<IaPage />} />
+        <Route path="/architecture" element={<ArchitecturePage />} />
         {/* /changelog — added alongside v17 TopBar (PR #405 ripple fix). */}
         <Route path="/changelog" element={<ChangelogPage />} />
         <Route path="/waitlist" element={<WaitlistPage />} />
@@ -439,6 +491,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/imprint" element={<ImprintPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/status" element={<StatusPage />} />
         <Route path="/cookies" element={<CookiesPage />} />
         {/* /legal/* subpath aliases so both URL conventions work. */}
         <Route path="/legal/imprint" element={<Navigate to="/legal" replace />} />

@@ -67,10 +67,6 @@ export interface RunSurfaceProps {
   initialRun?: RunRecord | null;
   onResetInitialRun?: () => void;
   onResult?: (result: RunSurfaceResult) => void;
-  /** R13 (2026-04-28): hoisted share handler from page level so
-   *  the inline IconShareButton in the output toolbar can fire
-   *  the same shareRun() flow as the hero Share button. */
-  onShare?: () => void;
 }
 
 type Phase = 'ready' | 'streaming' | 'job' | 'done' | 'error';
@@ -464,7 +460,6 @@ export function RunSurface({
   initialRun,
   onResetInitialRun,
   onResult,
-  onShare: _onShare,
 }: RunSurfaceProps) {
   // Upgrade 2 (2026-04-19): honor ?action=<name> on mount so multi-action
   // apps can be linked directly to a specific tab. Only the initial
@@ -588,12 +583,7 @@ export function RunSurface({
   // React's render loop. Both reset to null on reaching `done`/`ready`/
   // `error` so a shared-run permalink (phase=done) sees nothing.
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
-  // F4 (2026-04-28): elapsedMs state retained — the setter is still
-  // called by the interval below to keep the timer hot for any future
-  // re-introduction of an inline timer chip, but no UI currently reads
-  // it. Underscore prefix marks intentional-unused for TS6133.
-  const [_elapsedMs, setElapsedMs] = useState<number>(0);
-  void _elapsedMs;
+  const [elapsedMs, setElapsedMs] = useState<number>(0);
   // `isRunning` gates the banner + per-row feed. For async apps, the
   // `phase === 'job'` transition fires as soon as /api/:slug/jobs
   // returns (status=queued) — the worker hasn't started yet and
@@ -688,12 +678,7 @@ export function RunSurface({
       cancelled = true;
     };
   }, [isRunning]);
-  // F4 (2026-04-28): estimatedRowCount no longer read by UI (the outer
-  // run-feed-row that displayed it has been removed). Keep the state
-  // pipeline (runRowCount) intact in case we re-introduce a row-count
-  // affordance in the inner progress card.
-  const _estimatedRowCount = runRowCount;
-  void _estimatedRowCount;
+  const estimatedRowCount = runRowCount;
   // N (current row) is deliberately NOT computed client-side for this
   // launch: neither SSE log lines nor wall-clock ticks are reliable
   // signals. We'd rather show a row-less "Processing M rows..." label
@@ -818,19 +803,6 @@ export function RunSurface({
     submittedPayloadRef.current = { inputs, spec: actionSpec };
 
     if (app.is_async) {
-      // R11 (2026-04-28): Gemini audit — output panel stayed on
-      // "Positioning will appear here" for the duration of the network
-      // round-trip to startJob (could be 200-800ms). Flip the phase to
-      // 'job' synchronously so JobProgress with a "Connecting..."
-      // placeholder paints within the first frame. We patch in the
-      // real job_id below once startJob resolves.
-      setState((s) => ({
-        ...s,
-        phase: 'job',
-        jobId: undefined,
-        job: null,
-        errorMessage: undefined,
-      }));
       try {
         const { job_id } = await api.startJob(app.slug, inputs, action);
         let stopPoll: (() => void) | null = null;
@@ -911,23 +883,9 @@ export function RunSurface({
       return;
     }
 
-    // R11 (2026-04-28): Gemini audit — output panel stayed on the
-    // "Positioning will appear here" placeholder during the network
-    // round-trip to startRun (could be 200-800ms on cold start), making
-    // the click feel unresponsive. Flip phase to 'streaming' with an
-    // empty log buffer SYNCHRONOUSLY so StreamingTerminal's "Running..."
-    // state paints within the first frame. We patch in the real
-    // run_id once startRun resolves.
-    setState((s) => ({
-      ...s,
-      phase: 'streaming',
-      runId: undefined,
-      logs: [],
-      errorMessage: undefined,
-    }));
     try {
       const { run_id } = await api.startRun(app.slug, inputs, undefined, action);
-      setState((s) => ({ ...s, phase: 'streaming', runId: run_id, logs: s.logs ?? [] }));
+      setState((s) => ({ ...s, phase: 'streaming', runId: run_id, logs: [] }));
 
       const close = api.streamRun(run_id, {
         onLog: (line) => {
@@ -1225,46 +1183,58 @@ export function RunSurface({
         </div>
       )}
 
-      {/* F4 (2026-04-28): outer "Running: ... 0:00" pill + per-row
-          stream feed REMOVED (Federico: "the running state looks broken
-          with two competing state trackers"). The inner v26 progress
-          card in StreamingTerminal (.run-progress with the 3-step
-          Connecting/Running/Finalizing list and elapsed timer) is the
-          single source of truth for run state. The outer .run-banner +
-          .run-feed used to render in the page header above the unified
-          card and competed visually with the inner card.
-          Original styles in globals.css (.run-banner, .run-feed,
-          .run-feed-row) are now unused but kept in case we need a
-          variant later. */}
+      {/* #626 v17 run banner + per-row stream feed — visible ONLY during
+          streaming / job phases, never on the shared-run `done` path
+          (PublicRunPermalinkPage always hydrates with phase=done). Guarded
+          by the explicit phase check so no banner/feed ever renders for
+          /r/:id permalinks. Styles live in globals.css (.run-banner,
+          .run-feed, .run-feed-row) and mirror the wireframe's
+          .run-banner + .stream-row blocks. */}
+      {isRunning && (
+        <>
+          {/* Plain non-live region: assistive tech already gets phase
+              changes from run-surface-output (aria-live="polite") and
+              the InputCard's `running` prop. Re-announcing the timer
+              every 1s would spam screen readers (codex [P3]
+              2026-04-24). */}
+          <div className="run-banner" data-testid="run-banner">
+            <span className="run-banner-dot" aria-hidden="true" />
+            <span className="run-banner-label">
+              Running: <strong>{state.actionSpec.label || state.action || 'run'}</strong>
+              ...
+            </span>
+            <span className="run-banner-meta mono">
+              {formatElapsed(elapsedMs)}
+            </span>
+          </div>
+          <div className="run-feed" data-testid="run-feed">
+            <div className="run-feed-row" data-testid="run-feed-row">
+              <span className="run-feed-idx mono" aria-hidden="true">
+                {estimatedRowCount != null
+                  ? `~${estimatedRowCount}`
+                  : '—'}
+              </span>
+              <span className="run-feed-glyph" aria-hidden="true">
+                <span className="run-feed-glyph-pulse" />
+              </span>
+              <span className="run-feed-name">
+                {estimatedRowCount != null
+                  ? `Processing ~${estimatedRowCount} ${estimatedRowCount === 1 ? 'row' : 'rows'}...`
+                  : 'Processing...'}
+              </span>
+              <span className="run-feed-elapsed mono">
+                {formatElapsed(elapsedMs)}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
 
-      {/* v26 R4-1: unified card wraps input + output as one container. */}
-      <div className="run-unified-card">
-      {/* R10 (2026-04-28): wireframe v17 status header. Shows live state
-          INSIDE the run card. Three states:
-            idle    — quiet "Ready" pill (no Run button — InputCard owns it)
-            running — green pulsing dot + "Running · 0:03" + Stop button
-            done    — green check + "Done · 1.2s" + Run again button
-          Gemini R10 audit: removed the duplicate idle Run button from
-          the header (was conflicting with the InputCard's Run button).
-          The header's Run button only appears in done/error states as
-          "Run again", which is the wireframe's intended affordance. */}
-      <RunStatusHeader
-        phase={state.phase}
-        runStartedAt={runStartedAt}
-        run={state.run}
-        running={isRunning}
-        onCancel={
-          state.phase === 'streaming' ? handleCancelStream : state.phase === 'job' ? handleCancelJob : undefined
-        }
-        onRun={handleRun}
-        runLabel={runLabel}
-      />
       <div className="run-surface-grid">
         <section
           className="run-surface-input"
           data-testid="run-surface-input"
           aria-label="Input"
-          style={{ padding: '24px 26px' }}
         >
           <InputCard
             app={appAsPickResult}
@@ -1319,33 +1289,7 @@ export function RunSurface({
           data-testid="run-surface-output"
           aria-label="Output"
           aria-live="polite"
-          style={{ padding: '24px 26px' }}
         >
-          {/* R10 (2026-04-28): wireframe v17 OUTPUT eyebrow. Mirrors the
-              INPUTS eyebrow on the left so the surface reads as paired
-              panels. Picks up "STREAMING OUTPUT" during a run so the
-              visitor knows the panel is live. */}
-          <div
-            data-testid="run-surface-output-eyebrow"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10.5,
-              color: state.phase === 'streaming' || state.phase === 'job' ? 'var(--accent, #047857)' : 'var(--muted)',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              fontWeight: 600,
-              marginBottom: 12,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            {state.phase === 'streaming' || state.phase === 'job'
-              ? 'STREAMING OUTPUT'
-              : state.phase === 'done'
-                ? `OUTPUT · ${state.actionSpec.label || state.action || 'result'}`
-                : 'OUTPUT · preview'}
-          </div>
           <OutputSlot
             app={app}
             appAsPickResult={appAsPickResult}
@@ -1377,11 +1321,8 @@ export function RunSurface({
           />
         </section>
       </div>
-      </div>{/* /run-unified-card */}
 
-      {/* R10 (2026-04-28): PastRunsDisclosure moved to a dedicated
-          "Earlier runs" tab on AppPermalinkPage. The inline below-fold
-          disclosure was easy to miss; tabs are the discoverable spot. */}
+      <PastRunsDisclosure appSlug={app.slug} />
 
       <BYOKModal
         open={byokOpen}
@@ -1404,264 +1345,6 @@ export function RunSurface({
           }
         }}
       />
-    </div>
-  );
-}
-
-// ── Run status header (R10 — wireframe v17 hero status pill) ───────────────
-//
-// Renders inside the unified run-card, above the input/output grid.
-// Lifts the run state into the visible hero so visitors see live progress
-// next to the app name (not buried in the output column body). Three
-// states: idle (quiet "Ready"), running (green pulsing dot + elapsed
-// timer + Stop button), done (green check + final duration + Run again).
-//
-// Layout: [app name + status pill]    [Run / Stop / Run again button]
-// On <600px wraps to two lines.
-
-function RunStatusPill({
-  phase,
-  runStartedAt,
-  run,
-}: {
-  phase: Phase;
-  runStartedAt: number | null;
-  run: RunRecord | undefined;
-}) {
-  const [now, setNow] = useState<number>(() => Date.now());
-  const isRunning = phase === 'streaming' || phase === 'job';
-  useEffect(() => {
-    if (!isRunning) return;
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [isRunning]);
-
-  if (phase === 'ready') {
-    return (
-      <span
-        data-testid="run-status-pill"
-        data-state="idle"
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: 'var(--muted)',
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          fontFamily: 'var(--font-mono)',
-        }}
-      >
-        Ready
-      </span>
-    );
-  }
-
-  if (isRunning) {
-    const elapsed = runStartedAt != null ? Math.max(0, now - runStartedAt) : 0;
-    return (
-      <span
-        data-testid="run-status-pill"
-        data-state="running"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '4px 10px',
-          borderRadius: 999,
-          background: 'var(--accent-soft, #ecfdf5)',
-          border: '1px solid var(--accent-border, #a7f3d0)',
-          color: 'var(--accent, #047857)',
-          fontSize: 11.5,
-          fontWeight: 700,
-          fontFamily: 'var(--font-mono)',
-        }}
-      >
-        <span
-          aria-hidden="true"
-          className="run-status-dot-pulse"
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: 999,
-            background: 'var(--accent, #10b981)',
-            display: 'inline-block',
-          }}
-        />
-        Running · {formatElapsed(elapsed)}
-      </span>
-    );
-  }
-
-  if (phase === 'done' && run) {
-    const ok = run.status === 'success';
-    const dur = run.duration_ms;
-    const durLabel = dur != null ? (dur < 1000 ? `${dur}ms` : `${(dur / 1000).toFixed(1)}s`) : '--';
-    return (
-      <span
-        data-testid="run-status-pill"
-        data-state="done"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '4px 10px',
-          borderRadius: 999,
-          background: ok ? 'var(--accent-soft, #ecfdf5)' : 'rgba(196, 74, 43, 0.08)',
-          border: `1px solid ${ok ? 'var(--accent-border, #a7f3d0)' : 'rgba(196, 74, 43, 0.25)'}`,
-          color: ok ? 'var(--accent, #047857)' : '#c44a2b',
-          fontSize: 11.5,
-          fontWeight: 700,
-          fontFamily: 'var(--font-mono)',
-        }}
-      >
-        {ok ? (
-          <svg viewBox="0 0 16 16" width={11} height={11} aria-hidden="true">
-            <circle cx="8" cy="8" r="7" fill="currentColor" opacity="0.18" />
-            <path d="M4.5 8.3l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        ) : (
-          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 999, background: 'currentColor', display: 'inline-block' }} />
-        )}
-        {ok ? 'Done' : 'Error'} · {durLabel}
-      </span>
-    );
-  }
-
-  if (phase === 'error') {
-    return (
-      <span
-        data-testid="run-status-pill"
-        data-state="error"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '4px 10px',
-          borderRadius: 999,
-          background: 'rgba(196, 74, 43, 0.08)',
-          border: '1px solid rgba(196, 74, 43, 0.25)',
-          color: '#c44a2b',
-          fontSize: 11.5,
-          fontWeight: 700,
-          fontFamily: 'var(--font-mono)',
-        }}
-      >
-        Error
-      </span>
-    );
-  }
-
-  return null;
-}
-
-function RunStatusHeader({
-  phase,
-  runStartedAt,
-  run,
-  running,
-  onCancel,
-  onRun,
-  runLabel: _runLabel,
-}: {
-  phase: Phase;
-  runStartedAt: number | null;
-  run: RunRecord | undefined;
-  running: boolean;
-  onCancel?: () => void;
-  onRun: () => void;
-  runLabel: string;
-}) {
-  void _runLabel;
-  const showRunAgain = phase === 'done' || phase === 'error';
-  // R10 polish (Gemini audit): only show the header Run button when
-  // the action is meaningfully different from the InputCard's Run
-  // button. In `ready` (idle), the InputCard already has a primary
-  // green Run; surfacing the same affordance twice diluted the CTA.
-  const showHeaderRunButton = running || showRunAgain;
-  return (
-    <div
-      data-testid="run-status-header"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        padding: '14px 22px',
-        borderBottom: '1px solid var(--line)',
-        background: 'var(--card)',
-        flexWrap: 'wrap',
-      }}
-    >
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 10,
-          minWidth: 0,
-          flexShrink: 1,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: 'var(--muted)',
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
-          Run
-        </span>
-        <RunStatusPill phase={phase} runStartedAt={runStartedAt} run={run} />
-      </div>
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        {running && onCancel && (
-          <button
-            type="button"
-            data-testid="run-status-stop-btn"
-            onClick={onCancel}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 8,
-              border: '1px solid var(--line)',
-              background: 'var(--card)',
-              color: 'var(--ink)',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Stop
-          </button>
-        )}
-        {!running && showHeaderRunButton && (
-          <button
-            type="button"
-            data-testid="run-status-run-btn"
-            onClick={onRun}
-            style={{
-              padding: '7px 18px',
-              borderRadius: 8,
-              border: '1px solid var(--accent, #047857)',
-              background: 'var(--accent, #047857)',
-              color: '#fff',
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            Run again
-            <svg viewBox="0 0 16 16" width={11} height={11} aria-hidden="true">
-              <path d="M5 3l6 5-6 5V3z" fill="currentColor" />
-            </svg>
-          </button>
-        )}
-      </div>
     </div>
   );
 }
@@ -1749,20 +1432,8 @@ function InputCard({
   // INPUT eyebrow label per v23 wireframe — small mono uppercase token
   // above the form that names the column. In locked mode it gains a
   // "· SUBMITTED" suffix so the visitor sees what just happened.
-  // R10 (2026-04-28): wireframe v17 — eyebrow shows field count.
-  // "INPUTS · 3 fields" / "INPUTS · 1 field". Locked + disabled keep
-  // their existing suffix overrides so visitors see what just happened.
-  const fieldCount = actionSpec.inputs.length;
-  const fieldsSuffix =
-    fieldCount === 0
-      ? ''
-      : ` · ${fieldCount} field${fieldCount === 1 ? '' : 's'}`;
   const inputEyebrow =
-    lockedVisual
-      ? 'INPUTS · SUBMITTED'
-      : disabledVisual
-        ? 'INPUTS · LIMIT REACHED'
-        : `INPUTS${fieldsSuffix}`;
+    lockedVisual ? 'INPUT · SUBMITTED' : disabledVisual ? 'INPUT · LIMIT REACHED' : 'INPUT';
 
   // Recap-mode branch. After a successful run the input column flips to
   // a read-only summary of what produced the output below, plus twin
@@ -2312,14 +1983,13 @@ function OutputSlot({
 
 function EmptyOutputCard({
   slug,
-  appName: _appName,
+  appName,
   actionSpec,
 }: {
   slug: string;
   appName: string;
   actionSpec: ActionSpec;
 }) {
-  void _appName;
   // Pre-run empty state. Federico audit 2026-04-24: the right-side
   // output panel used to read as dead space — title was the literal
   // first output label (e.g. "Total Rows will appear here" for Lead
@@ -2348,14 +2018,10 @@ function EmptyOutputCard({
   const heroOutput = pickHeroOutput(actionSpec);
   const outputLabel = heroOutput?.label || 'Output';
   const hasSample = hasSampleForSlug(slug);
-  // R10 (2026-04-28): clearer pre-run copy. Federico R10 brief: idle
-  // state's skeleton bars confused visitors as "loading". When no sample
-  // exists we now lead with a direct instruction ("Fill the form and
-  // press Run to see your result here") instead of a fake table outline.
   const outputHint = hasSample
     ? 'This is what your real result will look like once you press Run.'
     : heroOutput?.description?.trim() ||
-      `Fill the form and press Run to see your result here.`;
+      `Fill in the form and press Run to generate a result with ${appName}.`;
   const title = hasSample
     ? 'Your result will look like this'
     : `${outputLabel} will appear here`;
@@ -2371,12 +2037,9 @@ function EmptyOutputCard({
           <div style={{ marginTop: 18 }}>
             <SampleOutputPreview slug={slug} />
           </div>
-        ) : null}
-        {/* R10 polish (Gemini audit): the no-sample fallback used to
-            render a fake RESULT/SCORE skeleton table. That was confusing
-            (read as "loading" not "empty"). The clear instructional
-            copy above is enough — no skeleton when we don't have real
-            sample data. */}
+        ) : (
+          <EmptyOutputSkeleton outputType={heroOutput?.type} />
+        )}
       </div>
     </div>
   );
@@ -2406,10 +2069,6 @@ function pickHeroOutput(
  * upcoming run output. Purely presentational — role=presentation so
  * screen readers skip it (the copy above already describes the slot).
  */
-// R10 polish: kept in case sample data lands for non-launch slugs.
-// Currently unreferenced; main empty path shows the instruction copy
-// only. The `void EmptyOutputSkeleton` at the bottom of the module
-// keeps TS6133 happy without deleting the helper.
 function EmptyOutputSkeleton({ outputType }: { outputType: OutputType | undefined }) {
   const commonWrap: React.CSSProperties = {
     marginTop: 18,
@@ -2559,7 +2218,7 @@ function EmptyOutputSkeleton({ outputType }: { outputType: OutputType | undefine
 //   - Single neutral palette (var(--card) bg, var(--line) border).
 //     NO category tints, NO warm-dark `--code` background despite the
 //     v23 wireframe — Federico's prompt overrides: "single neutral palette".
-//   - Vocabulary: "BYOK key" + "Gemini key" — never "API key".
+//   - Vocabulary: "BYOK key" + "Gemini key".
 //   - NO "Upgrade to Pro" CTA — Pro doesn't exist pre-launch.
 //   - The static "Resets at midnight UTC" reset line is a fallback because
 //     /api/:slug/quota does not currently expose `resets_at`. If the API
@@ -2637,7 +2296,7 @@ function RateLimitedCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3
             style={{
-              fontFamily: 'var(--font-sans)',
+              fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
               fontWeight: 700,
               fontSize: 17,
               letterSpacing: '-0.01em',
@@ -2947,7 +2606,7 @@ export function humanizeStartupError(raw: string): {
   }
   if (/byok|api key|gemini|auth/.test(r)) {
     return {
-      headline: 'The run needs a Gemini API key.',
+      headline: 'The run needs a Gemini BYOK key.',
       sub: 'Add your key in settings, or try a different app.',
     };
   }
@@ -3052,7 +2711,7 @@ function FriendlyStartupError({
 
 // ── Past runs disclosure ───────────────────────────────────────────────────
 
-export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
+function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
   const { isAuthenticated } = useSession();
   const deployEnabled = useDeployEnabled();
   const location = useLocation();
@@ -3356,6 +3015,3 @@ export const __test__ = {
   formatWhen,
   formatRecapValue,
 };
-
-// R10: keep EmptyOutputSkeleton importable for tests / future restore.
-void EmptyOutputSkeleton;

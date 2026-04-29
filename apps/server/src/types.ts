@@ -401,6 +401,7 @@ export interface WorkspaceRecord {
   plan: string;
   wrapped_dek: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface UserRecord {

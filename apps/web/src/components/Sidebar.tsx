@@ -95,9 +95,9 @@ export function Sidebar({ app, open, onClose }: Props) {
 
           <div className="divider" />
 
-          {/* Secrets */}
+          {/* App creator secrets */}
           <div className="sidebar-section">
-            <p className="sidebar-section-label">Secrets</p>
+            <p className="sidebar-section-label">App creator secrets</p>
             {secrets.length === 0 ? (
               <p className="sidebar-note">No secrets required.</p>
             ) : (

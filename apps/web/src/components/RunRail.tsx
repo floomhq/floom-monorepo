@@ -4,49 +4,29 @@
  * v26 changes (V26-IA-SPEC §12):
  *   §12.1 — brand logo REMOVED from rail (TopBar carries it)
  *   §12.2 — [Run|Studio] mode toggle pill below workspace name
- *   §12.3/12.4 — creation entry point lives in the TopBar
+ *   §12.3/12.4 — no standalone "App store" item; "+ New app" is the single
+ *                entry point; in Run mode it opens an overlay
  *   §12.5 — Docs removed from rail (moved to avatar dropdown)
  *   §12.6 — workspace settings only via identity-block click
  *   Rail: {workspace name ▾} → [Run|Studio] toggle → Apps · Runs → footer
  */
 
 import type { CSSProperties, ReactNode } from 'react';
-import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutGrid, Play } from 'lucide-react';
+import { Box, Play, Plus } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
-import { useMyApps } from '../hooks/useMyApps';
-import { useSession, clearSession } from '../hooks/useSession';
-import * as api from '../api/client';
+// V13: run-history hook so rail count matches MeAppsPage
+import { useMyRuns } from '../hooks/useMyRuns';
 
 const RAIL_WIDTH = 240;
 
-// TODO: wire to real metric from /api/workspace/stats when that endpoint ships.
-// For now, fetch a bounded run list and use its length as a proxy count.
-function useRunsCount(): number | null {
-  const [count, setCount] = useState<number | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getMyRuns(200)
-      .then((res) => {
-        if (!cancelled) setCount(res.runs.length);
-      })
-      .catch(() => {
-        if (!cancelled) setCount(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return count;
-}
-
 export function RunRail() {
   const location = useLocation();
-  const { apps } = useMyApps();
-  const runsCount = useRunsCount();
+  const { runs } = useMyRuns();
+  const appsCount = runs
+    ? new Set(runs.map((r: { app_slug: string | null }) => r.app_slug).filter(Boolean)).size
+    : null;
 
   return (
     <aside data-testid="run-rail" aria-label="Run navigation" style={railStyle}>
@@ -62,8 +42,8 @@ export function RunRail() {
             location.pathname === '/run/apps' ||
             location.pathname.startsWith('/run/apps/')
           }
-          icon={<LayoutGrid size={15} />}
-          count={apps?.length}
+          icon={<Box size={15} />}
+          count={appsCount ?? undefined}
         >
           Apps
         </RailItem>
@@ -74,52 +54,35 @@ export function RunRail() {
             location.pathname.startsWith('/run/runs/')
           }
           icon={<Play size={15} />}
-          count={runsCount ?? undefined}
         >
           Runs
         </RailItem>
+
+        {/* v26 §12.3/12.4: "+ New app" in Run mode → browse store (overlay in v1.1) */}
+        <div style={{ marginTop: 'auto', paddingTop: 12 }}>
+          <Link
+            to="/apps"
+            data-testid="run-rail-new-app"
+            style={runPrimaryCtaStyle}
+          >
+            <Plus size={14} aria-hidden="true" />
+            <span>New app</span>
+          </Link>
+        </div>
       </div>
-      <RailFoot />
+      {/* v26 §12.5 + §12.6: no rail-bottom avatar or sign-out.
+          Avatar dropdown lives in TopBar only (Account settings · Docs · Help · Sign out). */}
     </aside>
   );
 }
 
+/**
+ * v26 §12.5 + §12.6: Avatar and Sign out live in the TopBar avatar dropdown ONLY.
+ * The rail has no footer account section. RailFoot is exported for backward-compat
+ * but renders nothing.
+ */
 export function RailFoot() {
-  const { data, refresh } = useSession();
-  const user = data?.user;
-  const label = user?.name || user?.email || 'Local user';
-  const initial = label.charAt(0).toUpperCase();
-
-  async function handleSignOut() {
-    try { await api.signOut(); } catch { /* ignore */ }
-    clearSession();
-    await refresh();
-    window.location.href = '/';
-  }
-
-  return (
-    <div style={footStyle}>
-      <div style={avatarStyle}>
-        {user?.image ? (
-          <img src={user.image} alt="" style={avatarImgStyle} />
-        ) : (
-          initial
-        )}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={footNameStyle}>{label}</div>
-        {/* v26 §12.6: settings only via workspace name click; footer shows sign-out */}
-        <button
-          type="button"
-          data-testid="rail-foot-signout"
-          onClick={() => { void handleSignOut(); }}
-          style={footSignOutStyle}
-        >
-          Sign out
-        </button>
-      </div>
-    </div>
-  );
+  return null;
 }
 
 /** Kept for backward-compat imports only (StudioRail used to import Brand). */
@@ -165,15 +128,33 @@ export function RailItem({
   );
 }
 
+const runPrimaryCtaStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
+  padding: '9px 12px',
+  borderRadius: 8,
+  background: 'var(--ink)',
+  border: '1px solid var(--ink)',
+  color: '#fff',
+  textDecoration: 'none',
+  fontSize: 13,
+  fontWeight: 700,
+  width: '100%',
+  boxSizing: 'border-box' as const,
+};
+
 export const railStyle: CSSProperties = {
   width: RAIL_WIDTH,
   flexShrink: 0,
   borderRight: '1px solid var(--line)',
-  background: 'var(--studio)',
+  background: 'var(--bg)',
   display: 'flex',
   flexDirection: 'column',
-  height: '100%',
-  minHeight: 0,
+  height: '100vh',
+  position: 'sticky',
+  top: 0,
   overflow: 'hidden',
 };
 
@@ -222,7 +203,7 @@ const sectionStyle: CSSProperties = {
 };
 
 const sectionLabelStyle: CSSProperties = {
-  fontFamily: 'var(--font-mono)',
+  fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
   fontSize: 10,
   fontWeight: 700,
   textTransform: 'uppercase',
@@ -249,14 +230,12 @@ const itemTextStyle: CSSProperties = {
 };
 
 const countStyle: CSSProperties = {
-  fontFamily: 'var(--font-mono)',
+  fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
   fontSize: 10,
   color: 'var(--muted)',
   marginLeft: 'auto',
 };
 
-// Wireframe spec: .rail-item.active { background: var(--card); color: var(--ink);
-//   font-weight: 600; box-shadow: var(--shadow-1); } — NO border.
 function itemStyle(active: boolean): CSSProperties {
   return {
     display: 'flex',
@@ -266,61 +245,9 @@ function itemStyle(active: boolean): CSSProperties {
     borderRadius: 8,
     color: active ? 'var(--ink)' : 'var(--muted)',
     background: active ? 'var(--card)' : 'transparent',
-    border: '1px solid transparent',
-    boxShadow: active ? 'var(--shadow-1)' : undefined,
+    border: active ? '1px solid var(--line)' : '1px solid transparent',
     textDecoration: 'none',
     fontSize: 13,
-    fontWeight: active ? 600 : 500,
+    fontWeight: active ? 700 : 600,
   };
 }
-
-const footStyle: CSSProperties = {
-  padding: '13px 14px 15px',
-  borderTop: '1px solid var(--line)',
-  background: 'var(--bg)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-};
-
-const avatarStyle: CSSProperties = {
-  width: 30,
-  height: 30,
-  borderRadius: 999,
-  background: 'var(--accent)',
-  color: '#fff',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: 12,
-  fontWeight: 800,
-  flexShrink: 0,
-  overflow: 'hidden',
-};
-
-const avatarImgStyle: CSSProperties = {
-  width: '100%',
-  height: '100%',
-  objectFit: 'cover',
-};
-
-const footNameStyle: CSSProperties = {
-  fontSize: 12.5,
-  fontWeight: 700,
-  color: 'var(--ink)',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
-
-const footSignOutStyle: CSSProperties = {
-  fontSize: 11.5,
-  color: 'var(--muted)',
-  textDecoration: 'none',
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  cursor: 'pointer',
-  fontFamily: 'inherit',
-  display: 'inline',
-};

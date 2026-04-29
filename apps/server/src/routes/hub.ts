@@ -156,16 +156,18 @@ const IngestBody = z.object({
 
 // SECURITY (issue #378, pentest 2026-04-22): /detect fetches a user-supplied
 // URL server-side, which is a classic SSRF primitive. Two hardenings:
-//   1. Auth gate (Cloud mode): anon callers get a 401, so the capability to
-//      "make our server fetch a URL" is not exposed to the public internet.
-//      OSS self-host keeps the legacy behavior (no auth configured = no-op).
+//   1. ~~Auth gate (Cloud mode)~~ — REMOVED 2026-04-27 (V4 fix): the auth
+//      gate blocked anonymous detect of public OpenAPI URLs (e.g. petstore),
+//      breaking the core "paste URL → instant preview" flow for new creators.
+//      The remaining SSRF defence (hardening #2 below) is sufficient:
 //   2. Private-network / loopback / link-local blocks + response size cap +
 //      timeout live in `fetchSpec` (services/openapi-ingest.ts), so every
-//      caller of fetchSpec benefits, not just /detect.
+//      caller of fetchSpec benefits, not just /detect. The SSRF_BLOCK_LIST_V4
+//      and SSRF_BLOCK_LIST_V6 net-filter all private/loopback/RFC1918/LLA
+//      addresses at the TCP-connect level; public URLs are unaffected.
+//   Auth is still required on POST /api/hub/ingest (the publish step) and
+//   POST /api/studio/build/from-github. Preview ≠ publish.
 hubRouter.post('/detect', async (c) => {
-  const ctx = await resolveUserContext(c);
-  const gate = requireAuthenticatedInCloud(c, ctx);
-  if (gate) return gate;
   let body: unknown;
   try {
     body = await c.req.json();
@@ -292,9 +294,10 @@ const InlineDetectBody = z.object({
 });
 
 hubRouter.post('/detect/inline', async (c) => {
-  const ctx = await resolveUserContext(c);
-  const gate = requireAuthenticatedInCloud(c, ctx);
-  if (gate) return gate;
+  // Auth gate removed 2026-04-27 (V4 fix, mirrors /detect): inline specs
+  // carry no SSRF risk (no outbound fetch) and the paste-spec path must
+  // work for anonymous creators just like the URL-based path.
+  // Auth is still required on POST /api/hub/ingest (the publish step).
   let body: unknown;
   try {
     body = await c.req.json();
@@ -387,12 +390,13 @@ hubRouter.post('/ingest', async (c) => {
   }
 });
 
-// GET /api/hub/mine — apps authored by the caller. In OSS mode the
-// caller is the synthetic local user, and we return apps authored by
-// 'local' OR with workspace_id='local'. In Cloud mode we filter on
-// author = user_id.
+// GET /api/hub/mine — apps owned by the caller's active workspace.
 hubRouter.get('/mine', async (c) => {
   const ctx = await resolveUserContext(c);
+  // #870: in Cloud mode an anonymous caller must not list another user's apps.
+  // OSS / self-hosted (non-cloud) keeps the legacy single-workspace behaviour.
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
   const rows = db
     .prepare(
       `SELECT apps.*, (
@@ -402,11 +406,10 @@ hubRouter.get('/mine', async (c) => {
          SELECT MAX(runs.started_at) FROM runs WHERE runs.app_id = apps.id
        ) AS last_run_at
          FROM apps
-        WHERE (apps.workspace_id = ? AND apps.author = ?)
-           OR apps.author = ?
+        WHERE apps.workspace_id = ?
         ORDER BY apps.updated_at DESC`,
     )
-    .all(ctx.workspace_id, ctx.user_id, ctx.user_id) as Array<
+    .all(ctx.workspace_id) as Array<
     AppRecord & { run_count: number; last_run_at: string | null }
   >;
 
@@ -708,6 +711,169 @@ hubRouter.get('/:slug/runs-by-day', async (c) => {
   }
 
   return c.json({ slug: app.slug, days: out });
+});
+
+// GET /api/hub/:slug/analytics — per-app usage stats for the Studio Analytics tab.
+//
+// Returns aggregated run metrics scoped ACROSS all callers (not just the
+// requesting user) so the creator can see their app's total traction:
+//   total_runs, runs_7d, success_rate, last_run_at, avg_duration_ms, runs_by_day
+//
+// Ownership: same rule as /:slug/runs — creator-only, OSS-local escape hatch.
+// Closes GH #882.
+hubRouter.get('/:slug/analytics', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
+  const slug = c.req.param('slug');
+
+  const app = db.prepare('SELECT * FROM apps WHERE slug = ?').get(slug) as AppRecord | undefined;
+  if (!app) return c.json({ error: 'App not found' }, 404);
+
+  const isOssLocal = !ctx.is_authenticated && ctx.workspace_id === 'local';
+  const isOwner =
+    (!!app.author && app.author === ctx.user_id) ||
+    (isOssLocal && app.workspace_id === 'local');
+  if (!isOwner) {
+    return notOwnerResponse(c);
+  }
+
+  const totalRow = db
+    .prepare('SELECT COUNT(*) AS total FROM runs WHERE app_id = ?')
+    .get(app.id) as { total: number };
+
+  const runs7dRow = db
+    .prepare(
+      `SELECT COUNT(*) AS cnt FROM runs
+        WHERE app_id = ? AND started_at >= datetime('now','-7 days')`,
+    )
+    .get(app.id) as { cnt: number };
+
+  const successRow = db
+    .prepare(
+      `SELECT
+         CAST(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS REAL) * 1.0
+           / NULLIF(COUNT(*), 0) AS rate
+         FROM runs WHERE app_id = ?`,
+    )
+    .get(app.id) as { rate: number | null };
+
+  const lastRunRow = db
+    .prepare('SELECT MAX(started_at) AS last_run FROM runs WHERE app_id = ?')
+    .get(app.id) as { last_run: string | null };
+
+  const avgDurRow = db
+    .prepare(
+      `SELECT AVG(duration_ms) AS avg_ms
+         FROM runs WHERE app_id = ? AND status = 'success' AND duration_ms IS NOT NULL`,
+    )
+    .get(app.id) as { avg_ms: number | null };
+
+  // 7-day zero-filled sparkline (same logic as /:slug/runs-by-day with days=7).
+  const sparkRows = db
+    .prepare(
+      `SELECT date(started_at) AS day, COUNT(*) AS count
+         FROM runs
+        WHERE app_id = ?
+          AND date(started_at) >= date('now', '-6 days')
+        GROUP BY day
+        ORDER BY day ASC`,
+    )
+    .all(app.id) as Array<{ day: string; count: number }>;
+
+  const counts = new Map<string, number>(sparkRows.map((r) => [r.day, r.count]));
+  const runs_by_day: Array<{ date: string; count: number }> = [];
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+    const key = d.toISOString().slice(0, 10);
+    runs_by_day.push({ date: key, count: counts.get(key) ?? 0 });
+  }
+
+  return c.json({
+    slug: app.slug,
+    total_runs: totalRow.total ?? 0,
+    runs_7d: runs7dRow.cnt ?? 0,
+    success_rate: successRow.rate != null ? Math.round(successRow.rate * 1000) / 1000 : null,
+    last_run_at: lastRunRow.last_run ?? null,
+    avg_duration_ms: avgDurRow.avg_ms != null ? Math.round(avgDurRow.avg_ms) : null,
+    runs_by_day,
+  });
+});
+
+// GET /api/hub/:slug/feedback — Studio owner view of app reviews (most recent 50).
+//
+// The public facing reviews endpoint (/api/apps/:slug/reviews) is open to all
+// callers. This endpoint is creator-only and returns the same review rows plus
+// the reviewer's display name, scoped to the app's author so one creator
+// can't peek at another app's reviews. Closes GH #881.
+hubRouter.get('/:slug/feedback', async (c) => {
+  const ctx = await resolveUserContext(c);
+  const gate = requireAuthenticatedInCloud(c, ctx);
+  if (gate) return gate;
+  const slug = c.req.param('slug');
+  const limit = Math.max(1, Math.min(50, Number(c.req.query('limit') || 50)));
+
+  const app = db.prepare('SELECT * FROM apps WHERE slug = ?').get(slug) as AppRecord | undefined;
+  if (!app) return c.json({ error: 'App not found' }, 404);
+
+  const isOssLocal = !ctx.is_authenticated && ctx.workspace_id === 'local';
+  const isOwner =
+    (!!app.author && app.author === ctx.user_id) ||
+    (isOssLocal && app.workspace_id === 'local');
+  if (!isOwner) {
+    return notOwnerResponse(c);
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT ar.id, ar.app_slug, ar.user_id, ar.rating, ar.title, ar.body,
+              ar.created_at, ar.updated_at,
+              u.name AS author_name, u.email AS author_email
+         FROM app_reviews ar
+         LEFT JOIN users u ON u.id = ar.user_id
+        WHERE ar.app_slug = ?
+        ORDER BY ar.created_at DESC
+        LIMIT ?`,
+    )
+    .all(slug, limit) as Array<{
+      id: string;
+      app_slug: string;
+      user_id: string;
+      rating: number;
+      title: string | null;
+      body: string | null;
+      created_at: string;
+      updated_at: string;
+      author_name: string | null;
+      author_email: string | null;
+    }>;
+
+  const summary = db
+    .prepare(
+      `SELECT COUNT(*) AS count, COALESCE(AVG(rating), 0) AS avg
+         FROM app_reviews WHERE app_slug = ?`,
+    )
+    .get(slug) as { count: number; avg: number };
+
+  return c.json({
+    slug: app.slug,
+    summary: {
+      count: summary.count || 0,
+      avg: Math.round(Number(summary.avg || 0) * 10) / 10,
+    },
+    feedback: rows.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      title: r.title,
+      body: r.body,
+      author_display:
+        r.author_name ||
+        (r.author_email ? r.author_email.split('@')[0] : null) ||
+        'anonymous',
+      created_at: r.created_at,
+    })),
+  });
 });
 
 hubRouter.delete('/:slug', async (c) => {

@@ -1,13 +1,15 @@
-// useMyRuns — module-level cache + useSyncExternalStore so /me and any
-// component that lists recent runs all read from the same source without
-// refetching per mount.  Mirrors the useMyApps pattern.
+// Shared /api/me/runs hook.
 //
-// First subscriber triggers the initial load; manual `refresh()` is exposed
-// for after a new run completes.
+// Module-level cache + useSyncExternalStore pattern (mirrors useMyApps)
+// so RunRail and MeAppsPage read from the same run list without re-fetching
+// per route. First subscriber triggers the initial load; manual `refresh()`
+// is exposed for after a new run lands.
 
 import { useEffect, useSyncExternalStore } from 'react';
 import * as api from '../api/client';
 import type { MeRunSummary } from '../lib/types';
+
+const FETCH_LIMIT = 200;
 
 type CacheState = {
   runs: MeRunSummary[] | null;
@@ -31,11 +33,11 @@ function getSnapshot(): CacheState {
   return cache;
 }
 
-export async function refreshMyRuns(limit = 50): Promise<MeRunSummary[] | null> {
+export async function refreshMyRuns(): Promise<MeRunSummary[] | null> {
   cache = { ...cache, loading: true, error: null };
   notify();
   try {
-    const res = await api.getMyRuns(limit);
+    const res = await api.getMyRuns(FETCH_LIMIT);
     cache = { runs: res.runs, loading: false, error: null };
   } catch (err) {
     cache = {
@@ -48,14 +50,14 @@ export async function refreshMyRuns(limit = 50): Promise<MeRunSummary[] | null> 
   return cache.runs;
 }
 
-export function useMyRuns(limit = 50): CacheState & {
+export function useMyRuns(): CacheState & {
   refresh: () => Promise<MeRunSummary[] | null>;
 } {
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   useEffect(() => {
     if (!state.runs && !state.loading && !state.error) {
-      void refreshMyRuns(limit);
+      void refreshMyRuns();
     }
-  }, [state.runs, state.loading, state.error, limit]);
-  return { ...state, refresh: () => refreshMyRuns(limit) };
+  }, [state.runs, state.loading, state.error]);
+  return { ...state, refresh: refreshMyRuns };
 }

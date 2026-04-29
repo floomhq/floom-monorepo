@@ -23,12 +23,11 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Code2, Rocket, Share2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { TopBar } from '../components/TopBar';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { AppStripe } from '../components/public/AppStripe';
-import { AppGrid } from '../components/public/AppGrid';
 import { FeedbackButton } from '../components/FeedbackButton';
 
 import { WorksWithBelt } from '../components/home/WorksWithBelt';
@@ -50,131 +49,6 @@ import { publicHubApps } from '../lib/hub-filter';
 import { readDeployEnabled, useDeployEnabled } from '../lib/flags';
 import { waitlistHref } from '../lib/waitlistCta';
 import { useSession } from '../hooks/useSession';
-
-// MVP hero install — R7.6 (2026-04-28): hero composition cut to 4 elements
-// (eyebrow, H1, sub, npx command). Caption + MCP/CLI popover removed —
-// Federico's "the landing page hero header still looks a bit overwhelming".
-// Advanced install paths (MCP config, CLI snippet) live on /home and /docs.
-const NPX_SETUP_COMMAND = 'npx @floomhq/cli@latest setup';
-
-async function copyText(text: string) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return;
-    }
-  } catch { /* fall through */ }
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.left = '-9999px';
-  document.body.appendChild(ta);
-  ta.select();
-  document.execCommand('copy');
-  document.body.removeChild(ta);
-}
-
-function MvpHeroInstall() {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    await copyText(NPX_SETUP_COMMAND);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  }
-
-  // R7.6 (2026-04-28): MCP/CLI snippet popover removed from hero.
-  // Federico's brief: cut hero to 4 elements. Advanced install paths
-  // (MCP config, CLI snippet) live on /home and /docs — not in the
-  // first viewport.
-
-  return (
-    <div style={{ maxWidth: 540, margin: '20px auto 0', textAlign: 'left' }}>
-      {/* R7.6 (2026-04-28): caption "One command. Sets up MCP, mints a token,
-          you're live." removed — redundant with the npx command beneath it.
-          Federico's brief: cut hero to 4 elements (eyebrow, H1, sub, command). */}
-      <div style={{ position: 'relative' }}>
-        <pre
-          data-testid="hero-npx-command"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 14,
-            background: 'var(--studio, #f5f4f0)',
-            color: 'var(--ink)',
-            border: '1px solid var(--line)',
-            borderRadius: 10,
-            padding: '14px 90px 14px 18px',
-            overflowX: 'auto',
-            whiteSpace: 'pre',
-            lineHeight: 1.5,
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          <span style={{ color: 'var(--muted)', userSelect: 'none', marginRight: 10 }}>$</span>
-          {NPX_SETUP_COMMAND}
-        </pre>
-        <button
-          type="button"
-          data-testid="hero-npx-copy-btn"
-          onClick={() => void handleCopy()}
-          style={{
-            position: 'absolute',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            right: 10,
-            fontSize: 12,
-            fontWeight: 600,
-            color: copied ? '#fff' : 'var(--accent)',
-            background: copied ? 'var(--accent)' : 'var(--card)',
-            border: `1px solid ${copied ? 'var(--accent)' : 'rgba(4,120,87,0.35)'}`,
-            borderRadius: 6,
-            padding: '6px 14px',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            letterSpacing: '0.03em',
-          }}
-          aria-label={copied ? 'Copied' : 'Copy command'}
-        >
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
-      {/* R10 (2026-04-28): complementary "Try a live app" CTA. Gemini
-          baseline scored landing 6/10 partly because the only first-
-          step action was "copy this command and paste in your terminal".
-          Adding a 1-click path to a live app gives non-CLI visitors a
-          way to feel the product without installing anything. */}
-      <div
-        style={{
-          marginTop: 12,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          fontSize: 13,
-          color: 'var(--muted)',
-        }}
-      >
-        <span>or</span>
-        <a
-          href="/p/competitor-lens"
-          data-testid="hero-try-live-app"
-          style={{
-            color: 'var(--accent)',
-            fontWeight: 600,
-            textDecoration: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
-          try a live app in your browser
-          <span aria-hidden="true">→</span>
-        </a>
-      </div>
-    </div>
-  );
-}
 
 interface Stripe {
   slug: string;
@@ -222,24 +96,8 @@ function pickStripes(apps: HubApp[]): Stripe[] {
   return picked.length >= 3 ? picked : FALLBACK_STRIPES;
 }
 
-interface LandingV17PageProps {
-  variant?: 'full' | 'mvp';
-}
-
-export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
-  const isMvp = variant === 'mvp';
+export function LandingV17Page() {
   const [stripes, setStripes] = useState<Stripe[]>(FALLBACK_STRIPES);
-  // R8 #25 (2026-04-28): full HubApp[] for the AppGrid card variant.
-  // AppShowcaseCard didn't render the sample-output preview chip;
-  // AppGrid does (matches floom.dev's richer card style).
-  const [showcaseHubApps, setShowcaseHubApps] = useState<HubApp[]>([]);
-  // G9 (2026-04-28): inline directory grid on MVP landing. Next 6 apps
-  // after the 3 curated showcase slugs, plus a "Browse all <N> apps" CTA.
-  // Federico: "we should still, on the MVP Floom, have the app store
-  // visible, right?"
-  const [directoryApps, setDirectoryApps] = useState<Stripe[]>([]);
-  const [directoryHubApps, setDirectoryHubApps] = useState<HubApp[]>([]);
-  const [totalAppsCount, setTotalAppsCount] = useState<number>(0);
   const deployEnabledFlag = useDeployEnabled();
   const deployEnabled = deployEnabledFlag ?? readDeployEnabled();
   // v26 §3 option C: logged-in-aware landing.
@@ -259,34 +117,7 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
       .getHub()
       .then((apps) => {
         const visible = publicHubApps(apps);
-        if (visible.length > 0) {
-          setStripes(pickStripes(visible));
-          setTotalAppsCount(visible.length);
-          // R8 #25: keep full HubApp shape for AppGrid (sample-output
-          // preview chip needs thumbnail + manifest + sample data).
-          const curatedSlugs = new Set<string>(PREFERRED_SLUGS as readonly string[]);
-          const showcaseFull = visible.filter((a) => curatedSlugs.has(a.slug));
-          setShowcaseHubApps(
-            // Order to match PREFERRED_SLUGS so the editorial pick stays stable.
-            PREFERRED_SLUGS.map((slug) => showcaseFull.find((a) => a.slug === slug)).filter(
-              (a): a is HubApp => Boolean(a),
-            ),
-          );
-          // Pick the next 6 apps that aren't already in the curated showcase.
-          const rest = visible
-            .filter((app) => !curatedSlugs.has(app.slug))
-            .slice(0, 6)
-            .map((app) => ({
-              slug: app.slug,
-              name: app.name,
-              description: app.description,
-              category: app.category ?? undefined,
-            }));
-          setDirectoryApps(rest);
-          setDirectoryHubApps(
-            visible.filter((app) => !curatedSlugs.has(app.slug)).slice(0, 6),
-          );
-        }
+        if (visible.length > 0) setStripes(pickStripes(visible));
       })
       .catch(() => {
         // Keep static roster on failure.
@@ -302,37 +133,35 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
       <TopBar />
 
       {/* v26 §3 option C: resume banner for authenticated users.
-          G1 (2026-04-28): slimmed to a 1-line stripe so it doesn't
-          compete with the hero. Federico: "the composition still is
-          a bit overwhelming". */}
+          Only shown when session is confirmed authenticated (not while loading).
+          Logged-out users never see this. */}
       {isAuthenticated && session && (
         <div
           data-testid="landing-resume-banner"
           style={{
-            background: 'var(--studio, #f5f4f0)',
+            background: 'var(--card)',
             borderBottom: '1px solid var(--line)',
-            padding: '6px 24px',
+            padding: '10px 24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
-            fontSize: 12.5,
-            lineHeight: 1.4,
+            gap: 12,
           }}
         >
-          <span style={{ color: 'var(--muted)' }}>
+          <span style={{ fontSize: 13, color: 'var(--muted)' }}>
             You're signed in.
           </span>
           <Link
             to="/run/apps"
             data-testid="landing-resume-cta"
             style={{
-              fontWeight: 600,
+              fontSize: 13,
+              fontWeight: 700,
               color: 'var(--accent)',
               textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
+              gap: 5,
             }}
           >
             Resume in{' '}
@@ -354,7 +183,7 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
           data-testid="hero"
           style={{
             position: 'relative',
-            padding: isMvp ? '64px 24px 56px' : '24px 24px 40px',
+            padding: '24px 24px 40px',
             borderBottom: '1px solid var(--line)',
             background:
               'linear-gradient(180deg, var(--card) 0%, var(--bg) 100%)',
@@ -367,32 +196,18 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               textAlign: 'center',
             }}
           >
-            {/* G1 (2026-04-28): hero composition. Federico said the hero
-                still felt overwhelming. Solution:
-                - Lift "Backed by Founders Inc" ABOVE H1 as a quiet eyebrow
-                  (positions the product, doesn't compete with the H1)
-                - Add vertical breathing room around H1 + sub
-                - Demote WorksWithBelt to a soft caption under the snippet
-                - Resume banner slimmed to a 1-line stripe (above) */}
-            {/* MVP eyebrow: WorksWithBelt above H1 — agent-agnostic
-                positioning ("Works with any MCP client" + 3 logos) is
-                more useful than a Founders Inc credential here. Founders
-                Inc cohort credit stays in footer + WhosBehind. Federico
-                2026-04-28: hero eyebrow should be product positioning,
-                not investor proof. */}
-            {isMvp && (
-              <div data-testid="hero-eyebrow-belt" style={{ marginBottom: 32 }}>
-                <WorksWithBelt />
-              </div>
-            )}
-            {!isMvp && (
-              <div style={{ marginTop: 24 }}>
-                <WorksWithBelt />
-              </div>
-            )}
+            {/* Launch week pill removed from landing (#669) — remains on
+                /waitlist where it's route-scoped to the beta banner.
+                Landing keeps the hero calm with just the works-with belt
+                eyebrow + H1 + sub. The marginTop below restores the
+                vertical breathing room the pill wrapper used to provide
+                (Federico 2026-04-24 — "above ship ai apps fast we need
+                margin again"). */}
+            <div style={{ marginTop: 24 }}>
+              <WorksWithBelt />
+            </div>
 
-            {/* H1 — locked copy. Wireframe ships 64px desktop, balance wrap.
-                F10 (2026-04-28): "fast" coloured with brand green for emphasis. */}
+            {/* H1 — locked copy. Wireframe ships 64px desktop, balance wrap. */}
             <h1
               className="hero-headline"
               style={{
@@ -402,51 +217,38 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 lineHeight: 1.02,
                 letterSpacing: '-0.025em',
                 color: 'var(--ink)',
-                margin: isMvp ? '0 0 20px' : '0 0 16px',
+                margin: '0 0 16px',
                 textWrap: 'balance' as unknown as 'balance',
               }}
             >
-              Ship AI apps <span style={{ color: 'var(--accent)' }}>fast</span>.
+              Ship AI apps fast.
             </h1>
 
-            {/* Sub-positioning — full variant only. R7.6 followup
-                (2026-04-28): MVP variant drops the sub for now; H1 +
-                npx command stand alone. Federico: "The protocol +
-                runtime for agentic work. can be removed from hero
-                for now". */}
-            {!isMvp && (
-              <p
-                className="hero-sub"
-                data-testid="hero-sub-positioning"
-                style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: 19,
-                  lineHeight: 1.45,
-                  fontWeight: 400,
-                  color: 'var(--muted)',
-                  maxWidth: 640,
-                  margin: '0 auto 28px',
-                }}
-              >
-                The protocol + runtime for agentic work.
-              </p>
-            )}
-            {!isMvp && (
-              <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)', margin: '-14px 0 28px' }}>
-                Vibe-coding speed. Production-grade safety.
-              </p>
-            )}
+            {/* Sub-positioning — locked copy. NO KICKER (dropped 2026-04-22). */}
+            <p
+              className="hero-sub"
+              data-testid="hero-sub-positioning"
+              style={{
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 19,
+                lineHeight: 1.45,
+                fontWeight: 400,
+                color: 'var(--muted)',
+                maxWidth: 640,
+                margin: '0 auto 28px',
+              }}
+            >
+              The protocol + runtime for agentic work.
+            </p>
+            <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)', margin: '-14px 0 28px' }}>
+              Vibe-coding speed. Production-grade safety.
+            </p>
 
-            {/* CTA — MVP variant: inline MCP setup snippet.
-                Full variant: runtime-gated by DEPLOY_ENABLED. */}
-            {isMvp ? (
-              <>
-                <MvpHeroInstall />
-                {/* WorksWithBelt moved to the eyebrow above H1 (Federico
-                    2026-04-28). No longer rendered under the snippet — it
-                    was a second hero element competing with H1+snippet. */}
-              </>
-            ) : (
+            {/* CTA — runtime-gated by DEPLOY_ENABLED. Preview keeps the
+                original install-first branch; waitlist mode swaps the
+                builder CTA into the primary slot so floom.dev leads with
+                the waitlist while still exposing a "try one now" path in
+                Claude beside it. */}
             <div
               className="hero-ctas"
               style={{
@@ -501,7 +303,7 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {'Run in your AI tool'}
+                {deployEnabled ? 'Run this in Claude' : 'Run in Claude'}
               </Link>
               {deployEnabled && (
                 <Link
@@ -521,31 +323,25 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 </Link>
               )}
             </div>
-            )}
           </div>
 
-          {/* R7.6 followup (2026-04-28): HeroDemo lives directly under
-              the hero install snippet (above "From idea to shipped app
-              in 3 steps"). Earlier R7.6 pushed it BELOW that section
-              to calm the hero, but Federico flagged it as "too low" —
-              hero box stays clean (no demo INSIDE it) but the demo
-              should still anchor near hero so it reads as proof, not
-              filler. Full variant kept its placement here. */}
+          {/* Hero demo — interactive 3-state build/deploy/use loop.
+              Sits directly under the CTAs. Sized to 580px (Cursor-style,
+              Federico 2026-04-23): top ~120-150px is visible above the fold
+              at 1440x900, rest scrolls into view. Bigger canvas = more
+              cinematic, no squishing to fit the viewport. */}
           <HeroDemo />
         </section>
 
         {/* Compact CLI reference strip below the hero — smaller than the
             original hero-inline version (Federico 2026-04-23 — moved out of
-            hero, kept below as a smaller block).
-            MVP variant: dropped (technical → /docs). */}
-        {!isMvp && (
-          <section
-            data-testid="cli-reference-section"
-            style={{ padding: '32px 24px 8px' }}
-          >
-            <CliReference />
-          </section>
-        )}
+            hero, kept below as a smaller block). */}
+        <section
+          data-testid="cli-reference-section"
+          style={{ padding: '32px 24px 8px' }}
+        >
+          <CliReference />
+        </section>
 
         {/* HOW IT WORKS — 3 steps */}
         <section
@@ -577,58 +373,21 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               margin: '0 auto',
             }}
           >
-            {STEPS.map((s, idx) => {
-              const Icon = idx === 0 ? Code2 : idx === 1 ? Rocket : Share2;
-              return (
+            {STEPS.map((s) => (
               <div
                 key={s.num}
                 className="step"
                 style={{
-                  // R11 (2026-04-28): Gemini audit — the card-shaped
-                  // border + bg made these read as text inputs. Drop the
-                  // card chrome and lean on the explicit "STEP 0X" label
-                  // and accent number to make narrative obvious.
-                  background: 'transparent',
-                  border: 'none',
-                  borderRadius: 0,
-                  padding: '6px 4px 0',
+                  background: 'var(--card)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                  padding: '24px 22px',
                   position: 'relative',
                 }}
               >
-                {/* R11: explicit "STEP 0X" eyebrow tells the visitor this
-                    is a narrative step, not an input field. */}
                 <div
                   style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: 'var(--accent, #047857)',
-                    marginBottom: 10,
-                  }}
-                >
-                  Step {s.num}
-                </div>
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 10,
-                    background: 'rgba(4,120,87,0.08)',
-                    border: '1px solid rgba(4,120,87,0.18)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#047857',
-                    marginBottom: 16,
-                  }}
-                >
-                  <Icon size={22} strokeWidth={1.6} />
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
                     fontSize: 11,
                     color: 'var(--muted)',
                     letterSpacing: '0.08em',
@@ -636,25 +395,27 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                     marginBottom: 12,
                   }}
                 >
-                  {s.kicker}
+                  {s.num} &middot; {s.kicker}
                 </div>
                 <h3
                   style={{
-                    fontSize: 17,
-                    fontWeight: 700,
+                    fontSize: 16,
+                    fontWeight: 600,
                     margin: '0 0 8px',
                     lineHeight: 1.3,
                   }}
                 >
                   {s.title}
                 </h3>
-                <p style={{ fontSize: 15, color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>
+                <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.55, margin: 0 }}>
                   {s.body}
                 </p>
                 <div
                   style={{
                     marginTop: 14,
-                    fontFamily: 'var(--font-mono)',
+                    paddingTop: 14,
+                    borderTop: '1px solid var(--line)',
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
                     fontSize: 11.5,
                     color: 'var(--muted)',
                   }}
@@ -662,23 +423,27 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                   {s.mono}
                 </div>
               </div>
-            );
-            })}
+            ))}
           </div>
         </section>
 
-        {/* HeroDemo moved back to right under the hero install snippet
-            (R7.6 followup) — was pushed here in R7.6 first pass; Federico
-            flagged "too low". */}
+        {/* WORKED EXAMPLE — one concrete run (#541, Federico 2026-04-23).
+            Dedicated mid-page band that shows the Lead Scorer output in
+            full (87/100 "Strong fit" on stripe.com). Separate from the
+            HeroDemo USE tab so a scroller who skipped the demo still
+            lands on a complete example before they leave. */}
+        <WorkedExample />
 
-        {/* WORKED EXAMPLE — MVP variant: dropped (heavy). */}
-        {!isMvp && <WorkedExample />}
+        {/* THREE SURFACES DIAGRAM — non-tech visual (#542). Inline SVG,
+            "paste app -> web page + MCP + API". Scales cleanly, single
+            brand accent for connectors, no bespoke PNG. */}
+        <ThreeSurfacesDiagram />
 
-        {/* THREE SURFACES DIAGRAM — MVP variant: dropped (technical → /docs). */}
-        {!isMvp && <ThreeSurfacesDiagram />}
-
-        {/* FIT BAND — MVP variant: dropped (qualifying). */}
-        {!isMvp && <FitBand />}
+        {/* FIT BAND — who it's for / who it's not for (#543). Honest
+            about the shape before the visitor signs up. Placed between
+            the diagram and the showcase so the filter happens before
+            the product gallery. */}
+        <FitBand />
 
         {/* SHOWCASE — 3 apps */}
         <section
@@ -716,243 +481,107 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
           >
             Real AI doing real work. All three deploy from a single GitHub repo.
           </p>
-          {/* R8 #25 (2026-04-28): switched MVP showcase to AppGrid (the
-              same component /apps + floom.dev use), so the cards render
-              the sample-output preview chip per app — matches floom.dev
-              visual style instead of the simpler icon+name+tagline cards. */}
-          {isMvp ? (
-            <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-              {showcaseHubApps.length > 0 ? (
-                <AppGrid apps={showcaseHubApps} variant="featured" />
-              ) : (
-                // Fallback while /api/hub is in-flight: render simpler
-                // stripe row from FALLBACK_STRIPES so the slot doesn't
-                // collapse on cold load.
-                <div className="mvp-showcase-grid-fallback" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
-                  {stripes.map((s) => (
-                    <AppStripe
-                      key={s.slug}
-                      slug={s.slug}
-                      name={s.name}
-                      description={s.description}
-                      category={s.category}
-                      variant="landing"
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="mvp-showcase-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, maxWidth: 1100, margin: '0 auto' }}>
-              {stripes.map((s) => (
-                <AppStripe
-                  key={s.slug}
-                  slug={s.slug}
-                  name={s.name}
-                  description={s.description}
-                  category={s.category}
-                  variant="landing"
-                />
-              ))}
-            </div>
-          )}
-          <style>{`
-            @media (max-width: 880px) {
-              .mvp-showcase-grid { grid-template-columns: repeat(2, 1fr) !important; }
-              .mvp-showcase-grid-fallback { grid-template-columns: repeat(2, 1fr) !important; }
-            }
-            @media (max-width: 640px) {
-              .mvp-showcase-grid { grid-template-columns: 1fr !important; }
-              .mvp-showcase-grid-fallback { grid-template-columns: 1fr !important; }
-            }
-          `}</style>
+          <div style={{ display: 'grid', gap: 12, maxWidth: 820, margin: '0 auto' }}>
+            {stripes.map((s) => (
+              <AppStripe
+                key={s.slug}
+                slug={s.slug}
+                name={s.name}
+                description={s.description}
+                category={s.category}
+                variant="landing"
+              />
+            ))}
+          </div>
         </section>
 
-        {/* G9 (2026-04-28): inline app-directory grid on MVP landing.
-            Curated showcase above is the editorial pick (3 demo-ready
-            apps). This section surfaces the rest of the directory inline
-            so visitors see the full breadth without leaving the page,
-            then a prominent CTA links to `/apps` for the full directory.
-            Federico: "we should still, on the MVP Floom, have the app
-            store visible, right? What speaks against it? Already works." */}
-        {isMvp && directoryApps.length > 0 && (
-          <section
-            data-testid="mvp-directory-section"
-            style={{ padding: '24px 28px 64px', maxWidth: 1240, margin: '0 auto' }}
-          >
-            <h2
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 800,
-                fontSize: 24,
-                lineHeight: 1.15,
-                letterSpacing: '-0.025em',
-                textAlign: 'center',
-                margin: '0 auto 8px',
-                maxWidth: 760,
-              }}
-            >
-              Or browse the full directory.
-            </h2>
-            <p
-              style={{
-                fontSize: 14.5,
-                color: 'var(--muted)',
-                textAlign: 'center',
-                maxWidth: 620,
-                margin: '0 auto 32px',
-                lineHeight: 1.55,
-              }}
-            >
-              {totalAppsCount > 0
-                ? `${totalAppsCount} AI apps. Free to run on Floom's Gemini key.`
-                : "Free to run on Floom's Gemini key."}
-            </p>
-            <div
-              data-testid="mvp-directory-grid"
-              style={{
-                maxWidth: 1240,
-                margin: '0 auto 28px',
-              }}
-            >
-              {directoryHubApps.length > 0 ? (
-                <AppGrid apps={directoryHubApps} />
-              ) : (
-                directoryApps.length > 0 && (
-                  <div className="mvp-directory-grid-fallback" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                    {directoryApps.map((app) => (
-                      <AppStripe
-                        key={app.slug}
-                        slug={app.slug}
-                        name={app.name}
-                        description={app.description}
-                        category={app.category}
-                        variant="landing"
-                      />
-                    ))}
-                  </div>
-                )
-              )}
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <Link
-                to="/apps"
-                data-testid="mvp-directory-cta"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  border: '1px solid var(--accent)',
-                  borderRadius: 10,
-                  padding: '11px 18px',
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                }}
-              >
-                {totalAppsCount > 0 ? `Browse all ${totalAppsCount} apps` : 'Browse all apps'}
-                <span aria-hidden="true">→</span>
-              </Link>
-            </div>
-            <style>{`
-              @media (max-width: 880px) {
-                .mvp-directory-grid { grid-template-columns: repeat(2, 1fr) !important; }
-              }
-              @media (max-width: 640px) {
-                .mvp-directory-grid { grid-template-columns: 1fr !important; }
-              }
-            `}</style>
-          </section>
-        )}
+        {/* PUBLISH-CTA BOX */}
+        <section style={{ padding: '24px 28px', maxWidth: 1240, margin: '0 auto' }}>
+          <PublishCtaBox />
+        </section>
 
-        {/* PUBLISH-CTA BOX — MVP variant: dropped (creator-focused, MVP is consumer-first). */}
-        {!isMvp && (
-          <section style={{ padding: '24px 28px', maxWidth: 1240, margin: '0 auto' }}>
-            <PublishCtaBox />
-          </section>
-        )}
+        {/* DUAL AUDIENCES — makers + teams */}
+        <DualAudiences />
 
-        {/* DUAL AUDIENCES — MVP variant: dropped (heavy split). */}
-        {!isMvp && <DualAudiences />}
+        {/* PRICING TEASER — single $0 card */}
+        <PricingTeaser />
 
-        {/* PRICING TEASER — MVP variant: dropped (no pricing). */}
-        {!isMvp && <PricingTeaser />}
-
-        {/* BUILD CTA — MVP variant: dropped (creator-focused). */}
-        {!isMvp && (
-          <section
+        {/* BUILD CTA */}
+        <section
+          style={{
+            padding: '72px 28px',
+            maxWidth: 760,
+            margin: '0 auto',
+            textAlign: 'center',
+          }}
+        >
+          <h2
             style={{
-              padding: '72px 28px',
-              maxWidth: 760,
-              margin: '0 auto',
-              textAlign: 'center',
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
+              fontSize: 26,
+              lineHeight: 1.1,
+              letterSpacing: '-0.025em',
+              margin: '0 0 8px',
             }}
           >
-            <h2
+            Want to build yours?
+          </h2>
+          <p style={{ fontSize: 15.5, color: 'var(--muted)', margin: '0 0 24px', lineHeight: 1.55 }}>
+            The protocol is 40 lines of JSON. The docs walk you through your
+            first deploy in under 10 minutes.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link
+              to="/docs"
               style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 800,
-                fontSize: 26,
-                lineHeight: 1.1,
-                letterSpacing: '-0.025em',
-                margin: '0 0 8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                background: 'var(--accent)',
+                color: '#fff',
+                border: '1px solid var(--accent)',
+                borderRadius: 10,
+                padding: '11px 17px',
+                fontSize: 13.5,
+                fontWeight: 600,
+                textDecoration: 'none',
               }}
             >
-              Want to build yours?
-            </h2>
-            <p style={{ fontSize: 15.5, color: 'var(--muted)', margin: '0 0 24px', lineHeight: 1.55 }}>
-              The protocol is 40 lines of JSON. The docs walk you through your
-              first deploy in under 10 minutes.
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link
-                to="/docs"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  border: '1px solid var(--accent)',
-                  borderRadius: 10,
-                  padding: '11px 17px',
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                }}
-              >
-                Open the docs
-              </Link>
-              <a
-                href="https://github.com/floomhq/floom"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  background: 'var(--card)',
-                  color: 'var(--ink)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 10,
-                  padding: '11px 17px',
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                }}
-              >
-                Star on GitHub
-              </a>
-            </div>
-          </section>
-        )}
-
-        {/* WHO'S BEHIND IT — MVP variant: dropped (→ /about). */}
-        {!isMvp && <WhosBehind />}
+              Open the docs
+            </Link>
+            <a
+              href="https://github.com/floomhq/floom"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                background: 'var(--card)',
+                color: 'var(--ink)',
+                border: '1px solid var(--line)',
+                borderRadius: 10,
+                padding: '11px 17px',
+                fontSize: 13.5,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Star on GitHub
+            </a>
+          </div>
+        </section>
+        {/* WHO'S BEHIND IT — single-founder context + direct contact
+            (#589, Federico 2026-04-23). Sits near the bottom so a
+            visitor has already seen the product by the time they ask
+            "who's building this?". Photo is served from
+            /team/fede.jpg — a placeholder ships in the repo for
+            day-one parity; Federico overwrites the file locally when
+            he has a photo he likes. */}
+        <WhosBehind />
 
         {/* DISCORD CTA — quiet chip above the footer (#613,
             Federico 2026-04-23). Invite lives in MEMORY
@@ -972,23 +601,23 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
 const STEPS = [
   {
     num: '01',
-    kicker: 'BRING YOUR APP',
-    title: 'Got an idea or a GitHub link?',
-    body: 'Paste it. Floom takes care of the rest.',
-    mono: 'paste anything',
+    kicker: 'WRITE',
+    title: 'Write one JSON spec',
+    body: 'Describe inputs, outputs, and the model call. No framework. No server code.',
+    mono: 'spec.floom.json',
   },
   {
     num: '02',
-    kicker: 'GO LIVE',
-    title: '60 seconds later, your app is live',
-    body: 'You get a public URL, an AI-tool plugin, and an API. No setup.',
-    mono: 'live in ~60s',
+    kicker: 'DEPLOY',
+    title: 'Paste your GitHub URL',
+    body: 'Floom builds, tests, and ships it to a public page, an MCP server, and a JSON API.',
+    mono: 'git push \u2192 live in ~60s',
   },
   {
     num: '03',
-    kicker: 'SHARE ANYWHERE',
-    title: 'Send the link.',
-    body: 'People run your app from any MCP client, browser, or with curl.',
-    mono: 'one link, every tool',
+    kicker: 'SHARE',
+    title: 'Share a link. Install anywhere.',
+    body: 'Runs in Claude, Cursor, ChatGPT, a browser, or with an Agent token.',
+    mono: 'floom.dev/a/your-app',
   },
 ];

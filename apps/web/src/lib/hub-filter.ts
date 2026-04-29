@@ -23,7 +23,7 @@ export function isTestFixture(app: HubApp): boolean {
 
 /**
  * P0 launch curation (issue #252, 2026-04-21): the public landing +
- * /apps directory must only surface the three showcase demos. The
+ * /apps directory must only surface the showcase demos. The
  * backend still returns all ~42 rows (we don't delete DB rows —
  * installs from MCP, deep-link shares, /p/:slug permalinks, and the
  * InlineDemo hitting /api/run for `uuid` still resolve), but public
@@ -79,6 +79,7 @@ const SHOWCASE_SLUGS = new Set<string>([
   'competitor-lens',
   'ai-readiness-audit',
   'pitch-coach',
+  'linkedin-roaster',
 ]);
 
 const BROWSE_SLUGS = new Set<string>([
@@ -139,7 +140,7 @@ export function isPubliclyListed(
 
 /**
  * Public-facing hub list. Default (hosted floom.dev) behavior: the
- * three showcase demos only. On self-host (`opts.selfHost === true`):
+ * showcase demos only. On self-host (`opts.selfHost === true`):
  * everything except test fixtures, so the operator's fast-apps and
  * ingested apps render on landing + /apps.
  *

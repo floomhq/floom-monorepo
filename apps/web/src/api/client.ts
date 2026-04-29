@@ -95,6 +95,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       payload,
     );
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
@@ -126,6 +127,41 @@ export function pickApps(prompt: string, limit = 3): Promise<{ apps: PickResult[
   });
 }
 
+// Studio Analytics (GH #882)
+export interface AppAnalytics {
+  slug: string;
+  total_runs: number;
+  runs_7d: number;
+  success_rate: number | null;
+  last_run_at: string | null;
+  avg_duration_ms: number | null;
+  runs_by_day: Array<{ date: string; count: number }>;
+}
+
+export function getAppAnalytics(slug: string): Promise<AppAnalytics> {
+  return request<AppAnalytics>(`/api/hub/${slug}/analytics`);
+}
+
+// Studio Feedback (GH #881)
+export interface AppFeedbackItem {
+  id: string;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  author_display: string;
+  created_at: string;
+}
+
+export interface AppFeedbackResponse {
+  slug: string;
+  summary: { count: number; avg: number };
+  feedback: AppFeedbackItem[];
+}
+
+export function getAppFeedback(slug: string): Promise<AppFeedbackResponse> {
+  return request<AppFeedbackResponse>(`/api/hub/${slug}/feedback`);
+}
+
 export function parsePrompt(
   prompt: string,
   appSlug: string,
@@ -138,7 +174,7 @@ export function parsePrompt(
 }
 
 /**
- * localStorage key for the user's bring-your-own Gemini API key, used by
+ * localStorage key for the user's bring-your-own Gemini BYOK key, used by
  * the 3 launch demo apps (lead-scorer / competitor-analyzer /
  * resume-screener) once the 5 free runs per 24h are exhausted. See
  * apps/server/src/lib/byok-gate.ts for the server-side rule.
@@ -1072,7 +1108,7 @@ export function deleteRenderer(slug: string): Promise<{ ok: true; slug: string }
   return request(`/api/hub/${slug}/renderer`, { method: 'DELETE' });
 }
 
-// ---------- v15.2: per-user encrypted secrets vault ----------
+// ---------- Layer 5: workspace BYOK keys ----------
 //
 // Thin wrappers around /api/secrets (masked-list, upsert, delete). The
 // server never echoes plaintext back; the list endpoint returns
@@ -1083,11 +1119,28 @@ export function listSecrets(): Promise<UserSecretsList> {
   return request<UserSecretsList>('/api/secrets', { method: 'GET' });
 }
 
+export function listWorkspaceSecrets(workspaceId: string): Promise<UserSecretsList> {
+  return request<UserSecretsList>(`/api/workspaces/${encodeURIComponent(workspaceId)}/secrets`, {
+    method: 'GET',
+  });
+}
+
 export function setSecret(
   key: string,
   value: string,
 ): Promise<{ ok: true; key: string }> {
   return request('/api/secrets', {
+    method: 'POST',
+    body: JSON.stringify({ key, value }),
+  });
+}
+
+export function setWorkspaceSecret(
+  workspaceId: string,
+  key: string,
+  value: string,
+): Promise<{ ok: true; key: string }> {
+  return request(`/api/workspaces/${encodeURIComponent(workspaceId)}/secrets`, {
     method: 'POST',
     body: JSON.stringify({ key, value }),
   });
@@ -1258,7 +1311,64 @@ export function postFeedback(body: { text: string; email?: string; url?: string 
   });
 }
 
-// ---------- Personal API keys (Better Auth api-key plugin) ----------
+// ---------- Layer 5: workspace Agent tokens ----------
+//
+// Agent tokens are workspace credentials. The token value is returned once
+// on create as `raw_token`; list responses only include the masked prefix and
+// audit metadata.
+
+export type AgentTokenScope = 'read' | 'read-write' | 'publish-only';
+
+export interface AgentTokenRecord {
+  id: string;
+  prefix: string | null;
+  label: string;
+  scope: AgentTokenScope;
+  workspace_id: string;
+  issued_by_user_id: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  revoked: boolean;
+}
+
+export interface CreatedAgentToken extends AgentTokenRecord {
+  raw_token: string;
+}
+
+export async function listWorkspaceAgentTokens(workspaceId: string): Promise<AgentTokenRecord[]> {
+  return request<AgentTokenRecord[]>(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/agent-tokens`,
+  );
+}
+
+export function createWorkspaceAgentToken(
+  workspaceId: string,
+  body: {
+    label: string;
+    scope: AgentTokenScope;
+    rate_limit_per_minute?: number;
+  },
+): Promise<CreatedAgentToken> {
+  return request<CreatedAgentToken>(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/agent-tokens`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export function revokeWorkspaceAgentToken(
+  workspaceId: string,
+  tokenId: string,
+): Promise<void> {
+  return request<void>(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/agent-tokens/${encodeURIComponent(tokenId)}/revoke`,
+    { method: 'POST' },
+  );
+}
+
+// ---------- Legacy Better Auth access tokens ----------
 //
 // Used for headless integrations: Claude Code skill, CLI, scripts, MCP
 // clients. Keys are shown once at create time, then hashed server-side —

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { PageShell } from '../PageShell';
+import { WorkspacePageShell } from '../WorkspacePageShell';
 import { useSession } from '../../hooks/useSession';
 
 export type MeTabId =
@@ -155,6 +155,7 @@ const s: Record<string, CSSProperties> = {
 };
 
 export function MeLayout({
+  activeTab,
   title,
   allowSignedOutShell = false,
   eyebrow,
@@ -175,12 +176,10 @@ export function MeLayout({
     : s.shell;
 
   return (
-    <PageShell
-      requireAuth="cloud"
-      title={title || 'Me · Floom'}
-      contentStyle={{ padding: 0, maxWidth: 'none', minHeight: 'auto' }}
+    <WorkspacePageShell
+      mode={activeTab === 'secrets' || activeTab === 'settings' ? 'settings' : 'run'}
+      title={title || 'Workspace Run · Floom'}
       allowSignedOutShell={allowSignedOutShell || signedOutPreview}
-      noIndex
     >
       <div data-testid="me-layout" style={shellStyle}>
         {headerVariant === 'none' ? null : headerVariant === 'inline' ? (
@@ -212,7 +211,7 @@ export function MeLayout({
 
         <div data-testid="me-tab-panel">{children}</div>
       </div>
-    </PageShell>
+    </WorkspacePageShell>
   );
 }
 
@@ -230,25 +229,13 @@ function deriveGreeting(user: {
   const email = (user?.email ?? '').trim();
   const emailLocal = email.includes('@') ? email.split('@')[0] : email;
   const displayName = nameRaw || emailLocal || '';
-  const firstName = firstNameFromName(nameRaw) || capitalize(emailLocal);
 
   return {
-    eyebrow: firstName ? 'Welcome back' : 'Account',
-    heading: firstName ? `Hey, ${firstName}.` : 'Welcome back.',
+    eyebrow: 'Workspace',
+    heading: 'Workspace Run',
     initials: initialsFrom(displayName || 'there'),
     image: user?.image ?? null,
   };
-}
-
-function firstNameFromName(input: string): string {
-  const clean = input.trim();
-  if (!clean) return '';
-  return clean.split(/\s+/)[0] || '';
-}
-
-function capitalize(input: string): string {
-  if (!input) return input;
-  return `${input.charAt(0).toUpperCase()}${input.slice(1)}`;
 }
 
 function initialsFrom(input: string): string {

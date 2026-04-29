@@ -75,7 +75,7 @@ export function SettingsAgentTokensPage() {
           <div>
             <h2 style={h2Style}>Active Agent tokens</h2>
             <p style={mutedStyle}>
-              Workspace credentials for MCP clients (Claude Desktop, Cursor, Codex), CLI, CI, and HTTP.
+              Workspace credentials for Claude, Cursor, Codex, CLI, CI, MCP, and HTTP.
             </p>
           </div>
         </div>
@@ -294,13 +294,11 @@ const errorStyle: React.CSSProperties = {
   marginBottom: 14,
 };
 
-// F7 (2026-04-28): light tinted bg on copy box for tokens.
 const tokenBlockStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 12,
-  background: 'var(--studio, #f5f4f0)',
-  color: 'var(--ink)',
-  border: '1px solid var(--line)',
+  background: '#1b1a17',
+  color: '#d4d4c8',
   borderRadius: 8,
   padding: 14,
   overflowX: 'auto',

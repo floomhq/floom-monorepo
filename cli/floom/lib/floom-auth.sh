@@ -94,7 +94,7 @@ usage:
   floom auth login --token=<agent_token> [--api-url=<api_url>]
 
 options:
-  --token=<token>      Agent token (required). Get yours at <api_url>/home
+  --token=<token>      Agent token (required). Get yours at <api_url>/settings/agent-tokens
   --api-url=<url>      Override API base URL (default: install host or https://floom.dev)
   --url=<url>          Alias for --api-url
 
@@ -126,7 +126,7 @@ PY
     if [[ "$HTTP_CODE" != "200" ]]; then
       rm -f "$CONFIG"
       echo "ERROR: Token rejected by ${API_URL} (HTTP ${HTTP_CODE})." >&2
-      echo "Mint a fresh token at ${API_URL}/home and try again." >&2
+      echo "Mint a fresh token at ${API_URL}/settings/agent-tokens and try again." >&2
       exit 1
     fi
     # Extract user identity for a friendly confirmation message.
@@ -154,7 +154,7 @@ usage:
   floom auth --show                            print redacted config
 
 Get your Agent token:
-  https://floom.dev/home
+  https://floom.dev/settings/agent-tokens
 
 Agent tokens look like:
   floom_agent_...

@@ -117,14 +117,26 @@ function checkRunAccess(
   // local workspace.
   const runWorkspace = run.workspace_id || DEFAULT_WORKSPACE_ID;
 
-  // OSS single-user box back-compat: when Floom boots without
-  // FLOOM_CLOUD_MODE the whole environment is one user. `fetch`-based
-  // clients (curl, CI scripts, node tests) don't carry the device cookie
-  // across calls, so enforcing device_id parity would 404 every legit
-  // poll on the self-host flow. Unauthenticated reads on the synthetic
-  // 'local' workspace are allowed; Cloud deployments never hit this
-  // branch because isCloudMode() is true.
-  if (!isCloudMode() && runWorkspace === DEFAULT_WORKSPACE_ID) {
+  // OSS single-user box back-compat + anon cloud API back-compat:
+  //
+  // When Floom boots in OSS mode (no FLOOM_CLOUD_MODE), the whole
+  // environment is one user. `fetch`-based clients (curl, CI scripts,
+  // node tests) don't carry the device cookie across calls, so enforcing
+  // device_id parity would 404 every legit poll on the self-host flow.
+  //
+  // The same problem applies to anonymous callers in Cloud mode who hit
+  // the slug-based endpoint (POST /api/:slug/run). All anon runs land in
+  // DEFAULT_WORKSPACE_ID with user_id=local. A curl-based caller creates
+  // the run in one request and polls in another — without a persistent
+  // cookie jar the device_id differs between the two calls. Blocking the
+  // poll would break every documented curl example and the /p/:slug runner
+  // UI (which polls via XHR before the device cookie is set). Since the
+  // run is unclaimed (user_id=local/null) and lives in the synthetic local
+  // workspace, no cross-user leak is possible: authenticated users' runs
+  // always carry a real workspace_id ≠ DEFAULT_WORKSPACE_ID after rekey.
+  const runUser = run.user_id || null;
+  const isUnclaimed = runUser === null || runUser === DEFAULT_USER_ID;
+  if (runWorkspace === DEFAULT_WORKSPACE_ID && isUnclaimed) {
     return 'owner';
   }
 
@@ -142,8 +154,10 @@ function checkRunAccess(
       return 'owner';
     }
   } else {
-    const runUser = run.user_id || null;
-    const isUnclaimed = runUser === null || runUser === DEFAULT_USER_ID;
+    // Anon user outside the DEFAULT_WORKSPACE_ID (e.g. an invite-accepted
+    // anonymous session that landed in a real workspace). Require
+    // device_id match as before — these runs ARE scoped to a specific
+    // device and must not leak to other anonymous visitors.
     if (
       runWorkspace === ctx.workspace_id &&
       isUnclaimed &&
@@ -591,7 +605,7 @@ slugRunRouter.post('/', async (c) => {
   const body = parsed.value as {
     action?: unknown;
     inputs?: unknown;
-  };
+  } & Record<string, unknown>;
 
   const actionNames = Object.keys(manifest.actions);
   const actionName =
@@ -604,9 +618,16 @@ slugRunRouter.post('/', async (c) => {
 
   let validated: Record<string, unknown>;
   try {
+    const topLevelInputs = Object.fromEntries(
+      Object.entries(body).filter(([key]) => key !== 'action' && key !== 'inputs'),
+    );
+    const inputPayload =
+      body.inputs && typeof body.inputs === 'object' && !Array.isArray(body.inputs)
+        ? (body.inputs as Record<string, unknown>)
+        : topLevelInputs;
     validated = validateInputs(
       actionSpec,
-      (body.inputs as Record<string, unknown>) ?? {},
+      inputPayload,
     );
   } catch (err) {
     const e = err as ManifestError;
@@ -728,10 +749,9 @@ slugQuotaRouter.get('/', async (c) => {
   });
 });
 
-// ---------- /api/me/runs : per-user run history ----------
-// Returns the caller's run history scoped by (workspace_id, user_id) in
-// cloud mode and by (workspace_id, device_id) in OSS mode. Joins `apps`
-// so the UI can render the app name + icon without a second fetch.
+// ---------- /api/me/runs : scoped run history ----------
+// Browser/device callers keep the legacy owner filter for compatibility.
+// Agent-token callers are workspace principals, so they list workspace runs.
 export const meRouter = new Hono();
 
 meRouter.get('/invites', async (c) => {
@@ -1017,13 +1037,14 @@ meRouter.get('/runs', async (c) => {
   const ctx = await resolveUserContext(c);
   const limit = Math.max(1, Math.min(200, Number(c.req.query('limit') || 50)));
 
-  // Two filters: authenticated caller scopes by user_id; anonymous caller
-  // scopes by device_id. Both also check workspace_id so cross-workspace
-  // leaks are impossible.
-  const scopeClause = ctx.is_authenticated
-    ? 'runs.workspace_id = ? AND runs.user_id = ?'
-    : 'runs.workspace_id = ? AND runs.device_id = ?';
-  const scopeParam = ctx.is_authenticated ? ctx.user_id : ctx.device_id;
+  const scopeClause = ctx.agent_token_id
+    ? 'runs.workspace_id = ?'
+    : ctx.is_authenticated
+      ? 'runs.workspace_id = ? AND runs.user_id = ?'
+      : 'runs.workspace_id = ? AND runs.device_id = ?';
+  const scopeParams = ctx.agent_token_id
+    ? [ctx.workspace_id]
+    : [ctx.workspace_id, ctx.is_authenticated ? ctx.user_id : ctx.device_id];
 
   const rows = db
     .prepare(
@@ -1037,7 +1058,7 @@ meRouter.get('/runs', async (c) => {
         ORDER BY runs.started_at DESC
         LIMIT ?`,
     )
-    .all(ctx.workspace_id, scopeParam, limit) as Array<{
+    .all(...scopeParams, limit) as Array<{
     id: string;
     action: string;
     status: string;
@@ -1154,10 +1175,14 @@ meRouter.get('/runs/:id', async (c) => {
   const ctx = await resolveUserContext(c);
   const id = c.req.param('id');
 
-  const scopeClause = ctx.is_authenticated
-    ? 'runs.workspace_id = ? AND runs.user_id = ?'
-    : 'runs.workspace_id = ? AND runs.device_id = ?';
-  const scopeParam = ctx.is_authenticated ? ctx.user_id : ctx.device_id;
+  const scopeClause = ctx.agent_token_id
+    ? 'runs.workspace_id = ?'
+    : ctx.is_authenticated
+      ? 'runs.workspace_id = ? AND runs.user_id = ?'
+      : 'runs.workspace_id = ? AND runs.device_id = ?';
+  const scopeParams = ctx.agent_token_id
+    ? [ctx.workspace_id]
+    : [ctx.workspace_id, ctx.is_authenticated ? ctx.user_id : ctx.device_id];
 
   const row = db
     .prepare(
@@ -1166,7 +1191,7 @@ meRouter.get('/runs/:id', async (c) => {
         WHERE runs.id = ? AND ${scopeClause}
         LIMIT 1`,
     )
-    .get(id, ctx.workspace_id, scopeParam) as
+    .get(id, ...scopeParams) as
     | {
         id: string;
         app_id: string;

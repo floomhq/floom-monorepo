@@ -31,8 +31,8 @@ import { PageShell } from '../components/PageShell';
 import { SecretInput } from '../components/forms/SecretInput';
 import { MeRail } from '../components/me/MeRail';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
-import { StudioAppTabs } from '../components/StudioAppTabs';
 import { AppHeader, TabBar } from './MeAppPage';
+import { StudioAppTabs } from './StudioAppPage';
 import { useSecrets } from '../hooks/useSecrets';
 import { useSession } from '../hooks/useSession';
 import * as api from '../api/client';
@@ -171,7 +171,7 @@ export function MeAppSecretsPage({
             <span>{slug}</span>
           )}
           <span style={{ margin: '0 6px' }}>›</span>
-          <span style={{ color: 'var(--ink)' }}>Secrets</span>
+          <span style={{ color: 'var(--ink)' }}>App creator secrets</span>
         </nav>
       )}
       {chrome === 'studio' && app && (
@@ -186,7 +186,7 @@ export function MeAppSecretsPage({
             {app.name}
           </Link>
           <span style={{ margin: '0 6px' }}>›</span>
-          <span style={{ color: 'var(--ink)' }}>Secrets</span>
+          <span style={{ color: 'var(--ink)' }}>App creator secrets</span>
         </nav>
       )}
 
@@ -209,6 +209,7 @@ export function MeAppSecretsPage({
           {app && (
             <>
               <AppHeader app={app} />
+              {chrome === 'studio' && <StudioAppTabs slug={app.slug} active="secrets" />}
               {chrome === 'me' && <TabBar slug={app.slug} active="secrets" />}
 
               <h2
@@ -219,7 +220,7 @@ export function MeAppSecretsPage({
                   margin: chrome === 'studio' ? '20px 0 4px' : '0 0 4px',
                 }}
               >
-                Secrets for {app.name}
+                App creator secrets
               </h2>
               <p
                 style={{
@@ -230,8 +231,8 @@ export function MeAppSecretsPage({
                 }}
               >
                 {isCreator
-                  ? 'Choose how each secret is supplied. You can set a shared value yourself or leave it to each user.'
-                  : 'Provide the credentials this app needs to run on your behalf. Values are write-only.'}
+                  ? 'Publisher-controlled secrets for this app only. These are separate from workspace BYOK keys used when running apps.'
+                  : 'Workspace BYOK keys are configured in Workspace settings. Values are write-only.'}
               </p>
 
               {policiesError && (
@@ -262,7 +263,7 @@ export function MeAppSecretsPage({
                     color: 'var(--muted)',
                   }}
                 >
-                  This app doesn’t declare any secrets. Nothing to configure
+                  This app doesn’t declare any app creator secrets. Nothing to configure
                   here.
                 </div>
               ) : isCreator ? (
@@ -304,8 +305,8 @@ export function MeAppSecretsPage({
                     color: 'var(--muted)',
                   }}
                 >
-                  The creator of this app supplies every required secret.
-                  There’s nothing for you to set here.
+                  The creator of this app supplies every required app creator secret.
+                  There’s nothing to set here.
                 </div>
               ) : (
                 <div
@@ -330,19 +331,6 @@ export function MeAppSecretsPage({
                 </div>
               )}
 
-              {/* ---- Workspace BYOK requirements section (spec §8) ---- */}
-              {/* TODO: backend wire required_workspace_byok manifest field.
-                  Once the server emits `manifest.required_workspace_byok: string[]`,
-                  replace the stub below with app.manifest.required_workspace_byok ?? [].
-                  This section appears on both /studio/:slug/secrets (creator view)
-                  and /run/apps/:slug/secrets + /me/apps/:slug/secrets (runner view). */}
-              <WorkspaceBYOKSection
-                requiredByok={
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (app?.manifest as any).required_workspace_byok ?? []
-                }
-              />
-
               <p
                 style={{
                   fontSize: 11,
@@ -352,9 +340,16 @@ export function MeAppSecretsPage({
                   maxWidth: 620,
                 }}
               >
-                Secrets are AES-256 encrypted at rest and scoped to your
-                account. They’re injected at run time and never logged.
+                App creator secrets are AES-256 encrypted at rest and scoped to this app.
+                Workspace BYOK keys live in Workspace settings and are used when running apps.
               </p>
+
+              {/* v26 §8: Workspace BYOK requirements section (Studio only).
+                  Shows which BYOK keys from the runner's workspace this app
+                  expects. This is a declaration — keys are set in /settings/byok-keys. */}
+              {chrome === 'studio' && (
+                <WorkspaceBYOKRequirements neededKeys={neededKeys} />
+              )}
             </>
           )}
     </>
@@ -364,9 +359,8 @@ export function MeAppSecretsPage({
     return (
       <WorkspacePageShell
         mode="studio"
-        title={app ? `${app.name} · Secrets · Studio` : 'Secrets · Studio'}
+        title={app ? `${app.name} · App creator secrets · Studio` : 'App creator secrets · Studio'}
       >
-        <StudioAppTabs slug={slug ?? ''} activeTab="secrets" />
         {body}
       </WorkspacePageShell>
     );
@@ -375,7 +369,7 @@ export function MeAppSecretsPage({
   return (
     <PageShell
       requireAuth="cloud"
-      title={app ? `${app.name} · Secrets · Floom` : 'Secrets · Floom'}
+      title={app ? `${app.name} · App creator secrets · Floom` : 'App creator secrets · Floom'}
       contentStyle={{ padding: 0, maxWidth: 'none', minHeight: 'auto' }}
       noIndex
     >
@@ -932,49 +926,26 @@ function SecretRow({ secretKey, entry, onSave, onRemove }: SecretRowProps) {
   );
 }
 
-// ---------------------------------------------------------------------
-// Workspace BYOK requirements section (spec §8).
-//
-// Shows which workspace-level BYOK keys this app expects, with
-// present/missing status based on the active workspace's key list.
-// Renders on /studio/:slug/secrets (creator view), /me/apps/:slug/secrets
-// (v23 alias), and /run/apps/:slug/secrets (v26 runner view).
-//
-// TODO: backend wire required_workspace_byok manifest field.
-// Once the server emits `manifest.required_workspace_byok: string[]`,
-// the parent passes that list in. Empty list renders graceful empty state.
-// ---------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// v26 §8: Workspace BYOK requirements section (Studio per-app secrets page).
+// Declares which BYOK keys from the runner's workspace this app expects.
+// Keys are set by runners in /settings/byok-keys — this is read-only for the
+// publisher. The spec says it's a declaration, not an edit surface.
+// ─────────────────────────────────────────────────────────────────────────────
 
-function WorkspaceBYOKSection({ requiredByok }: { requiredByok: string[] }) {
-  const session = useSession();
-  const wsId = session.data?.active_workspace?.id;
-  const [wsKeys, setWsKeys] = useState<Set<string> | null>(null);
-
-  useEffect(() => {
-    if (!wsId) {
-      setWsKeys(new Set());
-      return;
-    }
-    let cancelled = false;
-    api
-      .listWorkspaceSecrets(wsId)
-      .then((res) => {
-        if (!cancelled)
-          setWsKeys(new Set((res.entries ?? []).map((e) => e.key)));
-      })
-      .catch(() => {
-        if (!cancelled) setWsKeys(new Set());
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [wsId]);
-
+function WorkspaceBYOKRequirements({
+  neededKeys,
+}: {
+  neededKeys: string[];
+}) {
   return (
-    <div data-testid="me-app-secrets-byok-section" style={{ marginTop: 32 }}>
+    <div
+      data-testid="workspace-byok-requirements"
+      style={{ marginTop: 32 }}
+    >
       <h2
         style={{
-          fontSize: 15,
+          fontSize: 16,
           fontWeight: 700,
           color: 'var(--ink)',
           margin: '0 0 4px',
@@ -990,111 +961,93 @@ function WorkspaceBYOKSection({ requiredByok }: { requiredByok: string[] }) {
           lineHeight: 1.55,
         }}
       >
-        BYOK keys this app expects from your workspace.{' '}
-        <Link to="/settings/byok-keys" style={{ color: 'var(--accent)' }}>
-          Manage BYOK keys →
+        BYOK keys this app expects from the runner's workspace. Runners set
+        these in{' '}
+        <Link
+          to="/settings/byok-keys"
+          style={{ color: 'var(--accent)', textDecoration: 'none' }}
+        >
+          Workspace settings › BYOK keys
         </Link>
+        .
       </p>
 
-      {/* TODO: backend wire required_workspace_byok manifest field.
-          Remove this note once the server emits the field. */}
-      {requiredByok.length === 0 && (
+      {neededKeys.length === 0 ? (
         <div
-          data-testid="me-app-secrets-byok-empty"
+          data-testid="workspace-byok-requirements-empty"
           style={{
             border: '1px dashed var(--line)',
             borderRadius: 10,
-            padding: '20px 16px',
+            padding: '20px 18px',
             background: 'var(--card)',
             fontSize: 13,
             color: 'var(--muted)',
           }}
         >
-          No workspace BYOK keys declared by this app.
+          This app doesn't declare any workspace BYOK key requirements. Runners
+          don't need to configure any keys to use it.
+        </div>
+      ) : (
+        <div
+          data-testid="workspace-byok-requirements-list"
+          style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+        >
+          {neededKeys.map((key) => (
+            <div
+              key={key}
+              data-testid={`byok-requirement-${key}`}
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
+                borderRadius: 8,
+                padding: '11px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <code
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--ink)',
+                }}
+              >
+                {key}
+              </code>
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  fontSize: 11,
+                  color: 'var(--muted)',
+                }}
+              >
+                declared by app
+              </span>
+            </div>
+          ))}
         </div>
       )}
 
-      {requiredByok.length > 0 && (
-        <div
-          data-testid="me-app-secrets-byok-list"
-          style={{
-            border: '1px solid var(--line)',
-            borderRadius: 10,
-            background: 'var(--card)',
-            overflow: 'hidden',
-          }}
+      <p
+        style={{
+          fontSize: 11,
+          color: 'var(--muted)',
+          marginTop: 16,
+          lineHeight: 1.5,
+          maxWidth: 560,
+        }}
+      >
+        This list is derived from{' '}
+        <code
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}
         >
-          {requiredByok.map((keyName) => {
-            const present = wsKeys?.has(keyName) ?? false;
-            return (
-              <div
-                key={keyName}
-                data-testid={`me-byok-row-${keyName}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 16px',
-                  borderBottom: '1px solid var(--line)',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <code
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: 'var(--ink)',
-                    flex: 1,
-                    minWidth: 0,
-                  }}
-                >
-                  {keyName}
-                </code>
-                {present ? (
-                  <span
-                    data-testid={`me-byok-present-${keyName}`}
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: 'var(--accent)',
-                      background: 'var(--accent-soft)',
-                      border: '1px solid var(--accent-border)',
-                      padding: '2px 8px',
-                      borderRadius: 999,
-                    }}
-                  >
-                    Present
-                  </span>
-                ) : (
-                  <>
-                    <span
-                      data-testid={`me-byok-missing-${keyName}`}
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: '#b45309',
-                        background: '#fef3c7',
-                        border: '1px solid #fcd9a8',
-                        padding: '2px 8px',
-                        borderRadius: 999,
-                      }}
-                    >
-                      Missing
-                    </span>
-                    <Link
-                      to="/settings/byok-keys"
-                      style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}
-                    >
-                      Add to workspace →
-                    </Link>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+          secrets_needed
+        </code>{' '}
+        in your app's manifest. Update the manifest to add or remove
+        declarations.
+      </p>
     </div>
   );
 }

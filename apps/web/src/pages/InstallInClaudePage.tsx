@@ -6,23 +6,6 @@ import * as api from '../api/client';
 import type { CreatedAgentToken } from '../api/client';
 import type { SessionWorkspace } from '../lib/types';
 
-async function copyToClipboard(text: string): Promise<void> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-  } catch (e) { console.error(e); }
-}
-
 interface AppMeta {
   slug: string;
   name: string;
@@ -44,21 +27,13 @@ type TokenState = {
 export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
   const { data: session } = useSession();
   const [tokenState, setTokenState] = useState<Record<string, TokenState>>({});
-  const [heroCopied, setHeroCopied] = useState(false);
   const workspaces = useMemo<SessionWorkspace[]>(() => {
     if (session?.workspaces?.length) return session.workspaces;
     if (session?.active_workspace) return [session.active_workspace];
     return [{ id: 'local', slug: 'local', name: 'Local', role: 'admin' }];
   }, [session?.active_workspace, session?.workspaces]);
-  const title = app ? `Install ${app.name} in your AI tool` : 'Install Floom in your AI tool';
+  const title = app ? `Install ${app.name} in Claude` : 'Install Floom in Claude';
   const exampleSlug = app?.slug || 'competitor-lens';
-
-  async function handleHeroCopy() {
-    const text = `claude skill add floom.dev/${exampleSlug}`;
-    await copyToClipboard(text);
-    setHeroCopied(true);
-    window.setTimeout(() => setHeroCopied(false), 1500);
-  }
 
   async function createAgentToken(workspace: SessionWorkspace) {
     setTokenState((prev) => ({
@@ -89,12 +64,12 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
   return (
     <PageShell
       title={`${title} | Floom`}
-      description="Install Floom apps in your AI tool, publish apps to Floom, and mint workspace Agent tokens for MCP clients."
+      description="Install Floom apps in Claude, publish apps to Floom, and mint workspace Agent tokens for MCP clients."
       contentStyle={{ maxWidth: 1120 }}
     >
       <main data-testid="install-in-claude-page" style={pageStyle}>
         <section style={heroStyle}>
-          <div style={kickerStyle}>Works with Claude Desktop, Cursor, Codex, and any MCP client</div>
+          <div style={kickerStyle}>For Claude Desktop and Claude Code users</div>
           <h1 style={h1Style}>{title}</h1>
           <p style={subStyle}>
             One command for public apps. Workspace cards for private apps and publisher access.
@@ -107,14 +82,7 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
           ) : null}
           <div style={heroCommandStyle}>
             <span><span style={codeMuteStyle}>$</span> claude skill add floom.dev/{exampleSlug}</span>
-            <button
-              type="button"
-              data-testid="install-copy-btn"
-              style={heroCopied ? { ...copyButtonStyle, background: 'rgba(255,255,255,0.12)', color: '#d4d4c8', border: '1px solid rgba(212,212,200,0.2)' } : copyButtonStyle}
-              onClick={() => void handleHeroCopy()}
-            >
-              {heroCopied ? 'Copied' : 'Copy'}
-            </button>
+            <button type="button" style={copyButtonStyle}>Copy</button>
           </div>
         </section>
 
@@ -122,7 +90,7 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
           <a href="#use" style={choiceCardStyle}>
             <div style={choiceNumStyle}>1</div>
             <div>
-              <h2 style={h2Style}>Use Floom apps in your AI tool</h2>
+              <h2 style={h2Style}>Use Floom apps in Claude</h2>
               <p style={mutedStyle}>Install a public app as a Skill, or connect a workspace through MCP with an Agent token.</p>
             </div>
           </a>
@@ -130,7 +98,7 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
             <div style={choiceNumStyle}>2</div>
             <div>
               <h2 style={h2Style}>Publish your app to Floom</h2>
-              <p style={mutedStyle}>Turn a repo, OpenAPI URL, or floom.yaml into a hosted app any agent can call by name.</p>
+              <p style={mutedStyle}>Turn a repo, OpenAPI URL, or floom.yaml into a hosted app Claude users can call by name.</p>
             </div>
           </a>
         </section>
@@ -138,8 +106,8 @@ export function InstallInClaudePage({ app }: InstallInClaudePageProps) {
         <section id="use" style={sectionStyle}>
           <h2 style={sectionTitleStyle}>Install a public app</h2>
           <div style={stepStackStyle}>
-            <Step number="1" title="Open your AI tool">
-              Claude Desktop, Cursor, Codex, and other MCP clients can use Floom.
+            <Step number="1" title="Open Claude Desktop or Claude Code">
+              Claude Code, Claude Desktop, Cursor, and other MCP clients can use Floom.
             </Step>
             <Step number="2" title="Run the Skill add command">
               <pre style={codeStyle}>claude skill add floom.dev/{exampleSlug}</pre>
@@ -293,13 +261,11 @@ const subStyle: React.CSSProperties = {
   margin: '14px auto 0',
 };
 
-// F7 (2026-04-28): light tinted bg on copy boxes (was dark).
 const heroCommandStyle: React.CSSProperties = {
   maxWidth: 560,
   margin: '24px auto 0',
-  background: 'var(--studio, #f5f4f0)',
-  color: 'var(--ink)',
-  border: '1px solid var(--line)',
+  background: '#1b1a17',
+  color: '#e7e3d7',
   fontFamily: 'var(--font-mono)',
   fontSize: 13,
   padding: '14px 18px',
@@ -311,7 +277,7 @@ const heroCommandStyle: React.CSSProperties = {
   textAlign: 'left',
 };
 
-const codeMuteStyle: React.CSSProperties = { color: 'var(--muted)' };
+const codeMuteStyle: React.CSSProperties = { color: '#9ca3af' };
 
 const copyButtonStyle: React.CSSProperties = {
   background: 'var(--accent)',
@@ -431,11 +397,9 @@ const numStyle: React.CSSProperties = {
   fontSize: 14,
 };
 
-// F7 (2026-04-28): light tinted bg on code blocks.
 const codeStyle: React.CSSProperties = {
-  background: 'var(--studio, #f5f4f0)',
-  color: 'var(--ink)',
-  border: '1px solid var(--line)',
+  background: '#1b1a17',
+  color: '#e7e3d7',
   borderRadius: 8,
   padding: 14,
   fontFamily: 'var(--font-mono)',
