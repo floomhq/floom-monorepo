@@ -23,6 +23,21 @@ GET /api/health
 
 Open even when global auth is enabled.
 
+Response:
+
+```json
+{
+  "status": "ok",
+  "service": "floom-chat",
+  "version": "0.4.0-mvp.5",
+  "apps": 170,
+  "threads": 25,
+  "timestamp": "2026-04-29T18:37:20.403Z"
+}
+```
+
+The `status` field is `"ok"` when healthy. Monitor scripts should key on `status`, not an `ok` boolean.
+
 ## App catalog
 
 ```http

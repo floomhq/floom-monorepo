@@ -29,6 +29,9 @@ curl http://localhost:3051/api/hub | jq 'length'
 If you don't want to clone the repo, a single `docker run` works:
 
 ```bash
+# Authenticate with GitHub Container Registry first (one-time)
+docker login ghcr.io
+
 docker run -d --name floom \
   -p 3051:3051 \
   -v floom_data:/data \
