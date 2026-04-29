@@ -1092,6 +1092,7 @@ if (webDist) {
     '/run/apps',
     '/run/runs',
     '/run/install',
+    '/run/connections',
     '/settings',
     '/settings/general',
     '/settings/byok-keys',
