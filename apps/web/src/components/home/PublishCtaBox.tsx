@@ -1,5 +1,5 @@
 /**
- * PublishCtaBox — v17 landing · dedicated "Publish your app" CTA box.
+ * PublishCtaBox — v17 landing · dedicated publish waitlist CTA box.
  *
  * Sits between the Showcase section and the dual creator/biz cards.
  * Closes #614 (Federico 2026-04-23 — "kill the robotic 'open source ·
@@ -93,17 +93,17 @@ export function PublishCtaBox() {
   return (
     <div data-testid="publish-cta-box" className="publish-cta" style={WRAP_STYLE}>
       <div>
-        <div style={EYEBROW_STYLE}>For makers</div>
-        <h3 style={H3_STYLE}>Publish your own app.</h3>
+        <div style={EYEBROW_STYLE}>Cloud publishing beta</div>
+        <h3 style={H3_STYLE}>Join the publish waitlist.</h3>
         <p style={P_STYLE}>
-          Paste a GitHub URL or OpenAPI spec. Floom turns it into a public
-          page, an MCP server, and a JSON API. Live in ~60 seconds. Free on
-          the hosted runtime, or self-host with one Docker command.
+          Self-host with Docker today. Hosted Cloud publishing, MCP creator
+          tooling, and agent-token account workflows are opening through beta
+          access while the public site stays in waitlist mode.
         </p>
       </div>
       <div style={STACK_STYLE}>
-        <Link to="/signup?mode=publish" style={BTN_ACCENT}>
-          Publish your app
+        <Link to="/waitlist" style={BTN_ACCENT}>
+          Join waitlist
           <ArrowRight size={16} aria-hidden="true" />
         </Link>
         <Link to="/docs" style={BTN_SECONDARY}>

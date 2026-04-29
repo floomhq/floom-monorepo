@@ -436,7 +436,7 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
       data-testid="hero-demo"
       data-mode="mobile-stacked"
       role="region"
-      aria-label="Build, deploy and use a Floom app in three steps"
+      aria-label="Build, preview, and use a Floom app in three steps"
       style={MOBILE_WRAP_STYLE}
     >
       {/* 01 — BUILD */}
@@ -464,8 +464,8 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
       <section style={MOBILE_CARD} aria-labelledby="hd-mob-deploy-title">
         <header style={MOBILE_CARD_HEADER}>
           <span style={MOBILE_STEP_NUM}>02</span>
-          <span style={MOBILE_STEP_LABEL} id="hd-mob-deploy-title">Deploy</span>
-          <span style={MOBILE_STEP_HINT}>via /floomit</span>
+          <span style={MOBILE_STEP_LABEL} id="hd-mob-deploy-title">Beta publish</span>
+          <span style={MOBILE_STEP_HINT}>waitlist access</span>
         </header>
         <div style={MOBILE_DEPLOY_BODY}>
           <div style={MOBILE_DEPLOY_SLASH}>
@@ -649,7 +649,7 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
               <div style={{ ...TERMINAL_LINE, color: '#8b8680' }}>
                 <span style={PROMPT_SIGN}>&gt;</span>
                 <span>
-                  type <span style={{ color: '#b45309', fontWeight: 600 }}>/floomit</span> to deploy
+                  hosted publishing opens through waitlist access
                 </span>
               </div>
             )}
@@ -758,7 +758,7 @@ function DeploySurface({
         <div style={DEPLOY_LEFT}>
           <div style={DEPLOY_HEADER_ROW}>
             <span style={DEPLOY_HEADER_LABEL}>
-              {done ? 'DEPLOYED' : 'PUBLISHING'}
+              {done ? 'PREVIEW READY' : 'BETA PUBLISH'}
             </span>
             <span style={DEPLOY_HEADER_PCT}>{progress}%</span>
           </div>
@@ -834,7 +834,7 @@ function DeploySurface({
             </span>
             <div style={DEPLOY_URL_TEXT_WRAP}>
               <div style={DEPLOY_URL_MAIN}>floom.dev/p/ai-readiness-audit</div>
-              <div style={DEPLOY_URL_META_CARD}>Deployed in 1.2s &middot; HTTPS &middot; edge</div>
+              <div style={DEPLOY_URL_META_CARD}>Beta publisher preview &middot; HTTPS &middot; edge</div>
             </div>
           </div>
         </div>
@@ -941,7 +941,7 @@ function RunSurface({
         <div style={RUN_CONTEXT}>
           <span style={RUN_CONTEXT_DOT} aria-hidden="true" />
           <span>
-            Just deployed via <code style={RUN_CONTEXT_CODE}>/floomit</code>
+            Beta preview from <code style={RUN_CONTEXT_CODE}>publisher access</code>
           </span>
           <span style={RUN_CONTEXT_SEP} aria-hidden="true">·</span>
           <span style={RUN_CONTEXT_URL}>floom.dev/p/ai-readiness-audit</span>

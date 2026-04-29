@@ -2,7 +2,7 @@
  * TryTheseApps — launch-hero app card row (waitlist-reality landing).
  *
  * Shows the 3 apps that are live + runnable on production today
- * (Resume Screener / Lead Scorer / Competitor Analyzer) as side-by-side
+ * (competitor-lens / ai-readiness-audit / pitch-coach) as side-by-side
  * cards right below the hero demo. This is the "proof of life" moment
  * now that Deploy is gated behind the waitlist: the visitor can't ship
  * their own app yet, but they can run these three in one click.
@@ -43,22 +43,22 @@ export interface TryAppCardData {
 
 const DEFAULT_CARDS: TryAppCardData[] = [
   {
-    slug: 'lead-scorer',
-    name: 'Lead Scorer',
-    description: 'Upload a CSV of leads + your ICP. Get fit scores and reasoning.',
-    category: 'GROWTH',
-  },
-  {
-    slug: 'resume-screener',
-    name: 'Resume Screener',
-    description: 'Zip of PDFs + a JD. Get a ranked shortlist with reasoning.',
-    category: 'HIRING',
-  },
-  {
-    slug: 'competitor-analyzer',
-    name: 'Competitor Analyzer',
-    description: 'Paste competitor URLs. Get positioning + a strengths/weaknesses table.',
+    slug: 'competitor-lens',
+    name: 'competitor-lens',
+    description: 'Compare your site against a competitor. Get positioning and pricing angles.',
     category: 'RESEARCH',
+  },
+  {
+    slug: 'ai-readiness-audit',
+    name: 'ai-readiness-audit',
+    description: 'Paste a URL. Get an AI readiness score, risks, opportunities, and one next step.',
+    category: 'AUDIT',
+  },
+  {
+    slug: 'pitch-coach',
+    name: 'pitch-coach',
+    description: 'Paste a short startup pitch. Get direct critiques and sharper rewrites.',
+    category: 'FOUNDER',
   },
 ];
 
@@ -86,6 +86,8 @@ const CATEGORY_PALETTE: Record<string, { fg: string; bg: string; ring: string }>
   GROWTH: NEUTRAL_PALETTE,
   HIRING: NEUTRAL_PALETTE,
   RESEARCH: NEUTRAL_PALETTE,
+  AUDIT: NEUTRAL_PALETTE,
+  FOUNDER: NEUTRAL_PALETTE,
 };
 
 interface TryTheseAppsProps {

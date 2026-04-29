@@ -4,10 +4,8 @@
  * Placement: BELOW the hero (Federico 2026-04-23 — removed from hero, moved
  * below hero as a smaller strip).
  *
- * Shows the slash command (`/floom-deploy`) and shell equivalent
- * (`floom deploy`). The slash command is real and lives at
- * /root/floom/skills/claude-code/SKILL.md; `floom deploy` is the CLI
- * equivalent (skills/floom/cli).
+ * Shows the beta slash command (`/floom-deploy`) and shell equivalent
+ * (`floom deploy`) for users with Cloud publishing access.
  *
  * Light theme terminal per the 2026-04-21 "no black terminals on landing"
  * correction (memory · feedback_light_terminals). Downsized vs the original
@@ -50,21 +48,20 @@ const ACCENT: CSSProperties = { color: 'var(--accent)', fontWeight: 600 };
 export function CliReference() {
   return (
     <div data-testid="cli-reference" style={SHELL_STYLE}>
-      <div style={EYEBROW_STYLE}>Works in any coding agent</div>
+      <div style={EYEBROW_STYLE}>Beta publisher workflow</div>
       <div style={BLOCK_STYLE}>
         <div>
           <span style={DIM}>{'>'}</span>{' '}
           <span style={{ fontWeight: 600 }}>/floom-deploy</span>
-          <span style={DIM}> &nbsp;# inside Claude Code</span>
+          <span style={DIM}> &nbsp;# beta access</span>
         </div>
         <div>
           <span style={DIM}>$</span>{' '}
           <span style={{ fontWeight: 600 }}>floom deploy</span>
-          <span style={DIM}> &nbsp;# from any terminal</span>
+          <span style={DIM}> &nbsp;# beta access</span>
         </div>
         <div style={{ marginTop: 4, ...DIM }}>
-          <span style={ACCENT}>&#10003;</span> App live at floom.dev/a/&lt;slug&gt; &middot;
-          MCP tool + JSON API included
+          <span style={ACCENT}>&#10003;</span> Self-host today, or join the waitlist for hosted publish access
         </div>
       </div>
     </div>

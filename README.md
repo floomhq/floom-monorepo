@@ -5,7 +5,7 @@
 
   <p><strong>Ship AI apps fast.</strong><br/>
   The protocol and runtime for agentic work.<br/>
-  Publish from an OpenAPI spec today. Floom gives you an MCP server, an HTTP endpoint, and a shareable web form — with auth, rate limits, run history, and output pages already wired up.</p>
+  Run published AI apps today. Cloud publishing, MCP creator tooling, and agent-token workflows are in beta access while the public site is in waitlist mode.</p>
 
   <p>
     <a href="https://github.com/floomhq/floom/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/floomhq/floom/ci.yml?branch=main&label=CI" alt="CI status"/></a>
@@ -35,17 +35,19 @@ OpenAPI spec ──▶ Floom ──▶ 3 surfaces
                            └─ Web form      (/p/:slug)
 ```
 
-> **Public beta.** Floom Cloud is open for running published apps, while publishing access is gated during the beta. Self-host works today with one Docker command. Three AI apps are live now for anyone to try: [Lead Scorer](https://floom.dev/p/lead-scorer), [Competitor Analyzer](https://floom.dev/p/competitor-analyzer), [Resume Screener](https://floom.dev/p/resume-screener). [Join the waitlist](https://floom.dev/waitlist) for Cloud publishing.
+> **Public beta + waitlist.** Floom Cloud is open for running published apps, while Cloud publishing, hosted repo deploys, MCP creator tooling, and agent-token account workflows are gated during beta access. Self-host works today with one Docker command. Three AI apps are live now for anyone to try: [competitor-lens](https://floom.dev/p/competitor-lens), [ai-readiness-audit](https://floom.dev/p/ai-readiness-audit), [pitch-coach](https://floom.dev/p/pitch-coach). [Join the waitlist](https://floom.dev/waitlist) for Cloud publishing.
 
 > **Install the CLI with `curl -fsSL https://floom.dev/install.sh | bash`.** Do NOT run `npm install floom` - the unscoped `floom` npm package is an unrelated third-party streaming tool. Details: [cli/floom/README.md](./cli/floom/README.md).
 
-Point Floom at an OpenAPI spec and you get all three, from the same manifest, with auth, rate limits, secret injection, run history, and shareable output pages. No glue code.
+Point a self-hosted Floom instance at an OpenAPI spec and you get all three, from the same manifest, with auth, rate limits, secret injection, run history, and shareable output pages. The hosted Cloud publish path is waitlist-gated during the beta.
 
-GitHub repo paste currently discovers OpenAPI specs inside a repo and publishes the resulting proxied app. Full "Floom hosts my repo code" publishing is tracked separately in [`packages/runtime`](./packages/runtime) and the roadmap.
+GitHub repo paste currently discovers OpenAPI specs inside a repo and publishes the resulting proxied app for beta users with publish access. Full "Floom hosts my repo code" publishing is tracked separately in [`packages/runtime`](./packages/runtime) as future platform work.
 
 ## Quickstart
 
-### Publish your first app in 5 minutes
+### Cloud publish beta
+
+Public Cloud is in waitlist mode. The CLI publish flow below is available to beta users with Cloud publishing and Agent-token access enabled.
 
 ```bash
 curl -fsSL https://floom.dev/install.sh | bash
@@ -64,7 +66,7 @@ openapi_spec_url: https://petstore3.swagger.io/api/v3/openapi.json
 visibility: private
 ```
 
-Then publish and run it:
+Then validate, publish, and run it after your account has beta publishing access:
 
 ```bash
 floom deploy --dry-run
@@ -72,7 +74,7 @@ floom deploy
 floom run petstore-demo '{"action":"getInventory"}'
 ```
 
-The deploy output prints the web page at `https://floom.dev/p/petstore-demo`, the MCP endpoint, and the Studio owner URL.
+For beta publishers, the deploy output prints the web page at `https://floom.dev/p/petstore-demo`, the MCP endpoint, and the Studio owner URL. Without beta publishing access, use the live apps or self-host locally.
 
 ### Self-host in one container
 
@@ -84,7 +86,7 @@ Or try the live apps at [floom.dev/apps](https://floom.dev/apps) — no install.
 
 ## What it is
 
-Floom is a runtime and a protocol for agentic apps. In the public beta path, you describe an app with an OpenAPI spec; Floom gives you an MCP server an agent can call, a plain HTTP endpoint, and a web form on a shareable URL — all at the same time, all backed by the same auth and rate-limit layer.
+Floom is a runtime and a protocol for agentic apps. In the beta publish path, you describe an app with an OpenAPI spec; Floom gives you an MCP server an agent can call, a plain HTTP endpoint, and a web form on a shareable URL — all at the same time, all backed by the same auth and rate-limit layer.
 
 The whole stack self-hosts in one Docker container. Source is [MIT](./LICENSE).
 
@@ -112,12 +114,12 @@ curl -X POST http://localhost:3051/api/resend/send-email \
 **Web form** — a clean page at `/p/:slug` your teammates can fill in, with typed inputs, a shareable result URL, and a run history.
 
 ```
-https://floom.dev/p/lead-scorer
+https://floom.dev/p/competitor-lens
 ```
 
 ## Who it's for
 
-- **Makers shipping side projects.** Paste an OpenAPI URL, publish a shareable page, hand your friends an MCP tool.
+- **Makers shipping side projects.** In self-host or Cloud beta publishing, paste an OpenAPI URL, publish a shareable page, hand your friends an MCP tool.
 - **Teams running internal tools.** Wrap a Stripe-style API in a form your ops team can fill in, with runs logged and outputs rendered cleanly.
 
 Two equal ICPs. Two CTAs on the homepage. Two dashboards (`/me` for runners, `/creator` for publishers).
@@ -128,9 +130,9 @@ Three apps shipped with Floom to show what it can do:
 
 | App | What it does | Live |
 |---|---|---|
-| [Lead Scorer](./examples/lead-scorer) | Scores a CSV of leads with Gemini, ranks them, explains why. | [floom.dev/p/lead-scorer](https://floom.dev/p/lead-scorer) |
-| [Competitor Analyzer](./examples/competitor-analyzer) | Takes a list of competitor URLs, pulls positioning + pricing + weak spots. | [floom.dev/p/competitor-analyzer](https://floom.dev/p/competitor-analyzer) |
-| [Resume Screener](./examples/resume-screener) | Scans a batch of resumes against a job description, ranks and flags. | [floom.dev/p/resume-screener](https://floom.dev/p/resume-screener) |
+| [competitor-lens](./examples/competitor-lens) | Compares your landing page against a competitor and returns positioning, pricing, and angle differences. | [floom.dev/p/competitor-lens](https://floom.dev/p/competitor-lens) |
+| [ai-readiness-audit](./examples/ai-readiness-audit) | Audits one site for AI readiness, risks, opportunities, and a concrete next action. | [floom.dev/p/ai-readiness-audit](https://floom.dev/p/ai-readiness-audit) |
+| [pitch-coach](./examples/pitch-coach) | Reviews a short startup pitch and returns critiques, rewrites, and a TL;DR. | [floom.dev/p/pitch-coach](https://floom.dev/p/pitch-coach) |
 
 Each one is a real OpenAPI-defined app under [`examples/`](./examples) — fork, rename, tweak the prompt.
 
@@ -197,7 +199,7 @@ Full self-host guide: [docs/SELF_HOST.md](./docs/SELF_HOST.md) · Protocol spec:
 - `apps/server` — backend (Hono + SQLite + Docker runner + MCP)
 - `packages/renderer` — `@floom/renderer`, default + custom output/input renderer library
 - `spec/protocol.md` — Floom Protocol spec
-- `examples/` — example manifests, including the three showcase apps above
+- `examples/` — example manifests, including the three current showcase apps above
 
 ## Development
 

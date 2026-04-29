@@ -1,6 +1,6 @@
 # Quickstart
 
-Build and run a Floom app from the terminal.
+Run a Floom app from the terminal. Public Cloud publishing is waitlist-gated; the publish steps below are for beta users with Cloud publishing and Agent-token access enabled. Self-host remains available with Docker.
 
 ## 1. Install
 
@@ -9,13 +9,13 @@ curl -fsSL https://floom.dev/install.sh | bash
 floom --version
 ```
 
-## 2. Authenticate
+## 2. Authenticate (Cloud beta)
 
 ```bash
 floom login
 ```
 
-Mint an Agent token at `https://floom.dev/me/agent-keys`, then run the printed command:
+Mint an Agent token at `https://floom.dev/me/agent-keys`, then run the printed command. If your account is not in the Cloud publishing beta, join the waitlist and use the live apps or self-host path.
 
 ```bash
 floom auth login --token=floom_agent_...
@@ -30,14 +30,14 @@ floom init
 For the shell CLI, set `openapi_spec_url` in `floom.yaml`. Inline `openapi_spec`
 objects are supported by the API/MCP ingest surfaces, not by `floom deploy`.
 
-## 4. Publish
+## 4. Publish (Cloud beta)
 
 ```bash
 floom deploy --dry-run
 floom deploy
 ```
 
-The CLI prints:
+For beta publishers, the CLI prints:
 
 - app page: `https://floom.dev/p/<slug>`
 - MCP URL: `https://floom.dev/mcp/app/<slug>`

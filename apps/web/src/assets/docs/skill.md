@@ -1,6 +1,6 @@
 # Claude Code Skill
 
-The Floom Claude Code Skill is a markdown file that teaches Claude Code your five Floom slash commands. Drop it once into `~/.claude/skills/floom/SKILL.md` and you get `/floom-new`, `/floom-deploy`, `/floom-run`, `/floom-list`, and `/floom-share` available in every Claude Code session — no MCP config edit, no restart, no token wiring.
+The Floom Claude Code Skill is a beta publisher helper. Drop it once into `~/.claude/skills/floom/SKILL.md` and it teaches Claude Code the Floom slash commands for creating, publishing, running, listing, and sharing apps. Public Cloud is in waitlist mode; publish/share/account commands require beta access, while public apps can still be run from the browser or via MCP.
 
 ## Install
 
@@ -12,14 +12,14 @@ mkdir -p ~/.claude/skills/floom && \
   -o ~/.claude/skills/floom/SKILL.md
 ```
 
-Then install and auth the CLI once:
+Then install and auth the CLI once if your account has beta publishing access:
 
 ```bash
 npm i -g @floomhq/cli@latest
 floom auth login --token=floom_agent_...
 ```
 
-Get your token at [floom.dev/me/agent-keys](https://floom.dev/me/agent-keys).
+Get your beta Agent token at [floom.dev/me/agent-keys](https://floom.dev/me/agent-keys). If that page is not enabled for your account, join the waitlist or use a self-host instance.
 
 ## Commands
 
@@ -33,7 +33,7 @@ Scaffolds a `floom.yaml` manifest and a starter handler in the current directory
 
 ### `/floom-deploy`
 
-Publishes the current directory's app to Floom and returns the live app page URL, MCP URL, and Studio link.
+Publishes the current directory's app for beta publishers and returns the live app page URL, MCP URL, and Studio link.
 
 ```
 /floom-deploy
@@ -72,7 +72,7 @@ Sets the sharing state of the app in the current directory. Valid states: `priva
 | **Best for** | Building and deploying from Claude Code | CI/CD, scripts, shell | Running apps from Claude Desktop, Cursor |
 | **Auth** | Reads `~/.floom/config.json` or `FLOOM_API_KEY` | Same | Bearer token in config |
 
-Use the **Skill** when you are already in Claude Code and want to deploy or run apps conversationally.
+Use the **Skill** when you are already in Claude Code and have beta publishing access or a self-host instance.
 
 Use the **CLI** directly when automating from a script or CI pipeline.
 

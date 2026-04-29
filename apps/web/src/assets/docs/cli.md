@@ -1,6 +1,6 @@
 # Floom CLI
 
-The Floom CLI scaffolds, validates, publishes OpenAPI/proxied apps, runs apps, and manages the app/account surfaces that are wired in the shell package.
+The Floom CLI scaffolds, validates, publishes OpenAPI/proxied apps for beta publishers, runs apps, and manages the app/account surfaces that are wired in the shell package. Public Cloud is in waitlist mode; hosted publish, Agent tokens, and account write workflows require beta access. Running public apps does not require publish access.
 
 ## Install
 
@@ -17,13 +17,13 @@ export PATH="$HOME/.floom/repo/cli/floom/bin:$PATH"
 floom --help
 ```
 
-## Auth
+## Auth (Cloud beta)
 
 ```bash
 floom login
 ```
 
-Mint an Agent token at `https://floom.dev/me/agent-keys`, then run the command printed by the CLI:
+Mint an Agent token at `https://floom.dev/me/agent-keys`, then run the command printed by the CLI. This requires beta account access while public Cloud is in waitlist mode:
 
 ```bash
 floom auth login --token=floom_agent_...
@@ -53,7 +53,7 @@ floom run <slug> --input invoice_id=INV-1 --use-context
 floom api GET /api/me/runs/<run_id>
 ```
 
-`floom deploy` publishes OpenAPI/proxied manifests through `/api/hub/ingest`:
+`floom deploy` publishes OpenAPI/proxied manifests through `/api/hub/ingest` for accounts with beta publishing access:
 
 - `openapi_spec_url` in `floom.yaml`
 
@@ -146,6 +146,8 @@ export FLOOM_API_KEY=floom_agent_...
 export FLOOM_API_URL=https://floom.dev
 floom deploy
 ```
+
+CI publishing requires a beta Agent token with write access. In waitlist mode, use the self-host API URL for local automation or join the Cloud publishing beta.
 
 ## Agent packages
 

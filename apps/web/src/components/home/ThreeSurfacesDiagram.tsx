@@ -52,11 +52,11 @@ export function ThreeSurfacesDiagram() {
     <section data-testid="three-surfaces-diagram" style={SECTION_STYLE}>
       <SectionEyebrow>One app, three surfaces</SectionEyebrow>
       <h2 style={H2_STYLE}>
-        Paste your app. Get a web page, an MCP endpoint, and a JSON API.
+        In beta publishing, one app gets a web page, MCP endpoint, and JSON API.
       </h2>
       <p style={SUB_STYLE}>
-        Same logic, three places it shows up. No duplication, no
-        per-surface framework to learn.
+        Same logic, three places it shows up. Run the live apps now, self-host
+        today, or join the waitlist for hosted publishing.
       </p>
 
       <div style={DIAGRAM_WRAP_STYLE}>

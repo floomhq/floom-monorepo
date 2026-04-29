@@ -31,7 +31,7 @@ docker run -d --name floom \
   -v "$(pwd)/apps.yaml:/app/config/apps.yaml:ro" \
   -e FLOOM_APPS_CONFIG=/app/config/apps.yaml \
   -e RESEND_API_KEY=re_xxx \
-  ghcr.io/floomhq/floom-monorepo:v0.4.0-minimal.6
+  ghcr.io/floomhq/floom-monorepo:latest
 
 # 3. Verify
 sleep 5
@@ -421,7 +421,7 @@ The bundled hosted-mode demo apps (bouncer, opendraft, openpaper, etc.) are opt-
 version: "3.9"
 services:
   floom:
-    image: ghcr.io/floomhq/floom-monorepo:v0.4.0-minimal.6
+    image: ghcr.io/floomhq/floom-monorepo:latest
     ports:
       - "3051:3051"
     volumes:

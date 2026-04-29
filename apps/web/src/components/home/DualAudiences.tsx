@@ -175,7 +175,7 @@ interface DualAudiencesProps {
 
 export function DualAudiences(_: DualAudiencesProps = {}) {
   // Launch flag. When DEPLOY_ENABLED=false, the makers card's primary
-  // CTA swaps from "Deploy your first app → /signup" to a "Join
+  // CTA swaps from publisher beta access to a "Join
   // waitlist" button that opens WaitlistModal in-place.
   const deployEnabled = useDeployEnabled();
   const [waitlistOpen, setWaitlistOpen] = useState(false);
@@ -204,10 +204,10 @@ export function DualAudiences(_: DualAudiencesProps = {}) {
         <AudienceCard
           eyebrow="For makers"
           title="Ship the weekend project."
-          lede="Vibe-code the idea. Paste your repo. Floom turns it into a page, an MCP server, and a JSON API. Share it with one link."
+          lede="Vibe-code the idea. Run the live examples today, self-host with Docker, or join the Cloud publishing beta to turn your app into a page, MCP server, and JSON API."
           bullets={[
             { text: 'One JSON spec, no framework to learn' },
-            { text: 'Auto-generated landing page and MCP install' },
+            { text: 'Auto-generated landing page and MCP install in beta publishing' },
             { text: "Free tier runs on Floom's Gemini key" },
             { text: 'Self-host with one Docker command' },
           ]}
@@ -221,7 +221,7 @@ export function DualAudiences(_: DualAudiencesProps = {}) {
                   testid: 'dual-audience-waitlist',
                 }
               : {
-                  label: 'Deploy your first app',
+                  label: 'Open publisher beta',
                   to: '/signup',
                   kind: 'ink',
                   testid: 'dual-audience-deploy',
@@ -232,7 +232,7 @@ export function DualAudiences(_: DualAudiencesProps = {}) {
         <AudienceCard
           eyebrow="For teams"
           title="Use AI apps that actually work."
-          lede="Compare competitors, audit a landing page, rewrite a pitch. No setup, no code. Install in your AI tool or run from a browser. Workspace, shared runs, one bill."
+          lede="Compare competitors, audit a landing page, rewrite a pitch. No setup, no code. Install public apps in your AI tool or run from a browser. Team features are in beta."
           bullets={[
             { text: '3 AI apps, free to run' },
             { text: 'Install in your AI tool in 30 seconds' },
