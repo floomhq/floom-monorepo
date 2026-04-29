@@ -154,6 +154,28 @@ Self-host: uncapped by default, configurable via `FLOOM_RATE_LIMIT_*` env vars.
 5. App writes a final line to stdout: `__FLOOM_RESULT__{"ok": true, "outputs": {...}}`.
 6. Floom parses the marker line, stores the run, returns structured JSON.
 
+Apps that produce downloadable files can add `artifacts` next to `outputs`:
+
+```json
+__FLOOM_RESULT__{
+  "ok": true,
+  "outputs": { "summary": "Draft complete." },
+  "artifacts": [
+    {
+      "name": "draft.pdf",
+      "mime": "application/pdf",
+      "size": 123456,
+      "data_b64": "<base64>"
+    }
+  ]
+}
+```
+
+Floom stores artifact bytes on disk, strips `data_b64` before persisting run
+JSON, and returns metadata with a signed `url` for `/api/artifacts/:artifact_id`.
+Single artifacts default to 50 MB max, each run defaults to 100 MB total, and
+artifact download links expire after 7 days.
+
 Long-running work: use async jobs.
 
 ```bash
