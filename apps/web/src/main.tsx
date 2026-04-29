@@ -110,6 +110,7 @@ import { WaitlistGuard } from './components/WaitlistGuard';
 import { primeSession, refreshSession } from './hooks/useSession';
 import { initPostHog, identifyFromSession, track } from './lib/posthog';
 import { BrowserSentryErrorBoundary, initBrowserSentry } from './lib/sentry';
+import { LazyChunkBoundary } from './lib/LazyChunkBoundary';
 import type { SessionMePayload } from './lib/types';
 import './styles/globals.css';
 import './styles/csp-inline-style-migrations.css';
@@ -260,6 +261,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <a href="#main" className="skip-to-content">
           Skip to main content
         </a>
+        <LazyChunkBoundary>
         <Suspense fallback={<RouteLoading variant="full" />}>
         <Routes>
         {/* M5: slim MVP landing */}
@@ -453,6 +455,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
         </Suspense>
+        </LazyChunkBoundary>
         <CookieBanner />
       </BrowserRouter>
     </BrowserSentryErrorBoundary>
