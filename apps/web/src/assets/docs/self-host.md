@@ -1,6 +1,6 @@
 # Self-host Floom
 
-Floom is [MIT-licensed](https://github.com/floomhq/floom/blob/main/LICENSE) and ships as a single Docker image. Run a full instance — web UI, MCP server, HTTP API — on any machine with Docker.
+Floom is [MIT-licensed](https://github.com/floomhq/floom/blob/main/LICENSE) and ships as a single Docker image. Run a full instance (web UI, MCP server, HTTP API) on any machine with Docker.
 
 The reference container image is `ghcr.io/floomhq/floom-monorepo`. The live showcase instance lives at [docker.floom.dev](https://docker.floom.dev).
 

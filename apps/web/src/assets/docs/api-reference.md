@@ -127,9 +127,9 @@ DELETE /api/me/apps/:slug/creator-secrets/:key
 
 ## MCP
 
-- `https://floom.dev/mcp` — account, Studio, run, context, secrets
-- `https://floom.dev/mcp/search` — public app discovery
-- `https://floom.dev/mcp/app/:slug` — per-app tools
+- `https://floom.dev/mcp`: account, Studio, run, context, secrets
+- `https://floom.dev/mcp/search`: public app discovery
+- `https://floom.dev/mcp/app/:slug`: per-app tools
 
 See [/docs/mcp-install](/docs/mcp-install).
 

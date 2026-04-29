@@ -60,7 +60,7 @@ const FALLBACK_STRIPES: Stripe[] = [
     slug: 'competitor-lens',
     name: 'Competitor Lens',
     description:
-      'Paste 2 URLs — yours + a competitor. Get a positioning, pricing, and angle diff in under 5 seconds.',
+      'Paste 2 URLs, yours and a competitor. Get a positioning, pricing, and angle diff in under 5 seconds.',
     category: 'research',
   },
   {

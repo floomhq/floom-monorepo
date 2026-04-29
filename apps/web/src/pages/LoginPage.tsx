@@ -140,7 +140,7 @@ const routeMode = getModeFromLocation(location.pathname, searchParams);
           // Surface this expectation right after signup so users don't bounce
           // when they don't see the email in their inbox.
           message:
-            'Check your email — the verification link will sign you in. ' +
+            'Check your email: the verification link will sign you in. ' +
             'New here? Floom\'s sending domain is brand-new, so the email ' +
             'might land in spam or "Promotions". Mark it "Not spam" and we\'ll ' +
             'land in your inbox next time.',

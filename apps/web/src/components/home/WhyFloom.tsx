@@ -62,7 +62,7 @@ export function WhyFloom() {
               margin: '0 0 10px',
             }}
           >
-            AI apps need infrastructure.
+            AI apps need real plumbing.
           </h2>
         </header>
 

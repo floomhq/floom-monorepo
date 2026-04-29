@@ -47,8 +47,8 @@ export function ManifestoBand() {
         </p>
 
         <p data-testid="manifesto-body" className="manifesto-body" style={BODY_STYLE}>
-          Agents don&rsquo;t just chat &mdash; they do work. That work needs real
-          infrastructure: auth, runs, rate limits, audit. Floom is the
+          Agents don&rsquo;t just chat: they do work. That work needs real
+          plumbing: auth, runs, rate limits, audit. Floom is the
           runtime for the agent era.
         </p>
       </div>

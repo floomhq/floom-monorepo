@@ -270,7 +270,7 @@ function TokenCard({ onTokenReady }: { onTokenReady?: (rawToken: string) => void
       {displayToken && (
         <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
           <p style={{ fontSize: 12, color: '#166534', margin: '0 0 8px', fontWeight: 600 }}>
-            Copy this token now — it won't be shown again.
+            Copy this token now: it won't be shown again.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <code style={{ fontFamily: MONO, fontSize: 12.5, background: 'var(--studio, #f5f4f0)', color: INK, border: `1px solid ${LINE}`, padding: '8px 12px', borderRadius: 6, flex: 1, overflowX: 'auto', wordBreak: 'break-all' as const }}>

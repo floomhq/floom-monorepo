@@ -291,7 +291,7 @@ export function NotFoundPage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search apps — try 'lead scorer' or 'jwt'"
+              placeholder="Search apps, try 'lead scorer' or 'jwt'"
               aria-label="Search Floom apps"
               data-testid="not-found-search-input"
               style={{

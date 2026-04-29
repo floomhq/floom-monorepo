@@ -6,7 +6,7 @@ Floom's launch-week security story is **container isolation plus explicit secret
 
 - Each hosted run is a **fresh Docker container** (Linux namespaces and cgroups; default runtime is the usual OCI `runc`).
 - Inputs are materialized on the host and mounted **read-only** under `/floom/inputs`.
-- Self-hosters may point Docker at **`runsc` (gVisor)** for stronger isolation — an **operator** setting, not a Floom UI toggle. No Firecracker or per-tenant micro-VMs in this repo.
+- Self-hosters may point Docker at **`runsc` (gVisor)** for stronger isolation, an **operator** setting, not a Floom UI toggle. No Firecracker or per-tenant micro-VMs in this repo.
 
 ## How secrets are passed
 
