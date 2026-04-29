@@ -65,7 +65,11 @@ export function LoginPage() {
     rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
       ? rawNext
       : null;
-  const nextPath = safeNext || (mode === 'signup' ? '/studio/build' : '/run');
+  // M3 (#1059): post-auth default landing is /me/agent-keys (the canonical
+  // Agent tokens page — v26's wedge surface). Sign-in AND sign-up both default
+  // here; the `?next=...` deep-link override (safeNext above) still wins so
+  // users clicking a workspace link land where they intended.
+  const nextPath = safeNext || '/me/agent-keys';
 
   // If the user is already logged in (cloud mode) redirect away.
   useEffect(() => {
@@ -577,6 +581,10 @@ export function LoginPage() {
             {mode === 'signin' ? 'Sign up' : 'Sign in'}
           </button>
         </p>
+        {/* M1 (#1058) 2026-04-29: dropped the awkward "you are in the right
+            place, the same page signs you up" sentence — Federico flagged it
+            as primitive. The Sign in / Sign up tab pair above already makes it
+            obvious the same page handles both, so this line was just noise. */}
         <p
           style={{
             textAlign: 'center',
@@ -585,7 +593,6 @@ export function LoginPage() {
             color: 'var(--muted)',
           }}
         >
-          New to Floom? You are in the right place, the same page signs you up. ·{' '}
           <Link to="/" style={{ color: 'var(--ink)' }}>Back to home</Link>
         </p>
       </div>
