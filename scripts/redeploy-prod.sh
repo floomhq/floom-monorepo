@@ -166,24 +166,25 @@ PY
 
 log "merged env file: $MERGED_ENV"
 
-# --- 3b. Set FLOOM_STORE_HIDE_SLUGS = kill list + prod docker apps ---
+# --- 3b. Set FLOOM_STORE_HIDE_SLUGS = kill list only ---
 #
-# PROD adds the 3 docker-runtime apps on top of the shared kill list because
-# prod intentionally does NOT mount /var/run/docker.sock (security stance).
 # We REPLACE any inherited FLOOM_STORE_HIDE_SLUGS line in $MERGED_ENV with
-# the recomputed value, so prod always reflects the current
-# launch-kill-list.txt + PROD_EXTRA_HIDE — earlier idempotency bug skipped
-# the append when an inherited value was already present, leaving stale data.
-PROD_EXTRA_HIDE="competitor-lens,ai-readiness-audit,pitch-coach"
+# the recomputed value from launch-kill-list.txt so prod always stays current.
+#
+# R37 (2026-04-29): competitor-lens, ai-readiness-audit, pitch-coach were
+# previously added here because they required docker.sock (docker-runtime).
+# They now run as Python FastAPI sidecars forked by launch-week-sidecars.ts
+# (FLOOM_LAUNCH_WEEK_APPS=true in prod.env.canonical), so they no longer
+# need to be hidden.
 
 if [ -f "$KILL_LIST" ]; then
   KILL_CSV=$(grep -v '^[[:space:]]*#' "$KILL_LIST" | grep -v '^[[:space:]]*$' | paste -sd, -)
-  COMBINED="${KILL_CSV},${PROD_EXTRA_HIDE}"
+  COMBINED="${KILL_CSV}"
   # Drop any existing FLOOM_STORE_HIDE_SLUGS line, then append the fresh one.
   grep -v '^FLOOM_STORE_HIDE_SLUGS=' "$MERGED_ENV" > "${MERGED_ENV}.tmp" && mv "${MERGED_ENV}.tmp" "$MERGED_ENV"
   echo "FLOOM_STORE_HIDE_SLUGS=${COMBINED}" >> "$MERGED_ENV"
   KILL_COUNT=$(echo "$COMBINED" | tr ',' '\n' | wc -l)
-  log "set FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs: kill-list + 3 prod docker apps)"
+  log "set FLOOM_STORE_HIDE_SLUGS (${KILL_COUNT} slugs from kill-list)"
 fi
 
 # --- 4. Stop + remove old container ---
