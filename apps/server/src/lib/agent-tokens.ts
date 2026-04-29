@@ -217,8 +217,11 @@ function isReadMethod(method: string): boolean {
 function isAgentReadPath(path: string): boolean {
   if (path === '/api/session/me' || path === '/api/session/me/') return true;
   if (path === '/api/hub' || path === '/api/hub/') return true;
+  if (path === '/api/projects' || path === '/api/projects/') return true;
   if (/^\/api\/hub\/[^/]+\/?$/.test(path)) return true;
+  if (/^\/api\/projects\/[^/]+\/?$/.test(path)) return true;
   if (/^\/api\/hub\/[^/]+\/(source|openapi\.json|runs|runs-by-day)\/?$/.test(path)) return true;
+  if (/^\/api\/projects\/[^/]+\/(source|openapi\.json|runs|runs-by-day)\/?$/.test(path)) return true;
   if (/^\/api\/agents\/runs(\/[^/]+)?\/?$/.test(path)) return true;
   if (/^\/api\/run\/[^/]+\/?$/.test(path)) return true;
   if (/^\/api\/apps\/[^/]+\/reviews\/?$/.test(path)) return true;
@@ -229,8 +232,11 @@ function isAgentReadPath(path: string): boolean {
 function isStudioReadPath(path: string): boolean {
   if (path === '/api/session/me' || path === '/api/session/me/') return true;
   if (path === '/api/hub/mine' || path === '/api/hub/mine/') return true;
+  if (path === '/api/projects/mine' || path === '/api/projects/mine/') return true;
   if (/^\/api\/hub\/[^/]+\/?$/.test(path)) return true;
+  if (/^\/api\/projects\/[^/]+\/?$/.test(path)) return true;
   if (/^\/api\/hub\/[^/]+\/(source|openapi\.json)\/?$/.test(path)) return true;
+  if (/^\/api\/projects\/[^/]+\/(source|openapi\.json)\/?$/.test(path)) return true;
   if (/^\/api\/me\/apps\/[^/]+\/.+/.test(path)) return true;
   return false;
 }
@@ -245,10 +251,17 @@ function isAgentRunWrite(method: string, path: string): boolean {
 
 function isStudioWritePath(method: string, path: string): boolean {
   if (method === 'POST' && path === '/api/hub/ingest') return true;
+  if (method === 'POST' && path === '/api/projects/ingest') return true;
   if (/^\/api\/hub\/[^/]+\/(fork|claim|install|renderer)\/?$/.test(path)) {
     return method === 'POST' || method === 'DELETE';
   }
+  if (/^\/api\/projects\/[^/]+\/(fork|claim|install|renderer)\/?$/.test(path)) {
+    return method === 'POST' || method === 'DELETE';
+  }
   if (/^\/api\/hub\/[^/]+\/?$/.test(path)) {
+    return method === 'PATCH' || method === 'DELETE';
+  }
+  if (/^\/api\/projects\/[^/]+\/?$/.test(path)) {
     return method === 'PATCH' || method === 'DELETE';
   }
   if (/^\/api\/me\/apps\/[^/]+\/.+/.test(path)) {

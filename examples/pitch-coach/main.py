@@ -532,10 +532,32 @@ def coach(pitch: str) -> dict[str, Any]:
 
     model = _resolve_model()
     _log("calling Gemini")
-    outputs = _normalize_response(_coach_with_gemini(normalized_pitch, client, model))
+    try:
+        outputs = _normalize_response(_coach_with_gemini(normalized_pitch, client, model))
+    except Exception as exc:  # noqa: BLE001
+        # Launch demo reliability beats upstream purity: if Gemini times out or
+        # returns a malformed payload, keep the app useful with the same
+        # deterministic coach used for local/no-key runs.
+        _log(f"Gemini failed ({exc}); falling back to deterministic coach")
+        outputs = _dry_run_response(normalized_pitch)
+        elapsed = time.monotonic() - start
+        _log(f"done in {elapsed:.2f}s")
+        return {
+            **outputs,
+            "dry_run": True,
+            "cache_hit": False,
+            "model": f"{model}->dry-run-fallback",
+        }
     elapsed = time.monotonic() - start
     if elapsed > TOTAL_BUDGET_S:
-        raise TimeoutError(f"pitch coach exceeded {TOTAL_BUDGET_S:.0f}s budget")
+        _log(f"Gemini exceeded {TOTAL_BUDGET_S:.0f}s budget; falling back")
+        outputs = _dry_run_response(normalized_pitch)
+        return {
+            **outputs,
+            "dry_run": True,
+            "cache_hit": False,
+            "model": f"{model}->dry-run-fallback",
+        }
     _log(f"done in {elapsed:.2f}s")
     return {
         **outputs,

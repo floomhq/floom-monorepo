@@ -109,6 +109,51 @@ async function runServerTest({ name, script, action, payload, validateOutputs })
   }
 }
 
+async function runPitchCoachGeminiFallbackTest() {
+  process.stdout.write(`\n--- pitch-coach Gemini fallback ---\n`);
+  const script = `
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path("examples/pitch-coach").resolve()))
+import main
+
+class FakeClient:
+    pass
+
+def fake_build_genai():
+    return FakeClient()
+
+def fake_coach_with_gemini(pitch, client, model):
+    raise TimeoutError("forced test timeout")
+
+main._build_genai = fake_build_genai
+main._coach_with_gemini = fake_coach_with_gemini
+out = main.coach("We help B2B ops teams stop losing leads to slow handoffs.")
+assert out["dry_run"] is True, out
+assert out["cache_hit"] is False, out
+assert out["model"].endswith("->dry-run-fallback"), out
+assert len(out["harsh_truth"]) == 3, out
+assert len(out["rewrites"]) == 3, out
+print("ok")
+`;
+  const proc = spawn('python3', ['-c', script], {
+    env: { ...process.env, GEMINI_API_KEY: 'fake-test-key' },
+    cwd: REPO_ROOT,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const chunks = [];
+  proc.stdout.on('data', (chunk) => chunks.push(chunk.toString()));
+  proc.stderr.on('data', (chunk) => chunks.push(chunk.toString()));
+  const code = await new Promise((resolve) => proc.on('close', resolve));
+  log(
+    'pitch-coach falls back when Gemini path fails',
+    code === 0,
+    chunks.join('').trim(),
+  );
+}
+
+await runPitchCoachGeminiFallbackTest();
+
 // --- pitch-coach ---
 await runServerTest({
   name: 'pitch-coach',

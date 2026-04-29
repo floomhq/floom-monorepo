@@ -404,6 +404,7 @@ const WRITE_RATE_LIMIT_SKIP_PATHS = new Set([
   '/api/run',
   '/api/agents/run',
   '/api/hub/ingest',
+  '/api/projects/ingest',
   '/api/feedback',
   '/api/waitlist',
   '/api/deploy-waitlist',

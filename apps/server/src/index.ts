@@ -187,6 +187,8 @@ app.use('/api/admin/*', restrictedCors);
 // Open surfaces (public read/run, MCP, OG, renderer bundles).
 app.use('/api/hub/*', openCors);
 app.use('/api/hub', openCors);
+app.use('/api/projects/*', openCors);
+app.use('/api/projects', openCors);
 app.use('/api/health/*', openCors);
 app.use('/api/healthz', openCors);
 // GH stars proxy — public read-only, no credentials.
@@ -294,6 +296,7 @@ app.use('/api/:slug/jobs', runBodyLimit, rateLimit);
 // uncapped. Route covers only POST (other hub paths are reads / owner-
 // scoped writes and route through their own auth).
 app.use('/api/hub/ingest', runBodyLimit, rateLimit);
+app.use('/api/projects/ingest', runBodyLimit, rateLimit);
 // Security launch-week #600: global write limiter for all /api mutations.
 // Existing per-route limiters are explicitly skipped inside the middleware
 // to avoid double-throttling (run surfaces, feedback, waitlist).
@@ -319,6 +322,10 @@ app.route('/api/admin', adminRouter);
 app.route('/api/metrics', metricsRouter);
 app.route('/api/studio/build', studioBuildRouter);
 app.route('/api/hub', hubRouter);
+// Launch-week compatibility: early CLI/agent audits used `/api/projects`
+// as the catalog route before `/api/hub` became canonical. Keep it as a
+// read/write-compatible alias so older scripts fail gracefully less often.
+app.route('/api/projects', hubRouter);
 app.route('/api/parse', parseRouter);
 app.route('/api/pick', pickRouter);
 app.route('/api/thread', threadRouter);
