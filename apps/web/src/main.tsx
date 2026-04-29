@@ -233,11 +233,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <a href="#main" className="skip-to-content">
           Skip to main content
         </a>
-        {/* Suspense fallback: null so SPA navigations don't flash the full-screen
-            branded loader on every route change. Each lazy chunk loads fast after
-            first visit (cached). The full-screen loader is only needed for the
-            initial bundle load, which is handled by the HTML shell. */}
-        <Suspense fallback={null}>
+        {/* Suspense fallback: subtle inline loader. Empty `null` flashed
+            as a blank/dark screen when switching tabs (Federico flagged
+            2026-04-29). The embed variant is a quiet inline skeleton —
+            avoids both the blank flash and the full-screen logo bounce. */}
+        <Suspense fallback={<RouteLoading variant="embed" />}>
+
         <Routes>
         {/* Landing v17 (2026-04-22): rebuild to wireframe parity. */}
         <Route path="/" element={<LandingV17Page />} />

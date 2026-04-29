@@ -331,7 +331,7 @@ function AppCard({ app }: { app: RunApp }) {
           >
             {app.runCount === 0
               ? 'Not run yet'
-              : `${app.runCount} run${app.runCount !== 1 ? 's' : ''}${app.lastRunAt ? ` · ${formatTime(app.lastRunAt)}` : ''}`}
+              : `${app.lastRunAt ? `last run ${formatTime(app.lastRunAt)}` : 'recent'} · ${app.runCount} run${app.runCount !== 1 ? 's' : ''}`}
           </div>
         </div>
       </div>
