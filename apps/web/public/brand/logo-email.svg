@@ -26,5 +26,5 @@
     fill="#1c1a14"
   >floom</text>
   <!-- trailing emerald dot: unified lockup (#980). Approx x = 118 + 5*58*0.55 ≈ 277; nudge via dx -->
-  <circle cx="302" cy="72" r="7" fill="#10b981" />
+  <circle cx="291" cy="74" r="6" fill="#10b981" />
 </svg>
