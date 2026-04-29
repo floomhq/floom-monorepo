@@ -618,6 +618,32 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
               >
                 {'Run in your AI tool'}
               </Link>
+              {/* Federico 2026-04-29: non-technical visitors don't know what
+                  "Run in your AI tool" means. Surface the directory as a
+                  lower-friction parallel CTA so they have a path that doesn't
+                  require already having Claude / Cursor / Codex set up. */}
+              <Link
+                to="/apps"
+                data-testid="hero-cta-browse-apps"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: 'transparent',
+                  color: 'var(--ink)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 999,
+                  padding: '13px 20px',
+                  fontSize: 15,
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Browse apps
+                <ArrowRight size={14} aria-hidden="true" />
+              </Link>
               {deployEnabled && (
                 <Link
                   to="/signup"
