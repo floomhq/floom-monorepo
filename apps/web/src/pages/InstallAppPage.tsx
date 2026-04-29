@@ -108,7 +108,7 @@ export function InstallAppPage() {
         >
           <div
             style={{
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: 11,
               fontWeight: 600,
               color: 'var(--muted,#64748b)',

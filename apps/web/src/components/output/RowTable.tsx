@@ -155,7 +155,7 @@ function ScoreCell({ value }: { value: number }) {
     >
       <span
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontWeight: 600,
           fontSize: 12.5,
           color: 'var(--ink)',
@@ -227,7 +227,7 @@ function StringListCell({ items }: { items: string[] }) {
             border: 'none',
             color: 'var(--muted)',
             cursor: 'pointer',
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: 'var(--font-mono)',
             fontSize: 11,
             textDecoration: 'underline',
           }}
@@ -246,7 +246,7 @@ function StringListCell({ items }: { items: string[] }) {
             border: 'none',
             color: 'var(--muted)',
             cursor: 'pointer',
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: 'var(--font-mono)',
             fontSize: 11,
             textDecoration: 'underline',
           }}
@@ -330,7 +330,7 @@ export function RowTable({ rows, label, maxRows = 50, maxCols = 8, appSlug, runI
                   borderBottom: '1px solid var(--line)',
                   textAlign: 'left',
                   padding: '10px 12px',
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 11,
                   color: 'var(--muted)',
                   textTransform: 'uppercase',
@@ -406,7 +406,7 @@ export function RowTable({ rows, label, maxRows = 50, maxCols = 8, appSlug, runI
             borderTop: '1px solid var(--line)',
             fontSize: 12,
             color: 'var(--muted)',
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: 'var(--font-mono)',
           }}
         >
           + {extra} more
@@ -433,7 +433,7 @@ export function RowTable({ rows, label, maxRows = 50, maxCols = 8, appSlug, runI
         >
           <span
             style={{
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: 11,
               color: 'var(--muted)',
               letterSpacing: '0.04em',

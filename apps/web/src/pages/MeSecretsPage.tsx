@@ -113,7 +113,7 @@ const styles: Record<string, CSSProperties> = {
     color: 'var(--ink)',
   },
   cardValue: {
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 11.5,
     color: 'var(--muted)',
     marginTop: 3,

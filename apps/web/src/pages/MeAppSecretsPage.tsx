@@ -510,7 +510,7 @@ function CreatorSecretRow({ slug, entry, onPolicyChanged }: CreatorSecretRowProp
       >
         <code
           style={{
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 13,
             fontWeight: 600,
             color: 'var(--ink)',
@@ -624,7 +624,7 @@ function CreatorSecretRow({ slug, entry, onPolicyChanged }: CreatorSecretRowProp
                   border: '1px solid var(--line)',
                   borderRadius: 8,
                   fontSize: 13,
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'var(--font-mono)',
                   background: 'var(--bg)',
                   color: 'var(--ink)',
                 }}
@@ -810,7 +810,7 @@ function SecretRow({ secretKey, entry, onSave, onRemove }: SecretRowProps) {
       >
         <code
           style={{
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 13,
             fontWeight: 600,
             color: 'var(--ink)',
@@ -871,7 +871,7 @@ function SecretRow({ secretKey, entry, onSave, onRemove }: SecretRowProps) {
               border: '1px solid var(--line)',
               borderRadius: 8,
               fontSize: 13,
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: 'var(--font-mono)',
               background: 'var(--bg)',
               color: 'var(--ink)',
             }}
@@ -1041,7 +1041,7 @@ function WorkspaceBYOKSection({ requiredByok }: { requiredByok: string[] }) {
               >
                 <code
                   style={{
-                    fontFamily: 'JetBrains Mono, monospace',
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 13,
                     fontWeight: 600,
                     color: 'var(--ink)',

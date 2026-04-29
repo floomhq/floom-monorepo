@@ -166,7 +166,7 @@ export function RunAppSecretsPage() {
               </h1>
               <div
                 style={{
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 11,
                   color: 'var(--muted)',
                   marginTop: 3,
@@ -253,7 +253,7 @@ export function RunAppSecretsPage() {
                     >
                       <code
                         style={{
-                          fontFamily: 'JetBrains Mono, monospace',
+                          fontFamily: 'var(--font-mono)',
                           fontSize: 13,
                           fontWeight: 600,
                           color: 'var(--ink)',
@@ -381,7 +381,7 @@ export function RunAppSecretsPage() {
                     >
                       <code
                         style={{
-                          fontFamily: 'JetBrains Mono, monospace',
+                          fontFamily: 'var(--font-mono)',
                           fontSize: 13,
                           fontWeight: 600,
                           color: 'var(--ink)',

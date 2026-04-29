@@ -155,7 +155,7 @@ export function RunAppRunPage() {
               </h1>
               <div
                 style={{
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 11,
                   color: 'var(--muted)',
                   marginTop: 3,

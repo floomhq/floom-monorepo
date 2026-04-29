@@ -167,7 +167,7 @@ export function StudioAppsPage() {
               <div style={{ minWidth: 0, flex: '1 1 420px' }}>
                 <div
                   style={{
-                    fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 10.5,
                     fontWeight: 700,
                     letterSpacing: '0.1em',
@@ -290,7 +290,7 @@ export function StudioAppsPage() {
                     alignItems: 'center',
                     gap: 10,
                     marginBottom: 12,
-                    fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 10.5,
                     fontWeight: 700,
                     color: 'var(--muted)',
@@ -364,7 +364,7 @@ export function StudioAppsPage() {
               </h3>
               <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
                 This removes the app from the store. Run history remains.
-                Type <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>{confirmSlug}</code> to confirm.
+                Type <code style={{ fontFamily: 'var(--font-mono)' }}>{confirmSlug}</code> to confirm.
               </p>
               <input
                 value={confirmInput}
@@ -378,7 +378,7 @@ export function StudioAppsPage() {
                   borderRadius: 8,
                   background: 'var(--card)',
                   fontSize: 14,
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'var(--font-mono)',
                   color: 'var(--ink)',
                   boxSizing: 'border-box',
                 }}
@@ -492,7 +492,7 @@ function MetricCell({ label, value, sub }: { label: string; value: string; sub?:
     >
       <div
         style={{
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
           fontSize: 10,
           fontWeight: 600,
           letterSpacing: '0.1em',
@@ -506,7 +506,7 @@ function MetricCell({ label, value, sub }: { label: string; value: string; sub?:
         style={{
           fontSize: 22,
           fontWeight: 700,
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
           letterSpacing: '-0.01em',
           color: 'var(--ink)',
         }}
@@ -706,7 +706,7 @@ function ActivityFeed({ runs }: { runs: MeRunSummary[] }) {
         <div>
           <div
             style={{
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 10,
               fontWeight: 600,
               letterSpacing: '0.1em',
@@ -785,7 +785,7 @@ function ActivityRow({ run }: { run: MeRunSummary }) {
         {failed && run.error && (
           <span
             style={{
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 11,
               color: '#ef4444',
               marginLeft: 6,
@@ -797,7 +797,7 @@ function ActivityRow({ run }: { run: MeRunSummary }) {
       </div>
       <span
         style={{
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
           color: 'var(--muted)',
           fontSize: 11.5,
         }}
@@ -889,7 +889,7 @@ function AppCard({
             justifyContent: 'center',
             fontSize: 15,
             fontWeight: 700,
-            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontFamily: 'var(--font-mono)',
             background: 'var(--bg)',
             border: '1px solid var(--line)',
             color: 'var(--ink)',
@@ -917,7 +917,7 @@ function AppCard({
           </div>
           <div
             style={{
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 10.5,
               color: 'var(--muted)',
               letterSpacing: '0.04em',
@@ -1051,7 +1051,7 @@ function AppCard({
           <strong
             style={{
               color: 'var(--ink)',
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
             }}
           >
             {app.run_count.toLocaleString()}

@@ -197,7 +197,7 @@ export function SecretsRequiredCard({ app, missingKeys, onSaved }: Props) {
                 {help.label}{' '}
                 <code
                   style={{
-                    fontFamily: 'JetBrains Mono, monospace',
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     color: 'var(--muted)',
                     fontWeight: 400,
@@ -246,7 +246,7 @@ export function SecretsRequiredCard({ app, missingKeys, onSaved }: Props) {
                   border: `1px solid ${err ? '#c2321f' : 'var(--line)'}`,
                   borderRadius: 8,
                   fontSize: 13,
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'var(--font-mono)',
                   background: 'var(--card)',
                   color: 'var(--ink)',
                 }}

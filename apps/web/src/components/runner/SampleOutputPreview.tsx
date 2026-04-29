@@ -118,7 +118,7 @@ export function SampleOutputPreview({ slug, className }: SampleOutputPreviewProp
     background: '#f5f5f3', // warm light neutral — matches card polish
     border: '1px solid var(--line)',
     color: '#8a8580', // muted, clearly "not real data"
-    fontFamily: "'JetBrains Mono', ui-monospace, 'Courier New', monospace",
+    fontFamily: 'var(--font-mono)',
     fontSize: 11.5,
     lineHeight: 1.7,
     overflow: 'auto',
@@ -130,7 +130,7 @@ export function SampleOutputPreview({ slug, className }: SampleOutputPreviewProp
     <div className={className ?? ''} data-testid="sample-output-preview">
       <div
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 10.5,
           color: 'var(--muted)',
           letterSpacing: '0.08em',

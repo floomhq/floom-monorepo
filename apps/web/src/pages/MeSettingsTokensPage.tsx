@@ -278,7 +278,7 @@ const rowStyle: React.CSSProperties = {
 };
 
 const monoStrongStyle: React.CSSProperties = {
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 13,
   fontWeight: 700,
   color: 'var(--ink)',
@@ -296,7 +296,7 @@ const errorStyle: React.CSSProperties = {
 
 // F7 (2026-04-28): light tinted bg on copy box for tokens.
 const tokenBlockStyle: React.CSSProperties = {
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 12,
   background: 'var(--studio, #f5f4f0)',
   color: 'var(--ink)',

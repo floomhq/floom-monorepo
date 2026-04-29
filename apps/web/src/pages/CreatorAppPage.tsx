@@ -272,7 +272,7 @@ export function CreatorAppPage() {
                     alignItems: 'center',
                   }}
                 >
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
                     {r.action}
                   </span>
                   <StatusPill status={r.status} />
@@ -283,7 +283,7 @@ export function CreatorAppPage() {
                     style={{
                       fontSize: 11,
                       color: 'var(--muted)',
-                      fontFamily: 'JetBrains Mono, monospace',
+                      fontFamily: 'var(--font-mono)',
                     }}
                   >
                     {r.is_self ? 'you' : r.caller_hash}
@@ -349,7 +349,7 @@ export function CreatorAppPage() {
                           style={{
                             fontSize: 12,
                             color: '#c2321f',
-                            fontFamily: 'JetBrains Mono, monospace',
+                            fontFamily: 'var(--font-mono)',
                           }}
                         >
                           {r.error}
@@ -373,7 +373,7 @@ function JsonBlock({ value }: { value: unknown }) {
       style={{
         background: 'var(--card)',
         color: 'var(--ink)',
-        fontFamily: 'JetBrains Mono, monospace',
+        fontFamily: 'var(--font-mono)',
         fontSize: 12,
         padding: 12,
         borderRadius: 6,

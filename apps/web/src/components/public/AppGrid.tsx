@@ -397,7 +397,7 @@ function AppGridCard({
               position: 'absolute',
               top: 10,
               left: 10,
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: 10,
               color: 'var(--accent, #047857)',
               letterSpacing: '0.06em',
@@ -455,7 +455,7 @@ function AppGridCard({
           alignItems: 'center',
           flexWrap: 'nowrap',
           columnGap: 6,
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 10.5,
           color: 'var(--muted)',
           lineHeight: 1.3,
@@ -581,7 +581,7 @@ function AppGridCard({
             data-testid={`app-grid-category-${app.slug}`}
             data-category={app.category}
             style={{
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: 10,
               color: 'var(--muted)',
               textTransform: 'uppercase',

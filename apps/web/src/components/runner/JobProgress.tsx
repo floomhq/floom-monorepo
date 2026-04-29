@@ -97,14 +97,14 @@ export function JobProgress({ app, job, onCancel }: Props) {
             color: 'var(--muted)',
           }}
         >
-          <div style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+          <div style={{ fontFamily: 'var(--font-mono)' }}>
             {job?.id ? `job ${job.id.slice(0, 12)}…` : 'creating job…'}
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <span
               data-testid="job-elapsed"
               style={{
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: 'var(--font-mono)',
                 fontVariantNumeric: 'tabular-nums',
               }}
             >

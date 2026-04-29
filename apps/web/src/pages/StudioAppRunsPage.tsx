@@ -64,7 +64,7 @@ export function StudioAppRunsPage() {
                 No runs yet
               </div>
               <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-                Share <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>/p/{app.slug}</code> to drive your first run.
+                Share <code style={{ fontFamily: 'var(--font-mono)' }}>/p/{app.slug}</code> to drive your first run.
               </p>
             </div>
           )}
@@ -91,7 +91,7 @@ export function StudioAppRunsPage() {
                   style={tableRowStyle}
                 >
                   <span>{formatTime(r.started_at)}</span>
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--muted)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>
                     {r.action}
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--muted)' }}>{r.status}</span>

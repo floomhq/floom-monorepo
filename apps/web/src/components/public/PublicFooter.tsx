@@ -75,7 +75,7 @@ const COL_STYLE: React.CSSProperties = {
 };
 
 const COL_LABEL_STYLE: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   letterSpacing: '0.12em',
   textTransform: 'uppercase',
@@ -146,7 +146,7 @@ export function PublicFooter() {
             to="/"
             data-testid="footer-brand"
             style={{
-              fontFamily: 'var(--font-display, Inter), system-ui, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontWeight: 800,
               fontSize: 19,
               color: 'var(--ink)',

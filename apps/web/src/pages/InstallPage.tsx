@@ -21,7 +21,7 @@ const codeBlockStyle: React.CSSProperties = {
   color: 'var(--ink)',
   padding: '14px 16px',
   borderRadius: 10,
-  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 13,
   lineHeight: 1.5,
   overflowX: 'auto',

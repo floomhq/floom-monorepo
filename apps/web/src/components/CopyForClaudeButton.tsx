@@ -153,7 +153,7 @@ export function CopyForClaudeButton({ variant = 'desktop' }: Props = {}) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span
             style={{
-              fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 10,
               fontWeight: 700,
               color: 'var(--muted)',
@@ -187,7 +187,7 @@ export function CopyForClaudeButton({ variant = 'desktop' }: Props = {}) {
         </div>
         <pre
           style={{
-            fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 11.5,
             color: 'var(--ink)',
             background: 'var(--bg)',

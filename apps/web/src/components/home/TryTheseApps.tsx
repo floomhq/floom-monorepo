@@ -231,7 +231,7 @@ const ICON_TILE: CSSProperties = {
 };
 
 const CATEGORY_PILL: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   letterSpacing: '0.12em',
   fontWeight: 700,
@@ -284,7 +284,7 @@ const CARD_FOOT: CSSProperties = {
 const META_STYLE: CSSProperties = {
   fontSize: 11.5,
   color: 'var(--muted)',
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   letterSpacing: '0.04em',
 };
 

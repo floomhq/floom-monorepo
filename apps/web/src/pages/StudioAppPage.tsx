@@ -205,7 +205,7 @@ export function StudioAppPage() {
                 No runs yet
               </div>
               <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-                Share <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>/p/{app.slug}</code> to drive your first run.
+                Share <code style={{ fontFamily: 'var(--font-mono)' }}>/p/{app.slug}</code> to drive your first run.
               </p>
             </div>
           )}
@@ -381,7 +381,7 @@ export function StudioAppPage() {
                   Delete this app
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-                  Removes <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>/p/{app.slug}</code> from the store and drops all run history. Cannot be undone.
+                  Removes <code style={{ fontFamily: 'var(--font-mono)' }}>/p/{app.slug}</code> from the store and drops all run history. Cannot be undone.
                 </p>
               </div>
               <button
@@ -444,7 +444,7 @@ export function StudioAppPage() {
             </h3>
             <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
               This removes the app from the store and drops run history. Cannot be undone.
-              Type <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>{app.slug}</code> to confirm.
+              Type <code style={{ fontFamily: 'var(--font-mono)' }}>{app.slug}</code> to confirm.
             </p>
             <input
               value={confirmInput}
@@ -459,7 +459,7 @@ export function StudioAppPage() {
                 borderRadius: 8,
                 background: 'var(--card)',
                 fontSize: 14,
-                fontFamily: 'JetBrains Mono, monospace',
+                fontFamily: 'var(--font-mono)',
                 color: 'var(--ink)',
                 boxSizing: 'border-box',
               }}
@@ -543,7 +543,7 @@ function AppMetaStrip({ app }: { app: AppDetail }) {
         borderRadius: 10,
         padding: '9px 12px',
         marginBottom: 16,
-        fontFamily: 'JetBrains Mono, monospace',
+        fontFamily: 'var(--font-mono)',
         fontSize: 11,
         color: 'var(--muted)',
         flexWrap: 'wrap',
@@ -594,7 +594,7 @@ function TrafficPanel({ runsByDay }: { runsByDay: Array<{ date: string; count: n
     >
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
         <h3 style={panelHeading}>Traffic</h3>
-        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.04em' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.04em' }}>
           last 14 days
         </span>
       </div>
@@ -630,7 +630,7 @@ function TrafficPanel({ runsByDay }: { runsByDay: Array<{ date: string; count: n
           />
         )}
       </svg>
-      <div style={{ display: 'flex', gap: 16, marginTop: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+      <div style={{ display: 'flex', gap: 16, marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
         <span style={{ color: 'var(--ink)', fontWeight: 700 }}>{loading ? '—' : total}</span>
         <span style={{ color: 'var(--muted)' }}>total runs</span>
       </div>
@@ -671,7 +671,7 @@ function AppMetaPanel({ app }: { app: AppDetail }) {
           <span
             style={{
               color: r.label === 'Visibility' && r.value === 'public' ? 'var(--accent)' : 'var(--ink)',
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 11.5,
               fontWeight: 500,
             }}
@@ -767,7 +767,7 @@ function TopErrorsPanel({ runs }: { runs: CreatorRun[] | null }) {
           </div>
           <span
             style={{
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 11,
               color: 'var(--muted)',
               minWidth: 24,
@@ -855,7 +855,7 @@ function WhereItRunsPanel({ runs }: { runs: CreatorRun[] | null }) {
           </div>
           <span
             style={{
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 11,
               color: 'var(--muted)',
               minWidth: 44,
@@ -924,7 +924,7 @@ function RunTable({ runs }: { runs: CreatorRun[] }) {
           <span>{formatTime(r.started_at)}</span>
           <span
             style={{
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 12,
               color: 'var(--muted)',
             }}

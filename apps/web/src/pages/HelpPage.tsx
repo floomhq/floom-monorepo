@@ -57,7 +57,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
-          fontFamily: "'Inter', system-ui, sans-serif",
+          fontFamily: 'var(--font-sans)',
           textAlign: 'left',
         }}
         aria-expanded={open}
@@ -232,7 +232,7 @@ export function HelpPage() {
     <PageShell title="Help & Support · Floom">
       <div
         style={{
-          fontFamily: "'Inter', system-ui, sans-serif",
+          fontFamily: 'var(--font-sans)',
         }}
       >
         {/* Hero */}

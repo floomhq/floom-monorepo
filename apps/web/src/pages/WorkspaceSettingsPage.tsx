@@ -65,7 +65,7 @@ function ControlCard({ label, value, mono }: { label: string; value: string; mon
   return (
     <div style={controlCardStyle}>
       <div style={controlLabelStyle}>{label}</div>
-      <div style={mono ? { ...controlValueStyle, fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 } : controlValueStyle}>
+      <div style={mono ? { ...controlValueStyle, fontFamily: 'var(--font-mono)', fontSize: 11.5 } : controlValueStyle}>
         {value}
       </div>
     </div>
@@ -132,7 +132,7 @@ const deepLinkRowStyle: React.CSSProperties = {
 };
 
 const deepLinkCodeStyle: React.CSSProperties = {
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 12,
   color: 'var(--muted)',
 };

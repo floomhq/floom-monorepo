@@ -215,7 +215,7 @@ export function BYOKModal({
               borderRadius: 8,
               background: 'var(--bg)',
               color: 'var(--ink)',
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: 13,
               boxSizing: 'border-box',
               marginBottom: error ? 6 : 14,

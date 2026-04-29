@@ -93,7 +93,7 @@ export function SelfHostSection() {
             border: '1px solid var(--line)',
             borderRadius: 10,
             overflow: 'hidden',
-            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontFamily: 'var(--font-mono)',
           }}
         >
           <code

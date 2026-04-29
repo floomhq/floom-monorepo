@@ -72,7 +72,7 @@ export function PublicRunPermalinkPage() {
           ) : (
             <>
               We couldn&apos;t find the shared run for{' '}
-              <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>/r/{runId}</code>
+              <code style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>/r/{runId}</code>
               .
             </>
           )}

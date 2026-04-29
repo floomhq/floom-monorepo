@@ -151,7 +151,7 @@ export function OutputPanel({ app, run, onIterate, onOpenDetails, onRetry, appDe
               data-testid="run-header-error-meta"
               style={{
                 color: 'var(--muted)',
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: 'var(--font-mono)',
                 fontSize: 12,
               }}
             >
@@ -234,7 +234,7 @@ function OutputRenderer({ outputs }: { outputs: unknown }) {
             style={{
               fontSize: 12,
               color: 'var(--muted)',
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: 'var(--font-mono)',
               marginTop: 4,
             }}
           >
@@ -571,7 +571,7 @@ function ErrorCard({
                 <div
                   style={{
                     marginTop: 10,
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     color: palette.sub,
                   }}
@@ -584,7 +584,7 @@ function ErrorCard({
                 <div
                   style={{
                     marginTop: 10,
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     color: palette.sub,
                     background: 'rgba(0,0,0,0.035)',
@@ -606,7 +606,7 @@ function ErrorCard({
                 <pre
                   style={{
                     marginTop: 10,
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     background: '#f7f6f1',
                     color: 'var(--ink)',

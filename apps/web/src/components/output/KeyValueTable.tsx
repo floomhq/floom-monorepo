@@ -99,7 +99,7 @@ function Row({ k, v }: { k: string; v: unknown }) {
         style={{
           padding: '8px 12px 8px 0',
           color: 'var(--muted)',
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 12,
           verticalAlign: 'top',
           width: '40%',
@@ -135,7 +135,7 @@ function Row({ k, v }: { k: string; v: unknown }) {
                 padding: 0,
                 color: 'var(--accent)',
                 cursor: 'pointer',
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: 'var(--font-mono)',
                 fontSize: 12,
               }}
             >
@@ -146,7 +146,7 @@ function Row({ k, v }: { k: string; v: unknown }) {
               <pre
                 style={{
                   marginTop: 6,
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 11,
                   background: 'rgba(0,0,0,0.03)',
                   padding: 10,

@@ -284,7 +284,7 @@ function CopyRow({ value }: { value: string }) {
         style={{
           flex: 1,
           fontSize: 12,
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: 'var(--font-mono)',
           color: 'var(--ink)',
           background: 'var(--bg)',
           border: '1px solid var(--line)',
@@ -337,7 +337,7 @@ function CodeBlock({ code }: { code: string }) {
           background: 'var(--studio, #f5f4f0)',
           color: 'var(--ink)',
           border: '1px solid var(--line)',
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: 'var(--font-mono)',
           fontSize: 12,
           padding: 16,
           borderRadius: 8,
@@ -385,7 +385,7 @@ function ErrorCard({ title, message }: { title: string; message: string }) {
       }}
     >
       <div style={{ fontWeight: 600, marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 13, fontFamily: 'JetBrains Mono, monospace' }}>
+      <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)' }}>
         {message}
       </div>
     </div>

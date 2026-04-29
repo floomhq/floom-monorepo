@@ -58,7 +58,7 @@ const BUTTON_STYLE: CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
   textDecoration: 'none',
-  fontFamily: "'Inter', system-ui, sans-serif",
+  fontFamily: 'var(--font-sans)',
 };
 
 export function DiscordCta() {

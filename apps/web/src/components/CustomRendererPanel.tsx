@@ -47,12 +47,12 @@ export default function Renderer({ data }: RenderProps) {
       border: '1px solid #e5e7eb',
       borderRadius: 12,
       background: '#fafafa',
-      fontFamily: 'Inter, system-ui, sans-serif',
+      fontFamily: 'var(--font-sans)',
     }}>
       <h3 style={{ margin: 0, fontSize: 16 }}>Custom renderer</h3>
       <pre style={{
         marginTop: 8,
-        fontFamily: 'JetBrains Mono, monospace',
+        fontFamily: 'var(--font-mono)',
         fontSize: 12,
         whiteSpace: 'pre-wrap',
       }}>{JSON.stringify(data, null, 2)}</pre>
@@ -266,7 +266,7 @@ export function CustomRendererPanel({
           width: '100%',
           minHeight: 240,
           padding: '12px 14px',
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: 'var(--font-mono)',
           fontSize: 12,
           lineHeight: 1.5,
           border: '1px solid var(--line)',

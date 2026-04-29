@@ -59,7 +59,7 @@ function CompactHeroStrip({ runs }: { runs: StudioActivityRun[] }) {
         border: '1px solid var(--line)',
         borderRadius: 999,
         fontSize: 12.5,
-        fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+        fontFamily: 'var(--font-mono)',
         fontWeight: 500,
         color: 'var(--muted)',
         marginBottom: 18,

@@ -845,6 +845,6 @@ const errorTextStyle: React.CSSProperties = {
 };
 
 const codeStyle: React.CSSProperties = {
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 12,
 };

@@ -205,7 +205,7 @@ function ModelChip({ model, cacheHit }: { model: string; cacheHit: boolean }) {
       }}
     >
       <span>Model</span>
-      <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+      <span style={{ fontFamily: 'var(--font-mono)' }}>
         {model}
         {cacheHit ? (
           <span

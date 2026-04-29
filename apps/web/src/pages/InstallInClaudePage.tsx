@@ -266,7 +266,7 @@ const heroStyle: React.CSSProperties = {
 };
 
 const kickerStyle: React.CSSProperties = {
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   fontWeight: 800,
   color: 'var(--accent)',
@@ -300,7 +300,7 @@ const heroCommandStyle: React.CSSProperties = {
   background: 'var(--studio, #f5f4f0)',
   color: 'var(--ink)',
   border: '1px solid var(--line)',
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 13,
   padding: '14px 18px',
   borderRadius: 10,
@@ -354,7 +354,7 @@ const choiceNumStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 14,
   fontWeight: 800,
 };
@@ -426,7 +426,7 @@ const numStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontWeight: 800,
   fontSize: 14,
 };
@@ -438,7 +438,7 @@ const codeStyle: React.CSSProperties = {
   border: '1px solid var(--line)',
   borderRadius: 8,
   padding: 14,
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 12.5,
   lineHeight: 1.6,
   overflowX: 'auto',
@@ -515,7 +515,7 @@ const rolePillStyle: React.CSSProperties = {
   padding: '3px 8px',
   fontSize: 11,
   color: 'var(--muted)',
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
 };
 
 const appPillStyle: React.CSSProperties = {
@@ -542,7 +542,7 @@ const appIconStyle: React.CSSProperties = {
 };
 
 const monoInlineStyle: React.CSSProperties = {
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 12,
   color: 'var(--ink)',
 };

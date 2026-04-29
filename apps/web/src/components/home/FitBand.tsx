@@ -71,7 +71,7 @@ const CARD_FIT: CSSProperties = {
 };
 
 const CARD_LABEL_STYLE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   letterSpacing: '0.12em',
   textTransform: 'uppercase',

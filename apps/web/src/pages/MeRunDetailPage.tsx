@@ -177,7 +177,7 @@ export function MeRunDetailPage() {
                   maxHeight: 400,
                   background: 'var(--code)',
                   color: 'var(--code-text)',
-                  fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 12.5,
                   lineHeight: 1.7,
                 }}
@@ -516,7 +516,7 @@ function renderAiReadinessAudit(output: unknown): React.ReactNode {
           <span
             className={`score ${scoreClass}`}
             style={{
-              fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontWeight: 700,
               padding: '8px 16px',
               borderRadius: 10,

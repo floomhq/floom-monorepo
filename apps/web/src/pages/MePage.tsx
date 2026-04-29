@@ -729,7 +729,7 @@ function AppNotFound({
             <>
               {' '}
               (
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
                 {slug}
               </span>
               )

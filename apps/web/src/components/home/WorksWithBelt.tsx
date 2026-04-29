@@ -111,7 +111,7 @@ const EXAMPLES_ROW: CSSProperties = {
 };
 
 const EXAMPLES_PREFIX: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',

@@ -35,7 +35,7 @@ const ACTIVE_THRESHOLD_DAYS = 7;
 const styles: Record<string, CSSProperties> = {
   head: { marginBottom: 20 },
   crumb: {
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 11.5,
     color: 'var(--muted)',
     marginBottom: 8,
@@ -101,7 +101,7 @@ const styles: Record<string, CSSProperties> = {
     gap: 8,
   },
   actionsCount: {
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 11,
     color: 'var(--muted)',
     fontWeight: 600,
@@ -156,7 +156,7 @@ const styles: Record<string, CSSProperties> = {
     color: 'var(--ink)',
   },
   scopePill: {
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 9.5,
     fontWeight: 700,
     letterSpacing: '0.04em',
@@ -174,7 +174,7 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid var(--line)',
   },
   activePill: {
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 9.5,
     fontWeight: 700,
     letterSpacing: '0.04em',
@@ -185,13 +185,13 @@ const styles: Record<string, CSSProperties> = {
     color: '#fff',
   },
   cardValue: {
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 11.5,
     color: 'var(--muted)',
     marginTop: 4,
   },
   metaRow: {
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 11,
     color: 'var(--muted)',
     marginTop: 6,
@@ -307,7 +307,7 @@ const styles: Record<string, CSSProperties> = {
     color: 'var(--code-text, #e8e6e0)',
     borderRadius: 10,
     padding: '14px 16px',
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 12,
     lineHeight: 1.6,
     display: 'flex',
@@ -331,7 +331,7 @@ const styles: Record<string, CSSProperties> = {
     padding: '5px 10px',
     fontSize: 10.5,
     fontWeight: 700,
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     letterSpacing: '0.04em',
     textTransform: 'uppercase' as const,
     cursor: 'pointer',
@@ -351,7 +351,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'flex-start',
   },
   snippetLab: {
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 10,
     color: 'var(--muted)',
     letterSpacing: '0.08em',
@@ -364,7 +364,7 @@ const styles: Record<string, CSSProperties> = {
     color: 'var(--code-text, #e8e6e0)',
     borderRadius: 8,
     padding: '12px 14px',
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: 11.5,
     lineHeight: 1.55,
     overflow: 'auto',

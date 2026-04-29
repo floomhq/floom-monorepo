@@ -30,7 +30,7 @@ const LINK_STYLE: React.CSSProperties = {
   textUnderlineOffset: '2px',
 };
 const CODE_STYLE: React.CSSProperties = {
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: '0.92em',
   background: 'var(--bg)',
   padding: '0 4px',
@@ -286,7 +286,7 @@ export function CreatorPage() {
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>
                     {a.name}
                   </div>
-                  <div style={{ fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--muted)' }}>
+                  <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>
                     /p/{a.slug}
                   </div>
                 </div>
@@ -398,7 +398,7 @@ export function CreatorPage() {
               </h3>
               <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
                 Removes the app from the store and drops run history. Cannot be undone.
-                Type the slug <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>{confirmSlug}</code> to confirm.
+                Type the slug <code style={{ fontFamily: 'var(--font-mono)' }}>{confirmSlug}</code> to confirm.
               </p>
               <input
                 value={confirmInput}
@@ -412,7 +412,7 @@ export function CreatorPage() {
                   borderRadius: 8,
                   background: 'var(--card)',
                   fontSize: 14,
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'var(--font-mono)',
                   color: 'var(--ink)',
                   boxSizing: 'border-box',
                 }}

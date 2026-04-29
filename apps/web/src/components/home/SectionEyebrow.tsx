@@ -25,7 +25,7 @@ export function SectionEyebrow({ children, testid, tone = 'muted' }: SectionEyeb
     <div
       data-testid={testid}
       style={{
-        fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+        fontFamily: 'var(--font-mono)',
         fontSize: 11,
         fontWeight: 600,
         color,

@@ -77,7 +77,7 @@ export function DescriptionMarkdown({
     code: ({ children }) => (
       <code
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: '0.9em',
           padding: '1px 6px',
           background: 'var(--bg)',

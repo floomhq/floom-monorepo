@@ -138,7 +138,7 @@ export function McpSnippet() {
             Paste into your MCP client&apos;s{' '}
             <code
               style={{
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFamily: 'var(--font-mono)',
                 fontSize: 14,
                 background: 'var(--card)',
                 border: '1px solid var(--line)',
@@ -159,7 +159,7 @@ export function McpSnippet() {
             border: '1px solid var(--line)',
             borderRadius: 14,
             padding: '20px 22px',
-            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontFamily: 'var(--font-mono)',
             fontSize: 13.5,
             lineHeight: 1.7,
             overflowX: 'auto',

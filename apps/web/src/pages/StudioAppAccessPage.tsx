@@ -457,7 +457,7 @@ const styles = {
     fontSize: 14,
     color: 'var(--ink)',
     background: 'var(--card)',
-    fontFamily: 'JetBrains Mono, monospace',
+    fontFamily: 'var(--font-mono)',
   } as React.CSSProperties,
 
   unitSelect: {

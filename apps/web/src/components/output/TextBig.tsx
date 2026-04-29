@@ -23,7 +23,7 @@ export function TextBig({ value, copyable = true }: TextBigProps) {
       )}
       <div
         style={{
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 18,
           fontWeight: 500,
           wordBreak: 'break-all',

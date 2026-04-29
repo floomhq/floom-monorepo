@@ -449,7 +449,7 @@ export function AppsDirectoryPage() {
                   <span>{labelForCategory(cat)}</span>
                   <span
                     style={{
-                      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                      fontFamily: 'var(--font-mono)',
                       fontSize: 10,
                       opacity: 0.7,
                       marginLeft: 2,
@@ -538,7 +538,7 @@ export function AppsDirectoryPage() {
               aria-hidden="true"
               className="apps-search-kbd"
               style={{
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFamily: 'var(--font-mono)',
                 fontSize: 10.5,
                 fontWeight: 600,
                 color: 'var(--muted)',
@@ -961,7 +961,7 @@ function SortDropdown() {
               <span>{opt.label}</span>
               <span
                 style={{
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 10.5,
                   color: opt.active ? 'var(--accent, #047857)' : 'var(--muted)',
                   opacity: 0.75,

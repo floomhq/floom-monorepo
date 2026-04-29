@@ -222,7 +222,7 @@ const sectionStyle: CSSProperties = {
 };
 
 const sectionLabelStyle: CSSProperties = {
-  fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 10,
   fontWeight: 700,
   textTransform: 'uppercase',
@@ -249,7 +249,7 @@ const itemTextStyle: CSSProperties = {
 };
 
 const countStyle: CSSProperties = {
-  fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 10,
   color: 'var(--muted)',
   marginLeft: 'auto',

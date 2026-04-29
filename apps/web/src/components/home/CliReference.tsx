@@ -22,7 +22,7 @@ const SHELL_STYLE: CSSProperties = {
 };
 
 const EYEBROW_STYLE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   color: 'var(--muted)',
   letterSpacing: '0.1em',
@@ -37,7 +37,7 @@ const BLOCK_STYLE: CSSProperties = {
   border: '1px solid var(--line)',
   borderRadius: 10,
   padding: '12px 14px',
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 12,
   lineHeight: 1.65,
   textAlign: 'left',

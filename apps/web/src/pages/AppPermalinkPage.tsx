@@ -727,7 +727,7 @@ export function AppPermalinkPage() {
             ) : (
               <>
                 No app found at{' '}
-                <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>/p/{slug}</code>
+                <code style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>/p/{slug}</code>
               </>
             )}
           </p>
@@ -958,7 +958,7 @@ export function AppPermalinkPage() {
                     {summary.avg.toFixed(1)}
                   </span>
                 )}
-                <span data-testid="hero-version" style={{ fontSize: 11, padding: '3px 9px', borderRadius: 999, border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--bg)', fontFamily: 'JetBrains Mono, ui-monospace, monospace', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <span data-testid="hero-version" style={{ fontSize: 11, padding: '3px 9px', borderRadius: 999, border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--bg)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   v{app.version ?? '0.1.0'} · {app.version_status ?? 'stable'}
                 </span>
                 {/* G5: capability chips merged inline — same row, same
@@ -1417,27 +1417,27 @@ export function AppPermalinkPage() {
                 marginBottom: 14,
               }}
             >
-              <h4 style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 10px' }}>
+              <h4 style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 10px' }}>
                 App meta
               </h4>
-              <AboutMetaRow label="Slug" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.slug}</code>} />
-              {app.version && <AboutMetaRow label="Version" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>v{app.version}</code>} />}
+              <AboutMetaRow label="Slug" value={<code style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>{app.slug}</code>} />
+              {app.version && <AboutMetaRow label="Version" value={<code style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>v{app.version}</code>} />}
               {app.manifest?.license?.trim() && (
                 <AboutMetaRow
                   label="License"
                   value={
                     githubRepo ? (
-                      <a href={`${githubRepo}/blob/main/LICENSE`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>
+                      <a href={`${githubRepo}/blob/main/LICENSE`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
                         {app.manifest.license.trim()}
                       </a>
                     ) : (
-                      <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.manifest.license.trim()}</code>
+                      <code style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>{app.manifest.license.trim()}</code>
                     )
                   }
                 />
               )}
               {app.runtime && (
-                <AboutMetaRow label="Runtime" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.runtime}</code>} />
+                <AboutMetaRow label="Runtime" value={<code style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>{app.runtime}</code>} />
               )}
               {app.category && <AboutMetaRow label="Category" value={app.category} />}
               {createdByLabel && <AboutMetaRow label="Created by" value={createdByLabel} />}
@@ -1454,16 +1454,16 @@ export function AppPermalinkPage() {
                   padding: '16px 18px',
                 }}
               >
-                <h4 style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 10px' }}>
+                <h4 style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 10px' }}>
                   Stats
                 </h4>
                 {app.runs_7d != null && app.runs_7d > 0 && (
-                  <AboutMetaRow label="Runs (7d)" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.runs_7d.toLocaleString()}</code>} />
+                  <AboutMetaRow label="Runs (7d)" value={<code style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>{app.runs_7d.toLocaleString()}</code>} />
                 )}
                 {summary && summary.count > 0 && (
                   <>
-                    <AboutMetaRow label="Ratings" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{summary.count}</code>} />
-                    <AboutMetaRow label="Avg rating" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5, color: 'var(--accent)' }}>{summary.avg.toFixed(1)}/5</code>} />
+                    <AboutMetaRow label="Ratings" value={<code style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>{summary.count}</code>} />
+                    <AboutMetaRow label="Avg rating" value={<code style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--accent)' }}>{summary.avg.toFixed(1)}/5</code>} />
                   </>
                 )}
               </div>
@@ -1561,7 +1561,7 @@ export function AppPermalinkPage() {
                     padding: '18px 20px',
                   }}
                 >
-                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
                     Repository
                   </div>
                   <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -1605,7 +1605,7 @@ export function AppPermalinkPage() {
                   padding: '18px 20px',
                 }}
               >
-                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
                   Spec (floom.json)
                 </div>
                 <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
@@ -1639,7 +1639,7 @@ export function AppPermalinkPage() {
                 padding: '18px 20px',
               }}
             >
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
                 Self-host
               </div>
               <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Run this app on your own infra.</h3>
@@ -1659,7 +1659,7 @@ export function AppPermalinkPage() {
           <section data-testid="tab-content-runs">
             <div
               style={{
-                fontFamily: 'JetBrains Mono, monospace',
+                fontFamily: 'var(--font-mono)',
                 fontSize: 10.5,
                 color: 'var(--muted)',
                 letterSpacing: '0.08em',
@@ -1768,7 +1768,7 @@ function InstallCard({
         <span
           style={{
             flex: 1,
-            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 12,
             color: 'var(--ink)',
             whiteSpace: 'pre-wrap',
@@ -1832,7 +1832,7 @@ function SourceSnippet({ value }: { value: string }) {
       <pre
         style={{
           flex: 1,
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
           fontSize: 11.5,
           color: 'var(--ink)',
           margin: 0,

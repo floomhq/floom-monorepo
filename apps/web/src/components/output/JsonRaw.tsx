@@ -31,7 +31,7 @@ export function JsonRaw({ data }: JsonRawProps) {
       className="app-expanded-card"
       style={{
         position: 'relative',
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: 'var(--font-mono)',
         fontSize: 12,
       }}
     >

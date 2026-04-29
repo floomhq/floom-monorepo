@@ -103,7 +103,7 @@ export function RunRunDetailPage() {
                 ? 'Run not found'
                 : "Couldn't load run"}
             </div>
-            <pre style={{ margin: 0, fontSize: 12.5, fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>
+            <pre style={{ margin: 0, fontSize: 12.5, fontFamily: 'var(--font-mono)' }}>
               {error.includes('404') || error.toLowerCase().includes('not found')
                 ? 'It may belong to another device or user, or the link is invalid.'
                 : error}
@@ -154,7 +154,7 @@ export function RunRunDetailPage() {
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>
                   {run.error_type || 'Error'}
                 </div>
-                <pre style={{ margin: 0, fontSize: 12.5, fontFamily: 'JetBrains Mono, ui-monospace, monospace', whiteSpace: 'pre-wrap' }}>
+                <pre style={{ margin: 0, fontSize: 12.5, fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap' }}>
                   {run.error}
                 </pre>
               </div>
@@ -208,7 +208,7 @@ export function RunRunDetailPage() {
                   maxHeight: 400,
                   background: 'var(--code)',
                   color: 'var(--code-text)',
-                  fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 12.5,
                   lineHeight: 1.7,
                 }}
@@ -299,7 +299,7 @@ function StatusHeader({
           </div>
           <div
             style={{
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 11.5,
               color: 'var(--muted)',
               marginTop: 3,
@@ -443,7 +443,7 @@ function CollapsibleSection({
               style={{
                 marginLeft: 8,
                 fontSize: 10.5,
-                fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                fontFamily: 'var(--font-mono)',
                 color: 'var(--muted)',
                 fontWeight: 500,
               }}
@@ -477,7 +477,7 @@ function CollapsibleSection({
                   padding: 0,
                   background: 'var(--code)',
                   color: 'var(--code-text)',
-                  fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 12.5,
                   lineHeight: 1.7,
                 }

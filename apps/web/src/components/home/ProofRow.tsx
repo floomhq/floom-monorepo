@@ -109,7 +109,7 @@ function StatSkeleton({ label }: { label: string }) {
       />
       <span
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 11,
           color: 'var(--muted)',
           textTransform: 'uppercase',
@@ -143,7 +143,7 @@ function Stat({ value, label }: { value: string; label: string }) {
     >
       <span
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 26,
           fontWeight: 600,
           color: 'var(--ink)',
@@ -155,7 +155,7 @@ function Stat({ value, label }: { value: string; label: string }) {
       </span>
       <span
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 11,
           color: 'var(--muted)',
           textTransform: 'uppercase',

@@ -283,7 +283,7 @@ export function ResetPasswordPage() {
             <div
               data-testid="reset-password-rules"
               style={{
-                fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+                fontFamily: 'var(--font-mono)',
                 fontSize: 11,
                 color: 'var(--muted)',
                 background: 'var(--bg)',

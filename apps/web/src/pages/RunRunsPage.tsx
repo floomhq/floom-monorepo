@@ -67,7 +67,7 @@ function CompactHeroStrip({ runs }: { runs: MeRunSummary[] }) {
         border: '1px solid var(--line)',
         borderRadius: 999,
         fontSize: 12.5,
-        fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+        fontFamily: 'var(--font-mono)',
         fontWeight: 500,
         color: 'var(--muted)',
         marginBottom: 18,
@@ -268,7 +268,7 @@ function RunRow({ run }: { run: MeRunSummary }) {
         {snip && (
           <div
             style={{
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 10.5,
               color: 'var(--muted)',
               marginTop: 2,
@@ -369,7 +369,7 @@ function RunRow({ run }: { run: MeRunSummary }) {
       {/* Duration */}
       <span
         style={{
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
           fontSize: 10.5,
           color: isFailed ? 'var(--danger, #ef4444)' : 'var(--accent)',
           background: isFailed ? 'var(--danger-soft, #fef2f2)' : 'var(--accent-soft)',
@@ -387,7 +387,7 @@ function RunRow({ run }: { run: MeRunSummary }) {
       {/* Timestamp */}
       <span
         style={{
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
           fontSize: 10.5,
           color: 'var(--muted)',
           whiteSpace: 'nowrap',
@@ -665,7 +665,7 @@ export function RunRunsPage() {
                 justifyContent: 'space-between',
                 fontSize: 12,
                 color: 'var(--muted)',
-                fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                fontFamily: 'var(--font-mono)',
                 marginBottom: 16,
               }}
             >

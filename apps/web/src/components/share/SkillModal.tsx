@@ -285,8 +285,7 @@ export function SkillModal({
             <pre
               style={{
                 margin: 0,
-                fontFamily:
-                  'JetBrains Mono, ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
+                fontFamily: 'var(--font-mono)',
                 fontSize: 12,
                 lineHeight: 1.55,
                 color: 'var(--ink)',
@@ -336,7 +335,7 @@ export function SkillModal({
                 color: 'var(--muted)',
               }}
             >
-              Save to <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: 11.5 }}>{pastePath}</code>
+              Save to <code style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>{pastePath}</code>
             </span>
           </div>
         </section>
@@ -389,8 +388,7 @@ export function SkillModal({
               <p
                 style={{
                   margin: '4px 0 0',
-                  fontFamily:
-                    'JetBrains Mono, ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 12.5,
                   color: 'var(--accent)',
                   lineHeight: 1.5,

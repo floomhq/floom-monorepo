@@ -69,7 +69,7 @@ const CARD_STYLE: CSSProperties = {
 };
 
 const CARD_LABEL_STYLE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   letterSpacing: '0.12em',
   textTransform: 'uppercase',
@@ -78,7 +78,7 @@ const CARD_LABEL_STYLE: CSSProperties = {
 };
 
 const MONO_BLOCK_STYLE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 13,
   lineHeight: 1.55,
   color: 'var(--ink)',
@@ -107,7 +107,7 @@ const SCORE_NUM_STYLE: CSSProperties = {
 };
 
 const SCORE_SUFFIX_STYLE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 13,
   color: 'var(--muted)',
 };

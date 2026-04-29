@@ -102,7 +102,7 @@ export function StringList({ items, label, maxItems = 20 }: StringListProps) {
             marginTop: 10,
             fontSize: 12,
             color: 'var(--muted)',
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: 'var(--font-mono)',
           }}
         >
           + {extra} more
@@ -123,7 +123,7 @@ function ChipItem({ value }: { value: string }) {
         border: '1px solid var(--line)',
         borderRadius: 999,
         background: 'var(--card)',
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: 'var(--font-mono)',
         fontSize: 12,
         color: 'var(--ink)',
         userSelect: 'all',

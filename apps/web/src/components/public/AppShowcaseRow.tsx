@@ -180,7 +180,7 @@ export function AppShowcaseRow({ apps }: AppShowcaseRowProps) {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: 10.5,
               fontWeight: 700,
               letterSpacing: '0.06em',
@@ -313,7 +313,7 @@ function ShowcaseCard({
             position: 'absolute',
             top: 12,
             left: 12,
-            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontFamily: 'var(--font-mono)',
             fontSize: 9.5,
             letterSpacing: '0.06em',
             textTransform: 'uppercase',
@@ -337,7 +337,7 @@ function ShowcaseCard({
             position: 'absolute',
             top: 12,
             right: 12,
-            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontFamily: 'var(--font-mono)',
             fontSize: 9.5,
             letterSpacing: '0.06em',
             textTransform: 'uppercase',
@@ -401,7 +401,7 @@ function ShowcaseCard({
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: 10.5,
               color: 'var(--muted)',
               // Stat-line nowrap fix per decision doc PORT #6: stats
@@ -445,7 +445,7 @@ function ShowcaseCard({
             <span
               key={tag}
               style={{
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFamily: 'var(--font-mono)',
                 fontSize: 10,
                 color: 'var(--muted)',
                 letterSpacing: '0.04em',
@@ -473,7 +473,7 @@ function ShowcaseCard({
         >
           <span
             style={{
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: 12.5,
               color: 'var(--muted)',
               fontWeight: 500,

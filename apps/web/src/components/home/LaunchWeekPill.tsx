@@ -12,7 +12,7 @@
 import type { CSSProperties } from 'react';
 
 const PILL_STYLE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   fontWeight: 700,
   color: 'var(--accent)',

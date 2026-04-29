@@ -104,7 +104,7 @@ function FlowDiagram() {
         <p
           aria-hidden="true"
           className="protocol-flow-scroll-hint"
-          style={{ margin: 0, fontSize: 10, color: 'var(--muted)', display: 'none', fontFamily: 'JetBrains Mono, monospace' }}
+          style={{ margin: 0, fontSize: 10, color: 'var(--muted)', display: 'none', fontFamily: 'var(--font-mono)' }}
         >
           ← scroll →
         </p>
@@ -133,8 +133,8 @@ function FlowDiagram() {
           flexShrink: 0,
         }}>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Input</p>
-          <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace' }}>OpenAPI spec</p>
-          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted)', fontFamily: 'JetBrains Mono, monospace' }}>+ floom.yaml</p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>OpenAPI spec</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>+ floom.yaml</p>
         </div>
 
         <Arrow />
@@ -169,7 +169,7 @@ function FlowDiagram() {
               fontSize: 12,
               fontWeight: 600,
               color: 'var(--ink)',
-              fontFamily: mono ? 'JetBrains Mono, monospace' : 'inherit',
+              fontFamily: mono ? 'var(--font-mono)' : 'inherit',
               whiteSpace: 'nowrap',
             }}>
               {label}
@@ -268,7 +268,7 @@ function ProxiedVsHosted() {
               background: 'var(--bg)',
               color: 'var(--ink)',
               border: '1px solid var(--line)',
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 11.5,
               padding: '16px',
               margin: 0,
@@ -316,7 +316,7 @@ function ProxiedVsHosted() {
               background: 'var(--bg)',
               color: 'var(--ink)',
               border: '1px solid var(--line)',
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 11.5,
               padding: '16px',
               margin: 0,
@@ -430,7 +430,7 @@ const markdownComponents = {
       return (
         <code
           style={{
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: '0.88em',
             background: 'var(--bg)',
             border: '1px solid var(--line)',
@@ -449,7 +449,7 @@ const markdownComponents = {
             background: 'var(--bg)',
             color: 'var(--ink)',
             border: '1px solid var(--line)',
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 12,
             padding: '20px 16px',
             borderRadius: 10,
@@ -732,7 +732,7 @@ export function ProtocolPage() {
                   rel="noreferrer"
                   style={{
                     fontSize: 12,
-                    fontFamily: 'JetBrains Mono, monospace',
+                    fontFamily: 'var(--font-mono)',
                     color: 'var(--accent)',
                     textDecoration: 'none',
                     padding: '4px 10px',
@@ -756,7 +756,7 @@ export function ProtocolPage() {
               color: 'var(--ink)',
               border: '1px solid var(--line)',
               borderRadius: 10,
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 12,
               lineHeight: 1.8,
             }}

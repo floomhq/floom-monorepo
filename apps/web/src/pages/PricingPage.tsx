@@ -28,7 +28,7 @@ const LINE_HOVER = '#d1d5db';
 // Typography helpers
 // ---------------------------------------------------------------------------
 const MONO: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
 };
 
 // Display (formerly SERIF — pre-2026-04-24 the display family was

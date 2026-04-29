@@ -71,7 +71,7 @@ export function BannerCard({ title, lines, size = 'sm' }: BannerCardProps) {
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
-    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+    fontFamily: 'var(--font-mono)',
     color: BANNER_INK,
   };
 

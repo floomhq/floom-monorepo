@@ -256,7 +256,7 @@ export function InstallPopover({
             >
               Mint a token →
             </Link>{' '}
-            then replace <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>{'<your_token>'}</code> below.
+            then replace <code style={{ fontFamily: 'var(--font-mono)' }}>{'<your_token>'}</code> below.
           </p>
         ) : null}
 
@@ -322,7 +322,7 @@ export function InstallPopover({
               description={
                 <>
                   Saves to{' '}
-                  <code style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>{pastePath}</code>
+                  <code style={{ fontFamily: 'var(--font-mono)' }}>{pastePath}</code>
                 </>
               }
               value={skillCommand}
@@ -407,8 +407,7 @@ function Snippet({
         <pre
           style={{
             margin: 0,
-            fontFamily:
-              'JetBrains Mono, ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 12,
             lineHeight: 1.55,
             color: 'var(--ink)',

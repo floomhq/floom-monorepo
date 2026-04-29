@@ -30,7 +30,7 @@ export function TrustStrip() {
       </div>
       <p
         style={{
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 11,
           color: 'var(--muted)',
           marginTop: 32,

@@ -109,7 +109,7 @@ export function FileDownload({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: 'var(--font-mono)',
             fontSize: 10,
             fontWeight: 600,
             color: 'var(--muted)',

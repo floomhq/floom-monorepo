@@ -422,7 +422,7 @@ function OverviewPanel({
               <span>{formatTime(r.started_at)}</span>
               <span
                 style={{
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 12,
                   color: 'var(--muted)',
                 }}

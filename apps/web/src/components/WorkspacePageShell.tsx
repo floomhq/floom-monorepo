@@ -88,7 +88,7 @@ const headerStyle: CSSProperties = {
 };
 
 const kickerStyle: CSSProperties = {
-  fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   fontWeight: 700,
   letterSpacing: '0.06em',

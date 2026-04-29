@@ -81,7 +81,7 @@ export function UrlLink({ url, label }: UrlLinkProps) {
             textDecoration: 'none',
             borderBottom: '1px solid transparent',
             fontSize: 15,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: 'var(--font-mono)',
             wordBreak: 'break-all',
             minWidth: 0,
           }}

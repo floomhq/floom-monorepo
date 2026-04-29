@@ -70,7 +70,7 @@ export function ArchitectureDiagram() {
             <span
               style={{
                 fontSize: 11,
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFamily: 'var(--font-mono)',
                 color: 'var(--muted)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
@@ -92,7 +92,7 @@ export function ArchitectureDiagram() {
             <span
               style={{
                 fontSize: 11,
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFamily: 'var(--font-mono)',
                 color: '#ffffff',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
@@ -168,7 +168,7 @@ export function ArchitectureDiagram() {
                     style={{
                       marginTop: 2,
                       fontSize: 11,
-                      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                      fontFamily: 'var(--font-mono)',
                       color: 'var(--muted)',
                       textTransform: 'lowercase',
                       letterSpacing: '0.04em',

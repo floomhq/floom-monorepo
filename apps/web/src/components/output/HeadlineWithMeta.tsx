@@ -85,7 +85,7 @@ export function HeadlineWithMeta({ headline, headlineLabel, meta }: HeadlineWith
                 borderRadius: 999,
                 fontSize: 12,
                 color: 'var(--muted)',
-                fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontFamily: 'var(--font-mono)',
               }}
             >
               <span style={{ color: 'var(--muted)' }}>{m.label}:</span>

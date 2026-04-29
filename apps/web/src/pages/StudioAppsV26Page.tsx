@@ -144,7 +144,7 @@ function CompactHeroStrip({
         border: '1px solid var(--line)',
         borderRadius: 999,
         fontSize: 12.5,
-        fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+        fontFamily: 'var(--font-mono)',
         fontWeight: 500,
         color: 'var(--muted)',
         marginBottom: 18,
@@ -238,7 +238,7 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
             justifyContent: 'center',
             fontSize: 13,
             fontWeight: 700,
-            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontFamily: 'var(--font-mono)',
             color: 'var(--ink)',
             flexShrink: 0,
           }}
@@ -260,7 +260,7 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
           </div>
           <div
             style={{
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 10.5,
               color: 'var(--muted)',
               marginTop: 2,
@@ -365,7 +365,7 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
           <strong
             style={{
               color: 'var(--ink)',
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
             }}
           >
             {app.run_count.toLocaleString()}
@@ -435,7 +435,7 @@ function RecentActivityPanel({ runs }: { runs: MeRunSummary[] }) {
           />
           <span
             style={{
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 11,
               fontWeight: 600,
               letterSpacing: '0.08em',
@@ -512,7 +512,7 @@ function RecentActivityPanel({ runs }: { runs: MeRunSummary[] }) {
               </div>
               <span
                 style={{
-                  fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                  fontFamily: 'var(--font-mono)',
                   color: 'var(--muted)',
                   fontSize: 11.5,
                 }}

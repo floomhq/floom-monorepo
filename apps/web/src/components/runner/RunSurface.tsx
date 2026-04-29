@@ -1328,7 +1328,7 @@ export function RunSurface({
           <div
             data-testid="run-surface-output-eyebrow"
             style={{
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 10.5,
               color: state.phase === 'streaming' || state.phase === 'job' ? 'var(--accent, #047857)' : 'var(--muted)',
               letterSpacing: '0.08em',
@@ -1447,7 +1447,7 @@ function RunStatusPill({
           color: 'var(--muted)',
           letterSpacing: '0.04em',
           textTransform: 'uppercase',
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
         }}
       >
         Ready
@@ -1472,7 +1472,7 @@ function RunStatusPill({
           color: 'var(--accent, #047857)',
           fontSize: 11.5,
           fontWeight: 700,
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
         }}
       >
         <span
@@ -1510,7 +1510,7 @@ function RunStatusPill({
           color: ok ? 'var(--accent, #047857)' : '#c44a2b',
           fontSize: 11.5,
           fontWeight: 700,
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
         }}
       >
         {ok ? (
@@ -1542,7 +1542,7 @@ function RunStatusPill({
           color: '#c44a2b',
           fontSize: 11.5,
           fontWeight: 700,
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
         }}
       >
         Error
@@ -1607,7 +1607,7 @@ function RunStatusHeader({
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             color: 'var(--muted)',
-            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontFamily: 'var(--font-mono)',
           }}
         >
           Run
@@ -1779,7 +1779,7 @@ function InputCard({
           className="run-surface-input-eyebrow"
           data-testid="run-surface-input-eyebrow"
           style={{
-            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 10.5,
             color: 'var(--muted)',
             letterSpacing: '0.08em',
@@ -1816,7 +1816,7 @@ function InputCard({
                 </span>
                 <span
                   style={{
-                    fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 13,
                     color: 'var(--ink)',
                     overflow: 'hidden',
@@ -1868,7 +1868,7 @@ function InputCard({
         className="run-surface-input-eyebrow"
         data-testid="run-surface-input-eyebrow"
         style={{
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
           fontSize: 10.5,
           color: 'var(--muted)',
           letterSpacing: '0.08em',
@@ -2155,7 +2155,7 @@ function RunningEyebrowTimer({ startedAt }: { startedAt: number }) {
     <span
       aria-hidden="true"
       style={{
-        fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+        fontFamily: 'var(--font-mono)',
         fontSize: 10.5,
         fontWeight: 600,
         color: 'var(--accent, #047857)',
@@ -2516,7 +2516,7 @@ function EmptyOutputSkeleton({ outputType }: { outputType: OutputType | undefine
           border: '1px dashed var(--line)',
           borderRadius: 8,
           background: 'var(--card, transparent)',
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
           fontSize: 12,
           color: 'var(--muted)',
           whiteSpace: 'pre-wrap',
@@ -2637,7 +2637,7 @@ function RateLimitedCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3
             style={{
-              fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontWeight: 700,
               fontSize: 17,
               letterSpacing: '-0.01em',
@@ -2668,7 +2668,7 @@ function RateLimitedCard({
       >
         <div
           style={{
-            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 10.5,
             color: 'var(--muted)',
             letterSpacing: '0.08em',
@@ -2701,7 +2701,7 @@ function RateLimitedCard({
             justifyContent: 'space-between',
             alignItems: 'center',
             marginTop: 8,
-            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 11.5,
             color: 'var(--muted)',
           }}
@@ -2787,7 +2787,7 @@ function RateLimitedCard({
             aria-hidden="true"
             style={{
               color: '#fff',
-              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
               fontWeight: 700,
@@ -2878,7 +2878,7 @@ function RateLimitedCard({
           margin: '14px 0 0',
           paddingTop: 14,
           borderTop: '1px solid var(--line)',
-          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontFamily: 'var(--font-mono)',
           fontSize: 11,
           color: 'var(--muted)',
           lineHeight: 1.55,
@@ -3174,7 +3174,7 @@ export function PastRunsDisclosure({ appSlug }: { appSlug: string }) {
                   <span
                     className="run-surface-past-preview-line"
                     style={{
-                      fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                      fontFamily: 'var(--font-mono)',
                       fontSize: 12,
                       color: 'var(--ink)',
                       flex: 1,

@@ -20,7 +20,7 @@ const SECTION_STYLE: React.CSSProperties = {
 };
 
 const EYEBROW_STYLE: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   fontWeight: 700,
   color: 'var(--muted)',

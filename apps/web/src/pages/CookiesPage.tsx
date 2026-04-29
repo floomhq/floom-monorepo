@@ -72,7 +72,7 @@ function CookieTable({ lang }: { lang: Lang }) {
         <tbody>
           {COOKIES.map((c) => (
             <tr key={c.name} style={{ borderBottom: '1px solid var(--line)' }}>
-              <td style={{ padding: '10px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+              <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
                 {c.name}
               </td>
               <td style={{ padding: '10px 12px', color: 'var(--ink)' }}>

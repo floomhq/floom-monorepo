@@ -97,7 +97,7 @@ function MvpHeroInstall() {
         <pre
           data-testid="hero-npx-command"
           style={{
-            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontFamily: 'var(--font-mono)',
             fontSize: 14,
             background: 'var(--studio, #f5f4f0)',
             color: 'var(--ink)',
@@ -419,7 +419,7 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 className="hero-sub"
                 data-testid="hero-sub-positioning"
                 style={{
-                  fontFamily: "'Inter', system-ui, sans-serif",
+                  fontFamily: 'var(--font-sans)',
                   fontSize: 19,
                   lineHeight: 1.45,
                   fontWeight: 400,
@@ -599,7 +599,7 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                     is a narrative step, not an input field. */}
                 <div
                   style={{
-                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 10.5,
                     fontWeight: 700,
                     letterSpacing: '0.12em',
@@ -628,7 +628,7 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 </div>
                 <div
                   style={{
-                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     color: 'var(--muted)',
                     letterSpacing: '0.08em',
@@ -654,7 +654,7 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 <div
                   style={{
                     marginTop: 14,
-                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontFamily: 'var(--font-mono)',
                     fontSize: 11.5,
                     color: 'var(--muted)',
                   }}

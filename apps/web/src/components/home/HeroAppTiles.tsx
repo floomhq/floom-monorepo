@@ -183,7 +183,7 @@ export function HeroAppTiles({ tiles, totalCount }: HeroAppTilesProps) {
                   bottom: 10,
                   fontSize: 11,
                   color: 'var(--accent)',
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: 'var(--font-mono)',
                   fontWeight: 600,
                   background: 'var(--card)',
                   padding: '2px 6px',

@@ -55,7 +55,7 @@ const LAUNCH_PILL_STYLE: CSSProperties = {
   background: '#f5f5f3',
   border: '1px solid var(--line)',
   color: '#1b1a17',
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   fontWeight: 700,
   textTransform: 'uppercase',
@@ -191,7 +191,7 @@ const SHIPPING_SECTION: CSSProperties = {
 };
 
 const SECTION_HEAD_EYEBROW: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   fontWeight: 700,
   color: 'var(--muted)',
@@ -283,7 +283,7 @@ const TIMELINE_BAND: CSSProperties = {
 };
 
 const TIMELINE_EYEBROW: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   fontWeight: 700,
   color: '#9a9790',

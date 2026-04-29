@@ -1024,7 +1024,7 @@ const TRACKER_PILL: CSSProperties = {
   background: 'transparent',
   border: 0,
   cursor: 'pointer',
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   letterSpacing: '0.08em',
   fontWeight: 600,
@@ -1102,7 +1102,7 @@ const EDITOR_GRID: CSSProperties = {
   height: '100%',
   background: '#faf8f3',
   color: '#2a2825',
-  fontFamily: "'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace",
+  fontFamily: 'var(--font-mono)',
 };
 
 const SIDEBAR_STYLE: CSSProperties = {
@@ -1255,7 +1255,7 @@ const DEPLOY_GRID: CSSProperties = {
   gridTemplateColumns: '1.1fr 1fr',
   height: '100%',
   background: '#faf8f3',
-  fontFamily: "'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace",
+  fontFamily: 'var(--font-mono)',
   color: '#2a2825',
 };
 
@@ -1391,7 +1391,7 @@ const DEPLOY_URL_TEXT_WRAP: CSSProperties = {
 };
 
 const DEPLOY_URL_MAIN: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 14,
   fontWeight: 600,
   color: '#047857',
@@ -1399,7 +1399,7 @@ const DEPLOY_URL_MAIN: CSSProperties = {
 };
 
 const DEPLOY_URL_META_CARD: CSSProperties = {
-  fontFamily: "'Inter', system-ui, sans-serif",
+  fontFamily: 'var(--font-sans)',
   fontSize: 11.5,
   color: '#6a665f',
 };
@@ -1457,7 +1457,7 @@ const RUN_WRAP: CSSProperties = {
   // this cream frame.
   background: '#faf8f3',
   color: '#1b1a17',
-  fontFamily: "'Inter', system-ui, sans-serif",
+  fontFamily: 'var(--font-sans)',
   overflow: 'hidden',
 };
 
@@ -1481,7 +1481,7 @@ const RUN_CONTEXT_DOT: CSSProperties = {
 };
 
 const RUN_CONTEXT_CODE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   color: '#2a2825',
   background: '#f5f4f0',
@@ -1494,7 +1494,7 @@ const RUN_CONTEXT_SEP: CSSProperties = {
 };
 
 const RUN_CONTEXT_URL: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   color: '#6a665f',
 };
@@ -1618,7 +1618,7 @@ const RUN_FIELD_INPUT: CSSProperties = {
 };
 
 const RUN_FIELD_INPUT_TEXT: CSSProperties = {
-  fontFamily: "'Inter', system-ui, sans-serif",
+  fontFamily: 'var(--font-sans)',
   fontSize: 13,
   color: '#2a2825',
   lineHeight: 1.45,
@@ -1633,7 +1633,7 @@ const RUN_BUTTON: CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: 'var(--font-sans)',
   width: '100%',
   letterSpacing: '-0.005em',
 };
@@ -1654,7 +1654,7 @@ const RUN_OUTPUT_LABEL: CSSProperties = {
 };
 
 const RUN_OUTPUT_META: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   color: '#a8a49b',
 };
@@ -1734,7 +1734,7 @@ const SCORE_BIG: CSSProperties = {
 };
 
 const SCORE_OF: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 13,
   color: '#8b8680',
 };
@@ -1808,7 +1808,7 @@ const RUN_SECONDARY: CSSProperties = {
 };
 
 const RUN_SEC_TAG: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   color: '#8b8680',
   letterSpacing: '0.04em',

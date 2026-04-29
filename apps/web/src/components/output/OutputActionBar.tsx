@@ -82,7 +82,7 @@ export function OutputActionBar({ label = 'Output', doneBadge, actions }: Action
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
                 fontWeight: 600,
-                fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontFamily: 'var(--font-mono)',
               }}
             >
               {label}
@@ -125,7 +125,7 @@ export function OutputDoneBadge({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
-        fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+        fontFamily: 'var(--font-mono)',
         fontSize: 12,
         color: 'var(--ink)',
         fontWeight: 600,
@@ -238,7 +238,7 @@ export function TableFullscreenModal({ open, onClose, title, children }: Fullscr
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
               fontWeight: 600,
-              fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+              fontFamily: 'var(--font-mono)',
             }}
           >
             {title ?? 'Expanded view'}

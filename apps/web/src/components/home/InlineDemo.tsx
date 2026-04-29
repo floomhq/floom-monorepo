@@ -275,7 +275,7 @@ export function InlineDemo() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFamily: 'var(--font-mono)',
                 fontWeight: 700,
                 fontSize: 13,
               }}
@@ -323,7 +323,7 @@ export function InlineDemo() {
                   color: 'var(--ink)',
                   border: '1px solid var(--line)',
                   borderRadius: 8,
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 11.5,
                   lineHeight: 1.5,
                   overflowX: 'auto',
@@ -356,7 +356,7 @@ export function InlineDemo() {
                   color: 'var(--ink)',
                   border: '1px solid var(--line)',
                   borderRadius: 8,
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 11.5,
                   lineHeight: 1.55,
                   overflowX: 'auto',
@@ -468,7 +468,7 @@ export function InlineDemo() {
                         style={{
                           ...tdStyle,
                           textAlign: 'right',
-                          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                          fontFamily: 'var(--font-mono)',
                           fontWeight: 700,
                           color:
                             typeof r.score === 'number' && r.score >= 60
@@ -512,7 +512,7 @@ export function InlineDemo() {
                 background: 'var(--bg)',
                 color: 'var(--ink)',
                 border: '1px solid var(--line)',
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFamily: 'var(--font-mono)',
                 fontSize: 13,
                 lineHeight: 1.65,
                 borderRadius: 10,

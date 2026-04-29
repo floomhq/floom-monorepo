@@ -109,7 +109,7 @@ const BANNER_BASE: CSSProperties = {
 };
 
 const BANNER_CARD_BASE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   lineHeight: 1.55,
   color: 'var(--ink)',
   background: 'var(--card)',
@@ -151,7 +151,7 @@ const HERO_PILL_STYLE: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   fontWeight: 700,
   letterSpacing: '0.08em',
@@ -358,7 +358,7 @@ export function ShowcaseGridV23({ stripes }: ShowcaseGridV23Props) {
         <div style={{ flex: 1, minWidth: 280 }}>
           <div
             style={{
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: 11,
               fontWeight: 600,
               color: 'var(--muted)',

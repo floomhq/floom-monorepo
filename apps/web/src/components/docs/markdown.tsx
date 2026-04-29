@@ -105,7 +105,7 @@ export const lightCodeBlockStyle: React.CSSProperties = {
   background: 'var(--bg)',
   color: 'var(--ink)',
   border: '1px solid var(--line)',
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 12,
   padding: '20px 16px',
   borderRadius: 10,
@@ -234,7 +234,7 @@ export const markdownComponents = {
       return (
         <code
           style={{
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: '0.86em',
             background: '#f5f5f3',
             border: '1px solid var(--line)',

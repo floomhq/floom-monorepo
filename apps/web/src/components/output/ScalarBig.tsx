@@ -48,7 +48,7 @@ export function ScalarBig({ value, label }: ScalarBigProps) {
       ) : null}
       <div
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 44,
           fontWeight: 600,
           color: 'var(--ink)',

@@ -74,7 +74,7 @@ function AuthBrandLockup() {
         fontSize: 18,
         fontWeight: 600,
         color: 'var(--ink)',
-        fontFamily: 'var(--font-display, Inter)',
+        fontFamily: 'var(--font-sans)',
       }}
     >
       <svg width="28" height="28" viewBox="0 0 100 100" aria-hidden="true">
@@ -93,7 +93,7 @@ function AuthBrandLockup() {
  * centred / line-height 1.1. Matches `.lg-card h1` from wireframe.
  */
 export const authH1Style: React.CSSProperties = {
-  fontFamily: 'var(--font-display, Inter)',
+  fontFamily: 'var(--font-sans)',
   fontSize: 28,
   fontWeight: 800,
   letterSpacing: '-0.02em',
@@ -201,7 +201,7 @@ export function AuthOrDivider() {
         gap: 14,
         margin: '8px 0 24px',
         color: 'var(--muted)',
-        fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+        fontFamily: 'var(--font-mono)',
         fontSize: 11,
         letterSpacing: '0.08em',
         textTransform: 'uppercase',

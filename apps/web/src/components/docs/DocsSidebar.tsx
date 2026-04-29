@@ -114,7 +114,7 @@ const headingRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
   fontWeight: 600,
   color: 'var(--muted)',
@@ -154,7 +154,7 @@ const linkActive: CSSProperties = {
 
 const tagStyle: CSSProperties = {
   marginLeft: 'auto',
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 9.5,
   color: 'var(--accent)',
   background: 'var(--accent-soft)',

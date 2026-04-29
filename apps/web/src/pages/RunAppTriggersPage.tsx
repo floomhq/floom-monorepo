@@ -169,7 +169,7 @@ export function RunAppTriggersPage() {
               </h1>
               <div
                 style={{
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 11,
                   color: 'var(--muted)',
                   marginTop: 3,
@@ -380,7 +380,7 @@ function TriggerRow({
           </span>
           <code
             style={{
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 12,
               color: 'var(--ink)',
             }}
@@ -404,7 +404,7 @@ function TriggerRow({
         </div>
         {isSchedule && (
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <code style={{ fontFamily: 'var(--font-mono)' }}>
               {trigger.cron_expression}
             </code>{' '}
             ({trigger.tz || 'UTC'}) · {humanCron}
@@ -412,7 +412,7 @@ function TriggerRow({
         )}
         {!isSchedule && trigger.webhook_url_path && (
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <code style={{ fontFamily: 'var(--font-mono)' }}>
               /hook/{trigger.webhook_url_path}
             </code>
           </div>
@@ -572,7 +572,7 @@ function NewTriggerModal({
                   value={cron}
                   onChange={(e) => setCron(e.target.value)}
                   placeholder="0 9 * * 1"
-                  style={{ ...inputStyle, fontFamily: 'JetBrains Mono, monospace' }}
+                  style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
                   data-testid="run-triggers-cron"
                 />
                 <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 14px' }}>
@@ -672,7 +672,7 @@ function CopyField({ value, testId }: { value: string; testId?: string }) {
           border: '1px solid var(--line)',
           borderRadius: 6,
           fontSize: 12,
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: 'var(--font-mono)',
           background: 'var(--bg)',
         }}
         onFocus={(e) => e.currentTarget.select()}

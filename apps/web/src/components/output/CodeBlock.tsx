@@ -70,7 +70,7 @@ export function CodeBlock({ code, language, filename }: CodeBlockProps) {
       <pre
         aria-label={language ? `${language} code` : 'code'}
         style={{
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 12,
           lineHeight: 1.5,
           whiteSpace: 'pre-wrap',

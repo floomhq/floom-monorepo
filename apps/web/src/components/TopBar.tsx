@@ -1104,8 +1104,7 @@ function DropdownItem({
       {typeof count === 'number' && count > 0 && (
         <span
           style={{
-            fontFamily:
-              '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: 11,
             color: MUTED,
           }}

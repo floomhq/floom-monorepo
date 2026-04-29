@@ -84,7 +84,7 @@ export function Sidebar({ app, open, onClose }: Props) {
                     borderBottom: '1px solid var(--line)',
                   }}
                 >
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                     {name}
                   </span>{' '}
                   : {spec.label}
@@ -116,7 +116,7 @@ export function Sidebar({ app, open, onClose }: Props) {
                     <span className="green-dot" />
                     <span
                       style={{
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: 'var(--font-mono)',
                         fontSize: 12,
                         color: 'var(--ink)',
                       }}
@@ -211,7 +211,7 @@ function IntegrationRow({
       <code
         style={{
           display: 'block',
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 11,
           background: 'var(--bg)',
           border: '1px solid var(--line)',

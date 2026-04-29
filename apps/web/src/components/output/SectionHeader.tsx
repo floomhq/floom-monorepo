@@ -72,7 +72,7 @@ export function SectionHeader({
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
             fontWeight: 600,
-            fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontFamily: 'var(--font-mono)',
           }}
         >
           {label}
@@ -82,7 +82,7 @@ export function SectionHeader({
             style={{
               fontSize: 11,
               color: 'var(--muted)',
-              fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+              fontFamily: 'var(--font-mono)',
               opacity: 0.75,
             }}
           >

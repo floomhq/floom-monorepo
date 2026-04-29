@@ -740,8 +740,7 @@ export function ShareModal({
                     outline: 'none',
                     background: 'transparent',
                     fontSize: 12.5,
-                    fontFamily:
-                      'ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace',
+                    fontFamily: 'var(--font-mono)',
                     color: 'var(--ink, #1b1a17)',
                     padding: 0,
                   }}
@@ -803,8 +802,7 @@ export function ShareModal({
                     outline: 'none',
                     background: 'transparent',
                     fontSize: 12.5,
-                    fontFamily:
-                      'ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace',
+                    fontFamily: 'var(--font-mono)',
                     color: 'var(--ink, #1b1a17)',
                     padding: 0,
                   }}

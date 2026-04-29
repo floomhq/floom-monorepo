@@ -90,7 +90,7 @@ const LINK_STYLE: CSSProperties = {
   fontWeight: 500,
   color: 'var(--ink)',
   textDecoration: 'none',
-  fontFamily: "'Inter', system-ui, sans-serif",
+  fontFamily: 'var(--font-sans)',
 };
 
 export function WhosBehind() {

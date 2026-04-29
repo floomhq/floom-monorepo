@@ -152,7 +152,7 @@ const kbdStyle: CSSProperties = {
   border: '1px solid var(--line)',
   background: 'var(--bg)',
   color: 'var(--muted)',
-  fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
 };
 
@@ -168,7 +168,7 @@ const searchShellStyle: CSSProperties = {
 };
 
 const searchIconStyle: CSSProperties = {
-  fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 12,
   fontWeight: 700,
   color: 'var(--muted)',

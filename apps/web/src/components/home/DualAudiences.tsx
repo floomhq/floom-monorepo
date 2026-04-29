@@ -58,7 +58,7 @@ const COL_STYLE: CSSProperties = {
 };
 
 const EYEBROW_STYLE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   color: 'var(--accent)',
   letterSpacing: '0.1em',

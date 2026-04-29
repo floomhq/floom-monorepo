@@ -68,7 +68,7 @@ const tabActive: CSSProperties = {
 };
 
 const ctStyle: CSSProperties = {
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 10,
   color: 'var(--muted)',
   background: 'var(--bg)',

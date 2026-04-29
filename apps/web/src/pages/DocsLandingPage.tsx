@@ -37,7 +37,7 @@ const mainStyle: CSSProperties = {
 };
 
 const crumbsStyle: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   color: 'var(--muted)',
   marginBottom: 12,
@@ -96,7 +96,7 @@ const pStyle: CSSProperties = {
 const codeBlockStyle: CSSProperties = {
   background: 'var(--card)',
   color: 'var(--ink)',
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 12.5,
   lineHeight: 1.7,
   padding: '18px 20px',
@@ -113,7 +113,7 @@ const codeBlockStyle: CSSProperties = {
 const heroCodeBlockStyle: CSSProperties = {
   background: 'var(--studio, #f5f4f0)',
   color: 'var(--ink)',
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 13,
   lineHeight: 1.75,
   padding: '18px 20px',
@@ -160,7 +160,7 @@ const pillStyle: CSSProperties = {
 };
 
 const pillKeyStyle: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   color: 'var(--muted)',
   fontWeight: 400,
@@ -185,7 +185,7 @@ const mrCardStyle: CSSProperties = {
 };
 
 const mrKicker: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 10,
   color: 'var(--muted)',
   letterSpacing: '0.06em',
@@ -225,7 +225,7 @@ const surfaceCardStyle: CSSProperties = {
 };
 
 const surfaceNameStyle: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   color: 'var(--accent)',
   letterSpacing: '0.06em',
@@ -241,7 +241,7 @@ const surfaceTitleStyle: CSSProperties = {
 };
 
 const surfaceToolStyle: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   color: 'var(--ink)',
   background: 'var(--studio, var(--bg))',
@@ -283,7 +283,7 @@ const specTdStyle: CSSProperties = {
 
 const specTdMonoStyle: CSSProperties = {
   ...specTdStyle,
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 12.5,
   color: 'var(--accent)',
   fontWeight: 600,

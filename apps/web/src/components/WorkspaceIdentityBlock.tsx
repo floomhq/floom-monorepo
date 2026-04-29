@@ -40,7 +40,7 @@ const chipStyle: CSSProperties = {
 };
 
 const eyebrowStyle: CSSProperties = {
-  fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 10,
   fontWeight: 700,
   letterSpacing: '0.06em',

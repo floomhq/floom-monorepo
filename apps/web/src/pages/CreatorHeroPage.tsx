@@ -399,7 +399,7 @@ export function CreatorHeroPage() {
             >
               <span
                 style={{
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 10.5,
                   fontWeight: 600,
                   color: 'var(--muted)',
@@ -439,7 +439,7 @@ export function CreatorHeroPage() {
               className="hero-accent"
               data-testid="hero-accent"
               style={{
-                fontFamily: "'Inter', system-ui, sans-serif",
+                fontFamily: 'var(--font-sans)',
                 fontSize: 19,
                 lineHeight: 1.35,
                 fontWeight: 600,
@@ -456,7 +456,7 @@ export function CreatorHeroPage() {
               className="hero-sub-positioning"
               data-testid="hero-sub-positioning"
               style={{
-                fontFamily: "'Inter', system-ui, sans-serif",
+                fontFamily: 'var(--font-sans)',
                 fontSize: 15,
                 lineHeight: 1.5,
                 fontWeight: 400,
@@ -501,7 +501,7 @@ export function CreatorHeroPage() {
                   outline: 'none',
                   padding: '16px 16px',
                   fontSize: 15,
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontFamily: 'var(--font-mono)',
                   background: 'transparent',
                   color: 'var(--ink)',
                 }}
@@ -902,7 +902,7 @@ export function CreatorHeroPage() {
                 border: '1px solid var(--line)',
                 borderRadius: 12,
                 padding: '20px 22px',
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFamily: 'var(--font-mono)',
                 fontSize: 13.5,
                 lineHeight: 1.85,
                 textAlign: 'left',

@@ -48,7 +48,7 @@ const SECTION_BORDERED: React.CSSProperties = {
 };
 
 const EYEBROW_STYLE: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   fontWeight: 700,
   color: 'var(--muted)',
@@ -513,7 +513,7 @@ function WhoCard({
     >
       <span
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 11,
           fontWeight: 700,
           color: 'var(--accent)',
@@ -564,7 +564,7 @@ function Triad({ label, body }: { label: string; body: string }) {
     >
       <span
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 12,
           fontWeight: 700,
           color: 'var(--accent)',
@@ -665,7 +665,7 @@ function FactCallout({
     >
       <div
         style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontFamily: 'var(--font-mono)',
           fontSize: 10.5,
           fontWeight: 700,
           textTransform: 'uppercase',
