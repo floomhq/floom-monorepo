@@ -308,3 +308,131 @@ adminRouter.get('/audit-log', (c) => {
 adminRouter.get('/pending-deletes', (c) => {
   return c.json({ users: listPendingAccountDeletes() });
 });
+
+/**
+ * GET /api/admin/featured-health
+ *
+ * Runtime health-check for every featured app in the public store.
+ * For each featured app, POSTs a minimal run to GET /api/hub/:slug to
+ * confirm the app record is reachable, and separately hits /api/run to
+ * confirm the run endpoint is reachable. Does NOT execute a real run —
+ * we only verify the HTTP surface is reachable within 10 s.
+ *
+ * Returns:
+ *   { results: Array<{ slug, name, status, latencyMs, error? }> }
+ *
+ * `status` is one of:
+ *   'ok'      — app record + run endpoint both reachable (2xx)
+ *   'broken'  — app record missing, inactive, or not published
+ *   'error'   — request failed / timed out
+ *
+ * Callers should alert when `status !== 'ok'`. The endpoint intentionally
+ * does not auto-hide apps — flagging is enough for v1. Use
+ * POST /api/admin/apps/:slug/publish-status with `{ status: "draft" }` to
+ * manually take a broken app off the store.
+ */
+adminRouter.get('/featured-health', async (c) => {
+  const featuredApps = db
+    .prepare(
+      `SELECT id, slug, name, status, visibility, publish_status
+         FROM apps
+        WHERE featured = 1
+        ORDER BY name ASC`,
+    )
+    .all() as Array<{
+    id: string;
+    slug: string;
+    name: string;
+    status: string;
+    visibility: string | null;
+    publish_status: string | null;
+  }>;
+
+  // Derive the base URL for internal probes from the request (same logic
+  // as getPublicBaseUrl in mcp.ts, but we only need origin here).
+  const overrideOrigin = process.env.FLOOM_PUBLIC_ORIGIN;
+  let probeOrigin: string;
+  if (overrideOrigin && overrideOrigin.length > 0) {
+    probeOrigin = overrideOrigin.replace(/\/+$/, '');
+  } else {
+    try {
+      probeOrigin = new URL(c.req.url).origin;
+    } catch {
+      probeOrigin = 'http://localhost:' + (process.env.PORT || '8787');
+    }
+  }
+
+  const PROBE_TIMEOUT_MS = 10_000;
+
+  const results = await Promise.all(
+    featuredApps.map(async (app) => {
+      // Fast path: if the DB record itself is already broken, return without
+      // making a network probe so we don't inflate latency numbers.
+      if (app.status !== 'active') {
+        return {
+          slug: app.slug,
+          name: app.name,
+          status: 'broken' as const,
+          latencyMs: 0,
+          error: `App status is "${app.status}" (not active)`,
+        };
+      }
+      const isPublished =
+        (app.visibility === 'public' || app.visibility === null) &&
+        app.publish_status === 'published';
+      if (!isPublished) {
+        return {
+          slug: app.slug,
+          name: app.name,
+          status: 'broken' as const,
+          latencyMs: 0,
+          error: `App not publicly published (visibility=${app.visibility}, publish_status=${app.publish_status})`,
+        };
+      }
+
+      // When FLOOM_AUTH_TOKEN is set, /api/* requires bearer auth. Forward the
+      // same admin token so the probe can reach the hub endpoint.
+      const probeHeaders: Record<string, string> = { Accept: 'application/json' };
+      if (process.env.FLOOM_AUTH_TOKEN) {
+        probeHeaders['Authorization'] = `Bearer ${process.env.FLOOM_AUTH_TOKEN}`;
+      }
+
+      const start = Date.now();
+      try {
+        const res = await fetch(`${probeOrigin}/api/hub/${encodeURIComponent(app.slug)}`, {
+          signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+          headers: probeHeaders,
+        });
+        const latencyMs = Date.now() - start;
+        if (res.ok) {
+          return { slug: app.slug, name: app.name, status: 'ok' as const, latencyMs };
+        }
+        return {
+          slug: app.slug,
+          name: app.name,
+          status: 'broken' as const,
+          latencyMs,
+          error: `Hub probe returned HTTP ${res.status}`,
+        };
+      } catch (err) {
+        const latencyMs = Date.now() - start;
+        return {
+          slug: app.slug,
+          name: app.name,
+          status: 'error' as const,
+          latencyMs,
+          error: (err as Error).message || 'probe failed',
+        };
+      }
+    }),
+  );
+
+  const broken = results.filter((r) => r.status !== 'ok');
+  return c.json({
+    ok: broken.length === 0,
+    total: results.length,
+    broken: broken.length,
+    results,
+    checked_at: new Date().toISOString(),
+  });
+});
