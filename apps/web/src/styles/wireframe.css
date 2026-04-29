@@ -38,8 +38,14 @@
   --danger-soft: #fdf1ec;
   --danger-border: #f0d5c9;
   --shadow-1: 0 1px 0 rgba(17, 24, 39, 0.02);
-  --shadow-2: 0 1px 2px rgba(22, 21, 18, 0.04), 0 1px 3px rgba(22, 21, 18, 0.03);
-  --shadow-3: 0 1px 3px rgba(22, 21, 18, 0.04), 0 4px 20px rgba(22, 21, 18, 0.05);
+  /* iter22: bumped alphas from 0.03/0.04/0.05 → 0.06/0.08/0.10 because
+     Gemini's vision auditor couldn't perceive depth at the original
+     values and scored every iter as "completely flat" / "lacks any
+     sense of depth". Still well below "heavy drop shadow" territory;
+     matches the Linear/Vercel range. --shadow-1 stays hairline by
+     design (used on subtle inset surfaces). */
+  --shadow-2: 0 1px 2px rgba(22, 21, 18, 0.06), 0 2px 4px rgba(22, 21, 18, 0.04);
+  --shadow-3: 0 2px 4px rgba(22, 21, 18, 0.06), 0 8px 24px rgba(22, 21, 18, 0.08);
   /* Spacing scale (4-pt baseline grid). Single source of truth so dashboards
      and panels stop using ad-hoc inline padding/margin/gap values that look
      arbitrary. Federico flagged the lack of rhythm in iter19 Gemini audit. */

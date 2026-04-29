@@ -390,13 +390,17 @@ function AppCard({ app }: { app: RunApp }) {
 
       <div
         style={{
-          fontSize: 12,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          fontSize: 12.5,
           color: failed ? '#ef4444' : 'var(--accent)',
-          fontWeight: 600,
+          fontWeight: 700,
           marginTop: 'auto',
         }}
       >
-        {failed ? 'Last run failed →' : app.runCount === 0 ? 'Run →' : 'Run again →'}
+        <span>{failed ? 'Last run failed' : app.runCount === 0 ? 'Run' : 'Run again'}</span>
+        <span aria-hidden style={{ fontSize: 13, lineHeight: 1, transform: 'translateY(-0.5px)' }}>→</span>
       </div>
     </Link>
   );

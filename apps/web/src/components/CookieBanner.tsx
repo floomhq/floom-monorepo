@@ -245,11 +245,11 @@ export function CookieBanner() {
         right: 0,
         bottom: 0,
         zIndex: 950,
-        paddingLeft: 'max(16px, env(safe-area-inset-left, 0px))',
-        paddingRight: 'max(16px, env(safe-area-inset-right, 0px))',
-        paddingTop: 12,
-        paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
-        minHeight: 56,
+        paddingLeft: 'max(20px, env(safe-area-inset-left, 0px))',
+        paddingRight: 'max(20px, env(safe-area-inset-right, 0px))',
+        paddingTop: 10,
+        paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
+        minHeight: 48,
         maxWidth: '100%',
         boxSizing: 'border-box',
         display: 'flex',
@@ -257,12 +257,15 @@ export function CookieBanner() {
         flexWrap: isExpandedMobile ? 'wrap' : 'nowrap',
         alignItems: 'center',
         gap: 12,
-        background: 'var(--bg)',
-        backdropFilter: 'blur(12px) saturate(1.06)',
-        WebkitBackdropFilter: 'blur(12px) saturate(1.06)',
+        // iter22: brand-cohesive bottom strip. White card surface (not the
+        // softer --bg), hairline top border + 1px lift instead of the
+        // chunky 24px drop shadow, slim copy, ghost buttons. Stops the
+        // banner reading as a separate "alien" component (Gemini iter19/
+        // 20/21 systemic complaint that tanked SaaS-grade scores).
+        background: 'var(--card)',
         borderTop: '1px solid var(--line)',
         borderRadius: 0,
-        boxShadow: '0 -4px 24px rgba(15, 23, 42, 0.08)',
+        boxShadow: '0 -1px 0 rgba(22, 21, 18, 0.04)',
         fontSize: 12.5,
         color: 'var(--ink)',
       }}
@@ -274,12 +277,12 @@ export function CookieBanner() {
           flex: '1 1 0',
           minWidth: 0,
           lineHeight: 1.45,
+          color: 'var(--muted)',
         }}
       >
-        Floom uses essential cookies for sign-in and preferences. Choose
-        &quot;Accept all&quot; to also help us with anonymised analytics and error
-        reporting. See the{' '}
-        <Link to="/cookies" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+        Floom uses essential cookies for sign-in. Choose &quot;Accept all&quot; to
+        help with anonymised analytics. See the{' '}
+        <Link to="/cookies" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>
           cookie policy
         </Link>
         .
@@ -298,12 +301,12 @@ export function CookieBanner() {
           type="button"
           onClick={() => accept('essential')}
           style={{
-            padding: '8px 14px',
-            minHeight: 44,
+            padding: '6px 12px',
+            minHeight: 32,
             borderRadius: 8,
             border: '1px solid var(--line)',
             background: 'transparent',
-            color: 'var(--ink)',
+            color: 'var(--muted)',
             cursor: 'pointer',
             fontFamily: 'inherit',
             fontSize: 12.5,
@@ -317,12 +320,12 @@ export function CookieBanner() {
           type="button"
           onClick={() => accept('all')}
           style={{
-            padding: '8px 14px',
-            minHeight: 44,
+            padding: '6px 12px',
+            minHeight: 32,
             borderRadius: 8,
-            border: '1px solid var(--accent)',
-            background: 'var(--accent)',
-            color: '#fff',
+            border: '1px solid var(--ink)',
+            background: 'var(--ink)',
+            color: 'var(--card)',
             cursor: 'pointer',
             fontFamily: 'inherit',
             fontSize: 12.5,
