@@ -154,9 +154,11 @@ export async function resolveOrProvisionAuthConfigId(slug: string): Promise<stri
     );
     if (listRes.ok) {
       const body = (await listRes.json()) as {
-        items?: Array<{ id: string; is_composio_managed?: boolean }>;
+        items?: Array<{ id: string; is_composio_managed?: boolean; toolkit?: { slug?: string } }>;
       };
-      const managed = (body.items || []).find((c) => c.is_composio_managed);
+      const managed = (body.items || []).find(
+        (c) => c.is_composio_managed && c.toolkit?.slug?.toLowerCase() === normalized,
+      );
       if (managed?.id) existingId = managed.id;
     }
   } catch {
