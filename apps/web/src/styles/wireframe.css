@@ -7,7 +7,13 @@
 :root {
   --bg: #fafaf8;
   --card: #ffffff;
-  --ink: #0e0e0c;
+  /* v26 iter25: Federico-locked warm-dark for ANY surface that paints --ink
+     as a background (mode toggle, .stage.on, /studio/build CTAs, etc.).
+     Was #0e0e0c — too close to pure black on chip-sized surfaces. The
+     warm #1b1a17 reads identically as body text on --bg #fafaf8 (contrast
+     16:1, AAA) but stops the "black terminal bg" regression Federico
+     flagged on /studio/build. See feedback_terminal_never_black.md. */
+  --ink: #1b1a17;
   --muted: #585550;
   --line: #e8e6e0;
   /* Brand accent: Floom green. Shifted to emerald-700 (#047857) so white

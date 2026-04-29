@@ -22,7 +22,7 @@ import { auditLog } from './audit-log.js';
 import { generateLinkShareToken } from '../lib/link-share-token.js';
 import { bundleRendererFromManifest } from './renderer-bundler.js';
 import { normalizeMaxRunRetentionDays } from './run-retention-sweeper.js';
-import type { NormalizedManifest, InputSpec, OutputSpec } from '../types.js';
+import type { ActionSpec, NormalizedManifest, InputSpec, OutputSpec } from '../types.js';
 
 // ---------- config schema ----------
 
@@ -882,7 +882,13 @@ export function specToManifest(
     );
   }
 
-  // If no paths were parsed, add a single generic action
+  // If no paths were parsed, add a single generic action.
+  // Required `path` carries a placeholder default so /studio/build can
+  // dispatch a sample run without forcing the user to type one — they
+  // can edit it inline in the SampleInputs panel before clicking Run.
+  // Without a default, seedInputs() resolves `path` to '' and the
+  // server-side validator throws `Missing required input: path` from
+  // manifest.ts:334 before the runner ever fires. Fix v26-iter25.
   if (Object.keys(actions).length === 0) {
     actions['call'] = {
       label: 'Call API',
@@ -893,6 +899,8 @@ export function specToManifest(
           label: 'Path',
           type: 'text',
           required: true,
+          default: '/',
+          placeholder: '/v1/endpoint',
           description: 'API path (e.g. /v1/endpoint)',
         },
         {
@@ -1911,16 +1919,97 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
  * The UI renders the detected values into an editable form, then POSTs
  * the finalized manifest back via a second call.
  */
+/**
+ * JSON-Schema-ish view of an action's inputs, surfaced on `DetectedApp`
+ * so the /studio/build sample-input panel can render real fields BEFORE
+ * the app is persisted. Keys mirror what the run form already understands
+ * (see apps/web/src/pages/BuildPage.tsx::SampleInputs / seedInputs):
+ *   - `properties[name]` carries `{type, description, default, example}`
+ *   - `required` lists names whose `required: true` was set during ingest
+ *
+ * Without this, an action like the OpenAPI fallback `call` (which has a
+ * required `path` input) renders as "no inputs · ready to run" and the
+ * user clicks Run sample → server throws `Missing required input: path`.
+ * Bug fix v26-iter25 (2026-04-29).
+ */
+export interface ActionInputSchema {
+  type: 'object';
+  properties: Record<
+    string,
+    {
+      type?: string;
+      description?: string;
+      default?: unknown;
+      example?: unknown;
+      enum?: string[];
+    }
+  >;
+  required?: string[];
+}
+
+export interface DetectedAction {
+  name: string;
+  label: string;
+  description?: string;
+  input_schema?: ActionInputSchema;
+}
+
 export interface DetectedApp {
   slug: string;
   name: string;
   description: string;
-  actions: Array<{ name: string; label: string; description?: string }>;
+  actions: DetectedAction[];
   auth_type: string | null;
   category: string | null;
   openapi_spec_url: string;
   tools_count: number;
   secrets_needed: string[];
+}
+
+/**
+ * Map an InputSpec (manifest shape) `type` to the JSON-Schema primitive
+ * the /studio/build form code expects. Anything that isn't a number /
+ * boolean is shown as a text input — see seedInputs() and SampleInputs().
+ */
+function inputTypeToJsonSchema(type: InputSpec['type']): string {
+  if (type === 'number') return 'number';
+  if (type === 'boolean') return 'boolean';
+  return 'string';
+}
+
+/**
+ * Convert a normalized ActionSpec into the JSON-Schema-ish view the
+ * /studio/build sample-input panel renders. Pulls `default` straight
+ * through, and synthesizes a sensible `example` for required fields
+ * (placeholder for `text`, 0 for number, false for boolean) so the
+ * sample run can dispatch even if the user clicks Run without typing.
+ */
+function actionToInputSchema(action: ActionSpec): ActionInputSchema {
+  const properties: ActionInputSchema['properties'] = {};
+  const required: string[] = [];
+  for (const input of action.inputs) {
+    const def: ActionInputSchema['properties'][string] = {
+      type: inputTypeToJsonSchema(input.type),
+    };
+    if (input.description) def.description = input.description;
+    if (input.placeholder && !def.description) def.description = input.placeholder;
+    if (input.default !== undefined) def.default = input.default;
+    if (input.options) def.enum = input.options;
+    properties[input.name] = def;
+    if (input.required) required.push(input.name);
+  }
+  return { type: 'object', properties, ...(required.length > 0 ? { required } : {}) };
+}
+
+function actionEntriesFromManifest(
+  manifest: NormalizedManifest,
+): DetectedAction[] {
+  return Object.entries(manifest.actions).map(([k, v]) => ({
+    name: k,
+    label: v.label,
+    description: v.description,
+    input_schema: actionToInputSchema(v),
+  }));
 }
 
 /**
@@ -2045,11 +2134,12 @@ export async function detectAppFromUrl(
     auth: 'none',
   };
   const manifest = specToManifest(derefed, appSpec, deriveSecretsFromSpec(derefed));
-  const actions = Object.entries(manifest.actions).map(([k, v]) => ({
-    name: k,
-    label: v.label,
-    description: v.description,
-  }));
+  // Surface each action's normalized input schema so the /studio/build
+  // sample-input panel can render real fields (incl. required ones)
+  // BEFORE the app is persisted. Without this the panel falls back to
+  // "no inputs · ready to run" even when the action requires `path`,
+  // and the run trips over `Missing required input: path` server-side.
+  const actions = actionEntriesFromManifest(manifest);
 
   // Auth-type detection: merged view of OpenAPI 3 `components.securitySchemes`
   // and Swagger 2 `securityDefinitions`, so a spec ingested via either path
@@ -2458,11 +2548,9 @@ export async function detectAppFromInlineSpec(
     auth: 'none',
   };
   const manifest = specToManifest(derefed, appSpec, deriveSecretsFromSpec(derefed));
-  const actions = Object.entries(manifest.actions).map(([k, v]) => ({
-    name: k,
-    label: v.label,
-    description: v.description,
-  }));
+  // Same input_schema surfacing as detectAppFromUrl — see the sister
+  // function above for the rationale (Bug v26-iter25).
+  const actions = actionEntriesFromManifest(manifest);
 
   const schemes = collectSecuritySchemes(derefed);
   let auth_type: string | null = null;
