@@ -12,6 +12,9 @@ import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from '
 // tree in a follow-up). Both are eager so the LCP path doesn't wait on
 // a dynamic import round-trip.
 import { LandingV17Page } from './pages/LandingV17Page';
+// M5 (#1068): mvp.floom.dev gets the slim landing (hero + 3-step + footer).
+// floom.dev keeps the full V17 marketing landing. Same build, host-aware route.
+import { LandingMVPPage } from './pages/LandingMVPPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 const AppsDirectoryPage = lazy(() => import('./pages/AppsDirectoryPage').then(m => ({ default: m.AppsDirectoryPage })));
 const AppPermalinkPage = lazy(() => import('./pages/AppPermalinkPage').then(m => ({ default: m.AppPermalinkPage })));
@@ -156,6 +159,22 @@ if (typeof window !== 'undefined' && window.location.pathname === '/') {
   track('landing_viewed');
 }
 
+// M5 (#1068): host-aware landing. mvp.floom.dev renders the slim
+// LandingMVPPage (hero + 3-step + footer); floom.dev / preview / localhost
+// render the full V17 marketing landing. The check runs at module evaluation
+// time so we don't pay any per-render cost. Override via ?mvp=1 / ?mvp=0 for
+// dev preview without needing the mvp host.
+function HostAwareLanding() {
+  if (typeof window === 'undefined') return <LandingV17Page />;
+  const params = new URLSearchParams(window.location.search);
+  const override = params.get('mvp');
+  if (override === '1') return <LandingMVPPage />;
+  if (override === '0') return <LandingV17Page />;
+  const host = window.location.hostname;
+  const isMvpHost = host === 'mvp.floom.dev' || host.startsWith('mvp.');
+  return isMvpHost ? <LandingMVPPage /> : <LandingV17Page />;
+}
+
 // Wireframe v11 puts each app's creator view at /p/:slug/dashboard. Preview
 // wired it to /creator/:slug. Redirect the wireframe URL to the live one so
 // external links don't 404.
@@ -282,8 +301,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Suspense fallback={<RouteLoading variant="embed" />}>
 
         <Routes>
-        {/* Landing v17 (2026-04-22): rebuild to wireframe parity. */}
-        <Route path="/" element={<LandingV17Page />} />
+        {/* Landing v17 (2026-04-22): rebuild to wireframe parity.
+            M5 (#1068): on mvp.floom.dev render the slim LandingMVPPage instead.
+            Same build serves both hosts. /marketing always renders V17 so the
+            full landing stays reachable from mvp for review. */}
+        <Route path="/" element={<HostAwareLanding />} />
+        <Route path="/marketing" element={<LandingV17Page />} />
         {/* Apps directory. Mounted at both /apps (legacy canonical) and
             /store (matches the "Store" pill label Federico sees on screen).
             Nav-polish 2026-04-20: URL no longer drifts from the label. */}
