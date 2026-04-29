@@ -158,22 +158,17 @@ function hasPresentedAdminBearer(c: Context): boolean {
   return token !== null && constantTimeEqual(token, expected);
 }
 
-function isMcpRequest(c: Context): boolean {
-  return new URL(c.req.url).pathname.startsWith('/mcp');
-}
-
 export const agentTokenAuthMiddleware: MiddlewareHandler = async (c, next) => {
   const rawToken = getPresentedAgentToken(c);
 
-  // No Floom token presented — check if there's a mis-formatted floom_agent_*
-  // bearer (wrong length, bad chars, etc.). If so, return 401 explicitly so
-  // clients know their token is bad rather than silently routing to the admin
-  // MCP server (closes item 7 / checklist 7.5).
+  // No valid Floom token presented. Any non-admin bearer on an agent-aware
+  // surface is an auth attempt, so return 401 instead of silently falling
+  // through to the anonymous/local session.
   if (!rawToken) {
     const bearer = getPresentedBearer(c);
     if (
       looksLikeAgentTokenAttempt(c) ||
-      (bearer && isMcpRequest(c) && !hasPresentedAdminBearer(c))
+      (bearer && !hasPresentedAdminBearer(c))
     ) {
       return c.json(
         {

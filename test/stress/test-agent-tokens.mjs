@@ -354,6 +354,12 @@ try {
     rateLimited?.text,
   );
 
+  const randomBearer = await jsonFetch(server.port, '/api/session/me', {
+    token: 'randomstring',
+  });
+  log('random bearer returns 401 instead of local session', randomBearer.res.status === 401, randomBearer.text);
+  log('random bearer error is invalid_token', randomBearer.json?.code === 'invalid_token', randomBearer.text);
+
   const cookieSession = await jsonFetch(server.port, '/api/session/me', {
     cookie: 'floom_device=agent-token-regression-device',
   });
