@@ -73,8 +73,7 @@ export function RunRail() {
           </Link>
         </div>
       </div>
-      {/* v26 §12.5 + §12.6: no rail-bottom avatar or sign-out.
-          Avatar dropdown lives in TopBar only (Account settings · Docs · Help · Sign out). */}
+      <RailFoot />
     </aside>
   );
 }
@@ -213,9 +212,11 @@ export const railStyle: CSSProperties = {
   background: 'var(--bg)',
   display: 'flex',
   flexDirection: 'column',
-  height: '100vh',
+  // 56px = TopBar height (wireframe.css:171/381). Without subtracting it,
+  // RailFoot ends up below the visible viewport on standard laptop heights.
+  height: 'calc(100vh - 56px)',
   position: 'sticky',
-  top: 0,
+  top: 56,
   overflow: 'hidden',
 };
 
