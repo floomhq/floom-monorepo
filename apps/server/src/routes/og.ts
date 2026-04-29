@@ -254,6 +254,26 @@ ogRouter.get('/main.svg', (_c) => {
   });
 });
 
+// GET /og/:slug.png — Twitter-compatible fallback for app social preview cards.
+//
+// Twitter's Card validator only accepts JPEG, PNG, WEBP, and GIF for og:image.
+// SVG is NOT rendered by Twitter (confirmed against Twitter Card spec). All
+// other major previewers (Discord, Slack, LinkedIn, iMessage) accept SVG, but
+// Twitter silently drops the image, leaving share-card previews imageless.
+//
+// Fix: SSR rewrites og:image / twitter:image to /og/:slug.png for /p/:slug.
+// This endpoint redirects .png → the global og-main.png (1200×630 PNG) so
+// every platform gets a valid raster image on share. The .svg endpoint remains
+// for direct consumers that explicitly request it.
+ogRouter.get('/:slugPng{[a-z0-9][a-z0-9-]*\\.png}', (c) => {
+  // Redirect to the global PNG card. We don't generate per-app raster OG
+  // images server-side (no canvas/sharp dep in the runtime), so the global
+  // brand card is the correct fallback — it's 1200×630 PNG and renders on
+  // Twitter/X, Facebook, WhatsApp, and every other raster-only previewer.
+  const origin = new URL(c.req.url).origin;
+  return c.redirect(`${origin}/og-main.png`, 301);
+});
+
 ogRouter.get('/:slugPng{[a-z0-9][a-z0-9-]*\\.svg}', (c) => {
   const param = c.req.param('slugPng');
   const slug = param.replace(/\.svg$/, '');

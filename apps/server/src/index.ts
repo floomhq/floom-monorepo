@@ -1387,7 +1387,13 @@ if (webDist) {
       row &&
       isPublicListingVisibility(row.visibility) &&
       (row.visibility === 'public_live' || row.publish_status === 'published');
-    const ogImage = `${publicOrigin}/og/${slug}.svg`;
+    // Use .png for og:image and twitter:image so Twitter/X card previews work.
+    // Twitter's Card validator only accepts JPEG/PNG/WEBP/GIF — SVG is silently
+    // dropped, leaving share cards imageless. /og/:slug.png redirects 301 to
+    // /og-main.png (see apps/server/src/routes/og.ts). Discord, Slack, LinkedIn,
+    // and iMessage all handle PNG fine; they also accepted SVG, but PNG is the
+    // universal safe choice.
+    const ogImage = `${publicOrigin}/og/${slug}.png`;
     // 2026-04-20 (PRR #172): canonical per-slug so indexers don't fold
     // every /p/:slug back to the landing canonical.
     let out = rewriteCanonical(html, `/p/${slug}`);
