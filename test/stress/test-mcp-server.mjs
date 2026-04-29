@@ -817,6 +817,24 @@ try {
   const rotatedSharingPayload = parseToolText(rotatedSharing);
   log('studio_set_app_sharing rotates link token', rotatedSharingPayload?.visibility === 'link' && rotatedSharingPayload?.link_share_token !== linkSharingPayload?.link_share_token, rotatedSharing.text);
 
+  const invitedSharing = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 311,
+    method: 'tools/call',
+    params: { name: 'studio_set_app_sharing', arguments: { slug: 'agent-studio-publish', state: 'invited' } },
+  });
+  const invitedSharingPayload = parseToolText(invitedSharing);
+  log('studio_set_app_sharing moves link app to invited', invitedSharingPayload?.visibility === 'invited' && invitedSharingPayload?.link_share_token === null, invitedSharing.text);
+
+  const relinkedSharing = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 312,
+    method: 'tools/call',
+    params: { name: 'studio_set_app_sharing', arguments: { slug: 'agent-studio-publish', state: 'link' } },
+  });
+  const relinkedSharingPayload = parseToolText(relinkedSharing);
+  log('studio_set_app_sharing moves invited app back to link', relinkedSharingPayload?.visibility === 'link' && typeof relinkedSharingPayload?.link_share_token === 'string', relinkedSharing.text);
+
   const privateSharing = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',
     id: 32,
@@ -834,6 +852,15 @@ try {
   });
   const submitReviewPayload = parseToolText(submitReview);
   log('studio_submit_app_review moves private app to pending_review', submitReviewPayload?.ok === true && submitReviewPayload?.visibility === 'pending_review', submitReview.text);
+
+  const submitReviewAgain = await callMcp(server.port, publishToken, {
+    jsonrpc: '2.0',
+    id: 331,
+    method: 'tools/call',
+    params: { name: 'studio_submit_app_review', arguments: { slug: 'agent-studio-publish' } },
+  });
+  const submitReviewAgainPayload = parseToolText(submitReviewAgain);
+  log('studio_submit_app_review is idempotent while pending', submitReviewAgainPayload?.ok === true && submitReviewAgainPayload?.visibility === 'pending_review', submitReviewAgain.text);
 
   const withdrawReview = await callMcp(server.port, publishToken, {
     jsonrpc: '2.0',

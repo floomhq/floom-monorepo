@@ -139,11 +139,12 @@ export function canAccessApp(
 ): boolean {
   const visibility = canonicalVisibility(app.visibility);
   if (visibility === 'public_live') return true;
-  if (readOwnerMatches(app, ctx)) return true;
+  if (visibility !== 'link' && readOwnerMatches(app, ctx)) return true;
   if (visibility === 'private' || visibility === 'pending_review' || visibility === 'changes_requested') {
     return false;
   }
   if (visibility === 'link') {
+    if (ctx.is_authenticated && readOwnerMatches(app, ctx)) return true;
     const validToken = app.slug
       ? verifyLinkToken(app.slug, linkToken)
       : Boolean(app.link_share_token && linkToken && app.link_share_token === linkToken);
@@ -169,11 +170,12 @@ export function getAppAccessDecision(
   linkToken?: string | null,
 ): AppAccessDecision {
   const visibility = canonicalVisibility(app.visibility);
-  if (readOwnerMatches(app, ctx)) return { ok: true };
+  if (visibility !== 'link' && readOwnerMatches(app, ctx)) return { ok: true };
   if (visibility !== 'link') {
     return canAccessApp(app, ctx, linkToken) ? { ok: true } : { ok: false, status: 404 };
   }
 
+  if (ctx.is_authenticated && readOwnerMatches(app, ctx)) return { ok: true };
   const validToken = app.slug
     ? verifyLinkToken(app.slug, linkToken)
     : Boolean(app.link_share_token && linkToken && app.link_share_token === linkToken);
@@ -191,6 +193,18 @@ export function assertLegalTransition(
   to: AppVisibilityState,
   reason: TransitionReason,
 ): void {
+  if (from === to) {
+    if (
+      (to === 'private' && reason === 'owner_set_private') ||
+      (to === 'link' && reason === 'owner_enable_link') ||
+      (to === 'invited' && reason === 'owner_set_invited') ||
+      (to === 'pending_review' &&
+        (reason === 'owner_submit_review' || reason === 'owner_resubmit_review'))
+    ) {
+      return;
+    }
+  }
+
   if (reason === 'admin_takedown') {
     if (to === 'private') return;
     throw new Error('admin_takedown_must_target_private');
@@ -202,8 +216,8 @@ export function assertLegalTransition(
 
   const allowed: Record<AppVisibilityState, AppVisibilityState[]> = {
     private: ['link', 'invited', 'pending_review'],
-    link: ['private', 'link'],
-    invited: ['private'],
+    link: ['private', 'link', 'invited'],
+    invited: ['private', 'link'],
     pending_review: ['public_live', 'changes_requested'],
     public_live: ['private'],
     changes_requested: ['pending_review'],

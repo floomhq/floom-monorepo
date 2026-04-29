@@ -55,10 +55,16 @@ console.log('Sharing · state machine');
 const id = insertApp('state-machine');
 const legal = [
   ['private', 'link', 'owner_enable_link'],
+  ['link', 'link', 'owner_enable_link'],
   ['link', 'private', 'owner_set_private'],
+  ['private', 'private', 'owner_set_private'],
   ['private', 'invited', 'owner_set_invited'],
+  ['invited', 'invited', 'owner_set_invited'],
   ['invited', 'private', 'owner_set_private'],
+  ['link', 'invited', 'owner_set_invited'],
+  ['invited', 'link', 'owner_enable_link'],
   ['private', 'pending_review', 'owner_submit_review'],
+  ['pending_review', 'pending_review', 'owner_submit_review'],
   ['pending_review', 'public_live', 'admin_approve'],
   ['public_live', 'private', 'owner_unlist'],
   ['private', 'pending_review', 'owner_submit_review'],
@@ -74,7 +80,6 @@ for (const [from, to, reason] of legal) {
 
 const illegal = [
   ['private', 'public_live', 'admin_approve'],
-  ['link', 'invited', 'owner_set_invited'],
   ['pending_review', 'link', 'owner_enable_link'],
   ['public_live', 'invited', 'owner_set_invited'],
   ['changes_requested', 'public_live', 'admin_approve'],
@@ -90,6 +95,31 @@ for (const [from, to, reason] of illegal) {
   }
   log(`${from} -> ${to} rejected`, threw);
 }
+
+reset(id, 'private');
+let seq = move(id, 'link', 'owner_enable_link');
+seq = move(id, 'invited', 'owner_set_invited');
+seq = move(id, 'link', 'owner_enable_link');
+seq = move(id, 'link', 'owner_enable_link');
+seq = move(id, 'invited', 'owner_set_invited');
+seq = move(id, 'private', 'owner_set_private');
+log('private/link/invited/link repeated sequence ends private', seq.visibility === 'private', `got ${seq.visibility}`);
+
+reset(id, 'private');
+for (let i = 0; i < 3; i++) {
+  seq = move(id, 'pending_review', 'owner_submit_review');
+  seq = move(id, 'pending_review', 'owner_submit_review');
+  seq = move(id, 'private', 'owner_withdraw_review');
+}
+log('repeated submit/withdraw loops end private', seq.visibility === 'private', `got ${seq.visibility}`);
+
+let withdrawPrivateThrew = false;
+try {
+  move(id, 'private', 'owner_withdraw_review');
+} catch (err) {
+  withdrawPrivateThrew = err instanceof Error && err.message === 'illegal_transition';
+}
+log('withdraw from private remains a stable illegal transition', withdrawPrivateThrew);
 
 rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${passed} passed, ${failed} failed`);
