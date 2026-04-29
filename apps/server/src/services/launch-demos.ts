@@ -307,6 +307,100 @@ export const DEMOS: LaunchDemo[] = [
       },
     },
   },
+  // Composio integration demos (feat/composio-runtime). Gated by
+  // FLOOM_SEED_LAUNCH_DEMOS (same flag as the rest). These apps use
+  // Composio OAuth — no GEMINI_API_KEY or API key management needed by the
+  // user. COMPOSIO_API_KEY must be set in env for the OAuth flow to work.
+  {
+    slug: 'inbox-summarizer',
+    name: 'Inbox Summarizer',
+    description:
+      'Connect your Gmail inbox and get an AI summary of your recent unread emails. Powered by Composio (Gmail) + Gemini. No credentials to manage — Floom handles the OAuth connection for you.',
+    category: 'productivity',
+    icon: null,
+    author: 'floom',
+    contextDir: 'examples/composio-demos/inbox-summarizer',
+    manifest: {
+      name: 'Inbox Summarizer',
+      description:
+        'Connect Gmail via Composio OAuth and get a Gemini-powered digest of recent unread emails.',
+      runtime: 'python',
+      python_dependencies: ['composio-core==0.7.12', 'google-genai==1.64.0'],
+      node_dependencies: {},
+      secrets_needed: ['COMPOSIO_API_KEY', 'GEMINI_API_KEY'],
+      integrations: [{ provider: 'composio', slug: 'gmail' }],
+      manifest_version: '2.0',
+      actions: {
+        summarize: {
+          label: 'Summarize Inbox',
+          description:
+            'Fetch up to N recent unread Gmail messages and summarize them with Gemini. Returns a markdown digest grouped by sender/thread.',
+          inputs: [
+            {
+              name: 'max_emails',
+              label: 'Max emails to fetch',
+              type: 'number',
+              required: false,
+              default: 10,
+              description: 'How many recent unread emails to include (max 50).',
+            },
+          ],
+          outputs: [
+            { name: 'summary', label: 'Inbox Summary', type: 'markdown' },
+            { name: 'email_count', label: 'Emails Processed', type: 'number' },
+          ],
+        },
+      },
+    },
+  },
+  {
+    slug: 'slack-poster',
+    name: 'Slack Poster',
+    description:
+      'Connect your Slack workspace and post messages to any channel. Powered by Composio (Slack OAuth). No credentials to manage — Floom handles the OAuth connection for you.',
+    category: 'productivity',
+    icon: null,
+    author: 'floom',
+    contextDir: 'examples/composio-demos/slack-poster',
+    manifest: {
+      name: 'Slack Poster',
+      description: 'Post a message to any Slack channel via Composio OAuth.',
+      runtime: 'python',
+      python_dependencies: ['composio-core==0.7.12'],
+      node_dependencies: {},
+      secrets_needed: ['COMPOSIO_API_KEY'],
+      integrations: [{ provider: 'composio', slug: 'slack' }],
+      manifest_version: '2.0',
+      actions: {
+        post: {
+          label: 'Post to Slack',
+          description: 'Post a message to a Slack channel using the connected workspace.',
+          inputs: [
+            {
+              name: 'channel',
+              label: 'Channel',
+              type: 'text',
+              required: true,
+              placeholder: '#general',
+              description: 'The Slack channel to post to (with or without #).',
+            },
+            {
+              name: 'message',
+              label: 'Message',
+              type: 'textarea',
+              required: true,
+              placeholder: 'Hello from Floom!',
+              description: 'The message text to post.',
+            },
+          ],
+          outputs: [
+            { name: 'ok', label: 'Success', type: 'text' },
+            { name: 'message_ts', label: 'Message Timestamp', type: 'text' },
+          ],
+        },
+      },
+    },
+  },
 ];
 
 function findRepoRoot(): string | null {
