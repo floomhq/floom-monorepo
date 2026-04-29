@@ -351,12 +351,10 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
   // When authenticated user hits "/", show a "Resume in {workspaceName} →" banner.
   const { data: session, isAuthenticated } = useSession();
   const waitlistHeroHref = useMemo(() => waitlistHref('landing-hero'), []);
-  // Route both modes to /install-in-claude (the 4-tab Claude install flow).
-  // /install is self-host Docker docs, /install/lead-scorer 404s when the
-  // hub misses the row — neither matches the "Run in Claude" CTA text.
-  // /install-in-claude renders without a slug (MCP search endpoint fallback)
-  // so it can't dead-end.
-  const runInClaudeHref = '/install-in-claude';
+  // r39 (2026-04-29): "Run in your AI tool" CTA removed per Federico's comment —
+  // non-technical visitors don't understand it. Dominant CTA is now "Browse live
+  // apps" → /apps. The /install-in-claude route is still live for developer
+  // visitors who find it via docs or TopBar; it's just not promoted in the hero.
 
   useEffect(() => {
     document.title = 'Ship AI apps fast · Floom';
@@ -574,6 +572,35 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                 marginBottom: 4,
               }}
             >
+              {/* Task B (r39, 2026-04-29): dominant CTA = Browse apps.
+                  "Run in your AI tool" removed per Federico's 2026-04-29
+                  comment — non-technical visitors don't understand it.
+                  waitlist mode (DEPLOY_ENABLED=false): primary = Browse apps,
+                  secondary = "or join the waitlist" inline link.
+                  deploy mode (DEPLOY_ENABLED=true): primary = Browse apps,
+                  secondary = Deploy your own. */}
+              <Link
+                to="/apps"
+                data-testid="hero-cta-browse-apps"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  background: 'var(--ink)',
+                  color: '#fff',
+                  border: '1px solid var(--ink)',
+                  borderRadius: 999,
+                  padding: '14px 26px',
+                  fontSize: 15,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Browse live apps
+                <ArrowRight size={14} aria-hidden="true" />
+              </Link>
               {!deployEnabled && (
                 <Link
                   to={waitlistHeroHref}
@@ -583,67 +610,20 @@ export function LandingV17Page({ variant = 'full' }: LandingV17PageProps = {}) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
-                    background: 'var(--ink)',
-                    color: '#fff',
-                    border: '1px solid var(--ink)',
+                    background: 'transparent',
+                    color: 'var(--ink)',
+                    border: '1px solid var(--line)',
                     borderRadius: 999,
-                    padding: '14px 26px',
+                    padding: '13px 20px',
                     fontSize: 15,
-                    fontWeight: 600,
+                    fontWeight: 500,
                     textDecoration: 'none',
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  Join the waitlist
+                  Publish your own — join waitlist
                 </Link>
               )}
-              <Link
-                to={runInClaudeHref}
-                data-testid="hero-cta-run-in-claude"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  background: deployEnabled ? 'var(--ink)' : 'var(--card)',
-                  color: deployEnabled ? '#fff' : 'var(--ink)',
-                  border: `1px solid ${deployEnabled ? 'var(--ink)' : 'var(--line)'}`,
-                  borderRadius: 999,
-                  padding: deployEnabled ? '14px 24px' : '13px 18px',
-                  fontSize: 15,
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {'Run in your AI tool'}
-              </Link>
-              {/* Federico 2026-04-29: non-technical visitors don't know what
-                  "Run in your AI tool" means. Surface the directory as a
-                  lower-friction parallel CTA so they have a path that doesn't
-                  require already having Claude / Cursor / Codex set up. */}
-              <Link
-                to="/apps"
-                data-testid="hero-cta-browse-apps"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  background: 'transparent',
-                  color: 'var(--ink)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 999,
-                  padding: '13px 20px',
-                  fontSize: 15,
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Browse apps
-                <ArrowRight size={14} aria-hidden="true" />
-              </Link>
               {deployEnabled && (
                 <Link
                   to="/signup"
@@ -1117,10 +1097,10 @@ const STEPS = [
   },
   {
     num: '02',
-    kicker: 'GO LIVE',
-    title: '60 seconds later, your app is live',
-    body: 'You get a public URL, an AI-tool plugin, and an API. No setup.',
-    mono: 'live in ~60s',
+    kicker: 'DEPLOY (BUILDERS ONLY)',
+    title: 'Join the waitlist to publish your own app',
+    body: 'Deploying your own app is rolling out to early builders. Join the waitlist — marketplace apps are already live for everyone.',
+    mono: 'publishing via waitlist',
   },
   {
     num: '03',

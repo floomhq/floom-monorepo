@@ -266,7 +266,8 @@ apps:
     base_url: "https://public-api.sandbox.bunq.com/v1"
     auth: none
     category: "financial"
-    visibility: public
+    # r39 (2026-04-29): sandbox base URL — unreliable for public catalog
+    visibility: private
     icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_bunq_profile_image.jpeg"
 
   - slug: canada-holidays-api
@@ -684,7 +685,8 @@ apps:
     base_url: "https://api.icons8.com"
     auth: none
     category: "media"
-    visibility: public
+    # r39 (2026-04-29): markdown-link display name renders broken in catalog UI
+    visibility: private
     icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_icons_8_profile_image.jpeg"
 
   - slug: api-reference-ideal-postcodes
@@ -860,7 +862,8 @@ apps:
     base_url: "https://api.mercedes-benz.com/configurator_tryout/v1"
     auth: none
     category: "transport"
-    visibility: public
+    # r39 (2026-04-29): "_tryout" base URL — demo/sandbox endpoint, not production
+    visibility: private
     icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_MercedesBenz_profile_image.jpeg"
 
   - slug: magento-b2b
@@ -926,7 +929,8 @@ apps:
     base_url: "https://demo.uat.naviplancentral.com/factfinder"
     auth: none
     category: "financial"
-    visibility: public
+    # r39 (2026-04-29): "demo.uat" base URL — not a production endpoint
+    visibility: private
     icon: "https://api.apis.guru/v2/cache/logo/https_twitter.com_Advicent_profile_image.jpeg"
 
   - slug: nowpayments-api
