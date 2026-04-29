@@ -160,7 +160,7 @@ const SIDECARS: LaunchWeekSidecar[] = [
         slug: 'pitch-coach',
         display_name: 'Pitch Coach',
         description:
-          'Paste a 20-500 char startup pitch. Get 3 direct critiques, 3 angle-specific rewrites, and a 1-line TL;DR of the biggest issue. Under 5 seconds.',
+          'Paste a 20-500 char startup pitch. Get 3 direct critiques, 3 angle-specific rewrites, and a 1-line TL;DR of the biggest issue.',
         category: 'writing',
         openapiPath: '/openapi.json',
         featured: true,

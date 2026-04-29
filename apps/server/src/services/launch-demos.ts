@@ -220,7 +220,7 @@ export const DEMOS: LaunchDemo[] = [
     slug: 'pitch-coach',
     name: 'Pitch Coach',
     description:
-      'Paste a 20-500 char startup pitch. A single Gemini 2.5 Flash Lite call returns 3 direct critiques, 3 angle-specific rewrites, and a 1-line TL;DR of the biggest issue. Under 5 seconds.',
+      'Paste a 20-500 char startup pitch. A single Gemini 2.5 Flash Lite call returns 3 direct critiques, 3 angle-specific rewrites, and a 1-line TL;DR of the biggest issue.',
     category: 'writing',
     icon: null,
     author: 'floom',
@@ -238,7 +238,7 @@ export const DEMOS: LaunchDemo[] = [
         coach: {
           label: 'Coach Pitch',
           description:
-            'Runs a single Gemini 2.5 Flash Lite call with strict JSON schema against your pitch (20-500 chars). Returns three direct critiques with VC-style reactions, three rewrites in different angles (user-outcome / market-size / technical-moat), and a one-line TL;DR of the biggest issue. Under 5 seconds.',
+            'Runs a single Gemini 2.5 Flash Lite call with strict JSON schema against your pitch (20-500 chars). Returns three direct critiques with VC-style reactions, three rewrites in different angles (user-outcome / market-size / technical-moat), and a one-line TL;DR of the biggest issue.',
           inputs: [
             {
               name: 'pitch',
