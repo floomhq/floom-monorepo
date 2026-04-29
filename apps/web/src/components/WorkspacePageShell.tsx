@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { PageShell } from './PageShell';
+import { AppShell } from './AppShell';
 import { RunRail } from './RunRail';
 import { SettingsRail } from './SettingsRail';
 import { SettingsTabBar } from './SettingsTabBar';
@@ -33,29 +33,17 @@ export function WorkspacePageShell({
   const studioBg = mode === 'studio' ? 'var(--studio)' : undefined;
 
   return (
-    <PageShell
-      requireAuth="cloud"
+    <AppShell
+      rail={rail}
       title={title}
       allowSignedOutShell={allowSignedOutShell}
-      noIndex
-      contentStyle={{ padding: 0, maxWidth: 'none', minHeight: 'auto' }}
+      mainMaxWidth={mainMaxWidth}
+      background={studioBg ?? 'var(--bg)'}
+      contentStyle={contentStyle}
     >
-      <div style={{ ...shellStyle, ...(studioBg ? { background: studioBg } : {}) }}>
-        {rail}
-        <div
-          role="region"
-          style={{
-            ...mainStyle,
-            ...(studioBg ? { background: studioBg } : {}),
-            maxWidth: mainMaxWidth,
-            ...contentStyle,
-          }}
-        >
-          {showSettingsTabs && <SettingsTabBar />}
-          {children}
-        </div>
-      </div>
-    </PageShell>
+      {showSettingsTabs && <SettingsTabBar />}
+      {children}
+    </AppShell>
   );
 }
 
@@ -89,28 +77,6 @@ export function WorkspaceHeader({
     </header>
   );
 }
-
-const shellStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  minHeight: 'calc(100vh - 56px)',
-  background: 'var(--bg)',
-};
-
-const mainStyle: CSSProperties = {
-  flex: 1,
-  paddingTop: 24,
-  paddingLeft: 28,
-  paddingRight: 28,
-  // Extra room ensures the cookie banner (position:fixed, bottom:0) never
-  // overlaps content. 80px base + --cookie-banner-height (set by
-  // CookieBanner.tsx via ResizeObserver; 0px when banner is dismissed).
-  paddingBottom: 'calc(80px + var(--cookie-banner-height, 0px))',
-  margin: '0 auto',
-  width: '100%',
-  minWidth: 0,
-  boxSizing: 'border-box',
-};
 
 const headerStyle: CSSProperties = {
   display: 'flex',

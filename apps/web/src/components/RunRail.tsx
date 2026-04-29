@@ -211,9 +211,8 @@ export const railStyle: CSSProperties = {
   background: 'var(--studio)',
   display: 'flex',
   flexDirection: 'column',
-  height: '100vh',
-  position: 'sticky',
-  top: 0,
+  height: '100%',
+  minHeight: 0,
   overflow: 'hidden',
 };
 
