@@ -1,13 +1,19 @@
 /**
  * /studio/runs — thin wrapper over RunsList.
- * Data fetching lives here; all rendering in RunsList.
- * v26-IA-SPEC §12.2: uses WorkspacePageShell mode="studio" for shell alignment.
+ * Data fetching + filter state live here; all rendering in RunsList.
+ *
+ * V26-IA-SPEC §12.2: shares shell + layout shape with /run/runs.
+ * Semantic difference (workspace-scoped activity) preserved at the data layer.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { StudioSignedOutState } from '../components/studio/StudioSignedOutState';
-import { RunsList, runListRowsFromStudioActivity } from '../components/workspace/RunsList';
+import {
+  RunsList,
+  runListRowsFromStudioActivity,
+  type RunsListFilter,
+} from '../components/workspace/RunsList';
 import { useSession } from '../hooks/useSession';
 import * as api from '../api/client';
 import type { StudioActivityRun } from '../lib/types';
@@ -15,12 +21,35 @@ import type { StudioActivityRun } from '../lib/types';
 const INITIAL_LIMIT = 25;
 const LOAD_STEP = 25;
 
+type StudioFilter = 'all' | 'successful' | 'failed';
+
+const FILTER_LABELS: Record<StudioFilter, string> = {
+  all: 'All',
+  successful: 'Successful',
+  failed: 'Failed',
+};
+
+function applyFilter(
+  runs: StudioActivityRun[],
+  filter: StudioFilter,
+): StudioActivityRun[] {
+  if (filter === 'all') return runs;
+  if (filter === 'successful') return runs.filter((r) => r.status === 'success');
+  if (filter === 'failed') {
+    return runs.filter(
+      (r) => r.status === 'error' || r.status === 'timeout',
+    );
+  }
+  return runs;
+}
+
 export function StudioRunsPage() {
   const { data: session } = useSession();
   const signedOutPreview = !!session && session.cloud_mode && session.user.is_local;
   const [runs, setRuns] = useState<StudioActivityRun[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_LIMIT);
+  const [activeFilter, setActiveFilter] = useState<StudioFilter>('all');
 
   useEffect(() => {
     if (signedOutPreview) return;
@@ -38,12 +67,38 @@ export function StudioRunsPage() {
     };
   }, [signedOutPreview]);
 
-  const allRows = useMemo(() => (runs ? runListRowsFromStudioActivity(runs) : null), [runs]);
-  const visibleRows = useMemo(
-    () => (allRows ? allRows.slice(0, visibleCount) : null),
-    [allRows, visibleCount],
+  const filteredRuns = useMemo(
+    () => (runs ? applyFilter(runs, activeFilter) : []),
+    [runs, activeFilter],
   );
-  const hasMore = allRows ? allRows.length > visibleCount : false;
+  const visibleSlice = useMemo(
+    () => filteredRuns.slice(0, visibleCount),
+    [filteredRuns, visibleCount],
+  );
+  const visibleRows = useMemo(
+    () => runListRowsFromStudioActivity(visibleSlice),
+    [visibleSlice],
+  );
+  const hasMore = filteredRuns.length > visibleCount;
+
+  const filters: RunsListFilter[] = useMemo(() => {
+    const all = runs ?? [];
+    const counts: Record<StudioFilter, number> = {
+      all: all.length,
+      successful: applyFilter(all, 'successful').length,
+      failed: applyFilter(all, 'failed').length,
+    };
+    return (['all', 'successful', 'failed'] as StudioFilter[]).map((f) => ({
+      id: f,
+      label: FILTER_LABELS[f],
+      count: runs ? counts[f] : undefined,
+      active: activeFilter === f,
+      onClick: () => {
+        setActiveFilter(f);
+        setVisibleCount(INITIAL_LIMIT);
+      },
+    }));
+  }, [runs, activeFilter]);
 
   return (
     <WorkspacePageShell
@@ -82,16 +137,14 @@ export function StudioRunsPage() {
               sub: 'active',
             },
           ]}
-          filters={[
-            { label: 'All apps', active: true },
-            { label: 'Failed only' },
-          ]}
-          runs={visibleRows}
-          totalCount={runs?.length}
+          filters={filters}
+          runs={runs === null && !error ? null : visibleRows}
+          totalCount={filteredRuns.length}
           hasMore={hasMore}
           onLoadMore={() => setVisibleCount((n) => n + LOAD_STEP)}
           loading={runs === null && !error}
           error={error}
+          emptyState="No runs in this workspace yet."
         />
       )}
     </WorkspacePageShell>

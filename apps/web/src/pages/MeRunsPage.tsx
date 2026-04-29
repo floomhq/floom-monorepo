@@ -45,7 +45,10 @@ export function MeRunsPage() {
     };
   }, [sessionPending, signedOutPreview]);
 
-  const allRows = useMemo(() => (runs ? runListRowsFromMeRuns(runs) : null), [runs]);
+  const allRows = useMemo(
+    () => (runs ? runListRowsFromMeRuns(runs, '/me/runs') : null),
+    [runs],
+  );
   const visibleRows = useMemo(
     () => (allRows ? allRows.slice(0, visibleCount) : null),
     [allRows, visibleCount],
