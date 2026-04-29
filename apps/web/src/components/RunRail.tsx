@@ -88,8 +88,6 @@ export function RunRail() {
  */
 export function RailFoot() {
   const now = useRailClock();
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const tzCity = tz.split('/').pop()?.replace(/_/g, ' ') ?? tz;
   const time = now.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
@@ -102,9 +100,7 @@ export function RailFoot() {
         <SettingsIcon size={14} aria-hidden="true" />
         <span>Settings</span>
       </Link>
-      <div style={railFootMetaStyle}>
-        {time} · {tzCity}
-      </div>
+      <div style={railFootMetaStyle}>{time}</div>
     </div>
   );
 }
