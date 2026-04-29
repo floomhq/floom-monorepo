@@ -581,6 +581,10 @@ export function LoginPage() {
             {mode === 'signin' ? 'Sign up' : 'Sign in'}
           </button>
         </p>
+        {/* M1 (#1058) 2026-04-29: dropped the awkward "you are in the right
+            place, the same page signs you up" sentence — Federico flagged it
+            as primitive. The Sign in / Sign up tab pair above already makes it
+            obvious the same page handles both, so this line was just noise. */}
         <p
           style={{
             textAlign: 'center',
@@ -589,7 +593,6 @@ export function LoginPage() {
             color: 'var(--muted)',
           }}
         >
-          New to Floom? You are in the right place, the same page signs you up. ·{' '}
           <Link to="/" style={{ color: 'var(--ink)' }}>Back to home</Link>
         </p>
       </div>
