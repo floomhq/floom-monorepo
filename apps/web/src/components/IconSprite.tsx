@@ -389,6 +389,25 @@ export function IconSprite() {
           d="M3.34 19a10 10 0 1117.32 0H3.34z"
         />
       </symbol>
+      <symbol id="app-ai-visibility" viewBox="0 0 24 24">
+        {/* Lucide-style eye with signal bars for AI visibility scoring. */}
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"
+        />
+        <circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          d="M5 21v-3M9 21v-2M15 21v-4M19 21v-3"
+        />
+      </symbol>
       <symbol id="app-pitch-coach" viewBox="0 0 24 24">
         {/* Lucide `megaphone` — pitch delivery, call to attention. */}
         <path
@@ -658,6 +677,7 @@ export function iconForSlug(slug: string): string {
     'resume-screener': 'app-resume-screener',
     'competitor-lens': 'app-competitor-lens',
     'ai-readiness-audit': 'app-ai-readiness-audit',
+    'ai-visibility': 'app-ai-visibility',
     'pitch-coach': 'app-pitch-coach',
     // Boring Pack
     receipt: 'app-receipt',
