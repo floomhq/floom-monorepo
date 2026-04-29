@@ -16,6 +16,7 @@
  */
 
 export type { Runtime } from '@floom/detect';
+import type { ByoRuntimeConfig } from '@floom/byo-providers';
 
 export type InputType = 'string' | 'number' | 'boolean' | 'file' | 'json';
 
@@ -100,6 +101,17 @@ export interface Manifest {
   network?: {
     allowed_domains: string[];
   };
+
+  /**
+   * User-owned provider orchestration config. Present when floom.yaml declares:
+   *
+   * runtime:
+   *   byo:
+   *     database: ...
+   *     hosting: ...
+   *     sandbox: ...
+   */
+  byo?: ByoRuntimeConfig;
 }
 
 export interface RunTiming {

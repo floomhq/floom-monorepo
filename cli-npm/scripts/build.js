@@ -45,6 +45,19 @@ function copyDir(src, dest) {
   }
 }
 
+function copySrc(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const s = path.join(src, entry.name);
+    const d = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copySrc(s, d);
+    } else if (entry.isFile()) {
+      fs.copyFileSync(s, d);
+    }
+  }
+}
+
 console.log('[cli-npm build] cleaning dist/ + vendor/');
 rm(DIST);
 rm(VENDOR);
@@ -57,9 +70,9 @@ if (!fs.existsSync(BASH_CLI_SRC)) {
 copyDir(BASH_CLI_SRC, path.join(VENDOR, 'floom'));
 
 console.log('[cli-npm build] copying src/ -> dist/');
-fs.mkdirSync(DIST, { recursive: true });
+copySrc(SRC, DIST);
 const indexSrc = fs.readFileSync(path.join(SRC, 'index.js'), 'utf8');
-fs.writeFileSync(path.join(DIST, 'index.js'), indexSrc, { mode: 0o755 });
+fs.chmodSync(path.join(DIST, 'index.js'), 0o755);
 
 // Verify the entrypoint has a shebang.
 if (!indexSrc.startsWith('#!')) {

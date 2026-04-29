@@ -7,7 +7,25 @@
  */
 import type { Runtime } from './types.ts';
 
-export type { Manifest, Input, InputType, Output, OutputType, Runtime } from './types.ts';
+export type {
+  Manifest,
+  Input,
+  InputType,
+  Output,
+  OutputType,
+  Runtime,
+} from './types.ts';
+export type {
+  ByoDatabaseConfig,
+  ByoHostingConfig,
+  ByoRuntimeConfig,
+  ByoSandboxConfig,
+  DatabaseProvider,
+  HostingProvider,
+  SandboxProvider,
+  TableColumnSchema,
+  TableSchema,
+} from '@floom/byo-providers';
 
 export const ALLOWED_RUNTIMES: Runtime[] = [
   'python3.12',

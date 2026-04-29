@@ -186,6 +186,15 @@ importers:
         specifier: 6.4.2
         version: 6.4.2(@types/node@22.9.0)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.3)
 
+  packages/byo-providers:
+    devDependencies:
+      '@types/node':
+        specifier: 22.9.0
+        version: 22.9.0
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+
   packages/cli:
     dependencies:
       '@floom/runtime':
@@ -228,6 +237,9 @@ importers:
 
   packages/manifest:
     dependencies:
+      '@floom/byo-providers':
+        specifier: workspace:*
+        version: link:../byo-providers
       '@floom/detect':
         specifier: workspace:*
         version: link:../detect

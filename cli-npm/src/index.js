@@ -25,6 +25,7 @@ const path = require('path');
 const readline = require('readline');
 const { spawn } = require('child_process');
 const pkg = require('../package.json');
+const { runByoDeploy } = require('./byo');
 
 const VERSION = pkg.version;
 const DEFAULT_API_URL = process.env.FLOOM_API_URL || 'https://floom.dev';
@@ -2051,6 +2052,7 @@ ${c.bold('usage:')}
   floom run <slug> --json      ${c.dim('# print raw final run JSON')}
   floom apps list [--json]     ${c.dim('# list workspace apps')}
   floom deploy                 ${c.dim('# validate + publish current floom.yaml')}
+  floom byo-deploy [repo-dir]  ${c.dim('# deploy with user-owned Supabase, Vercel, and E2B')}
   floom init                   ${c.dim('# scaffold floom.yaml in current dir')}
   floom status [--json]        ${c.dim('# list apps and recent runs')}
   floom account                ${c.dim('# manage secrets; agent-token commands need a browser session')}
@@ -2182,6 +2184,10 @@ async function main() {
 
     case 'deploy':
       await runDeploy(opts, rest);
+      return;
+
+    case 'byo-deploy':
+      await runByoDeploy(rest);
       return;
 
     case 'status':

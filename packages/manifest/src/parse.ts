@@ -8,6 +8,7 @@
  */
 import { parse as parseYaml } from 'yaml';
 import type { Manifest, Input, InputType, Output, OutputType } from './schema.ts';
+import type { ByoRuntimeConfig, TableColumnSchema, TableSchema } from '@floom/byo-providers';
 import {
   ALLOWED_RUNTIMES,
   ALLOWED_INPUT_TYPES,
@@ -16,6 +17,140 @@ import {
 } from './schema.ts';
 
 const MAX_ALLOWED_DOMAINS = 20;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function parseTableColumns(raw: unknown, path: string, errors: string[]): TableColumnSchema[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    errors.push(`${path} must be a list`);
+    return [];
+  }
+
+  const columns: TableColumnSchema[] = [];
+  raw.forEach((entry, idx) => {
+    if (!isRecord(entry)) {
+      errors.push(`${path}[${idx}] must be a mapping`);
+      return;
+    }
+    const name = optionalString(entry['name']);
+    const type = optionalString(entry['type']);
+    if (!name) errors.push(`${path}[${idx}].name must be a string`);
+    if (!type) errors.push(`${path}[${idx}].type must be a string`);
+    if (!name || !type) return;
+
+    const column: TableColumnSchema = { name, type };
+    if (typeof entry['primary_key'] === 'boolean') column.primary_key = entry['primary_key'];
+    if (typeof entry['nullable'] === 'boolean') column.nullable = entry['nullable'];
+    if (
+      entry['default'] === null ||
+      ['string', 'number', 'boolean'].includes(typeof entry['default'])
+    ) {
+      column.default = entry['default'] as string | number | boolean | null;
+    }
+    if (typeof entry['references'] === 'string') column.references = entry['references'];
+    columns.push(column);
+  });
+  return columns;
+}
+
+function parseTables(raw: unknown, path: string, errors: string[]): TableSchema[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    errors.push(`${path} must be a list`);
+    return [];
+  }
+
+  const tables: TableSchema[] = [];
+  raw.forEach((entry, idx) => {
+    if (!isRecord(entry)) {
+      errors.push(`${path}[${idx}] must be a mapping`);
+      return;
+    }
+    const name = optionalString(entry['name']);
+    if (!name) {
+      errors.push(`${path}[${idx}].name must be a string`);
+      return;
+    }
+    tables.push({
+      name,
+      columns: parseTableColumns(entry['columns'], `${path}[${idx}].columns`, errors),
+    });
+  });
+  return tables;
+}
+
+function parseByoRuntime(raw: unknown, errors: string[]): ByoRuntimeConfig | undefined {
+  if (!isRecord(raw) || !isRecord(raw['byo'])) return undefined;
+
+  const byoRaw = raw['byo'];
+  const byo: ByoRuntimeConfig = {};
+
+  if (byoRaw['database'] !== undefined) {
+    if (!isRecord(byoRaw['database'])) {
+      errors.push('runtime.byo.database must be a mapping');
+    } else {
+      const db = byoRaw['database'];
+      if (db['provider'] !== 'supabase') {
+        errors.push('runtime.byo.database.provider must be supabase');
+      } else {
+        byo.database = {
+          provider: 'supabase',
+          project_name: optionalString(db['project_name']),
+          tables: parseTables(db['tables'], 'runtime.byo.database.tables', errors),
+        };
+      }
+    }
+  }
+
+  if (byoRaw['hosting'] !== undefined) {
+    if (!isRecord(byoRaw['hosting'])) {
+      errors.push('runtime.byo.hosting must be a mapping');
+    } else {
+      const hosting = byoRaw['hosting'];
+      if (hosting['provider'] !== 'vercel') {
+        errors.push('runtime.byo.hosting.provider must be vercel');
+      } else {
+        byo.hosting = {
+          provider: 'vercel',
+          project_name: optionalString(hosting['project_name']),
+          build_command: optionalString(hosting['build_command']),
+          output_dir: optionalString(hosting['output_dir']),
+        };
+      }
+    }
+  }
+
+  if (byoRaw['sandbox'] !== undefined) {
+    if (!isRecord(byoRaw['sandbox'])) {
+      errors.push('runtime.byo.sandbox must be a mapping');
+    } else {
+      const sandbox = byoRaw['sandbox'];
+      if (sandbox['provider'] !== 'e2b') {
+        errors.push('runtime.byo.sandbox.provider must be e2b');
+      } else {
+        const template = optionalString(sandbox['template']);
+        if (!template) {
+          errors.push('runtime.byo.sandbox.template must be a string');
+        } else {
+          byo.sandbox = {
+            provider: 'e2b',
+            template,
+            image: optionalString(sandbox['image']),
+          };
+        }
+      }
+    }
+  }
+
+  return byo;
+}
 
 function isIpLiteral(value: string): boolean {
   return (
@@ -88,8 +223,13 @@ export function parseManifest(yamlSource: string): ParseResult {
 
   const obj = raw as Record<string, unknown>;
 
+  const runtimeRaw = obj['runtime'];
+  const byoRuntime = parseByoRuntime(runtimeRaw, errors);
+  const isByoManifest = !!byoRuntime;
+
   // Required fields
   for (const field of REQUIRED_FIELDS) {
+    if (isByoManifest && field === 'run') continue;
     if (!(field in obj)) {
       errors.push(`missing required field: ${field}`);
     }
@@ -102,9 +242,12 @@ export function parseManifest(yamlSource: string): ParseResult {
   }
 
   // runtime
-  const runtime = obj['runtime'];
+  const runtime = runtimeRaw;
   if (runtime !== undefined) {
-    if (typeof runtime !== 'string' || !ALLOWED_RUNTIMES.includes(runtime as never)) {
+    if (isByoManifest) {
+      // runtime.byo is normalized onto manifest.byo below while preserving the
+      // legacy Manifest.runtime string contract for existing runtime callers.
+    } else if (typeof runtime !== 'string' || !ALLOWED_RUNTIMES.includes(runtime as never)) {
       errors.push(
         `runtime must be one of: ${ALLOWED_RUNTIMES.join(', ')} (got ${JSON.stringify(runtime)})`,
       );
@@ -196,11 +339,13 @@ export function parseManifest(yamlSource: string): ParseResult {
     displayName: typeof obj['displayName'] === 'string' ? obj['displayName'] : (name as string),
     description: typeof obj['description'] === 'string' ? obj['description'] : '',
     creator: typeof obj['creator'] === 'string' ? obj['creator'] : 'unknown',
-    runtime: runtime as Manifest['runtime'],
-    run: run as string,
+    runtime: (isByoManifest ? 'node22' : runtime) as Manifest['runtime'],
+    run: typeof run === 'string' ? run : '',
     inputs,
     outputs: output ?? { type: 'stdout' },
   };
+
+  if (byoRuntime) manifest.byo = byoRuntime;
 
   if (typeof obj['build'] === 'string') manifest.build = obj['build'];
   if (typeof obj['category'] === 'string') manifest.category = obj['category'];
