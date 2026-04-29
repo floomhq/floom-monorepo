@@ -963,3 +963,97 @@ Priority fixes from this pass:
 3. Document review preconditions: submit/withdraw requires `private` visibility.
 4. Remove, hide, or implement CLI commands that are absent in the shipped/repo CLI surface.
 5. Fix CLI slug derivation and first-run result polling before public CLI onboarding.
+
+## 18. Round 18 Prod Token Host-Mismatch Audit
+
+Date: 2026-04-29
+
+Token under test: `floom_agent_lX...5G60` (redacted)
+
+Launch state during this round:
+
+- `origin/launch-mvp`: `b723c6a2`
+- Prod image: `floom-prod:auto-b723c6a2-r29-png-only`
+- MVP image: `floom-mvp-preview:auto-b723c6a2-r29-png-only`
+- Preview image: `floom-preview:auto-dd89d322-r37-launch-dd89`
+
+### 18.1 Token validity by host
+
+The new token is valid on prod and invalid on MVP/preview.
+
+Observed results:
+
+| Host | `/api/session/me` | `/mcp tools/list` | Interpretation |
+| --- | --- | --- | --- |
+| `https://floom.dev` | `200` | `200`, 39 tools | Token belongs to prod DB |
+| `https://mvp.floom.dev` | `401 invalid_agent_token` | `401 invalid_agent_token` | Host/DB mismatch |
+| `https://preview.floom.dev` | `401 invalid_agent_token` | `401 invalid_agent_token` | Host/DB mismatch |
+
+Root cause of the failed CLI/MCP attempt:
+
+- The test used `https://mvp.floom.dev`.
+- The token validates on `https://floom.dev`.
+- Agent tokens are host-scoped because each host has its own backing DB.
+
+### 18.2 MCP prod run proof
+
+Using `https://floom.dev/mcp` with the same token:
+
+- `tools/list`: `39` tools
+- `run_app(hash)`: success
+- `get_run`: success
+- `list_my_runs`: success
+
+Representative run:
+
+- `run_id`: `run_kg7vy1zt6nzg`
+- `slug`: `hash`
+- `status`: `success`
+- `duration_ms`: `11`
+- `digest_hex`: `b3fd21521270a8b91f64ab4e34e4ff453f3e5e97ee62bda92416504777bcc646`
+
+### 18.3 CLI virgin-session prod proof
+
+Fresh temporary `HOME` with `npx -y @floomhq/cli@latest`:
+
+- CLI version: `0.2.7`
+- `floom auth <token> https://floom.dev`: success
+- Saved config API URL: `https://floom.dev`
+- `floom run hash '{"text":"cli-prod-round","algorithm":"sha256"}' --json`: success
+
+Representative CLI run:
+
+- `run_id`: `run_jdytvdrqj2y4`
+- `slug`: `hash`
+- `status`: `success`
+- `duration_ms`: `4`
+- `digest_hex`: `a97b383146cdc8ce83046f515037c4b844d3fc86a2402667c48f1bf0b726d993`
+
+CLI JSON shape note:
+
+- Current CLI JSON uses `id`, `app_slug`, and `outputs`.
+- Older report projections that expected `run_id`, `slug`, and `output` read as null even though the run succeeded.
+
+### 18.4 Public boundary checks
+
+For `floom.dev`, `mvp.floom.dev`, and `preview.floom.dev`:
+
+- `/api/health`: `200`, version `0.4.0-mvp.5`
+- Invalid MCP bearer: `401` JSON with `code=invalid_token`
+- `/metrics`: `404`
+- No-auth `/api/session/me`: `200` local synthetic session, expected for public browse/run surfaces
+
+Port surface after cleanup:
+
+- Public `4310-4316`: closed
+- Public `3056`: closed
+- `floom-v26-preview`: stopped, restart policy `no`
+
+### 18.5 Round 18 conclusion
+
+The Round 18 token failure was not a token-generation failure. It was a host mismatch:
+
+- Use this token with `https://floom.dev`.
+- Do not use this token with `https://mvp.floom.dev` or `https://preview.floom.dev`.
+
+Prod MCP and prod CLI both passed with the token.
