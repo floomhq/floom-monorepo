@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, Play, Plus, Settings as SettingsIcon } from 'lucide-react';
+import { LayoutGrid, Play, Plus, Settings as SettingsIcon } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
 // V13 fix: rail's "Apps" count is now sourced from /api/hub/installed via
@@ -45,7 +45,7 @@ export function RunRail() {
             location.pathname === '/run/apps' ||
             location.pathname.startsWith('/run/apps/')
           }
-          icon={<Box size={15} />}
+          icon={<LayoutGrid size={15} />}
           count={appsCount ?? undefined}
         >
           Apps
