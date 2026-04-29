@@ -154,12 +154,12 @@ function FilterChipBar({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 14,
+        gap: 'var(--space-4)',
         flexWrap: 'wrap',
-        marginBottom: 16,
+        marginBottom: 'var(--space-4)',
       }}
     >
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         {filters.map((f) => {
           const isActive = f === active;
           return (
@@ -301,10 +301,10 @@ function AppCard({ app }: { app: RunApp }) {
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 14,
-        padding: 16,
+        padding: 'var(--space-4)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 10,
+        gap: 'var(--space-3)',
         textDecoration: 'none',
         color: 'inherit',
         boxShadow: 'var(--shadow-1)',
@@ -317,7 +317,7 @@ function AppCard({ app }: { app: RunApp }) {
         e.currentTarget.style.borderColor = 'var(--line)';
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
         <div
           aria-hidden="true"
           style={{
@@ -409,8 +409,8 @@ function AppsGrid({ apps }: { apps: RunApp[] }) {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 14,
-          marginBottom: 18,
+          gap: 'var(--space-4)',
+          marginBottom: 'var(--space-5)',
         }}
       >
         {apps.map((app) => (
@@ -424,12 +424,12 @@ function AppsGrid({ apps }: { apps: RunApp[] }) {
               background: 'transparent',
               border: '1px dashed var(--line)',
               borderRadius: 14,
-              padding: 16,
+              padding: 'var(--space-4)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 'var(--space-2)',
               textDecoration: 'none',
               color: 'var(--muted)',
               minHeight: 140,
@@ -464,8 +464,8 @@ function RecentRunsPanel({ runs }: { runs: MeRunSummary[] }) {
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 12,
-        padding: '18px 20px 6px',
-        marginBottom: 16,
+        padding: 'var(--space-5) var(--space-5) var(--space-2)',
+        marginBottom: 'var(--space-4)',
       }}
     >
       <div
@@ -473,10 +473,10 @@ function RecentRunsPanel({ runs }: { runs: MeRunSummary[] }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 10,
+          marginBottom: 'var(--space-3)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <span
             aria-hidden="true"
             style={{
@@ -531,9 +531,9 @@ function RecentRunsPanel({ runs }: { runs: MeRunSummary[] }) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: '32px minmax(0,1fr) auto auto auto',
-                gap: 14,
+                gap: 'var(--space-4)',
                 alignItems: 'center',
-                padding: '12px 16px',
+                padding: 'var(--space-3) var(--space-4)',
                 borderBottom: '1px solid var(--line)',
                 fontSize: 12.5,
                 textDecoration: 'none',
@@ -604,11 +604,11 @@ function EmptyState() {
         flexDirection: 'column',
         alignItems: 'center',
         textAlign: 'center',
-        padding: '48px 24px 56px',
+        padding: 'var(--space-8) var(--space-6) var(--space-8)',
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 14,
-        marginBottom: 18,
+        marginBottom: 'var(--space-5)',
       }}
     >
       <h3
@@ -732,14 +732,14 @@ export function RunAppsPage() {
     <WorkspacePageShell mode="run" title="Apps · Run · Floom">
       <div data-testid="run-apps-page">
         {/* Page head */}
-        <div style={{ marginBottom: 18 }}>
+        <div style={{ marginBottom: 'var(--space-5)' }}>
           <h1
             style={{
               fontWeight: 800,
               fontSize: 30,
               letterSpacing: '-0.02em',
               lineHeight: 1.1,
-              margin: '0 0 5px',
+              margin: '0 0 var(--space-1)',
               color: 'var(--ink)',
             }}
           >
@@ -774,7 +774,7 @@ export function RunAppsPage() {
         {!dataReady ? (
           <div
             data-testid="run-apps-loading"
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)' }}
           >
             {[1, 2].map((i) => (
               <div
@@ -783,12 +783,12 @@ export function RunAppsPage() {
                   background: 'var(--card)',
                   border: '1px solid var(--line)',
                   borderRadius: 14,
-                  padding: 18,
+                  padding: 'var(--space-5)',
                   height: 140,
                   boxShadow: 'var(--shadow-2)',
                 }}
               >
-                <div style={{ width: '60%', height: 14, background: 'var(--line)', borderRadius: 4, marginBottom: 8 }} />
+                <div style={{ width: '60%', height: 14, background: 'var(--line)', borderRadius: 4, marginBottom: 'var(--space-2)' }} />
                 <div style={{ width: '90%', height: 10, background: 'var(--line)', borderRadius: 4 }} />
               </div>
             ))}
@@ -802,8 +802,8 @@ export function RunAppsPage() {
               style={{
                 fontSize: 13,
                 color: 'var(--muted)',
-                marginBottom: 12,
-                padding: '10px 0',
+                marginBottom: 'var(--space-3)',
+                padding: 'var(--space-3) 0',
               }}
             >
               No apps match this filter.
@@ -819,11 +819,11 @@ export function RunAppsPage() {
 
 
         {/* Bottom CTA */}
-        <div data-testid="run-apps-bottom-cta" style={{ marginTop: 4 }}>
+        <div data-testid="run-apps-bottom-cta" style={{ marginTop: 'var(--space-1)' }}>
           <Link
             to="/apps"
             style={{
-              padding: '8px 16px',
+              padding: 'var(--space-2) var(--space-4)',
               background: 'var(--card)',
               border: '1px solid var(--line)',
               borderRadius: 8,

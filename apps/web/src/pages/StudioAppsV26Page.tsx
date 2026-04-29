@@ -70,9 +70,9 @@ function StudioFilterChipBar({
       data-testid="studio-apps-filter-chips"
       style={{
         display: 'flex',
-        gap: 8,
+        gap: 'var(--space-2)',
         flexWrap: 'wrap',
-        marginBottom: 16,
+        marginBottom: 'var(--space-4)',
       }}
     >
       {filters.map((f) => {
@@ -211,10 +211,10 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 14,
-        padding: 16,
+        padding: 'var(--space-4)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 10,
+        gap: 'var(--space-3)',
         textDecoration: 'none',
         color: 'inherit',
         boxShadow: 'var(--shadow-1)',
@@ -228,7 +228,7 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
       }}
     >
       {/* Row 1: icon + name + live/draft pill */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
         <div
           aria-hidden="true"
           style={{
@@ -412,8 +412,8 @@ function RecentActivityPanel({ runs }: { runs: MeRunSummary[] }) {
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 12,
-        padding: '18px 20px 6px',
-        marginBottom: 16,
+        padding: 'var(--space-5) var(--space-5) var(--space-2)',
+        marginBottom: 'var(--space-4)',
       }}
     >
       <div
@@ -421,10 +421,10 @@ function RecentActivityPanel({ runs }: { runs: MeRunSummary[] }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 10,
+          marginBottom: 'var(--space-3)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <span
             aria-hidden="true"
             style={{
@@ -479,9 +479,9 @@ function RecentActivityPanel({ runs }: { runs: MeRunSummary[] }) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: '32px minmax(0,1fr) auto auto auto',
-                gap: 14,
+                gap: 'var(--space-4)',
                 alignItems: 'center',
-                padding: '12px 16px',
+                padding: 'var(--space-3) var(--space-4)',
                 borderBottom: '1px solid var(--line)',
                 fontSize: 12.5,
                 textDecoration: 'none',
@@ -550,11 +550,11 @@ function StudioEmptyState() {
         flexDirection: 'column',
         alignItems: 'center',
         textAlign: 'center',
-        padding: '48px 24px 56px',
+        padding: 'var(--space-8) var(--space-6) var(--space-8)',
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 14,
-        marginBottom: 18,
+        marginBottom: 'var(--space-5)',
       }}
     >
       <h3
@@ -563,7 +563,7 @@ function StudioEmptyState() {
           fontSize: 26,
           fontWeight: 400,
           letterSpacing: '-0.02em',
-          margin: '0 0 8px',
+          margin: '0 0 var(--space-2)',
           color: 'var(--ink)',
         }}
       >
@@ -573,7 +573,7 @@ function StudioEmptyState() {
         style={{
           fontSize: 14,
           color: 'var(--muted)',
-          margin: '0 auto 20px',
+          margin: '0 auto var(--space-5)',
           maxWidth: 460,
           lineHeight: 1.55,
         }}
@@ -691,12 +691,12 @@ export function StudioAppsV26Page() {
           <div
             data-testid="studio-apps-signed-out"
             style={{
-              padding: '48px 24px',
+              padding: 'var(--space-8) var(--space-6)',
               textAlign: 'center',
               color: 'var(--muted)',
             }}
           >
-            <h3 style={{ color: 'var(--ink)', marginBottom: 8 }}>
+            <h3 style={{ color: 'var(--ink)', marginBottom: 'var(--space-2)' }}>
               Sign in to view Studio
             </h3>
             <Link to="/login?next=%2Fstudio%2Fapps" className="btn-ink">
@@ -711,9 +711,9 @@ export function StudioAppsV26Page() {
                 display: 'flex',
                 alignItems: 'flex-end',
                 justifyContent: 'space-between',
-                gap: 18,
+                gap: 'var(--space-5)',
                 flexWrap: 'wrap',
-                marginBottom: 18,
+                marginBottom: 'var(--space-5)',
               }}
             >
               <div>
@@ -723,7 +723,7 @@ export function StudioAppsV26Page() {
                     fontSize: 30,
                     letterSpacing: '-0.02em',
                     lineHeight: 1.1,
-                    margin: '0 0 5px',
+                    margin: '0 0 var(--space-1)',
                     color: 'var(--ink)',
                   }}
                 >
@@ -739,7 +739,7 @@ export function StudioAppsV26Page() {
                 to="/studio/build"
                 data-testid="studio-apps-new-app-cta"
                 style={{
-                  padding: '8px 14px',
+                  padding: 'var(--space-2) var(--space-4)',
                   background: 'var(--accent)',
                   color: '#fff',
                   border: '1px solid var(--accent)',
@@ -773,7 +773,7 @@ export function StudioAppsV26Page() {
             {appsLoading && !apps && (
               <div
                 data-testid="studio-apps-loading"
-                style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}
+                style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)' }}
               >
                 {[1, 2].map((i) => (
                   <div
@@ -782,12 +782,12 @@ export function StudioAppsV26Page() {
                       background: 'var(--card)',
                       border: '1px solid var(--line)',
                       borderRadius: 14,
-                      padding: 18,
+                      padding: 'var(--space-5)',
                       height: 140,
                       boxShadow: 'var(--shadow-2)',
                     }}
                   >
-                    <div style={{ width: '60%', height: 14, background: 'var(--line)', borderRadius: 4, marginBottom: 8 }} />
+                    <div style={{ width: '60%', height: 14, background: 'var(--line)', borderRadius: 4, marginBottom: 'var(--space-2)' }} />
                     <div style={{ width: '90%', height: 10, background: 'var(--line)', borderRadius: 4 }} />
                   </div>
                 ))}
@@ -808,8 +808,8 @@ export function StudioAppsV26Page() {
                         style={{
                           fontSize: 13,
                           color: 'var(--muted)',
-                          marginBottom: 12,
-                          padding: '10px 0',
+                          marginBottom: 'var(--space-3)',
+                          padding: 'var(--space-3) 0',
                         }}
                       >
                         No apps match this filter.
@@ -822,8 +822,8 @@ export function StudioAppsV26Page() {
                       style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(2, 1fr)',
-                        gap: 14,
-                        marginBottom: 18,
+                        gap: 'var(--space-4)',
+                        marginBottom: 'var(--space-5)',
                       }}
                     >
                       {(filteredApps && filteredApps.length > 0 ? filteredApps : apps).map((app) => (
@@ -841,11 +841,11 @@ export function StudioAppsV26Page() {
             )}
 
             {/* Bottom CTA: + New app (issue #917 overlay deferred; links to /studio/build) */}
-            <div data-testid="studio-apps-bottom-cta" style={{ marginTop: 4 }}>
+            <div data-testid="studio-apps-bottom-cta" style={{ marginTop: 'var(--space-1)' }}>
               <Link
                 to="/studio/build"
                 style={{
-                  padding: '8px 16px',
+                  padding: 'var(--space-2) var(--space-4)',
                   background: 'var(--accent)',
                   color: '#fff',
                   border: '1px solid var(--accent)',
