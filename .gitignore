@@ -21,6 +21,10 @@ screenshots-greenlight/
 
 # Internal planning / stash / ops material does not belong in this public repo.
 docs/internal/
+
+# Agent auth fixture — session cookies must never be committed
+/root/.config/floom-secrets/
+*.cookie
 examples/ai-readiness-audit/__pycache__/
 .claude/
 .mcp.json
