@@ -20,6 +20,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY packages/renderer/package.json ./packages/renderer/
+COPY packages/runtime/package.json ./packages/runtime/
+COPY packages/detect/package.json ./packages/detect/
+COPY packages/manifest/package.json ./packages/manifest/
+COPY packages/cli/package.json ./packages/cli/
 COPY turbo.json tsconfig.base.json ./
 
 # Install ALL deps (devDependencies needed for build)
@@ -140,6 +144,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY packages/renderer/package.json ./packages/renderer/
+COPY packages/runtime/package.json ./packages/runtime/
+COPY packages/detect/package.json ./packages/detect/
+COPY packages/manifest/package.json ./packages/manifest/
+COPY packages/cli/package.json ./packages/cli/
 
 # Install only production server dependencies.
 # @floom/renderer is a workspace:* dep but the server only needs its *types*
@@ -158,6 +166,13 @@ COPY --from=builder /app/apps/web/dist ./apps/web/dist
 # Copy @floom/renderer source — esbuild needs it at runtime for the renderer
 # bundler service (creator custom renderers are bundled on ingest).
 COPY --from=builder /app/packages/renderer/src ./packages/renderer/src
+
+# Copy Repo-to-Hosted runtime packages source. Required at runtime since
+# the server imports them via workspace:* symlinks.
+COPY --from=builder /app/packages/runtime/src ./packages/runtime/src
+COPY --from=builder /app/packages/detect/src ./packages/detect/src
+COPY --from=builder /app/packages/manifest/src ./packages/manifest/src
+COPY --from=builder /app/packages/cli/src ./packages/cli/src
 
 # Copy the fast-apps sidecar bundle. Pure Node.js, no deps, forked as a
 # child process at server boot to register seven deterministic utility apps
@@ -196,4 +211,4 @@ EXPOSE 3051
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -fsS http://localhost:${PORT}/api/health || exit 1
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "--import", "tsx", "dist/index.js"]
