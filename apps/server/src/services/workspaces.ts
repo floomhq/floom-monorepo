@@ -18,6 +18,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { db, DEFAULT_USER_ID, DEFAULT_WORKSPACE_ID } from '../db.js';
+import { getUserGithubAccount } from '../lib/better-auth.js';
 import type {
   SessionContext,
   SessionMePayload,
@@ -742,6 +743,10 @@ export function me(ctx: SessionContext, cloud_mode: boolean): SessionMePayload {
     // their workflows unchanged — the waitlist form still works in
     // that mode, it just isn't the default affordance anymore.
     deploy_enabled: isDeployEnabled(),
+    // R23.1: tells the UI whether the user can fetch private GitHub repos
+    // without a re-auth prompt. Only true once the user has completed the
+    // `repo`-scope opt-in OAuth flow.
+    github_has_repo_scope: getUserGithubAccount(ctx.user_id)?.hasRepoScope ?? false,
   };
 }
 

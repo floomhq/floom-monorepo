@@ -877,6 +877,55 @@ export async function signInWithSocial(
   window.location.assign(res.url);
 }
 
+/**
+ * R23.1: Initiate GitHub OAuth re-auth with the `repo` scope so the user
+ * can access private repositories via Floom. Unlike `signInWithSocial`,
+ * this passes `scopes: ['repo', 'read:user']` in the request body — Better
+ * Auth forwards these to GitHub's authorize URL as the `scope` query param.
+ *
+ * The GitHub consent screen will show the expanded permission list. After
+ * approval, Better Auth's callback handler stores the new token (with `repo`
+ * scope) in the `account` table, overwriting the old `read:user`-only token.
+ *
+ * callbackURL defaults to `/studio/build` so the user lands back on the
+ * build page and can retry their private-repo paste immediately.
+ */
+export async function signInWithGithubRepoScope(
+  callbackURL = '/studio/build',
+): Promise<void> {
+  const absoluteURL = callbackURL.startsWith('http')
+    ? callbackURL
+    : typeof window !== 'undefined'
+      ? `${window.location.origin}${callbackURL.startsWith('/') ? '' : '/'}${callbackURL}`
+      : callbackURL;
+
+  const res = await request<{ url?: string; redirect?: boolean }>(
+    '/auth/sign-in/social',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        provider: 'github',
+        callbackURL: absoluteURL,
+        // Better Auth 1.6.3: the `scopes` array is forwarded to GitHub's
+        // authorization URL. Requesting `repo` here causes GitHub to prompt
+        // the user to grant private-repo read access. `read:user` is included
+        // because it is what the default login requests; omitting it could
+        // confuse GitHub's scope merging.
+        scopes: ['repo', 'read:user'],
+      }),
+    },
+  );
+  if (!res?.url) {
+    throw new ApiError(
+      'OAuth provider did not return a redirect URL',
+      500,
+      'oauth_no_url',
+      res,
+    );
+  }
+  window.location.assign(res.url);
+}
+
 // Password reset (pre-launch P0): pair of helpers for the /forgot-password
 // request step and the /reset-password confirmation step. Backed by Better
 // Auth's built-in endpoints (password.mjs in better-auth@1.6.3):
