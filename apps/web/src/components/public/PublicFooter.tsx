@@ -167,17 +167,13 @@ export function PublicFooter() {
               height={22}
               style={{ display: 'inline-block' }}
             />
-            {/* Unified lockup (#980): lowercase + Inter 900 + trailing emerald dot */}
-            <span style={{ fontWeight: 900 }}>floom</span>
-            <svg
-              aria-hidden="true"
-              width={5}
-              height={5}
-              viewBox="0 0 5 5"
-              style={{ display: 'inline-block', verticalAlign: 'baseline', position: 'relative', top: '-1px', marginLeft: -4, flexShrink: 0 }}
-            >
-              <circle cx="2.5" cy="2.5" r="2.5" fill="#10b981" />
-            </svg>
+            {/* Unified lockup (#980): lowercase + Inter 900 + trailing emerald period.
+                Render as a styled glyph inside the same text run so it sits at the
+                wordmark's baseline naturally. Earlier SVG approach got vertically
+                centered by the parent flex container's alignItems:center. */}
+            <span style={{ fontWeight: 900 }}>
+              floom<span aria-hidden="true" style={{ color: '#10b981' }}>.</span>
+            </span>
           </Link>
           <p
             data-testid="footer-tagline"
