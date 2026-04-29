@@ -88,7 +88,7 @@ import type {
 export const mcpRouter = new Hono();
 
 const MCP_AUTH_HINT_CLOUD =
-  'Authentication required. Sign in, then mint an agent token at https://floom.dev/settings/agent-tokens and send it as Authorization: Bearer <token>.';
+  'Authentication required. Run `floom auth`, then mint an agent token at https://floom.dev/settings/agent-tokens and send it as Authorization: Bearer <token>.';
 
 /**
  * Resolve the public origin used in MCP response bodies (permalink, mcp_url,

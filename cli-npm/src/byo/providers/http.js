@@ -20,7 +20,11 @@ async function providerFetch(baseUrl, path, token, opts = {}) {
     json = null;
   }
   if (!res.ok) {
-    throw new Error(`${opts.label || 'provider request'} failed: HTTP ${res.status} ${text}`);
+    const err = new Error(`${opts.label || 'provider request'} failed: HTTP ${res.status} ${text}`);
+    err.status = res.status;
+    err.body = text;
+    err.json = json;
+    throw err;
   }
   return { res, text, json };
 }

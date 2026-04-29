@@ -6,7 +6,7 @@
  *    so the published tarball is self-contained.
  *  - Copies src/index.js into dist/index.js with a shebang preserved.
  *
- * No external deps. Run via `npm run build` or `npm publish` (prepublishOnly).
+ * Run via `npm run build` or `npm publish` (prepublishOnly).
  */
 'use strict';
 

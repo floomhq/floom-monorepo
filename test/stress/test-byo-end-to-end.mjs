@@ -52,7 +52,7 @@ function runCli(command, args, options) {
 const requests = [];
 const server = createServer(async (req, res) => {
   const body = await readJson(req);
-  requests.push({ method: req.method, url: req.url, body, auth: req.headers.authorization });
+  requests.push({ method: req.method, url: req.url, body, auth: req.headers.authorization || req.headers['x-api-key'] });
 
   if (req.method === 'POST' && req.url === '/v1/projects') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -69,9 +69,9 @@ const server = createServer(async (req, res) => {
     res.end(JSON.stringify({ ok: true }));
     return;
   }
-  if (req.method === 'POST' && req.url === '/templates') {
+  if (req.method === 'POST' && req.url === '/v3/templates') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ template_id: 'tpl_e2e' }));
+    res.end(JSON.stringify({ templateID: 'tpl_e2e', buildStatus: 'ready' }));
     return;
   }
   if (req.method === 'POST' && req.url === '/v9/projects') {
@@ -86,7 +86,7 @@ const server = createServer(async (req, res) => {
   }
   if (req.method === 'POST' && req.url === '/v13/deployments') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ url: 'my-app.vercel.app' }));
+    res.end(JSON.stringify({ id: 'dpl_e2e', readyState: 'READY', url: 'my-app.vercel.app' }));
     return;
   }
 
@@ -123,6 +123,7 @@ writeFileSync(join(tmp, 'floom.yaml'), [
   '              nullable: false',
   '    hosting:',
   '      provider: vercel',
+  '      repo: floomhq/my-app',
   '      build_command: npm run build',
   '      output_dir: dist',
   '    sandbox:',
@@ -163,7 +164,7 @@ log('CLI exits 0', result.status === 0, result.stderr || result.stdout || result
 log('CLI prints JSON result', !!json, result.stdout);
 log('web URL returned', json?.web === 'https://my-app.vercel.app', JSON.stringify(json));
 log('MCP URL returned', json?.mcp === 'https://my-app.vercel.app/mcp', JSON.stringify(json));
-log('REST action URL returned', json?.rest === 'POST https://my-app.vercel.app/api/capture', JSON.stringify(json));
+log('REST action URL returned', Array.isArray(json?.rest) && json.rest.includes('POST https://my-app.vercel.app/api/capture'), JSON.stringify(json));
 log('stored connection string returned', json?.stored === 'postgresql://e2e.supabase.co/db', JSON.stringify(json));
 log('migration was applied', migration?.body?.query?.includes('create table if not exists "leads"'), JSON.stringify(migration?.body));
 log('Vercel env contains provider outputs and manifest secret', envKeys.join(',') === 'DATABASE_URL,E2B_TEMPLATE_ID,OPENAI_API_KEY,SUPABASE_ANON_KEY,SUPABASE_URL', envKeys.join(','));

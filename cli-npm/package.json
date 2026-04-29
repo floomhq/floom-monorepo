@@ -16,6 +16,10 @@
     "prepack": "node scripts/build.js",
     "prepublishOnly": "node scripts/build.js"
   },
+  "dependencies": {
+    "ajv": "8.18.0",
+    "yaml": "2.8.3"
+  },
   "keywords": [
     "floom",
     "cli",

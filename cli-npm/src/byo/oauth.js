@@ -5,12 +5,15 @@ const fs = require('fs');
 const http = require('http');
 const os = require('os');
 const path = require('path');
-const readline = require('readline');
 const { spawn } = require('child_process');
+const { prompt } = require('./util');
 
 const TOKEN_CACHE =
   process.env.FLOOM_BYO_TOKEN_CACHE ||
   path.join(os.homedir(), '.floom', 'byo-tokens.json');
+
+const OAUTH_TIMEOUT_MS = 5 * 60 * 1000;
+const REFRESH_SKEW_MS = 60 * 1000;
 
 const PROVIDERS = {
   supabase: {
@@ -42,7 +45,9 @@ function ensureDir(dir) {
 
 function readTokenCache(cachePath = TOKEN_CACHE) {
   try {
-    return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    if (!cache || typeof cache !== 'object' || Array.isArray(cache)) return {};
+    return cache;
   } catch {
     return {};
   }
@@ -50,21 +55,20 @@ function readTokenCache(cachePath = TOKEN_CACHE) {
 
 function writeTokenCache(cache, cachePath = TOKEN_CACHE) {
   ensureDir(path.dirname(cachePath));
-  fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2) + '\n', { mode: 0o600 });
-  fs.chmodSync(cachePath, 0o600);
-}
-
-function prompt(question) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
+  const fd = fs.openSync(cachePath, 'w', 0o600);
+  try {
+    fs.writeSync(fd, JSON.stringify(cache, null, 2) + '\n');
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 function openBrowser(url) {
+  if (process.platform === 'linux' && !process.env.DISPLAY) {
+    console.log(`Open this URL manually: ${url}`);
+    return;
+  }
+
   const cmd =
     process.platform === 'darwin'
       ? 'open'
@@ -73,7 +77,9 @@ function openBrowser(url) {
         : 'xdg-open';
   const args = process.platform === 'win32' ? ['url.dll,FileProtocolHandler', url] : [url];
   const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
-  child.on('error', () => {});
+  child.on('error', () => {
+    console.log(`Open this URL manually: ${url}`);
+  });
   child.unref();
 }
 
@@ -89,84 +95,170 @@ function createPkce() {
 
 async function waitForOAuthCode(provider, redirectPort, expectedState) {
   return new Promise((resolve, reject) => {
+    let settled = false;
     const server = http.createServer((req, res) => {
       try {
         const url = new URL(req.url || '/', `http://127.0.0.1:${redirectPort}`);
+        if (req.method !== 'GET' || url.pathname !== '/callback') {
+          res.writeHead(204);
+          res.end();
+          return;
+        }
         const code = url.searchParams.get('code');
         const error = url.searchParams.get('error');
         const state = url.searchParams.get('state');
+        if (!code && !error) {
+          res.writeHead(204);
+          res.end();
+          return;
+        }
         if (error) throw new Error(error);
         if (state !== expectedState) throw new Error('OAuth callback state mismatch');
         if (!code) throw new Error('OAuth callback did not include a code');
+        settled = true;
+        clearTimeout(timer);
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end(`Floom ${provider} connected. You can close this tab.\n`);
         server.close();
         resolve(code);
       } catch (err) {
+        settled = true;
+        clearTimeout(timer);
         res.writeHead(400, { 'Content-Type': 'text/plain' });
         res.end(`Floom OAuth failed: ${err.message}\n`);
         server.close();
         reject(err);
       }
     });
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      server.close();
+      reject(new Error(`OAuth timed out — re-run with FLOOM_BYO_${provider.toUpperCase()}_TOKEN to skip browser flow`));
+    }, OAUTH_TIMEOUT_MS);
+    server.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
     server.listen(redirectPort, '127.0.0.1');
   });
 }
 
-async function exchangeCode(config, code, verifier, redirectUri) {
+async function tokenRequest(config, body) {
+  const form = new URLSearchParams(body);
   const res = await fetch(config.tokenUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      grant_type: 'authorization_code',
-      client_id: config.clientId,
-      code,
-      code_verifier: verifier,
-      redirect_uri: redirectUri,
-    }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form,
   });
-  const body = await res.text();
+  const text = await res.text();
   let json = null;
   try {
-    json = body ? JSON.parse(body) : null;
+    json = text ? JSON.parse(text) : null;
   } catch {
     json = null;
   }
   if (!res.ok || !json || !json.access_token) {
-    throw new Error(`OAuth token exchange failed: HTTP ${res.status} ${body}`);
+    throw new Error(`OAuth token request failed: HTTP ${res.status} ${text}`);
   }
-  return json;
+  return normalizeToken(json);
+}
+
+function normalizeToken(token) {
+  const normalized = { ...token, updated_at: new Date().toISOString() };
+  if (token.expires_in) {
+    normalized.expires_at = Date.now() + Number(token.expires_in) * 1000;
+    delete normalized.expires_in;
+  }
+  return normalized;
+}
+
+async function exchangeCode(config, code, verifier, redirectUri) {
+  return tokenRequest(config, {
+    grant_type: 'authorization_code',
+    client_id: config.clientId,
+    code,
+    code_verifier: verifier,
+    redirect_uri: redirectUri,
+  });
+}
+
+async function refreshToken(config, token) {
+  if (!token.refresh_token) throw new Error('cached token has no refresh_token');
+  return tokenRequest(config, {
+    grant_type: 'refresh_token',
+    client_id: config.clientId,
+    refresh_token: token.refresh_token,
+  });
+}
+
+function getCachedProvider(cache, provider, account) {
+  if (!cache[provider]) return null;
+  if (cache[provider].access_token) {
+    const migrated = { default: cache[provider] };
+    cache[provider] = migrated;
+  }
+  return cache[provider][account] || null;
+}
+
+function setCachedProvider(cache, provider, account, token) {
+  if (!cache[provider] || cache[provider].access_token) cache[provider] = {};
+  cache[provider][account] = token;
+}
+
+function isUsableToken(token) {
+  if (!token || !token.access_token) return false;
+  if (!token.expires_at) return true;
+  return Number(token.expires_at) > Date.now() + REFRESH_SKEW_MS;
+}
+
+async function promptApiToken(provider, config, account, options, cache, cachePath) {
+  if (options.nonInteractive) {
+    throw new Error(`missing ${config.envToken}; API-token auth cannot prompt in non-interactive mode`);
+  }
+  const label = provider.toUpperCase();
+  const apiKey = await prompt(`Paste ${label} API token for account "${account}": `);
+  if (!apiKey) throw new Error(`empty ${label} API token`);
+  const token = { access_token: apiKey, token_type: 'api_key', updated_at: new Date().toISOString() };
+  setCachedProvider(cache, provider, account, token);
+  writeTokenCache(cache, cachePath);
+  return { accessToken: apiKey, source: 'prompt', account };
 }
 
 async function oauthToken(provider, options = {}) {
   const config = PROVIDERS[provider];
   if (!config) throw new Error(`unknown BYO provider: ${provider}`);
 
+  const account = options.account || 'default';
   const envToken = process.env[config.envToken];
-  if (envToken) return { accessToken: envToken, source: 'env' };
+  if (envToken) return { accessToken: envToken, source: 'env', account };
 
   const cachePath = options.cachePath || TOKEN_CACHE;
   const cache = readTokenCache(cachePath);
-  if (cache[provider] && cache[provider].access_token) {
-    return { accessToken: cache[provider].access_token, source: 'cache' };
+  const cached = getCachedProvider(cache, provider, account);
+  if (isUsableToken(cached)) {
+    return { accessToken: cached.access_token, source: 'cache', account };
   }
 
-  if (provider === 'e2b' && !config.clientId) {
-    if (options.nonInteractive) {
-      throw new Error(`missing ${config.envToken}; E2B API-key auth cannot prompt in non-interactive mode`);
+  const oauthConfigured = !!(config.clientId && config.authUrl && config.tokenUrl);
+  if (cached && cached.refresh_token && oauthConfigured) {
+    try {
+      const refreshed = await refreshToken(config, cached);
+      setCachedProvider(cache, provider, account, refreshed);
+      writeTokenCache(cache, cachePath);
+      return { accessToken: refreshed.access_token, source: 'refresh', account };
+    } catch {
+      // Re-auth or API-token prompt below.
     }
-    const apiKey = await prompt('Paste E2B API key: ');
-    if (!apiKey) throw new Error('empty E2B API key');
-    cache[provider] = { access_token: apiKey, token_type: 'api_key', updated_at: new Date().toISOString() };
-    writeTokenCache(cache, cachePath);
-    return { accessToken: apiKey, source: 'prompt' };
   }
 
-  if (!config.clientId || !config.authUrl || !config.tokenUrl) {
-    throw new Error(`missing OAuth client config for ${provider}; set ${config.envToken} for non-interactive use`);
+  if (!oauthConfigured) {
+    return promptApiToken(provider, config, account, options, cache, cachePath);
   }
   if (options.nonInteractive) {
-    throw new Error(`missing ${config.envToken}; OAuth is disabled in non-interactive mode`);
+    throw new Error(`missing ${config.envToken}; OAuth/API-token prompt is disabled in non-interactive mode`);
   }
 
   const redirectPort = Number(process.env.FLOOM_BYO_OAUTH_PORT || 47737);
@@ -188,9 +280,9 @@ async function oauthToken(provider, options = {}) {
   openBrowser(url.toString());
   const code = await codePromise;
   const token = await exchangeCode(config, code, pkce.verifier, redirectUri);
-  cache[provider] = { ...token, updated_at: new Date().toISOString() };
+  setCachedProvider(cache, provider, account, token);
   writeTokenCache(cache, cachePath);
-  return { accessToken: token.access_token, source: 'oauth' };
+  return { accessToken: token.access_token, source: 'oauth', account };
 }
 
 module.exports = {
@@ -198,4 +290,6 @@ module.exports = {
   readTokenCache,
   writeTokenCache,
   TOKEN_CACHE,
+  exchangeCode,
+  waitForOAuthCode,
 };

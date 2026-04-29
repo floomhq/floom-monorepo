@@ -34,13 +34,14 @@ runtime:
       provider: e2b
 ```
 
-4. Never ask for provider secrets in chat. The CLI handles OAuth or local
-API-key prompts and stores tokens at `~/.floom/byo-tokens.json` mode `0600`.
+4. Never ask for provider secrets in chat. The CLI uses API-token prompts in
+v1 and stores tokens at `~/.floom/byo-tokens.json` mode `0600`. OAuth flow
+ships in v1.1 once Floom registers OAuth apps with each vendor.
 
 ## Command
 
 ```bash
-npx @floomhq/cli@latest byo-deploy <repo-path>
+npx @floomhq/cli@^1 byo-deploy <repo-path>
 ```
 
 For local development inside this monorepo:
@@ -53,7 +54,7 @@ node cli-npm/dist/index.js byo-deploy <repo-path>
 
 1. Tell the user the CLI will connect one provider at a time.
 2. Run the command.
-3. Let the user complete each browser OAuth or API-key prompt locally.
+3. Let the user complete each API-key prompt locally.
 4. Return only the verified output from the CLI:
 
 ```text
@@ -67,5 +68,5 @@ Stored: postgresql://...
 ## Troubleshooting
 
 - `runtime.byo is missing`: use the regular Floom skill or add the BYO runtime block.
-- `missing FLOOM_BYO_*_TOKEN` in non-interactive mode: rerun interactively or set provider test tokens for stubbed CI.
+- `missing FLOOM_BYO_*_TOKEN` in non-interactive mode: rerun interactively or set provider tokens for replay/CI.
 - Provider HTTP errors: quote the provider, HTTP status, and response body from the CLI output; do not invent a fix.
