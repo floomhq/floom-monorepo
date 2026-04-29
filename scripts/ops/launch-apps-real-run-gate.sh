@@ -85,21 +85,6 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
-LEAD_SCORER_CSV=""
-for candidate in \
-  "${REPO_ROOT}/apps/web/public/examples/lead-scorer/sample-leads.csv" \
-  "${REPO_ROOT}/examples/lead-scorer/test-input.csv"
-do
-  if [ -f "$candidate" ]; then
-    LEAD_SCORER_CSV="$candidate"
-    break
-  fi
-done
-if [ -z "$LEAD_SCORER_CSV" ]; then
-  echo "[gate] missing lead-scorer fixture CSV in repo" >&2
-  exit 2
-fi
-
 BASE_URL="${BASE_URL%/}"
 POST_RUN_URL="${BASE_URL}/api/run"
 
@@ -116,38 +101,18 @@ now_ms() {
 
 build_payload() {
   local slug="$1"
-  python3 - "$slug" "$LEAD_SCORER_CSV" <<'PY'
-import base64
+  local action="$2"
+  python3 - "$slug" "$action" <<'PY'
 import json
-import pathlib
 import sys
 
 slug = sys.argv[1]
-lead_csv_path = pathlib.Path(sys.argv[2])
+action = sys.argv[2]
 
-if slug == "lead-scorer":
-    raw = lead_csv_path.read_bytes()
-    payload = {
-        "app_slug": "lead-scorer",
-        "action": "score",
-        "inputs": {
-            "data": {
-                "__file": True,
-                "name": "sample-leads.csv",
-                "mime_type": "text/csv",
-                "size": len(raw),
-                "content_b64": base64.b64encode(raw).decode("ascii"),
-            },
-            "icp": (
-                "B2B SaaS CFOs at 100-500 employee fintechs in EU. "
-                "Looking for finance leaders at growth-stage companies with recent funding or hiring signals."
-            ),
-        },
-    }
-elif slug == "competitor-lens":
+if slug == "competitor-lens":
     payload = {
         "app_slug": "competitor-lens",
-        "action": "analyze",
+        "action": action,
         "inputs": {
             "your_url": "https://floom.dev",
             "competitor_url": "https://n8n.io",
@@ -156,7 +121,7 @@ elif slug == "competitor-lens":
 elif slug == "ai-readiness-audit":
     payload = {
         "app_slug": "ai-readiness-audit",
-        "action": "audit",
+        "action": action,
         "inputs": {
             "company_url": "https://floom.dev/",
         },
@@ -164,7 +129,7 @@ elif slug == "ai-readiness-audit":
 elif slug == "pitch-coach":
     payload = {
         "app_slug": "pitch-coach",
-        "action": "coach",
+        "action": action,
         "inputs": {
             "pitch": "We are a platform for AI apps that helps teams ship faster",
         },
@@ -180,21 +145,28 @@ curl_json() {
   local method="$1"
   local url="$2"
   local body="${3:-}"
+  local cookie_jar="${4:-}"
 
   local tmp_file
   tmp_file="$(mktemp)"
   local status
+  local cookie_args=()
+  if [ -n "$cookie_jar" ]; then
+    cookie_args=(-b "$cookie_jar" -c "$cookie_jar")
+  fi
 
   if [ "$method" = "POST" ]; then
     status="$(curl -sS -o "$tmp_file" -w "%{http_code}" \
       --connect-timeout 5 --max-time 30 \
       -X POST \
       -H "content-type: application/json" \
+      "${cookie_args[@]}" \
       --data "$body" \
       "$url")"
   else
     status="$(curl -sS -o "$tmp_file" -w "%{http_code}" \
       --connect-timeout 5 --max-time 15 \
+      "${cookie_args[@]}" \
       "$url")"
   fi
 
@@ -217,6 +189,57 @@ if not isinstance(run_id, str) or not run_id:
     raise SystemExit(1)
 print(run_id)
 '
+}
+
+resolve_action_name() {
+  local slug="$1"
+  local hub_resp hub_status hub_body
+
+  hub_resp="$(curl_json GET "${BASE_URL}/api/hub/${slug}")"
+  hub_status="$(printf '%s\n' "$hub_resp" | sed -n '1p')"
+  hub_body="$(printf '%s\n' "$hub_resp" | sed -n '2,$p')"
+
+  if [ "$hub_status" != "200" ]; then
+    echo "[gate] ${slug}: GET /api/hub/${slug} failed status=${hub_status} body=${hub_body}" >&2
+    return 1
+  fi
+
+  python3 - "$slug" "$hub_body" <<'PY'
+import json
+import sys
+
+slug = sys.argv[1]
+payload = json.loads(sys.argv[2])
+actions = ((payload.get("manifest") or {}).get("actions") or {})
+expected_inputs = {
+    "competitor-lens": {"your_url", "competitor_url"},
+    "ai-readiness-audit": {"company_url"},
+    "pitch-coach": {"pitch"},
+}
+needed = expected_inputs.get(slug)
+if not needed:
+    raise SystemExit(f"unknown launch demo slug: {slug}")
+matches = []
+for name, spec in actions.items():
+    if "health" in name.lower():
+        continue
+    inputs = spec.get("inputs") if isinstance(spec, dict) else None
+    input_names = {
+        item.get("name")
+        for item in inputs or []
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    if needed.issubset(input_names):
+        matches.append(name)
+
+if not matches:
+    available = ", ".join(actions.keys()) or "(none)"
+    raise SystemExit(
+        f"no action in live manifest for {slug} has inputs {sorted(needed)}; available actions: {available}"
+    )
+
+print(matches[0])
+PY
 }
 
 assert_terminal_row() {
@@ -281,25 +304,36 @@ print(f"ok status={status} dry_run={dry_run} model={model} wall_ms={wall_ms} dur
 run_gate_for_slug() {
   local slug="$1"
 
+  local cookie_jar
+  cookie_jar="$(mktemp)"
+
+  local action_name
+  if ! action_name="$(resolve_action_name "$slug")"; then
+    rm -f "$cookie_jar"
+    return 1
+  fi
+
   local payload
-  payload="$(build_payload "$slug")"
+  payload="$(build_payload "$slug" "$action_name")"
 
   local started_ms
   started_ms="$(now_ms)"
 
   local post_resp post_status post_body
-  post_resp="$(curl_json POST "$POST_RUN_URL" "$payload")"
+  post_resp="$(curl_json POST "$POST_RUN_URL" "$payload" "$cookie_jar")"
   post_status="$(printf '%s\n' "$post_resp" | sed -n '1p')"
   post_body="$(printf '%s\n' "$post_resp" | sed -n '2,$p')"
 
   if [ "$post_status" != "200" ]; then
-    echo "[gate] ${slug}: POST /api/run failed status=${post_status} body=${post_body}" >&2
+    echo "[gate] ${slug}: POST /api/run action=${action_name} failed status=${post_status} body=${post_body}" >&2
+    rm -f "$cookie_jar"
     return 1
   fi
 
   local run_id
   if ! run_id="$(extract_run_id "$post_body")"; then
-    echo "[gate] ${slug}: POST /api/run missing run_id body=${post_body}" >&2
+    echo "[gate] ${slug}: POST /api/run action=${action_name} missing run_id body=${post_body}" >&2
+    rm -f "$cookie_jar"
     return 1
   fi
 
@@ -311,16 +345,18 @@ run_gate_for_slug() {
     now="$(now_ms)"
     if [ "$now" -ge "$deadline_ms" ]; then
       echo "[gate] ${slug}: run ${run_id} timed out after ${POLL_TIMEOUT_MS}ms" >&2
+      rm -f "$cookie_jar"
       return 1
     fi
 
     local get_resp get_status row_json
-    get_resp="$(curl_json GET "${BASE_URL}/api/run/${run_id}")"
+    get_resp="$(curl_json GET "${BASE_URL}/api/run/${run_id}" "" "$cookie_jar")"
     get_status="$(printf '%s\n' "$get_resp" | sed -n '1p')"
     row_json="$(printf '%s\n' "$get_resp" | sed -n '2,$p')"
 
     if [ "$get_status" != "200" ]; then
       echo "[gate] ${slug}: GET /api/run/${run_id} failed status=${get_status} body=${row_json}" >&2
+      rm -f "$cookie_jar"
       return 1
     fi
 
@@ -333,6 +369,7 @@ row = json.load(sys.stdin)
 print(str(row.get("status") or ""))
 ')"; then
       echo "[gate] ${slug}: invalid JSON in GET /api/run/${run_id}: ${row_json}" >&2
+      rm -f "$cookie_jar"
       return 1
     fi
 
@@ -341,10 +378,12 @@ print(str(row.get("status") or ""))
         local wall_ms
         wall_ms="$(( $(now_ms) - started_ms ))"
         if result="$(assert_terminal_row "$slug" "$wall_ms" "$row_json")"; then
-          echo "[gate] ${slug}: ${result}"
+          echo "[gate] ${slug}: action=${action_name} ${result}"
+          rm -f "$cookie_jar"
           return 0
         fi
         echo "[gate] ${slug}: terminal assertion failed (${result})" >&2
+        rm -f "$cookie_jar"
         return 1
         ;;
       pending|running)
@@ -352,6 +391,7 @@ print(str(row.get("status") or ""))
         ;;
       *)
         echo "[gate] ${slug}: unexpected run status '${run_status}' run_id=${run_id}" >&2
+        rm -f "$cookie_jar"
         return 1
         ;;
     esac
@@ -359,7 +399,6 @@ print(str(row.get("status") or ""))
 }
 
 SLUGS=(
-  lead-scorer
   competitor-lens
   ai-readiness-audit
   pitch-coach

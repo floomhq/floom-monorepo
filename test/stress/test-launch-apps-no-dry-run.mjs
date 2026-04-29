@@ -18,11 +18,22 @@ const REPO_ROOT = join(__dirname, '..', '..');
 const GATE_SCRIPT = join(REPO_ROOT, 'scripts', 'ops', 'launch-apps-real-run-gate.sh');
 
 const SLUGS = [
-  'lead-scorer',
   'competitor-lens',
   'ai-readiness-audit',
   'pitch-coach',
 ];
+
+const ACTIONS = {
+  'competitor-lens': 'analyze_route_analyze_post',
+  'ai-readiness-audit': 'audit_route_audit_post',
+  'pitch-coach': 'coach_route_coach_post',
+};
+
+const INPUTS = {
+  'competitor-lens': ['your_url', 'competitor_url'],
+  'ai-readiness-audit': ['company_url'],
+  'pitch-coach': ['pitch'],
+};
 
 let passed = 0;
 let failed = 0;
@@ -116,6 +127,11 @@ async function startMockRunApi(failingSlug = null) {
         res.end(JSON.stringify({ error: `unknown slug: ${slug}` }));
         return;
       }
+      if (body?.action !== ACTIONS[slug]) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: `wrong action for ${slug}: ${body?.action}` }));
+        return;
+      }
 
       const runId = `run-${nextId++}`;
       runToSlug.set(runId, slug);
@@ -141,6 +157,36 @@ async function startMockRunApi(failingSlug = null) {
       };
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(row));
+      return;
+    }
+
+    const hubMatch = url.pathname.match(/^\/api\/hub\/([^/]+)$/);
+    if (req.method === 'GET' && hubMatch) {
+      const slug = decodeURIComponent(hubMatch[1]);
+      if (!SLUGS.includes(slug)) {
+        res.writeHead(404, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: `unknown slug: ${slug}` }));
+        return;
+      }
+
+      const action = ACTIONS[slug];
+      const manifest = {
+        actions: {
+          [action]: {
+            label: action,
+            inputs: INPUTS[slug].map((name) => ({ name, type: 'text', required: true })),
+            outputs: [{ name: 'model', label: 'Model', type: 'text' }],
+          },
+          health_health_get: {
+            label: 'Health',
+            inputs: [{ name: 'freeform', type: 'text', required: false }],
+            outputs: [{ name: 'response', label: 'Response', type: 'json' }],
+          },
+        },
+        manifest_version: '2.0',
+      };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ slug, manifest }));
       return;
     }
 
