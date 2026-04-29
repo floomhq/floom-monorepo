@@ -17,7 +17,7 @@
  * isolation today with a clean seam for stronger VM-level isolation later,
  * without changing the pipeline, server route, or UI.
  */
-import type { Manifest } from '../runtime/types.ts';
+import type { Manifest } from '../runtime/types.js';
 
 export interface RepoSource {
   /** `https://github.com/owner/repo` or `owner/repo`. */

@@ -10,7 +10,7 @@
  */
 import type { FileEntry, RepoSnapshot as DetectRepoSnapshot } from '@floom/detect';
 
-import { logger } from '../lib/logger.ts';
+import { logger } from '../lib/logger.js';
 
 export interface FetchSnapshotOptions {
   /** GitHub token for private repos (optional). */
@@ -51,7 +51,8 @@ export async function fetchSnapshotFromApi(
   const token = opts.githubToken ?? process.env.GITHUB_TOKEN;
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const metaRes = await fetch(`https://api.github.com/repos/${owner}/${name}`, { headers });
+  const apiBase = (process.env.FLOOM_GITHUB_API_BASE_URL || 'https://api.github.com').replace(/\/$/, '');
+  const metaRes = await fetch(`${apiBase}/repos/${owner}/${name}`, { headers });
   if (!metaRes.ok) {
     throw new Error(
       `GitHub API returned ${metaRes.status} for ${owner}/${name}: ${await metaRes.text()}`,
@@ -64,7 +65,7 @@ export async function fetchSnapshotFromApi(
   const ref = opts.ref ?? meta.default_branch;
 
   const treeRes = await fetch(
-    `https://api.github.com/repos/${owner}/${name}/git/trees/${ref}?recursive=1`,
+    `${apiBase}/repos/${owner}/${name}/git/trees/${ref}?recursive=1`,
     { headers },
   );
   if (!treeRes.ok) {
@@ -124,8 +125,9 @@ export async function fetchSnapshotFromApi(
     .slice(0, 5);
   toFetch.push(...pyShallow);
 
+  const rawBase = (process.env.FLOOM_GITHUB_RAW_BASE_URL || 'https://raw.githubusercontent.com').replace(/\/$/, '');
   for (const f of toFetch) {
-    const url = `https://raw.githubusercontent.com/${owner}/${name}/${ref}/${f.path}`;
+    const url = `${rawBase}/${owner}/${name}/${ref}/${f.path}`;
     try {
       const res = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},

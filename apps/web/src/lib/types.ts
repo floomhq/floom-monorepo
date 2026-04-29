@@ -429,6 +429,9 @@ export interface DetectedApp {
   openapi_spec_url: string;
   tools_count: number;
   secrets_needed: string[];
+  suggested_pipeline: 'proxy' | 'hosted';
+  has_dockerfile: boolean;
+  has_floom_yaml: boolean;
 }
 
 export type AppVisibility =

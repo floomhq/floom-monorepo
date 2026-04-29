@@ -9,7 +9,7 @@
  * The platform layer watches stdout of `slug == 'floom-deploy' && exit == 0`
  * invocations, parses this JSON, and runs the atomic slug swap transaction.
  */
-import type { Manifest } from '../runtime/types.ts';
+import type { Manifest } from '../runtime/types.js';
 
 export interface RegistryEntry {
   slug: string;

@@ -166,7 +166,7 @@ okServer.close();
 console.log('\n/detect route calls requireAuthenticatedInCloud (static check)');
 const { readFileSync } = await import('node:fs');
 const hubCompiled = readFileSync(
-  '../../apps/server/dist/routes/hub.js',
+  new URL('../../apps/server/dist/routes/hub.js', import.meta.url),
   'utf-8',
 );
 // Locate the detect handler and assert the auth gate is wired in.
@@ -195,5 +195,9 @@ if (!detectMatch) {
 
 // Summary
 console.log(`\n${passed} passed, ${failed} failed`);
-rmSync(tmp, { recursive: true, force: true });
+try {
+  rmSync(tmp, { recursive: true, force: true });
+} catch {
+  // Ignore Windows EBUSY where SQLite holds the db file open
+}
 process.exit(failed > 0 ? 1 : 0);

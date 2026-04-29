@@ -1089,6 +1089,28 @@ async function isSafeUrl(
   // sidecars) can opt out; never honor this flag for user-supplied URLs.
   if (options.allowPrivateNetwork) return true;
 
+  // Test-mode override: allow fetching from a configured local mock server.
+  // Only applies when FLOOM_GITHUB_*_BASE_URL is explicitly set to a loopback
+  // address (127.x or [::1]). The env vars are unset in production and point
+  // to real GitHub domains in staging — so this branch is never reachable there.
+  // We guard on the base URL pointing at loopback to prevent any accidental
+  // bypass if the vars were set to an internal-network address.
+  const apiBase = process.env.FLOOM_GITHUB_API_BASE_URL;
+  const rawBase = process.env.FLOOM_GITHUB_RAW_BASE_URL;
+  const isLoopbackBase = (base: string | undefined): boolean => {
+    if (!base) return false;
+    try {
+      const h = new URL(base).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+      return h === '127.0.0.1' || h === 'localhost' || h === '::1' || /^127\./.test(h);
+    } catch { return false; }
+  };
+  if (
+    (isLoopbackBase(apiBase) && apiBase && urlString.startsWith(apiBase)) ||
+    (isLoopbackBase(rawBase) && rawBase && urlString.startsWith(rawBase))
+  ) {
+    return true;
+  }
+
   // Reject localhost string variants upfront. DNS lookup of "localhost" on
   // most systems returns 127.0.0.1 anyway, but some resolvers can be
   // re-pointed (e.g. /etc/hosts rewrites), so we don't rely on DNS alone.
@@ -1160,10 +1182,11 @@ export async function fetchSpec(
   const fetchHeaders: Record<string, string> = {
     Accept: 'application/json, application/yaml, text/plain',
   };
+  const rawHost = (process.env.FLOOM_GITHUB_RAW_BASE_URL || 'https://raw.githubusercontent.com').replace(/^https?:\/\//, '').replace(/\/$/, '');
   let isGithubRawUrl = false;
   try {
-    const parsedForGh = new URL(url);
-    isGithubRawUrl = parsedForGh.hostname === 'raw.githubusercontent.com';
+    const u = new URL(url);
+    isGithubRawUrl = u.hostname === rawHost;
   } catch { /* non-URL string handled below by isSafeUrl */ }
   if (isGithubRawUrl && options.githubToken) {
     fetchHeaders['Authorization'] = `token ${options.githubToken}`;
@@ -1372,7 +1395,8 @@ export function parseGithubWebUrl(inputUrl: string): {
   // garbage like `https://raw.githubusercontent.com/openapi.json` (which
   // the generic walk-up logic would otherwise generate because the host
   // has no meaningful "root").
-  if (u.hostname === 'raw.githubusercontent.com') {
+  const base = (process.env.FLOOM_GITHUB_RAW_BASE_URL || 'https://raw.githubusercontent.com').replace(/\/$/, '');
+  if (u.hostname === base.replace(/^https?:\/\//, '')) {
     const parts = u.pathname.split('/').filter((s) => s.length > 0);
     if (parts.length < 4) return null;
     const owner = parts[0];
@@ -1479,11 +1503,12 @@ export function buildGithubRawCandidates(
     for (const d of COMMON_REPO_SPEC_SUBDIRS) pathPrefixes.push(d);
   }
 
+  const rawBase = (process.env.FLOOM_GITHUB_RAW_BASE_URL || 'https://raw.githubusercontent.com').replace(/\/$/, '');
   for (const br of branchList) {
     for (const prefix of pathPrefixes) {
       for (const file of GITHUB_SPEC_FILENAMES) {
         const path = prefix ? `${prefix}/${file}` : file;
-        push(`https://raw.githubusercontent.com/${owner}/${repo}/${br}/${path}`);
+        push(`${rawBase}/${owner}/${repo}/${br}/${path}`);
         if (out.length >= maxCandidates) return out;
       }
     }
@@ -1980,6 +2005,9 @@ export interface DetectedApp {
   openapi_spec_url: string;
   tools_count: number;
   secrets_needed: string[];
+  suggested_pipeline: 'proxy' | 'hosted';
+  has_dockerfile: boolean;
+  has_floom_yaml: boolean;
 }
 
 /**
@@ -2129,6 +2157,32 @@ export async function detectAppFromUrl(
     }
   }
 
+  // Repo content detection for Smart Detection UI
+  let has_dockerfile = false;
+  let has_floom_yaml = false;
+  const gh = parseGithubWebUrl(openapi_url);
+  if (gh) {
+    const branches = ['main', 'master'];
+    const rawBase = (process.env.FLOOM_GITHUB_RAW_BASE_URL || 'https://raw.githubusercontent.com').replace(/\/$/, '');
+    for (const branch of branches) {
+      const dockerUrl = `${rawBase}/${gh.owner}/${gh.repo}/${branch}/Dockerfile`;
+      const floomUrl = `${rawBase}/${gh.owner}/${gh.repo}/${branch}/floom.yaml`;
+      try {
+        const [dr, fr] = await Promise.all([
+          fetch(dockerUrl, { method: 'HEAD', headers: options?.githubToken ? { Authorization: `token ${options.githubToken}` } : {} }),
+          fetch(floomUrl, { method: 'HEAD', headers: options?.githubToken ? { Authorization: `token ${options.githubToken}` } : {} }),
+        ]);
+        if (dr.ok) has_dockerfile = true;
+        if (fr.ok) has_floom_yaml = true;
+        if (has_dockerfile || has_floom_yaml) break;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  const suggested_pipeline = has_dockerfile || has_floom_yaml ? 'hosted' : 'proxy';
+
   return {
     slug,
     name,
@@ -2139,6 +2193,9 @@ export async function detectAppFromUrl(
     openapi_spec_url: resolvedUrl,
     tools_count: actions.length,
     secrets_needed: manifest.secrets_needed || [],
+    suggested_pipeline,
+    has_dockerfile,
+    has_floom_yaml,
   };
 }
 
@@ -2240,6 +2297,10 @@ export interface IngestHint {
    * actionable, never a dead-end.
    */
   message: string;
+  /** Smart Detection: true if a Dockerfile was found in the repo. */
+  has_dockerfile?: boolean;
+  /** Smart Detection: true if a floom.yaml was found in the repo. */
+  has_floom_yaml?: boolean;
 }
 
 // The filenames we recognize, in priority order. Keep in sync with the
@@ -2253,6 +2314,8 @@ export const INGEST_HINT_REQUIRED_FILES = [
   'swagger.yaml',
   'swagger.yml',
   'swagger.json',
+  'Dockerfile',
+  'floom.yaml',
 ];
 
 const INGEST_HINT_REQUIRED_SHAPE: IngestHint['required_shape'] = {
@@ -2378,7 +2441,8 @@ function ingestHintRawUrl(
   branch: string,
   filename: string,
 ): string {
-  return `https://raw.githubusercontent.com/${repo.owner}/${repo.repo}/${branch}/${filename}`;
+  const base = (process.env.FLOOM_GITHUB_RAW_BASE_URL || 'https://raw.githubusercontent.com').replace(/\/$/, '');
+  return `${base}/${repo.owner}/${repo.repo}/${branch}/${filename}`;
 }
 
 /**
@@ -2446,12 +2510,19 @@ export async function probeIngestHint(input: IngestHintInput): Promise<IngestHin
   const callerTried = new Set(baseHint.paths_tried);
   const merged = [...baseHint.paths_tried, ...candidates.filter((c) => !callerTried.has(c))];
 
+  const dockerIdx = INGEST_HINT_REQUIRED_FILES.indexOf('Dockerfile');
+  const floomIdx = INGEST_HINT_REQUIRED_FILES.indexOf('floom.yaml');
+  const has_dockerfile = INGEST_HINT_PROBE_BRANCHES.some((_, bIdx) => results[bIdx * INGEST_HINT_REQUIRED_FILES.length + dockerIdx] !== null);
+  const has_floom_yaml = INGEST_HINT_PROBE_BRANCHES.some((_, bIdx) => results[bIdx * INGEST_HINT_REQUIRED_FILES.length + floomIdx] !== null);
+
   if (found) {
     return {
       ...baseHint,
       status: 'spec_found',
       paths_tried: merged,
       spec_found_url: found,
+      has_dockerfile,
+      has_floom_yaml,
       message:
         `Found an OpenAPI spec in ${baseHint.repo.owner}/${baseHint.repo.repo}. ` +
         `Pass this URL to studio_publish_app's openapi_url to ingest it.`,
@@ -2462,6 +2533,8 @@ export async function probeIngestHint(input: IngestHintInput): Promise<IngestHin
     ...baseHint,
     status: 'repo_no_spec',
     paths_tried: merged,
+    has_dockerfile,
+    has_floom_yaml,
   };
 }
 
@@ -2549,6 +2622,9 @@ export async function detectAppFromInlineSpec(
     openapi_spec_url: '',
     tools_count: actions.length,
     secrets_needed: manifest.secrets_needed || [],
+    suggested_pipeline: 'proxy',
+    has_dockerfile: false,
+    has_floom_yaml: false,
   };
 }
 

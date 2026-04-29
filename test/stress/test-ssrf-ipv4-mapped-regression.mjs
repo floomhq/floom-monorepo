@@ -205,7 +205,16 @@ okServer.close();
 
 // --- Summary ---
 console.log(`\n${passed} passed, ${failed} failed`);
-rmSync(tmp, { recursive: true, force: true });
+try {
+  rmSync(tmp, { recursive: true, force: true });
+} catch (e) {
+  if (process.platform === 'win32' && e.code === 'EBUSY') {
+    console.warn(`[cleanup] ignoring EBUSY on Windows for ${tmp}`);
+  } else {
+    throw e;
+  }
+}
+
 if (failed > 0) {
   console.log('\nFailures:');
   for (const f of failures) console.log('  -', f);

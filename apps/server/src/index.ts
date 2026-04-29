@@ -36,6 +36,7 @@ import { ghStarsRouter } from './routes/gh-stars.js';
 import { ghReleasesRouter } from './routes/gh-releases.js';
 import { skillRouter } from './routes/skill.js';
 import { studioBuildRouter } from './routes/studio-build.js';
+import { deployRouter } from './routes/deploy.js';
 import { db } from './db.js';
 import { SERVER_VERSION } from './lib/server-version.js';
 import { captureServerError } from './lib/sentry.js';
@@ -321,6 +322,7 @@ app.route('/api/admin', adminRouter);
 // owns its own METRICS_TOKEN bearer auth. 404 when the env var is unset.
 app.route('/api/metrics', metricsRouter);
 app.route('/api/studio/build', studioBuildRouter);
+app.route('/api/deploy', deployRouter);
 app.route('/api/hub', hubRouter);
 // Launch-week compatibility: early CLI/agent audits used `/api/projects`
 // as the catalog route before `/api/hub` became canonical. Keep it as a

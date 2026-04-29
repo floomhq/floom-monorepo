@@ -2,15 +2,16 @@
   "name": "@floom/runtime",
   "version": "0.4.0",
   "type": "module",
-  "main": "./src/runtime/index.ts",
-  "types": "./src/runtime/index.ts",
+  "main": "./dist/runtime/index.js",
+  "types": "./dist/runtime/index.d.ts",
   "exports": {
-    ".": "./src/runtime/index.ts",
-    "./deploy": "./src/deploy/pipeline.ts",
-    "./provider": "./src/provider/types.ts",
-    "./provider/ax41-docker": "./src/provider/ax41-docker.ts"
+    ".": "./dist/runtime/index.js",
+    "./deploy": "./dist/deploy/pipeline.js",
+    "./provider": "./dist/provider/types.js",
+    "./provider/ax41-docker": "./dist/provider/ax41-docker.js"
   },
   "scripts": {
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/detect/*.test.ts tests/provider/*.test.ts"
   },

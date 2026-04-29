@@ -15,10 +15,10 @@
  */
 import { generateManifest } from '@floom/manifest';
 
-import { logger } from '../lib/logger.ts';
-import type { DeployResult } from '../runtime/types.ts';
-import { fetchSnapshotFromApi, parseRepoUrl } from './clone.ts';
-import type { RuntimeProvider } from '../provider/types.ts';
+import { logger } from '../lib/logger.js';
+import type { DeployResult } from '../runtime/types.js';
+import { fetchSnapshotFromApi, parseRepoUrl } from './clone.js';
+import type { RuntimeProvider } from '../provider/types.js';
 
 export interface DeployOptions {
   /** Runtime provider to use (ax41-docker in MVP). */
