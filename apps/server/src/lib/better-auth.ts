@@ -420,14 +420,19 @@ function buildAuthOptions(_overrideBaseURL?: string): any {
       user: {
         create: {
           // Fires after a new user row is committed (email+password signup
-          // or social OAuth). Sends a minimal welcome email. Best-effort:
-          // a delivery failure MUST NOT roll back the user, so we swallow
-          // errors and only log. Also a no-op in stdout-fallback mode —
-          // the sendEmail helper handles that transparently.
+          // or social OAuth). Provisions the Floom-side user/workspace and
+          // sends a Welcome email — but ONLY if the user is already verified
+          // (OAuth providers auto-verify on signup). For email/pwd signups,
+          // we skip the welcome here because the user hasn't proven email
+          // ownership yet; `afterEmailVerification` (above) sends Welcome
+          // on the verify-link click instead. Pre-fix bug 2026-04-29:
+          // Welcome was firing on signup AND on verify, so users got two
+          // confusing emails simultaneously.
           after: async (user: {
             id: string;
             email: string;
             name?: string | null;
+            emailVerified?: boolean;
           }): Promise<void> => {
             // W3.1 cleanup: provision the Floom-side user row and a default
             // workspace immediately on creation. This ensures following
@@ -458,24 +463,29 @@ function buildAuthOptions(_overrideBaseURL?: string): any {
               // session.ts resolveUserContext has a second-chance bootstrap.
             }
 
-            try {
-              const isDev = process.env.NODE_ENV !== 'production';
-              const publicUrl =
-                process.env.FLOOM_APP_URL ||
-                process.env.PUBLIC_URL ||
-                (isDev ? 'http://localhost:5173' : 'https://floom.dev');
+            // Welcome email — only for users already verified at create time
+            // (OAuth via Google/GitHub). Email/password signups go through
+            // `afterEmailVerification` → Welcome fires there instead.
+            if (user.emailVerified) {
+              try {
+                const isDev = process.env.NODE_ENV !== 'production';
+                const publicUrl =
+                  process.env.FLOOM_APP_URL ||
+                  process.env.PUBLIC_URL ||
+                  (isDev ? 'http://localhost:5173' : 'https://floom.dev');
 
-              const { subject, html, text } = renderWelcomeEmail({
-                name: user.name ?? null,
-                publicUrl,
-              });
-              await sendEmail({ to: user.email, subject, html, text });
-            } catch (err) {
-              // eslint-disable-next-line no-console
-              console.error(
-                `[auth] welcome email failed for ${user.email}:`,
-                err,
-              );
+                const { subject, html, text } = renderWelcomeEmail({
+                  name: user.name ?? null,
+                  publicUrl,
+                });
+                await sendEmail({ to: user.email, subject, html, text });
+              } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error(
+                  `[auth] welcome email failed for ${user.email}:`,
+                  err,
+                );
+              }
             }
           },
         },
