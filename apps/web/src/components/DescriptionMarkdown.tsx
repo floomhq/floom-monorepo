@@ -12,15 +12,19 @@
 // hero paragraph still flows as body text. Longer descriptions render
 // as a block with normal prose spacing. Both paths use the same
 // markdown pipeline so behaviour stays consistent.
+//
+// r39-perf Fix 5: react-markdown + remark-gfm are lazy-loaded via a
+// dynamic import so they don't land in the landing page's initial JS.
+// The inner MarkdownInner component carries the heavy imports; the
+// outer DescriptionMarkdown wrapper is a Suspense boundary that renders
+// the plain description text as a fallback while the chunk loads.
 
-import type { CSSProperties, ReactNode } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { lazy, Suspense, type CSSProperties } from 'react';
 
 // Tags we allow in description markdown. Deliberately no images, no
 // tables-heavy tags, no headings bigger than h4 (descriptions shouldn't
 // compete with the hero h1/h2), no iframes, no raw HTML.
-const ALLOWED_ELEMENTS = [
+export const ALLOWED_ELEMENTS = [
   'p',
   'a',
   'strong',
@@ -40,12 +44,16 @@ const ALLOWED_ELEMENTS = [
 // no newlines AND no block markdown (headings, lists, code fences), we
 // render it as inline prose to avoid stealing vertical space on short
 // descriptions (most apps still have a 1-line pitch).
-function isSingleLineInlineCandidate(description: string): boolean {
+export function isSingleLineInlineCandidate(description: string): boolean {
   if (description.length > 140) return false;
   if (description.includes('\n')) return false;
   if (/^\s*(#|-|\*|\d+\.|```)/m.test(description)) return false;
   return true;
 }
+
+// Inner component loaded lazily — carries the react-markdown + remark-gfm
+// chunk so it doesn't block the initial paint.
+const LazyMarkdownInner = lazy(() => import('./DescriptionMarkdownInner').then(m => ({ default: m.DescriptionMarkdownInner })));
 
 interface DescriptionMarkdownProps {
   description: string;
@@ -60,66 +68,25 @@ export function DescriptionMarkdown({
   testId = 'product-description',
 }: DescriptionMarkdownProps) {
   const inline = isSingleLineInlineCandidate(description);
-  const components: Components = {
-    // Always open outbound links in a new tab + nofollow noreferrer.
-    a: ({ href, children }) => (
-      <a
-        href={href}
-        target="_blank"
-        rel="nofollow noreferrer noopener"
-        style={{ color: 'var(--accent)', textDecoration: 'underline' }}
-      >
-        {children as ReactNode}
-      </a>
-    ),
-    // Inline code gets a subtle background so it reads as code without
-    // the heavy chrome of a fenced block.
-    code: ({ children }) => (
-      <code
-        style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-          fontSize: '0.9em',
-          padding: '1px 6px',
-          background: 'var(--bg)',
-          border: '1px solid var(--line)',
-          borderRadius: 4,
-        }}
-      >
-        {children as ReactNode}
-      </code>
-    ),
-    // Paragraphs inside the inline variant collapse to fragments so the
-    // surrounding <p> we render stays a single block.
-    p: ({ children }) =>
-      inline ? <>{children as ReactNode}</> : <p style={{ margin: '0 0 12px' }}>{children as ReactNode}</p>,
-  };
-  const commonProps = {
-    remarkPlugins: [remarkGfm],
-    allowedElements: ALLOWED_ELEMENTS,
-    unwrapDisallowed: true,
-    components,
-  };
 
-  if (inline) {
-    return (
-      <p
-        data-testid={testId}
-        style={{
-          fontSize: 16,
-          color: 'var(--text-2, var(--ink))',
-          margin: '0 0 24px',
-          lineHeight: 1.55,
-          maxWidth: 620,
-          whiteSpace: 'normal',
-          ...style,
-        }}
-      >
-        <ReactMarkdown {...commonProps}>{description}</ReactMarkdown>
-      </p>
-    );
-  }
-
-  return (
+  // Fallback: render plain text while the markdown chunk loads.
+  // For inline descriptions this is visually identical.
+  const fallback = inline ? (
+    <p
+      data-testid={testId}
+      style={{
+        fontSize: 16,
+        color: 'var(--text-2, var(--ink))',
+        margin: '0 0 24px',
+        lineHeight: 1.55,
+        maxWidth: 620,
+        whiteSpace: 'normal',
+        ...style,
+      }}
+    >
+      {description}
+    </p>
+  ) : (
     <div
       data-testid={testId}
       style={{
@@ -131,7 +98,18 @@ export function DescriptionMarkdown({
         ...style,
       }}
     >
-      <ReactMarkdown {...commonProps}>{description}</ReactMarkdown>
+      {description}
     </div>
+  );
+
+  return (
+    <Suspense fallback={fallback}>
+      <LazyMarkdownInner
+        description={description}
+        style={style}
+        testId={testId}
+        inline={inline}
+      />
+    </Suspense>
   );
 }

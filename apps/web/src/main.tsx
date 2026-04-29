@@ -115,32 +115,44 @@ import type { SessionMePayload } from './lib/types';
 import './styles/globals.css';
 import './styles/csp-inline-style-migrations.css';
 
-// Browser Sentry. No-op when VITE_SENTRY_WEB_DSN is unset.
-initBrowserSentry();
-
 // Kick off the /api/session/me fetch as soon as the bundle loads so every
 // page's first render already has a value.
 primeSession();
 
-// PostHog analytics (launch #311). Also strict-opt-in — see
-// apps/web/src/lib/posthog.ts. When consent is "essential" OR the key is
-// unset, init() is a hard no-op: track() and identifyFromSession()
-// short-circuit, so calling them unconditionally below is safe.
-initPostHog();
+// Defer analytics + error-monitoring init to after first paint via
+// requestIdleCallback (fix r39-perf Fix 4). Both are 88-94% unused at
+// load time. They still track every event — just not blocking paint.
+// Falls back to setTimeout(0) on browsers without requestIdleCallback
+// (e.g. Safari < 18, though all modern versions support it).
+const scheduleAfterPaint =
+  typeof window !== 'undefined' && 'requestIdleCallback' in window
+    ? (cb: () => void) => window.requestIdleCallback(cb, { timeout: 3000 })
+    : (cb: () => void) => window.setTimeout(cb, 0);
 
-// Rebind PostHog identity whenever the session hook resolves. Covers
-// first-load + every login/logout transition. refreshSession returns the
-// same payload that useSession caches.
-void refreshSession().then((session: SessionMePayload | null) => {
-  identifyFromSession(session);
+scheduleAfterPaint(() => {
+  // Browser Sentry. No-op when VITE_SENTRY_WEB_DSN is unset.
+  initBrowserSentry();
+
+  // PostHog analytics (launch #311). Also strict-opt-in — see
+  // apps/web/src/lib/posthog.ts. When consent is "essential" OR the key is
+  // unset, init() is a hard no-op: track() and identifyFromSession()
+  // short-circuit, so calling them unconditionally below is safe.
+  initPostHog();
+
+  // Rebind PostHog identity whenever the session hook resolves. Covers
+  // first-load + every login/logout transition. refreshSession returns the
+  // same payload that useSession caches.
+  void refreshSession().then((session: SessionMePayload | null) => {
+    identifyFromSession(session);
+  });
+
+  // Fire landing_viewed exactly once, on the first page that mounts. We
+  // bind it to pathname===/ because that's the creator-hero route; other
+  // deep-links (e.g. /apps, /p/:slug) are NOT landing views.
+  if (typeof window !== 'undefined' && window.location.pathname === '/') {
+    track('landing_viewed');
+  }
 });
-
-// Fire landing_viewed exactly once, on the first page that mounts. We
-// bind it to pathname===/ because that's the creator-hero route; other
-// deep-links (e.g. /apps, /p/:slug) are NOT landing views.
-if (typeof window !== 'undefined' && window.location.pathname === '/') {
-  track('landing_viewed');
-}
 
 // Wireframe v11 puts each app's creator view at /p/:slug/dashboard. Preview
 // wired it to /creator/:slug. Redirect the wireframe URL to the live one so
@@ -231,6 +243,20 @@ function ExternalRedirect({ to }: { to: string }) {
 }
 
 /**
+ * Removes the static SPA fallback shell once React has mounted.
+ * The fallback is visible by default (no display:none) so the browser
+ * paints hero copy immediately — before the JS bundle runs — giving a fast
+ * LCP. Once React hydrates we discard it so it doesn't double-render.
+ */
+function SpaFallbackRemover() {
+  useEffect(() => {
+    const el = document.querySelector('[data-spa-fallback]');
+    if (el) el.remove();
+  }, []);
+  return null;
+}
+
+/**
  * PostHog page_view tracker (issue #599). Fires `page_view` on every route
  * change with `{ path }`. PostHog's own `capture_pageview` is disabled in
  * `lib/posthog.ts` so we own the routing semantics — a client-side nav in
@@ -250,6 +276,7 @@ function RouteChangeTracker() {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserSentryErrorBoundary fallback={<RouteLoading variant="full" />}>
+      <SpaFallbackRemover />
       <IconSprite />
       <BrowserRouter>
         <RouteChangeTracker />

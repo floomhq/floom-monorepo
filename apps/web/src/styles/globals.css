@@ -1,3 +1,18 @@
+/* Self-hosted fonts (Fix 2: r39-mobile-perf-p0). Replaces Google Fonts
+   <link rel="stylesheet"> which was render-blocking (+772 ms on mobile).
+   Weights loaded: Inter 400/400i/500/600/700/800/900, JetBrains Mono 400/500/600.
+   latin subset only — covers all Floom copy. */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/400-italic.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/inter/800.css';
+@import '@fontsource/inter/900.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
+
 /* The wireframe design system — CSS variables, all layout primitives,
    every component (run thread, prompt box, app card, terminal, etc).
    Copied verbatim from the Floom wireframes so the implementation

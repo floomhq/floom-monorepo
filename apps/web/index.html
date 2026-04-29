@@ -38,19 +38,10 @@
     <meta name="twitter:image" content="https://floom.dev/og-main.png" />
     <meta name="twitter:image:alt" content="Floom — ship AI apps fast." />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Google Fonts. The preload + print-swap onload trick was removed
-         in CSP hardening (GitHub #126); inline event handlers violate
-         `script-src 'self'`. `display=swap` in the URL still prevents
-         FOIT; the preconnect above keeps the connection cost low.
-         2026-04-24: dropped DM+Serif+Display. Hero + section titles
-         now use Inter 800 at tight tracking via --font-display
-         (wireframe.css). See PR body for the rationale. -->
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
-    />
+    <!-- Fonts are self-hosted via @fontsource (fix r39-perf Fix 2).
+         Google Fonts <link> removed — it was render-blocking (+772 ms mobile).
+         Inter + JetBrains Mono are now bundled into the CSS chunk and served
+         from the same origin. No render-blocking third-party request. -->
 
     <script type="application/ld+json">
     {
@@ -100,7 +91,7 @@
     <div id="root">
       <!-- SPA fallback. Rendered before React hydrates so crawlers and curl
            see the locked hero copy. Matches landing.floom.dev exactly. -->
-      <div style="display:none" data-spa-fallback>
+      <div data-spa-fallback>
         <h1>Ship AI apps fast.</h1>
         <p>The protocol + runtime for agentic work.</p>
         <p>Paste your app's link. Get a Claude tool, a page to share, a command-line, a chat interface, and a clean URL. Sign-in, history, and all the boring stuff are built in.</p>
