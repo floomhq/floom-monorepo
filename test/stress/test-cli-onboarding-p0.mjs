@@ -176,6 +176,24 @@ try {
   }
 
   {
+    const tmp = mkdtempSync(join(tmpdir(), 'floom-init-name-only-'));
+    try {
+      const res = await run(['init', '--name', 'Test App'], { cwd: tmp, apiUrl: mock.apiUrl });
+      const yaml = readFileSync(join(tmp, 'floom.yaml'), 'utf8');
+      log(
+        'init name-only non-tty creates a custom app with generated slug',
+        res.status === 0 &&
+          yaml.includes('slug: test-app') &&
+          yaml.includes('description: Run Test App.') &&
+          yaml.includes('runtime: python'),
+        res.stdout + res.stderr + yaml,
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+
+  {
     const res = await run(['account', '--help'], { apiUrl: mock.apiUrl });
     log('account agent-token help marks browser-session requirement', res.status === 0 && res.stdout.includes('browser session required') && res.stdout.includes('Agent tokens are rejected'), res.stdout + res.stderr);
   }

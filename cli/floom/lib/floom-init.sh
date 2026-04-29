@@ -75,12 +75,20 @@ if [[ ! "$SLUG" =~ ^[a-z0-9][a-z0-9-]{0,47}$ ]]; then
   exit 1
 fi
 
-[[ -z "$DESCRIPTION" ]] && DESCRIPTION=$(prompt "One-sentence description")
+if [[ -z "$DESCRIPTION" ]]; then
+  if [[ -t 0 ]]; then
+    DESCRIPTION=$(prompt "One-sentence description")
+  else
+    DESCRIPTION="Run ${NAME}."
+  fi
+fi
 [[ -z "$DESCRIPTION" ]] && { echo "floom init: description is required" >&2; exit 1; }
 
 if [[ -z "$APP_TYPE" ]]; then
   if [[ -n "$OPENAPI_URL" ]]; then
     APP_TYPE="proxied"
+  elif [[ ! -t 0 ]]; then
+    APP_TYPE="custom"
   else
     APP_TYPE=$(prompt "App type: (a) proxied OpenAPI, or (b) custom Python code" "a")
     case "$APP_TYPE" in
