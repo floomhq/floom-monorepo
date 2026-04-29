@@ -16,17 +16,19 @@ import { Link, useLocation } from 'react-router-dom';
 import { Box, Play, Plus } from 'lucide-react';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
-// V13: run-history hook so rail count matches MeAppsPage
-import { useMyRuns } from '../hooks/useMyRuns';
+// V13 fix: rail's "Apps" count is now sourced from /api/hub/installed via
+// useInstalledApps — same source RunAppsPage reads — so rail and content
+// stat agree (was: rail = unique app_slugs in run history, content =
+// installed merged with run-only slugs, mismatched whenever a user
+// installed without running or ran without installing).
+import { useInstalledApps } from '../hooks/useInstalledApps';
 
 const RAIL_WIDTH = 240;
 
 export function RunRail() {
   const location = useLocation();
-  const { runs } = useMyRuns();
-  const appsCount = runs
-    ? new Set(runs.map((r: { app_slug: string | null }) => r.app_slug).filter(Boolean)).size
-    : null;
+  const { apps } = useInstalledApps();
+  const appsCount = apps ? apps.length : null;
 
   return (
     <aside data-testid="run-rail" aria-label="Run navigation" style={railStyle}>

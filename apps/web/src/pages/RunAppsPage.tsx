@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { useSession } from '../hooks/useSession';
+import { useInstalledApps, type InstalledApp } from '../hooks/useInstalledApps';
 import { formatTime } from '../lib/time';
 import * as api from '../api/client';
 import type { MeRunSummary } from '../lib/types';
@@ -34,13 +35,6 @@ interface RunApp {
   lastRunId: string | null;
   lastRunAction: string | null;
   lastRunStatus: string | null;
-}
-
-/** Installed app shape returned by /api/hub/installed. */
-interface InstalledApp {
-  slug: string;
-  name: string;
-  description: string;
 }
 
 /**
@@ -228,7 +222,7 @@ function HeroStatRow({
   p95Ms: number | null;
 }) {
   const cards = [
-    { label: 'APPS',         value: appCount,    sub: 'installed' },
+    { label: 'APPS',         value: appCount,    sub: 'in workspace' },
     { label: 'RUNS · 7D',    value: runCount7d,  sub: 'this week' },
     { label: 'RUNNING NOW',  value: runningNow,  sub: runningNow === 1 ? 'in flight' : 'in flight' },
     { label: 'P95',          value: p95Ms,       sub: 'typical', unit: 'ms' },
@@ -630,7 +624,7 @@ function EmptyState() {
           color: 'var(--ink)',
         }}
       >
-        No apps installed yet.
+        No apps in your workspace yet.
       </h3>
       <p
         style={{
@@ -641,8 +635,8 @@ function EmptyState() {
           lineHeight: 1.55,
         }}
       >
-        Browse the store to install your first app. It will appear here —
-        ready to run from your browser, Claude, Cursor, or the CLI.
+        Browse the store and try one — it lands here automatically. Ready
+        to run from your browser, Claude, Cursor, or the CLI.
       </p>
       <Link to="/apps" className="btn-ink" data-testid="run-apps-empty-cta">
         Browse the store →
@@ -655,14 +649,14 @@ function EmptyState() {
 // Page
 // ------------------------------------------------------------------
 
-// Module-level cache so skeleton only shows on first load per session, not on
-// every route change back to this page. Cleared on full page reload.
-let _cachedInstalled: InstalledApp[] | null = null;
+// Module-level cache for runs so the skeleton only shows on first load
+// per session. Installed apps share the useInstalledApps hook cache with
+// RunRail (V13 fix: single source of truth for the "Apps" count).
 let _cachedRuns: MeRunSummary[] | null = null;
 
 export function RunAppsPage() {
   const { data: session, loading: sessionLoading, error: sessionError } = useSession();
-  const [installed, setInstalled] = useState<InstalledApp[] | null>(_cachedInstalled);
+  const { apps: installed } = useInstalledApps();
   const [runs, setRuns] = useState<MeRunSummary[] | null>(_cachedRuns);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -692,19 +686,15 @@ export function RunAppsPage() {
 
   useEffect(() => {
     if (sessionPending) return;
-    // Skip fetch if we already have cached data (stale-while-revalidate pattern).
-    // This prevents the skeleton from flashing on every route change.
+    // Runs fetched here; installed apps come via the shared hook.
     let cancelled = false;
-    Promise.all([
-      api.getInstalledApps().catch(() => ({ apps: [] as InstalledApp[] })),
-      api.getMyRuns(FETCH_LIMIT).catch(() => ({ runs: [] as MeRunSummary[] })),
-    ]).then(([installedRes, runsRes]) => {
-      if (cancelled) return;
-      _cachedInstalled = installedRes.apps as InstalledApp[];
-      _cachedRuns = runsRes.runs;
-      setInstalled(_cachedInstalled);
-      setRuns(_cachedRuns);
-    });
+    api.getMyRuns(FETCH_LIMIT)
+      .catch(() => ({ runs: [] as MeRunSummary[] }))
+      .then((runsRes) => {
+        if (cancelled) return;
+        _cachedRuns = runsRes.runs;
+        setRuns(_cachedRuns);
+      });
     return () => {
       cancelled = true;
     };
@@ -757,7 +747,7 @@ export function RunAppsPage() {
           <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.55 }}>
             {appCount > 0
               ? `${appCount} runnable app${appCount !== 1 ? 's' : ''} in your workspace. Available in browser, Claude, Cursor, and HTTP.`
-              : 'Install apps from the store to run them here.'}
+              : 'Browse the store and try one — it lands here automatically.'}
           </p>
         </div>
 
