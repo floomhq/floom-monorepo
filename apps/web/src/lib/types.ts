@@ -351,6 +351,14 @@ export interface SessionMePayload {
   // Defaults to false server-side, so treat `undefined` as false for
   // forward compatibility with older server builds.
   deploy_enabled: boolean;
+  /**
+   * R23.1: true when the user's stored GitHub OAuth token includes the
+   * `repo` scope (private-repo read access). False for users who signed
+   * up with email+password, Google, or the default GitHub login (which
+   * only grants `read:user`). When false, the /studio/build
+   * private-repo state shows a "Connect for private repos" CTA.
+   */
+  github_has_repo_scope?: boolean;
 }
 
 export interface MeRunSummary {

@@ -545,6 +545,19 @@ export interface SessionMePayload {
   // preview.floom.dev sets it to true; floom.dev sets it to false until
   // the GA cutover.
   deploy_enabled: boolean;
+  /**
+   * R23.1: Whether the authenticated user's stored GitHub OAuth token
+   * includes the `repo` scope (private-repo read access). False when:
+   *   - OSS mode (no cloud auth)
+   *   - user has not linked GitHub
+   *   - user linked GitHub with the default `read:user` scope only
+   *
+   * When true, private-repo ingest proceeds without a re-auth prompt.
+   * When false, the /studio/build private-repo state shows a
+   * "Connect for private repos" CTA that initiates the `repo`-scope
+   * re-auth flow.
+   */
+  github_has_repo_scope: boolean;
 }
 
 export interface AppMemoryRecord {

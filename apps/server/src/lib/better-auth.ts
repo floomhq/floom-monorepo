@@ -647,3 +647,49 @@ export function purgeUnverifiedAuthSessions(): number {
 export function _resetAuthForTests(): void {
   cachedAuth = undefined;
 }
+
+/**
+ * R23.1: Look up the stored GitHub OAuth access token and scope for a user.
+ *
+ * Better Auth persists the provider token in the `account` table
+ * (providerId = 'github'). Returns null when:
+ *   - cloud mode is off (OSS mode has no account table)
+ *   - the user signed up with email+password or Google (no GitHub account row)
+ *   - the account row exists but Better Auth stripped the token (it does so on
+ *     parseAccountOutput — but the raw DB row still has it)
+ *
+ * The returned `hasRepoScope` flag reflects whether the stored `scope` string
+ * contains `repo`. GitHub grants `repo` only when the user explicitly consented
+ * to the private-repo OAuth flow (R23.1 opt-in). The standard login flow only
+ * grants `read:user` (and possibly `user:email`).
+ */
+export function getUserGithubAccount(userId: string): {
+  accessToken: string | null;
+  scope: string | null;
+  hasRepoScope: boolean;
+} | null {
+  if (!isCloudMode()) return null;
+  try {
+    const row = db
+      .prepare(
+        `SELECT "accessToken", "scope"
+         FROM "account"
+         WHERE "userId" = ? AND "providerId" = 'github'
+         LIMIT 1`,
+      )
+      .get(userId) as { accessToken: string | null; scope: string | null } | undefined;
+    if (!row) return null;
+    const scope = row.scope || '';
+    // `repo` is a top-level scope that implies full private+public repo read/write.
+    // We only request it for the opt-in private-repo flow; the default login uses
+    // `read:user` (and `user:email` if the email is private). Checking for the
+    // exact word `repo` with word boundaries avoids false matches against
+    // `public_repo` or `delete_repo`.
+    const hasRepoScope = /\brepo\b/.test(scope);
+    return { accessToken: row.accessToken, scope, hasRepoScope };
+  } catch {
+    // Account table may not exist in OSS mode even when cloud mode is on during
+    // migration. Treat as no GitHub account.
+    return null;
+  }
+}

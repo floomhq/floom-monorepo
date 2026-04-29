@@ -21,9 +21,11 @@ import {
   detectAppFromInlineSpec,
   detectAppFromUrl,
   ingestAppFromUrl,
+  PrivateRepoError,
   SlugTakenError,
   SpecNotFoundError,
 } from '../services/openapi-ingest.js';
+import { getUserGithubAccount } from '../lib/better-auth.js';
 import { auditLog, getAuditActor } from '../services/audit-log.js';
 import {
   bundleRenderer,
@@ -196,11 +198,18 @@ hubRouter.post('/detect', async (c) => {
       400,
     );
   }
+  // R23.1: attempt the fetch with the user's stored GitHub token so private
+  // repos work if the user already opted into the `repo` scope. Falls back
+  // gracefully: if there's no token, the fetch proceeds unauthenticated and
+  // a 404 from raw.githubusercontent.com raises PrivateRepoError below.
+  const githubAccount = getUserGithubAccount(ctx.user_id);
+  const githubToken = githubAccount?.accessToken || undefined;
   try {
     const detected = await detectAppFromUrl(
       parsed.data.openapi_url,
       parsed.data.slug,
       parsed.data.name,
+      { githubToken },
     );
     return c.json(detected);
   } catch (err) {
@@ -213,6 +222,27 @@ hubRouter.post('/detect', async (c) => {
     // to render a proactive recovery block (paste URL, paste contents,
     // ask-Claude prompt) instead of a dead-end error string.
     const hintUrl = `${resolveBaseUrlFromRequest(c)}/api/hub/detect/hint`;
+    // R23.1: GitHub private-repo — surface a dedicated code so the UI
+    // can prompt for the repo-scope re-auth instead of the generic
+    // "spec not found" recovery flow.
+    if (err instanceof PrivateRepoError) {
+      const hasRepoScope = githubAccount?.hasRepoScope ?? false;
+      return c.json(
+        {
+          error: err.message,
+          code: 'private_repo',
+          has_repo_scope: hasRepoScope,
+          // connect_url tells the frontend where to send the user to
+          // upgrade their GitHub OAuth scope. Constructed server-side so
+          // the client doesn't need to know the auth endpoint path.
+          connect_url: hasRepoScope
+            ? null
+            : `${resolveBaseUrlFromRequest(c)}/auth/sign-in/social`,
+          hint_url: hintUrl,
+        },
+        403,
+      );
+    }
     if (err instanceof SpecNotFoundError) {
       return c.json(
         {

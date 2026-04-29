@@ -940,6 +940,29 @@ interface FetchSpecOptions {
    * inside a 10s cumulative budget.
    */
   timeoutMs?: number;
+  /**
+   * R23.1: GitHub OAuth access token for private-repo reads.
+   * When set, requests to raw.githubusercontent.com are authenticated with
+   * `Authorization: token <githubToken>`. Only flows through this path;
+   * never sent to non-GitHub hosts.
+   */
+  githubToken?: string;
+}
+
+/**
+ * R23.1: Raised when a GitHub raw URL returns 404 and no authenticated
+ * GitHub token was supplied (or the token lacked `repo` scope). The
+ * caller should surface a "connect with private-repo access" CTA rather
+ * than the generic "spec not found" message.
+ */
+export class PrivateRepoError extends Error {
+  code = 'private_repo' as const;
+  repoUrl: string;
+  constructor(repoUrl: string) {
+    super(`GitHub repo appears private or inaccessible: ${repoUrl}`);
+    this.name = 'PrivateRepoError';
+    this.repoUrl = repoUrl;
+  }
 }
 
 // SSRF hardening (issue #378, pentest 2026-04-22).
@@ -1132,8 +1155,21 @@ export async function fetchSpec(
   const timeoutMs =
     options.timeoutMs ??
     (options.allowPrivateNetwork ? TRUSTED_FETCH_TIMEOUT_MS : FETCH_TIMEOUT_MS);
+  // R23.1: attach GitHub token only when fetching from raw.githubusercontent.com.
+  // Never send to arbitrary hosts to avoid leaking the user credential.
+  const fetchHeaders: Record<string, string> = {
+    Accept: 'application/json, application/yaml, text/plain',
+  };
+  let isGithubRawUrl = false;
+  try {
+    const parsedForGh = new URL(url);
+    isGithubRawUrl = parsedForGh.hostname === 'raw.githubusercontent.com';
+  } catch { /* non-URL string handled below by isSafeUrl */ }
+  if (isGithubRawUrl && options.githubToken) {
+    fetchHeaders['Authorization'] = `token ${options.githubToken}`;
+  }
   const res = await fetch(url, {
-    headers: { Accept: 'application/json, application/yaml, text/plain' },
+    headers: fetchHeaders,
     signal: AbortSignal.timeout(timeoutMs),
     redirect: 'manual',
   });
@@ -1155,6 +1191,14 @@ export async function fetchSpec(
     });
   }
   if (!res.ok) {
+    // R23.1: a 404 from raw.githubusercontent.com with no auth token (or a
+    // token without `repo` scope) almost always means the repo is private.
+    // Surface PrivateRepoError so the route layer can return a specific
+    // `private_repo` code and the UI can prompt for a re-auth with `repo`
+    // scope, instead of the generic "spec not found" dead-end.
+    if (isGithubRawUrl && (res.status === 404 || res.status === 403) && !options.githubToken) {
+      throw new PrivateRepoError(url);
+    }
     throw new Error(`Failed to fetch OpenAPI spec from ${url}: HTTP ${res.status}`);
   }
 
@@ -1586,6 +1630,11 @@ export async function fetchSpecWithFallback(
   // the same host as the input URL, so if any of them is blocked by the
   // SSRF guard, they're all blocked — we should propagate that signal.
   let blockedErr: Error | null = null;
+  // R23.1: track the most recent PrivateRepoError separately — if every
+  // GitHub candidate 404s without a token, the real diagnosis is "private
+  // repo" not "spec not found". We propagate it if all candidates share the
+  // same failure mode.
+  let privateRepoErr: PrivateRepoError | null = null;
   let hadNonBlockedFailure = false;
 
   for (const candidate of candidates) {
@@ -1602,14 +1651,24 @@ export async function fetchSpecWithFallback(
       }
       hadNonBlockedFailure = true;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.startsWith('Invalid or disallowed OpenAPI URL')) {
-        blockedErr = err instanceof Error ? err : new Error(msg);
+      if (err instanceof PrivateRepoError) {
+        privateRepoErr = err;
+        // Don't mark hadNonBlockedFailure — this is a recognised signal.
       } else {
-        hadNonBlockedFailure = true;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.startsWith('Invalid or disallowed OpenAPI URL')) {
+          blockedErr = err instanceof Error ? err : new Error(msg);
+        } else {
+          hadNonBlockedFailure = true;
+        }
       }
       // Fall through to the next candidate.
     }
+  }
+  // R23.1: if all candidates raised PrivateRepoError (and none succeeded or
+  // hit an SSRF block), propagate it so the route returns `private_repo`.
+  if (privateRepoErr && !hadNonBlockedFailure && !blockedErr) {
+    throw privateRepoErr;
   }
   // If every failure was the SSRF guard rejecting the URL, surface that
   // instead of the generic "not found" — the caller needs to know the URL
@@ -2020,6 +2079,7 @@ export async function detectAppFromUrl(
   openapi_url: string,
   requested_slug?: string,
   requested_name?: string,
+  options?: { githubToken?: string },
 ): Promise<DetectedApp> {
   // Issue #389: the user may have pasted a deep endpoint URL
   // (`https://api.example.com/v2/users/{id}/orders`) rather than the spec
@@ -2027,7 +2087,9 @@ export async function detectAppFromUrl(
   // walks up the path hierarchy with common filenames. The resolved URL
   // is what we store as `openapi_spec_url` so the persisted manifest
   // points at the real spec, not at the endpoint the user pasted.
-  const { spec, url: resolvedUrl } = await fetchSpecWithFallback(openapi_url);
+  const { spec, url: resolvedUrl } = await fetchSpecWithFallback(openapi_url, {
+    githubToken: options?.githubToken,
+  });
   const derefed = await dereferenceSpec(spec);
   const info = (derefed as { info?: { title?: string; description?: string } })
     .info || {};

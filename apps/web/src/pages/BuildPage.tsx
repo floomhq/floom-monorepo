@@ -261,6 +261,20 @@ export function BuildPage({ postPublishHref, layout: Layout = PageShell }: Build
     } catch (err) {
       updateProgress(lineId, 'fail');
       const apiErr = err instanceof api.ApiError ? err : null;
+      // R23.1: server returns 403 + code:'private_repo' when the URL
+      // resolves to a GitHub raw URL that 404s without a `repo`-scoped token.
+      if (apiErr?.status === 403 && apiErr.code === 'private_repo') {
+        const ghUrl = looksLikeGithubRef(inputUrl)
+          ? inputUrl
+          : (apiErr.payload as { error?: string } | null)?.error
+            ? inputUrl
+            : inputUrl;
+        setPrivateRepoUrl(ghUrl.replace(/^https?:\/\//, ''));
+        setDetectErrorKind('private');
+        setDetectError(null);
+        setStep('private-repo');
+        return;
+      }
       if (apiErr?.status === 404) {
         setDetectErrorKind('unreachable');
         setDetectError("We couldn't find that spec. Double-check the URL.");
@@ -582,6 +596,9 @@ export function BuildPage({ postPublishHref, layout: Layout = PageShell }: Build
         {step === 'private-repo' && (
           <PrivateRepoStep
             repoUrl={privateRepoUrl ?? url}
+            // R23.1: pass the current GitHub scope level so the CTA knows
+            // whether to show "Connect for private repos" or the GitHub App.
+            hasGithubRepoScope={sessionData?.github_has_repo_scope === true}
             onUsePublic={resetToPaste}
             onUsePat={() => setStep('pat-fallback')}
             onPasteSpec={() => {
@@ -1905,15 +1922,36 @@ function suggestNextSlug(base: string, existing: string[]): string {
 
 function PrivateRepoStep({
   repoUrl,
+  hasGithubRepoScope,
   onUsePublic,
   onUsePat,
   onPasteSpec,
 }: {
   repoUrl: string;
+  /** R23.1: true when the user's stored GitHub token already has `repo` scope. */
+  hasGithubRepoScope: boolean;
   onUsePublic: () => void;
   onUsePat: () => void;
   onPasteSpec: () => void;
 }) {
+  const [connecting, setConnecting] = useState(false);
+
+  async function handleConnectPrivateRepos() {
+    setConnecting(true);
+    try {
+      // R23.1: re-auth GitHub with `repo` scope. Better Auth 1.6.3 accepts
+      // `scopes` in the sign-in/social body and forwards them to GitHub's
+      // authorize URL. After the user consents, Better Auth stores the new
+      // token (with `repo` scope) in the `account` table and redirects back
+      // to /studio/build so the user can retry their paste immediately.
+      await api.signInWithGithubRepoScope('/studio/build');
+    } catch {
+      setConnecting(false);
+    }
+    // If signInWithGithubRepoScope triggers a page navigation (it does via
+    // window.location.assign), we'll never reach here. Reset on failure only.
+  }
+
   // Flag #2 default B: the GitHub App install endpoint is gated. If
   // the env doesn't expose VITE_GITHUB_APP_INSTALL_URL we render the
   // CTA disabled with "Coming soon" framing and steer to paste-spec.
@@ -1942,7 +1980,35 @@ function PrivateRepoStep({
         </div>
       </div>
 
-      {installEnabled ? (
+      {/* R23.1: primary CTA — connect GitHub with repo scope (opt-in) */}
+      {!hasGithubRepoScope && (
+        <button
+          type="button"
+          className="install-cta"
+          onClick={handleConnectPrivateRepos}
+          disabled={connecting}
+          aria-disabled={connecting}
+          data-testid="connect-github-repo-scope"
+        >
+          <div className="row">
+            <span className="gh">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 0a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.74.08-.73.08-.73 1.21.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.66-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.93.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 12 0z" />
+              </svg>
+            </span>
+            <div className="label-stack">
+              <div className="label-top">RECOMMENDED</div>
+              <div className="label-main">
+                {connecting ? 'Redirecting to GitHub…' : 'Connect GitHub for private repos'}
+              </div>
+            </div>
+            <span className="arr">→</span>
+          </div>
+        </button>
+      )}
+
+      {/* Fallback: GitHub App install (future) — gated behind env flag */}
+      {hasGithubRepoScope && installEnabled && (
         <a className="install-cta" href={installUrl} data-testid="install-gh-app-cta">
           <div className="row">
             <span className="gh">
@@ -1957,7 +2023,11 @@ function PrivateRepoStep({
             <span className="arr">→</span>
           </div>
         </a>
-      ) : (
+      )}
+
+      {/* If user already has repo scope but the repo is still inaccessible
+          (e.g. no access to this specific private org repo) */}
+      {hasGithubRepoScope && !installEnabled && (
         <button
           type="button"
           className="install-cta"
@@ -1987,33 +2057,28 @@ function PrivateRepoStep({
             <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            Read repository contents <span className="role">· clone source for builds</span>
+            Read all your repositories (public and private) <span className="role">· GitHub&rsquo;s <code>repo</code> scope</span>
           </li>
           <li>
             <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            Read commit metadata <span className="role">· show last commit on Source tab</span>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            Receive webhooks <span className="role">· auto-rebuild on push</span>
+            Read your GitHub profile <span className="role">· name, avatar, email</span>
           </li>
         </ul>
         <p style={{ fontSize: 11.5, color: 'var(--muted)', margin: '10px 0 0', lineHeight: 1.55 }}>
+          Floom will get read access to all your repos. You can disconnect anytime in{' '}
+          <a href="/me/settings" style={{ color: 'var(--ink)' }}>/settings</a>.
+          <br />
           <strong style={{ color: 'var(--ink)' }}>Floom never asks for:</strong> write access, issue
-          access, secrets, account-level permissions. Pick exactly which repos to grant — it&rsquo;s
-          not all-or-nothing.
+          access, or secrets.
         </p>
       </div>
 
       <div className="alt-block">
-        {!installEnabled && (
+        {!hasGithubRepoScope && !installEnabled && (
           <p style={{ margin: '0 0 10px' }}>
-            <strong>Coming soon.</strong> While the Floom GitHub App is being rolled out, the
-            fastest path is to{' '}
+            Prefer not to grant full repo access? You can{' '}
             <button type="button" onClick={onPasteSpec} data-testid="private-repo-paste-spec">
               paste your floom.yaml directly
             </button>
