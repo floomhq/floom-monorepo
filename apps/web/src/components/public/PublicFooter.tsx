@@ -167,7 +167,17 @@ export function PublicFooter() {
               height={22}
               style={{ display: 'inline-block' }}
             />
-            Floom
+            {/* Unified lockup (#980): lowercase + Inter 900 + trailing emerald dot */}
+            <span style={{ fontWeight: 900 }}>floom</span>
+            <svg
+              aria-hidden="true"
+              width={5}
+              height={5}
+              viewBox="0 0 5 5"
+              style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 2, flexShrink: 0 }}
+            >
+              <circle cx="2.5" cy="2.5" r="2.5" fill="#10b981" />
+            </svg>
           </Link>
           <p
             data-testid="footer-tagline"
