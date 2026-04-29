@@ -251,7 +251,7 @@ function HeroStatRow({
             border: '1px solid var(--line)',
             borderRadius: 12,
             padding: 'var(--space-4)',
-            boxShadow: 'var(--shadow-1)',
+            boxShadow: 'var(--shadow-2)',
             display: 'flex',
             flexDirection: 'column',
             gap: 'var(--space-1)',
@@ -267,13 +267,13 @@ function HeroStatRow({
           }}>{c.label}</div>
           <div style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 22,
+            fontSize: 19,
             fontWeight: 700,
             color: 'var(--ink)',
-            lineHeight: 1,
+            lineHeight: 1.05,
           }}>
             {c.value ?? '—'}
-            {c.unit && c.value != null && <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)', marginLeft: 2 }}>{c.unit}</span>}
+            {c.unit && c.value != null && <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)', marginLeft: 2 }}>{c.unit}</span>}
           </div>
           <div style={{
             fontSize: 11,
@@ -301,20 +301,25 @@ function AppCard({ app }: { app: RunApp }) {
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 14,
-        padding: 'var(--space-4)',
+        padding: 'var(--space-5) var(--space-4)',
+        minHeight: 132,
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--space-3)',
         textDecoration: 'none',
         color: 'inherit',
-        boxShadow: 'var(--shadow-1)',
-        transition: 'border-color 0.12s ease',
+        boxShadow: 'var(--shadow-2)',
+        transition: 'border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--line-hover)';
+        e.currentTarget.style.boxShadow = 'var(--shadow-3)';
+        e.currentTarget.style.transform = 'translateY(-1px)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--line)';
+        e.currentTarget.style.boxShadow = 'var(--shadow-2)';
+        e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>

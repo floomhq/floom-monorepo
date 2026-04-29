@@ -158,7 +158,7 @@ function HeroStatRow({
             border: '1px solid var(--line)',
             borderRadius: 12,
             padding: 'var(--space-4)',
-            boxShadow: 'var(--shadow-1)',
+            boxShadow: 'var(--shadow-2)',
             display: 'flex',
             flexDirection: 'column',
             gap: 'var(--space-1)',
@@ -174,14 +174,14 @@ function HeroStatRow({
           }}>{c.label}</div>
           <div style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 22,
+            fontSize: 19,
             fontWeight: 700,
             color: 'var(--ink)',
-            lineHeight: 1,
+            lineHeight: 1.05,
           }}>
             {c.value != null ? c.value.toLocaleString() : '—'}
             {c.unit && c.value != null && (
-              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)', marginLeft: 2 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)', marginLeft: 2 }}>
                 {c.unit}
               </span>
             )}
@@ -211,20 +211,25 @@ function StudioAppCard({ app }: { app: CreatorApp }) {
         background: 'var(--card)',
         border: '1px solid var(--line)',
         borderRadius: 14,
-        padding: 'var(--space-4)',
+        padding: 'var(--space-5) var(--space-4)',
+        minHeight: 132,
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--space-3)',
         textDecoration: 'none',
         color: 'inherit',
-        boxShadow: 'var(--shadow-1)',
-        transition: 'border-color 0.12s ease',
+        boxShadow: 'var(--shadow-2)',
+        transition: 'border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--line-hover)';
+        e.currentTarget.style.boxShadow = 'var(--shadow-3)';
+        e.currentTarget.style.transform = 'translateY(-1px)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--line)';
+        e.currentTarget.style.boxShadow = 'var(--shadow-2)';
+        e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
       {/* Row 1: icon + name + live/draft pill */}
@@ -840,18 +845,22 @@ export function StudioAppsV26Page() {
               </>
             )}
 
-            {/* Bottom CTA: + New app (issue #917 overlay deferred; links to /studio/build) */}
-            <div data-testid="studio-apps-bottom-cta" style={{ marginTop: 'var(--space-1)' }}>
+            {/* Bottom CTA — secondary action with low visual weight so the
+                primary "+ New app" in the page header stays the dominant
+                affordance. Gemini iter20 flagged "button soup": three primary
+                green buttons created hierarchy ambiguity. This is the
+                de-promoted, ghost-style backup link. */}
+            <div data-testid="studio-apps-bottom-cta" style={{ marginTop: 'var(--space-3)' }}>
               <Link
                 to="/studio/build"
                 style={{
                   padding: 'var(--space-2) var(--space-4)',
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  border: '1px solid var(--accent)',
+                  background: 'transparent',
+                  color: 'var(--muted)',
+                  border: '1px solid var(--line)',
                   borderRadius: 8,
                   fontSize: 13,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   textDecoration: 'none',
                 }}
               >
