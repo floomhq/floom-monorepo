@@ -1,11 +1,10 @@
 // WorkspaceIdentityBlock — top-of-rail workspace chip.
 //
 // Behaviour:
-//   - Single workspace: acts as a Link to /settings (workspace settings).
-//   - Multiple workspaces: opens a dropdown switcher in-place.
-//     Dropdown lists all workspaces, marks the active one, and lets the
-//     user switch via POST /api/session/switch-workspace. Has a
-//     "Workspace settings →" footer link to /settings.
+//   - Always opens a dropdown switcher in-place.
+//   - Dropdown lists all workspaces, marks the active one, lets the user
+//     switch via POST /api/session/switch-workspace, and includes
+//     "Create new workspace" plus "Workspace settings →" actions.
 //
 // Used in RunRail + StudioRail. The chip shape is the same in both modes;
 // the switcher dropdown is generic (no mode-specific chrome).
@@ -112,6 +111,26 @@ function CheckIcon({ size = 12 }: { size?: number }) {
   );
 }
 
+function PlusIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ flexShrink: 0 }}
+    >
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 function Spinner({ size = 12 }: { size?: number }) {
   return (
     <svg
@@ -144,8 +163,15 @@ interface SwitcherMenuProps {
 
 function SwitcherMenu({ active, workspaces, onClose }: SwitcherMenuProps) {
   const [switching, setSwitching] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { refresh } = useSession();
+
+  useEffect(() => {
+    if (creating) inputRef.current?.focus();
+  }, [creating]);
 
   async function handleSelect(id: string) {
     if (switching || id === active.id) {
@@ -161,6 +187,24 @@ function SwitcherMenu({ active, workspaces, onClose }: SwitcherMenuProps) {
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not switch workspace');
+    } finally {
+      setSwitching(null);
+    }
+  }
+
+  async function handleCreate() {
+    const name = newName.trim();
+    if (!name || switching) return;
+    setSwitching('new');
+    setError(null);
+    try {
+      await api.createWorkspace({ name });
+      await refresh();
+      await refreshMyApps();
+      setNewName('');
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create workspace');
     } finally {
       setSwitching(null);
     }
@@ -222,6 +266,82 @@ function SwitcherMenu({ active, workspaces, onClose }: SwitcherMenuProps) {
         );
       })}
 
+      <div style={{ height: 1, background: 'var(--line)', margin: '6px 4px' }} />
+
+      {!creating ? (
+        <button
+          type="button"
+          role="menuitem"
+          data-testid="workspace-create-new"
+          onClick={() => {
+            setCreating(true);
+            setError(null);
+          }}
+          disabled={switching !== null}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            width: '100%',
+            padding: '9px 10px',
+            border: 'none',
+            borderRadius: 8,
+            background: 'transparent',
+            color: 'var(--ink)',
+            fontWeight: 600,
+            cursor: switching ? 'wait' : 'pointer',
+            fontFamily: 'inherit',
+            fontSize: 13,
+            textAlign: 'left',
+          }}
+        >
+          <PlusIcon size={12} />
+          <span>Create new workspace</span>
+        </button>
+      ) : (
+        <div style={createWrapStyle}>
+          <label htmlFor="workspace-create-name" style={createLabelStyle}>
+            Create new workspace
+          </label>
+          <input
+            ref={inputRef}
+            id="workspace-create-name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void handleCreate();
+              }
+            }}
+            placeholder="Workspace name"
+            data-testid="workspace-create-input"
+            style={createInputStyle}
+          />
+          <div style={createActionsStyle}>
+            <button
+              type="button"
+              onClick={() => {
+                setCreating(false);
+                setNewName('');
+                setError(null);
+              }}
+              style={secondaryActionStyle}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => { void handleCreate(); }}
+              disabled={!newName.trim() || switching !== null}
+              style={primaryActionStyle(!newName.trim() || switching !== null)}
+            >
+              {switching === 'new' ? 'Creating…' : 'Create'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div
           role="alert"
@@ -271,7 +391,10 @@ export function WorkspaceIdentityBlock() {
   const workspaceName = data?.active_workspace?.name?.trim() || 'Workspace';
   const active = data?.active_workspace ?? null;
   const workspaces: SessionWorkspace[] = data?.workspaces ?? [];
-  const hasMultiple = workspaces.length > 1;
+  const menuWorkspaces =
+    active && !workspaces.some((workspace) => workspace.id === active.id)
+      ? [active, ...workspaces]
+      : workspaces;
 
   // Close on outside click
   useEffect(() => {
@@ -308,26 +431,6 @@ export function WorkspaceIdentityBlock() {
     },
   };
 
-  // Single workspace: plain link to settings
-  if (!hasMultiple) {
-    return (
-      <Link
-        to="/settings"
-        data-testid="workspace-identity-block"
-        title="Workspace settings"
-        style={{ ...chipStyle, textDecoration: 'none' }}
-        {...hoverHandlers}
-      >
-        <span style={eyebrowStyle}>Workspace</span>
-        <div style={nameRowStyle}>
-          <span style={nameStyle}>{workspaceName}</span>
-          <ChevronDown />
-        </div>
-      </Link>
-    );
-  }
-
-  // Multiple workspaces: dropdown switcher
   return (
     <div ref={rootRef} style={{ position: 'relative' }}>
       <button
@@ -348,10 +451,69 @@ export function WorkspaceIdentityBlock() {
       {open && active && (
         <SwitcherMenu
           active={active}
-          workspaces={workspaces}
+          workspaces={menuWorkspaces}
           onClose={() => setOpen(false)}
         />
       )}
     </div>
   );
+}
+
+const createWrapStyle: CSSProperties = {
+  padding: 8,
+  borderRadius: 8,
+  background: 'var(--bg)',
+};
+
+const createLabelStyle: CSSProperties = {
+  display: 'block',
+  marginBottom: 6,
+  fontSize: 11,
+  fontWeight: 700,
+  color: 'var(--muted)',
+};
+
+const createInputStyle: CSSProperties = {
+  width: '100%',
+  border: '1px solid var(--line)',
+  borderRadius: 8,
+  padding: '8px 9px',
+  fontSize: 13,
+  color: 'var(--ink)',
+  background: 'var(--card)',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+const createActionsStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 6,
+  marginTop: 8,
+};
+
+const secondaryActionStyle: CSSProperties = {
+  border: '1px solid var(--line)',
+  borderRadius: 7,
+  padding: '6px 9px',
+  background: 'var(--card)',
+  color: 'var(--muted)',
+  fontSize: 12,
+  fontWeight: 600,
+  fontFamily: 'inherit',
+};
+
+function primaryActionStyle(disabled: boolean): CSSProperties {
+  return {
+    border: '1px solid var(--ink)',
+    borderRadius: 7,
+    padding: '6px 9px',
+    background: 'var(--ink)',
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 700,
+    fontFamily: 'inherit',
+    opacity: disabled ? 0.5 : 1,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+  };
 }
