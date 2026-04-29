@@ -1,6 +1,6 @@
-# MCP Read/Run Tools
+# MCP Tools
 
-Phase 2B adds an agent-token MCP server at `POST /mcp`. When the request uses `Authorization: Bearer floom_agent_<token>`, `tools/list` exposes these read/run tools instead of the legacy unauthenticated admin toolset.
+Floom exposes a headless MCP server at `POST /mcp`. When the request uses `Authorization: Bearer floom_agent_<token>`, `tools/list` exposes tools according to the token scope.
 
 All examples use Streamable HTTP JSON-RPC:
 
@@ -15,10 +15,12 @@ curl -sS https://floom.dev/mcp \
 ## Scope Rules
 
 - `read`: discovery, app skill reads, run reads, run history, and running `public_live` apps.
-- `read-write`: all `read` access plus running apps owned by the token user, including private apps.
-- `publish-only`: run history listing only in Phase 2B. Read and run tools return `forbidden_scope`.
+- `read-write`: all `read` access plus running apps owned by the token user, Studio app management, workspace secrets, and JSON profile context.
+- `publish-only`: Studio publish/update/delete/sharing/rate-limit/secret-policy tools without run tools.
 
 `public_live` means `status=active`, `visibility=public`, and `publish_status=published`. Private or auth-required apps are visible to the token user only when the app is owned by that user.
+
+Agent tokens cannot create, list, or revoke other Agent tokens. Token governance requires a browser user session and returns `session_required` for Agent-token auth.
 
 ## `discover_apps`
 
@@ -181,6 +183,39 @@ curl -sS 'https://floom.dev/api/agents/runs?slug=lead-scorer&limit=20' \
   -H 'authorization: Bearer floom_agent_<token>'
 ```
 
+## Studio and Account Tools
+
+`read-write` and `publish-only` tokens expose Studio tools such as:
+
+- `studio_publish_app`
+- `studio_update_app`
+- `studio_delete_app`
+- `studio_get_app_sharing`
+- `studio_set_app_sharing`
+- `studio_submit_app_review`
+- `studio_withdraw_app_review`
+- `studio_get_app_rate_limit`
+- `studio_set_app_rate_limit`
+- `studio_list_secret_policies`
+- `studio_set_secret_policy`
+- `studio_set_creator_secret`
+- `studio_delete_creator_secret`
+
+`read-write` tokens also expose account tools:
+
+- `account_set_secret`
+- `account_list_secrets`
+- `account_delete_secret`
+- `account_set_user_context`
+- `account_set_workspace_context`
+- `account_get_context`
+
+Sharing states are deterministic for owner transitions between `private`, `link`, and `invited`. Store review submission is idempotent while an app is already `pending_review`; withdrawing a review is valid only from `pending_review` and otherwise returns `409 illegal_transition`.
+
+Pending-review, private, link-shared, and invited apps are not installable from the public Store install endpoint. That path returns `409 app_not_installable`; owners can still manage the app in Studio.
+
+App secret policy keys use the declared OpenAPI `securitySchemes` key, for example `ApiKeyAuth`, not the header name such as `X-API-Key`.
+
 ## Error Types
 
 REST endpoints return HTTP status plus:
@@ -198,9 +233,7 @@ Error codes:
 - `not_found` (`404`)
 - `not_accessible` (`403`)
 - `invalid_input` (`400`)
+- `app_not_installable` (`409`)
+- `illegal_transition` (`409`)
 - `rate_limit_exceeded` (`429`)
 - `runtime_error` (`500`)
-
-## Deferred To Phase 2D
-
-Write tools are not part of Phase 2B. `create_app`, `publish_app`, visibility updates, secret writes, delete, and token rotation remain deferred to Phase 2D.

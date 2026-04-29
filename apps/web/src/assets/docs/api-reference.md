@@ -105,6 +105,7 @@ POST /api/me/agent-keys/:id/revoke
 ```
 
 Profile context stores JSON for user and workspace profiles. Secrets are encrypted and write-only.
+Agent-token key management requires a browser user session; Agent-token auth receives `401 session_required` for create/list/revoke.
 
 ## Studio app management
 
@@ -114,6 +115,8 @@ DELETE /api/hub/:slug
 
 GET /api/me/apps/:slug/sharing
 PATCH /api/me/apps/:slug/sharing
+POST /api/me/apps/:slug/sharing/submit-review
+POST /api/me/apps/:slug/sharing/withdraw-review
 GET /api/me/apps/:slug/rate-limit
 PATCH /api/me/apps/:slug/rate-limit
 GET /api/me/apps/:slug/secret-policies

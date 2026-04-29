@@ -80,6 +80,7 @@ floom account agent-tokens revoke <token-id>
 ```
 
 Secret values are write-only. List commands return metadata, not plaintext.
+Agent-token management requires a browser user session; Agent-token auth cannot mint or revoke more Agent tokens and returns `session_required`.
 
 ## Apps, runs, jobs
 
@@ -90,6 +91,11 @@ floom apps update <slug> --visibility private
 floom apps update <slug> --primary-action run
 floom apps update <slug> --run-rate-limit-per-hour 120
 floom apps sharing get <slug>
+floom apps sharing set <slug> --state link
+floom apps sharing set <slug> --state private
+floom apps sharing set <slug> --state invited
+floom apps sharing submit-review <slug>
+floom apps sharing withdraw-review <slug>
 floom apps rate-limit set <slug> --per-hour 120
 
 floom runs list
@@ -101,6 +107,8 @@ floom jobs create <slug> '{"input":"hello"}'
 floom jobs get <slug> <job-id>
 floom jobs cancel <slug> <job-id>
 ```
+
+Pending-review, private, link-shared, and invited apps return `409 app_not_installable` from Store install commands. Owners manage those apps through Studio commands.
 
 ## CI
 
