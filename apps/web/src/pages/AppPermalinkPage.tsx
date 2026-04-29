@@ -32,7 +32,7 @@ import { ShareModal } from '../components/share/ShareModal';
 import {
   ClaudeSkillModal,
   ClaudeSkillIcon,
-} from '../components/share/ClaudeSkillModal';
+} from '../components/share/SkillModal';
 import { getApp, getAppReviews, getRun, shareRun, ApiError } from '../api/client';
 import { useSession } from '../hooks/useSession';
 import type { ActionSpec, AppDetail, ReviewSummary, RunRecord } from '../lib/types';
@@ -66,11 +66,10 @@ const GITHUB_REPOS: Record<string, string> = {
   'ig-nano-scout': 'https://github.com/floomhq/floom/tree/main/examples/ig-nano-scout',
 };
 
-// R37 (2026-04-29): competitor-lens, ai-readiness-audit, pitch-coach were
-// removed. They now run as proxy-runtime Python sidecars via
-// launch-week-sidecars.ts. The /p/:slug page renders the real RunSurface.
-// Keeping the Set empty so the guard below is a no-op for these three slugs.
-const DOCKER_RUNTIME_COMING_SOON_SLUGS = new Set<string>([]);
+// R37 (2026-04-29): competitor-lens, ai-readiness-audit, pitch-coach now run
+// as proxy-runtime Python sidecars via launch-week-sidecars.ts. The
+// docker-runtime "coming soon" gate was removed entirely; /p/:slug renders
+// the real RunSurface for these three slugs.
 
 // v23 PR-D (2026-04-26): per-slug hero subhead override for the 3 launch
 // demos. The wireframe ships a sales-tone one-liner that explains what the

@@ -41,7 +41,6 @@ const MeAgentKeysPage = lazy(() => import('./pages/MeAgentKeysPage').then(m => (
 // exports (AppHeader, TabBar) used by the Studio pages; the routes that
 // mounted them directly now redirect into /studio/*.
 const MeAppRunPage = lazy(() => import('./pages/MeAppRunPage').then(m => ({ default: m.MeAppRunPage })));
-const MeAppTriggersPage = lazy(() => import('./pages/MeAppTriggersPage').then(m => ({ default: m.MeAppTriggersPage })));
 const MeAppTriggerSchedulePage = lazy(() => import('./pages/MeAppTriggerSchedulePage').then(m => ({ default: m.MeAppTriggerSchedulePage })));
 const MeAppTriggerWebhookPage = lazy(() => import('./pages/MeAppTriggerWebhookPage').then(m => ({ default: m.MeAppTriggerWebhookPage })));
 const MeInstallPage = lazy(() => import('./pages/MeInstallPage').then(m => ({ default: m.MeInstallPage })));
@@ -96,7 +95,6 @@ const StudioAppRendererPage = lazy(() => import('./pages/StudioAppRendererPage')
 const StudioAppAnalyticsPage = lazy(() => import('./pages/StudioAppAnalyticsPage').then(m => ({ default: m.StudioAppAnalyticsPage })));
 const StudioAppFeedbackPage = lazy(() => import('./pages/StudioAppFeedbackPage').then(m => ({ default: m.StudioAppFeedbackPage })));
 const StudioTriggersTab = lazy(() => import('./pages/StudioTriggersTab').then(m => ({ default: m.StudioTriggersTab })));
-const StudioSettingsPage = lazy(() => import('./pages/StudioSettingsPage').then(m => ({ default: m.StudioSettingsPage })));
 const ImprintPage = lazy(() => import('./pages/ImprintPage').then(m => ({ default: m.ImprintPage })));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
 const TermsPage = lazy(() => import('./pages/TermsPage').then(m => ({ default: m.TermsPage })));

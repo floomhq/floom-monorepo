@@ -246,7 +246,7 @@ function JsonBlock({ value }: { value: unknown }) {
   );
 }
 
-function StatusPill({ status }: { status: string }) {
+export function StatusPill({ status }: { status: string }) {
   const colors: Record<string, { bg: string; fg: string }> = {
     success: { bg: '#e6f4ea', fg: '#1a7f37' },
     error: { bg: '#fdecea', fg: '#c2321f' },

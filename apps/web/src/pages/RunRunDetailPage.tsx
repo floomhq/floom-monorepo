@@ -15,7 +15,7 @@ import { Link, useParams } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { AppIcon } from '../components/AppIcon';
 import { buildRerunHref, formatDuration } from '../components/me/runPreview';
-import { StatusPill } from './MeRunsPage';
+import { StatusPill } from './MeRunDetailPage';
 import * as api from '../api/client';
 import type { MeRunDetail, RunStatus } from '../lib/types';
 import { formatTime } from '../lib/time';

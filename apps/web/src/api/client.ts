@@ -1152,25 +1152,9 @@ export function deleteSecret(key: string): Promise<{ ok: true; removed: boolean 
 
 // ---------- workspace secrets (BYOK) ----------
 //
-// Workspace-scoped provider credentials. Values are write-only: the list
-// endpoint returns key names + metadata but never the plaintext value.
-
-export function listWorkspaceSecrets(workspaceId: string): Promise<UserSecretsList> {
-  return request<UserSecretsList>(`/api/workspaces/${encodeURIComponent(workspaceId)}/secrets`, {
-    method: 'GET',
-  });
-}
-
-export function setWorkspaceSecret(
-  workspaceId: string,
-  key: string,
-  value: string,
-): Promise<{ ok: true; key: string }> {
-  return request(`/api/workspaces/${encodeURIComponent(workspaceId)}/secrets`, {
-    method: 'POST',
-    body: JSON.stringify({ key, value }),
-  });
-}
+// Workspace-scoped provider credentials (listWorkspaceSecrets, setWorkspaceSecret
+// declared above interleaved with single-secret variants). Values are write-only:
+// the list endpoint returns key names + metadata but never the plaintext value.
 
 export function deleteWorkspaceSecret(
   workspaceId: string,
@@ -1309,63 +1293,6 @@ export function postFeedback(body: { text: string; email?: string; url?: string 
     method: 'POST',
     body: JSON.stringify(body),
   });
-}
-
-// ---------- Layer 5: workspace Agent tokens ----------
-//
-// Agent tokens are workspace credentials. The token value is returned once
-// on create as `raw_token`; list responses only include the masked prefix and
-// audit metadata.
-
-export type AgentTokenScope = 'read' | 'read-write' | 'publish-only';
-
-export interface AgentTokenRecord {
-  id: string;
-  prefix: string | null;
-  label: string;
-  scope: AgentTokenScope;
-  workspace_id: string;
-  issued_by_user_id: string | null;
-  created_at: string;
-  last_used_at: string | null;
-  revoked: boolean;
-}
-
-export interface CreatedAgentToken extends AgentTokenRecord {
-  raw_token: string;
-}
-
-export async function listWorkspaceAgentTokens(workspaceId: string): Promise<AgentTokenRecord[]> {
-  return request<AgentTokenRecord[]>(
-    `/api/workspaces/${encodeURIComponent(workspaceId)}/agent-tokens`,
-  );
-}
-
-export function createWorkspaceAgentToken(
-  workspaceId: string,
-  body: {
-    label: string;
-    scope: AgentTokenScope;
-    rate_limit_per_minute?: number;
-  },
-): Promise<CreatedAgentToken> {
-  return request<CreatedAgentToken>(
-    `/api/workspaces/${encodeURIComponent(workspaceId)}/agent-tokens`,
-    {
-      method: 'POST',
-      body: JSON.stringify(body),
-    },
-  );
-}
-
-export function revokeWorkspaceAgentToken(
-  workspaceId: string,
-  tokenId: string,
-): Promise<void> {
-  return request<void>(
-    `/api/workspaces/${encodeURIComponent(workspaceId)}/agent-tokens/${encodeURIComponent(tokenId)}/revoke`,
-    { method: 'POST' },
-  );
 }
 
 // ---------- Legacy Better Auth access tokens ----------

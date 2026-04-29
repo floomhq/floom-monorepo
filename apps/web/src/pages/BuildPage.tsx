@@ -333,7 +333,7 @@ export function BuildPage({ postPublishHref, layout: Layout = PageShell }: Build
         }
         // Any other ingest failure (e.g. slug collision): surface as sample error.
         setSampleError(e.message || 'Could not register app for sample run.');
-        setStep('preview');
+        setStep('detected');
         return;
       }
       const { run_id } = await api.startRun(slug, sampleInputs, undefined, sampleAction.name);
