@@ -11,12 +11,12 @@
  *
  * Source of truth for the heuristics: `/tmp/analyze_repos_v3.py`.
  */
-import type { Runtime } from './types.ts';
-import { detectPnpm } from './pnpm-detect.ts';
-import { detectUv } from './uv-detect.ts';
-import { detectSrcLayout } from './src-layout.ts';
-import { detectPhpExtensions } from './php-ext.ts';
-import { detectWorkdir, type FileEntry } from './workdir.ts';
+import type { Runtime } from './types.js';
+import { detectPnpm } from './pnpm-detect.js';
+import { detectUv } from './uv-detect.js';
+import { detectSrcLayout } from './src-layout.js';
+import { detectPhpExtensions } from './php-ext.js';
+import { detectWorkdir, type FileEntry } from './workdir.js';
 
 export interface RepoSnapshot {
   /** owner/name — informational only. */

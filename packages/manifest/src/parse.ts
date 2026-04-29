@@ -7,13 +7,13 @@
  * list to ship back to the user verbatim (H6 Scenario 2).
  */
 import { parse as parseYaml } from 'yaml';
-import type { Manifest, Input, InputType, Output, OutputType } from './schema.ts';
+import type { Manifest, Input, InputType, Output, OutputType } from './schema.js';
 import {
   ALLOWED_RUNTIMES,
   ALLOWED_INPUT_TYPES,
   ALLOWED_OUTPUT_TYPES,
   REQUIRED_FIELDS,
-} from './schema.ts';
+} from './schema.js';
 
 const MAX_ALLOWED_DOMAINS = 20;
 

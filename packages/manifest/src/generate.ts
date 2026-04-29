@@ -6,7 +6,7 @@
  * as a YAML string with `?` comments on the uncertain fields — this is the
  * H6 Scenario 2 convention.
  */
-import type { Manifest } from './schema.ts';
+import type { Manifest } from './schema.js';
 import { detect } from '@floom/detect';
 import type { RepoSnapshot, DetectResult } from '@floom/detect';
 

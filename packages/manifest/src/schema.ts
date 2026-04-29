@@ -5,9 +5,9 @@
  * The schema intentionally re-exports the Manifest type from the runtime
  * module so there is ONE definition of what a manifest looks like.
  */
-import type { Runtime } from './types.ts';
+import type { Runtime } from './types.js';
 
-export type { Manifest, Input, InputType, Output, OutputType, Runtime } from './types.ts';
+export type { Manifest, Input, InputType, Output, OutputType, Runtime } from './types.js';
 
 export const ALLOWED_RUNTIMES: Runtime[] = [
   'python3.12',

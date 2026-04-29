@@ -21,8 +21,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import type { Manifest } from '../runtime/types.ts';
-import { logger } from '../lib/logger.ts';
+import type { Manifest } from '../runtime/types.js';
+import { logger } from '../lib/logger.js';
 import type {
   BuildOptions,
   BuiltArtifact,
@@ -33,7 +33,7 @@ import type {
   RunningInstance,
   RuntimeProvider,
   SmokeResult,
-} from './types.ts';
+} from './types.js';
 
 const CLONE_ROOT_ENV = 'FLOOM_DEPLOY_CLONE_ROOT';
 const CLONE_TIMEOUT_MS = 120_000;
@@ -41,6 +41,22 @@ const DEFAULT_BUILD_TIMEOUT_MS = 600_000;
 const DEFAULT_CONTAINER_PORT = 8080;
 const DEFAULT_MEMORY_MB = 512;
 const DEFAULT_CPUS = 1;
+
+/**
+ * Sandbox hardening:
+ *   no-new-privileges — blocks setuid escalation inside container.
+ *   CapDrop ALL        — user apps are HTTP handlers; they need zero capabilities.
+ *   ReadonlyRootfs     — root FS is read-only.
+ *   Tmpfs /tmp         — writable scratch space (64MB, noexec).
+ *   PidsLimit 256      — fork-bomb protection.
+ */
+export const DOCKER_HARDENING_ARGS = [
+  '--security-opt', 'no-new-privileges:true',
+  '--cap-drop', 'ALL',
+  '--read-only',
+  '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m',
+  '--pids-limit', '256',
+];
 
 interface SpawnResult {
   exitCode: number;
@@ -241,9 +257,12 @@ export class Ax41DockerProvider implements RuntimeProvider {
     const workDir = await mkdtemp(path.join(this.cloneRoot, 'floom-clone-'));
     const repoDir = path.join(workDir, repo.name);
 
-    const cloneUrl = token
-      ? `https://${token}@github.com/${repo.owner}/${repo.name}.git`
-      : `https://github.com/${repo.owner}/${repo.name}.git`;
+    const template = process.env.FLOOM_GITHUB_CLONE_URL_TEMPLATE;
+    const cloneUrl = template
+      ? template.replaceAll('{owner}', repo.owner).replaceAll('{repo}', repo.name).replaceAll('{token}', token || '')
+      : (token
+          ? `https://${token}@github.com/${repo.owner}/${repo.name}.git`
+          : `https://github.com/${repo.owner}/${repo.name}.git`);
 
     const args = ['clone', '--depth', '1'];
     if (ref) args.push('--branch', ref);
@@ -387,6 +406,7 @@ export class Ax41DockerProvider implements RuntimeProvider {
       `${memMb}m`,
       '--cpus',
       String(cpus),
+      ...DOCKER_HARDENING_ARGS,
       ...envToDockerArgs(opts.env ?? {}),
       artifact.id,
     ];

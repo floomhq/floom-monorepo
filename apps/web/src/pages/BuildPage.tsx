@@ -48,6 +48,7 @@ import {
   parseGithubRepoRef,
 } from '../lib/githubUrl';
 import { markJustPublished } from '../lib/onboarding';
+import { StreamingTerminal } from '../components/runner/StreamingTerminal';
 
 // Federico-locked launch roster. Each starter pre-fills the input
 // with a known-good detection target. `meta` is purely descriptive
@@ -140,6 +141,14 @@ export function BuildPage({ postPublishHref, layout: Layout = PageShell }: Build
   const [conflictSlug, setConflictSlug] = useState('');
   const [hasTestRun, setHasTestRun] = useState(false);
 
+  // v23.2 Repo-to-Hosted states
+  const [deploymentId, setDeploymentId] = useState<string | null>(null);
+  const [deployLogs, setDeployLogs] = useState<string[]>([]);
+  // User-controlled override of the auto-detected pipeline (hosted vs proxy).
+  const [pipelineOverride, setPipelineOverride] = useState<'hosted' | 'proxy' | null>(null);
+  // Ref holding the EventSource cleanup fn so we can cancel on unmount or re-deploy.
+  const deployStreamCleanupRef = useRef<(() => void) | null>(null);
+
   // Recovery (paste URL / paste spec / ask Claude) — kept as fallback
   // for non-private-repo failures (unreachable, bad-spec, no-openapi,
   // repo-not-found). Same UI as the previous <RecoverStep>.
@@ -154,6 +163,15 @@ export function BuildPage({ postPublishHref, layout: Layout = PageShell }: Build
   const [patValue, setPatValue] = useState('');
 
   const autoDetectedRef = useRef(false);
+
+  // Cancel the SSE stream whenever deploymentId changes (re-deploy) or on unmount.
+  useEffect(() => {
+    return () => {
+      deployStreamCleanupRef.current?.();
+      deployStreamCleanupRef.current = null;
+    };
+  }, [deploymentId]);
+
   useEffect(() => {
     if (editSlug) return;
     if (autoDetectedRef.current) return;
@@ -424,6 +442,41 @@ export function BuildPage({ postPublishHref, layout: Layout = PageShell }: Build
     });
 
     try {
+      const effectivePipeline = pipelineOverride ?? detected.suggested_pipeline;
+      if (effectivePipeline === 'hosted') {
+        const result = await api.deployRepo({
+          repo_url: detected.openapi_spec_url,
+          name,
+          slug,
+          description,
+          category: category || undefined,
+          visibility,
+        });
+        setDeploymentId(result.deployment_id);
+        const cleanup = api.streamDeployLogs(result.deployment_id, {
+          onLog: (line) => setDeployLogs((prev) => [...prev, line]),
+          onDone: () => {
+            setPublishFeed((prev) => [
+              ...prev,
+              {
+                id: 'deploy-ok',
+                label: 'deployment successful · live',
+                status: 'ok',
+                ts: Math.round(performance.now() - startedAt),
+              },
+            ]);
+            markJustPublished(slug);
+            setStep('done');
+          },
+          onError: (err) => {
+            setPublishError(err.message || 'Deployment stream failed.');
+            setStep('previewed');
+          },
+        });
+        deployStreamCleanupRef.current = cleanup;
+        return;
+      }
+
       await api.ingestApp({
         openapi_url: detected.openapi_spec_url,
         name,
@@ -629,8 +682,15 @@ export function BuildPage({ postPublishHref, layout: Layout = PageShell }: Build
         )}
 
         {step === 'detected' && detected && (
-          <DetectedStep
+        <DetectedStep
             detected={detected}
+            pipelineOverride={pipelineOverride}
+            onPipelineToggle={() =>
+              setPipelineOverride((prev) => {
+                const current = prev ?? detected.suggested_pipeline;
+                return current === 'hosted' ? 'proxy' : 'hosted';
+              })
+            }
             url={url}
             name={name}
             setName={setName}
@@ -668,7 +728,14 @@ export function BuildPage({ postPublishHref, layout: Layout = PageShell }: Build
         )}
 
         {step === 'publishing' && (
-          <PublishingStep visibility={visibility} feed={publishFeed} slug={slug} />
+          <PublishingStep
+            visibility={visibility}
+            feed={publishFeed}
+            slug={slug}
+            deploymentId={deploymentId}
+            deployLogs={deployLogs}
+            detected={detected}
+          />
         )}
 
         {step === 'done' && (
@@ -1058,6 +1125,8 @@ function DetectedStep({
   sampleError,
   onRunSample,
   onChangeRepo,
+  pipelineOverride,
+  onPipelineToggle,
 }: {
   detected: DetectedApp;
   url: string;
@@ -1076,9 +1145,12 @@ function DetectedStep({
   sampleError: string | null;
   onRunSample: () => void;
   onChangeRepo: () => void;
+  pipelineOverride: 'hosted' | 'proxy' | null;
+  onPipelineToggle: () => void;
 }) {
   const repoLabel = useMemo(() => shortUrl(url || detected.openapi_spec_url || ''), [url, detected]);
   const ops = (detected.actions as Action[]) ?? [];
+  const effectivePipeline = pipelineOverride ?? detected.suggested_pipeline;
   return (
     <div data-testid="build-step-detected" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div className="repo-bar" data-testid="detected-repo-bar">
@@ -1096,6 +1168,47 @@ function DetectedStep({
           Change →
         </button>
       </div>
+
+      {effectivePipeline && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '10px 14px',
+            background: 'var(--card)',
+            border: '1px solid var(--line)',
+            borderRadius: 12,
+            fontSize: 13,
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, color: 'var(--ink)' }}>
+              {effectivePipeline === 'hosted' ? '🚀 Hosted Deployment' : '🔗 Proxy API'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              {effectivePipeline === 'hosted'
+                ? 'We detected a Dockerfile or floom.yaml. We will build and host this repo for you.'
+                : 'No build config found. We will proxy your existing API endpoint.'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onPipelineToggle}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 6,
+              border: '1px solid var(--line)',
+              background: 'var(--bg)',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Switch to {effectivePipeline === 'hosted' ? 'Proxy' : 'Hosted'}
+          </button>
+        </div>
+      )}
 
       <section className="detect-card" data-testid="detected-card">
         <h2>
@@ -1591,13 +1704,40 @@ function PublishingStep({
   visibility,
   feed,
   slug,
+  deploymentId,
+  deployLogs,
+  detected,
 }: {
   visibility: Visibility;
   feed: ProgressLine[];
   slug: string;
+  deploymentId: string | null;
+  deployLogs: string[];
+  detected: DetectedApp | null;
 }) {
   const elapsedMs = feed.length > 0 ? feed[feed.length - 1].ts ?? 0 : 0;
   const last = feed[feed.length - 1];
+
+  if (deploymentId && detected) {
+    return (
+      <div data-testid="build-step-publishing" style={{ paddingBottom: 60 }}>
+        <StreamingTerminal
+          app={{
+            slug: slug,
+            name: detected.name,
+            description: detected.description,
+            category: detected.category,
+            icon: null,
+            confidence: 1,
+          }}
+          lines={deployLogs}
+        />
+        <p style={{ marginTop: 24, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+          Publishing as <strong>{visibility}</strong> app&hellip;
+        </p>
+      </div>
+    );
+  }
   const headline = last?.label ?? 'Queueing build…';
   // Build sub-step state derived from progress feed.
   const subSteps = [

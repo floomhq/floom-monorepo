@@ -301,6 +301,56 @@ export function shareRun(runId: string): Promise<ShareRunResponse> {
   });
 }
 
+export function deployRepo(body: {
+  repo_url: string;
+  name?: string;
+  slug?: string;
+  description?: string;
+  category?: string;
+  visibility?: string;
+}): Promise<{ deployment_id: string; app_id: string; slug: string }> {
+  return request<{ deployment_id: string; app_id: string; slug: string }>(
+    '/api/deploy/deploy-github',
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export interface DeployStreamHandlers {
+  onLog?: (line: string) => void;
+  onDone?: (id: string) => void;
+  onError?: (err: Error) => void;
+}
+
+export function streamDeployLogs(deploymentId: string, handlers: DeployStreamHandlers): () => void {
+  const es = new EventSource(`/api/deploy/${deploymentId}/logs`);
+  let closed = false;
+
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    es.close();
+  };
+
+  es.onmessage = (evt) => {
+    if (evt.data === '[DONE]') {
+      handlers.onDone?.(deploymentId);
+      close();
+      return;
+    }
+    handlers.onLog?.(evt.data);
+  };
+
+  es.onerror = () => {
+    handlers.onError?.(new Error('Stream disconnected'));
+    close();
+  };
+
+  return close;
+}
+
 export type InvitePermission = 'run' | 'view';
 
 export interface InviteRequest {

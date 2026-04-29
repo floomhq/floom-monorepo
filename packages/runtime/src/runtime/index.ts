@@ -18,7 +18,7 @@ export type {
   OutputType,
   Runtime,
   DeployResult,
-} from './types.ts';
+} from './types.js';
 
 export type {
   RuntimeProvider,
@@ -32,10 +32,11 @@ export type {
   HealthProbe,
   SmokeResult,
   ResourceLimits,
-} from '../provider/types.ts';
+} from '../provider/types.js';
 
-export { Ax41DockerProvider } from '../provider/ax41-docker.ts';
-export { deployFromGithub } from '../deploy/pipeline.ts';
-export type { DeployOptions } from '../deploy/pipeline.ts';
-export { buildRegistryEntry, serializeRegistryEntry } from '../deploy/register.ts';
-export type { RegistryEntry } from '../deploy/register.ts';
+export { Ax41DockerProvider } from '../provider/ax41-docker.js';
+export { getDefaultProvider } from '../provider/factory.js';
+export { deployFromGithub } from '../deploy/pipeline.js';
+export type { DeployOptions } from '../deploy/pipeline.js';
+export { buildRegistryEntry, serializeRegistryEntry } from '../deploy/register.js';
+export type { RegistryEntry } from '../deploy/register.js';
