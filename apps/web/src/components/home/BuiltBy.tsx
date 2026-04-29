@@ -66,7 +66,7 @@ export function BuiltBy() {
         }}
       >
         <p style={{ margin: 0, fontSize: 15, color: 'var(--muted)', lineHeight: 1.55 }}>
-          Built in SF by{' '}
+          Built in Hamburg + SF by{' '}
           <a
             href="https://github.com/federicodeponte"
             target="_blank"
