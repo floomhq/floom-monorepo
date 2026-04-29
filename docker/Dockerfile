@@ -58,6 +58,11 @@ COPY examples/pitch-coach ./examples/pitch-coach
 COPY examples/lead-scorer ./examples/lead-scorer
 COPY examples/competitor-analyzer ./examples/competitor-analyzer
 COPY examples/resume-screener ./examples/resume-screener
+# Composio demo apps: inbox-summarizer and slack-poster. Consumed at boot by
+# services/launch-demos.ts (same pipeline as the other showcase apps).
+# Gated to feat/composio-runtime; not yet on main.
+COPY examples/composio-demos/inbox-summarizer ./examples/composio-demos/inbox-summarizer
+COPY examples/composio-demos/slack-poster ./examples/composio-demos/slack-poster
 
 # Re-run pnpm install to re-link workspace packages after the source COPY.
 # pnpm 9 has a symlink quirk where workspace package symlinks created by the
@@ -168,6 +173,10 @@ COPY --from=builder /app/examples/pitch-coach ./examples/pitch-coach
 COPY --from=builder /app/examples/lead-scorer ./examples/lead-scorer
 COPY --from=builder /app/examples/competitor-analyzer ./examples/competitor-analyzer
 COPY --from=builder /app/examples/resume-screener ./examples/resume-screener
+
+# Composio demo apps (feat/composio-runtime). Gated; not on main yet.
+COPY --from=builder /app/examples/composio-demos/inbox-summarizer ./examples/composio-demos/inbox-summarizer
+COPY --from=builder /app/examples/composio-demos/slack-poster ./examples/composio-demos/slack-poster
 
 WORKDIR /app/apps/server
 
