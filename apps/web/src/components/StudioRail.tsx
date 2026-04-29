@@ -12,11 +12,9 @@
  *         footer
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { LayoutGrid, Play } from 'lucide-react';
-import { AppIcon } from './AppIcon';
 import { WorkspaceIdentityBlock } from './WorkspaceIdentityBlock';
 import { ModeToggle } from './ModeToggle';
 import {
@@ -53,15 +51,6 @@ export function StudioRail() {
     };
   }, []);
 
-  const visibleApps = useMemo(() => {
-    const source = apps ?? [];
-    if (!activeSlug) return source.slice(0, 5);
-    const top = source.slice(0, 5);
-    if (top.some((app) => app.slug === activeSlug)) return top;
-    const active = source.find((app) => app.slug === activeSlug);
-    return active ? [...top, active] : top;
-  }, [activeSlug, apps]);
-
   return (
     <aside data-testid="studio-rail" aria-label="Studio navigation" style={railStyle}>
       {/* v26 §12.1: no brand here — TopBar carries the floom logo */}
@@ -92,64 +81,8 @@ export function StudioRail() {
         >
           Runs
         </RailItem>
-
-        {/* Per-app quick links (active app shortcuts) */}
-        {visibleApps.length > 0 && (
-          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {visibleApps.map((app) => (
-              <Link
-                key={app.slug}
-                to={`/studio/${app.slug}`}
-                aria-current={app.slug === activeSlug ? 'page' : undefined}
-                style={appItemStyle(app.slug === activeSlug)}
-              >
-                <span style={appIconStyle}>
-                  <AppIcon slug={app.slug} size={13} />
-                </span>
-                <span style={appNameStyle}>{app.name}</span>
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
       <RailFoot />
     </aside>
   );
 }
-
-function appItemStyle(active: boolean): CSSProperties {
-  return {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 9,
-    padding: '8px 10px',
-    borderRadius: 8,
-    textDecoration: 'none',
-    color: active ? 'var(--ink)' : 'var(--muted)',
-    background: active ? 'var(--card)' : 'transparent',
-    border: '1px solid transparent',
-    boxShadow: active ? 'var(--shadow-1)' : undefined,
-    fontSize: 13,
-    fontWeight: active ? 600 : 500,
-  };
-}
-
-const appIconStyle: CSSProperties = {
-  width: 22,
-  height: 22,
-  borderRadius: 6,
-  background: 'var(--card)',
-  border: '1px solid var(--line)',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexShrink: 0,
-};
-
-const appNameStyle: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
