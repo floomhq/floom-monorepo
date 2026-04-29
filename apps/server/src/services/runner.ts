@@ -19,6 +19,33 @@ import type {
 } from '../types.js';
 
 /**
+ * Scrub file-system paths, process.env references, and internal hostnames
+ * from a string before it surfaces in user-visible run logs or error fields.
+ *
+ * What we strip:
+ *   - Absolute Unix paths: /root/…, /app/…, /home/…, /proc/…, /var/…, /tmp/…
+ *   - Windows-style absolute paths: C:\…, D:\…
+ *   - "process.env" mentions (would expose env var names)
+ *   - Docker-internal hostnames: *.internal, *.docker.internal, 172.x.x.x
+ *
+ * The output is still useful for debugging the error class and message — we
+ * only remove the structural details that would finger the server topology.
+ */
+export function scrubInfraDetails(raw: string): string {
+  if (!raw) return raw;
+  return raw
+    // Unix absolute paths like /root/floom/…, /app/server/…, /home/…
+    .replace(/\/(?:root|app|home|proc|var|tmp|usr|opt|etc)(?:\/[^\s"'`,);\]>]+)/g, '[path]')
+    // Windows absolute paths like C:\Users\…
+    .replace(/[A-Za-z]:\\[^\s"'`,);\]>]*/g, '[path]')
+    // process.env references
+    .replace(/process\.env\b[^\s"'`,);\]>]*/g, '[env]')
+    // Docker-internal / private network hostnames and RFC-1918 IPs
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[host]')
+    .replace(/\b[\w-]+\.(?:internal|docker\.internal|local)\b/g, '[host]');
+}
+
+/**
  * Default tenant context used when a dispatchRun caller (legacy route, test)
  * does not pass one. In OSS mode this always resolves to the synthetic local
  * workspace + user, so no caller has to branch on "is multi-tenant on yet".
@@ -429,9 +456,9 @@ async function runProxiedWorker(opts: {
     const e = err as Error;
     updateRun(opts.runId, {
       status: 'error',
-      error: e.message || 'Proxied runner crashed',
+      error: scrubInfraDetails(e.message || 'Proxied runner crashed'),
       error_type: 'floom_internal_error',
-      logs: e.stack || '',
+      logs: scrubInfraDetails(e.stack || ''),
       finished: true,
     });
   } finally {
@@ -567,9 +594,9 @@ async function runActionWorker(opts: {
     const mapped = classifyDockerRuntimeException(e);
     updateRun(opts.runId, {
       status: 'error',
-      error: mapped.error,
+      error: scrubInfraDetails(mapped.error),
       error_type: mapped.error_type,
-      logs: mapped.logs,
+      logs: scrubInfraDetails(mapped.logs),
       finished: true,
     });
     if (mapped.error_type === 'app_unavailable') {
