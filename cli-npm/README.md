@@ -29,12 +29,12 @@ floom auth login --token=<agent_token> --api-url=https://mvp.floom.dev
 floom auth <agent-token>     # save token non-interactively
 floom auth login --token=... # validate token, then save config non-interactively
 floom auth whoami            # print identity for current token
-floom run <slug> [json]      # run a Floom app by slug
-floom apps list              # list workspace apps
+floom run <slug> [json]      # run a Floom app by slug and wait for result
+floom apps list [--json]     # list workspace apps
 floom deploy                 # validate + publish current floom.yaml
 floom init                   # scaffold floom.yaml in current dir
-floom status                 # list apps and recent runs
-floom account                # manage workspace secrets and tokens
+floom status [--json]        # list apps and recent runs
+floom account                # manage secrets; agent-token commands need a browser session
 ```
 
 ## Configuration

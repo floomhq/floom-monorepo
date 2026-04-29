@@ -2,7 +2,7 @@
 
 Floom is [MIT-licensed](https://github.com/floomhq/floom/blob/main/LICENSE) and ships as a single Docker image. Run a full instance — web UI, MCP server, HTTP API — on any machine with Docker.
 
-The reference container image is `ghcr.io/floomhq/floom`. The live showcase instance lives at [docker.floom.dev](https://docker.floom.dev).
+The reference container image is `ghcr.io/floomhq/floom-monorepo`. The live showcase instance lives at [docker.floom.dev](https://docker.floom.dev).
 
 ## Quick start with Docker Compose
 
@@ -15,13 +15,13 @@ cp apps.yaml.example apps.yaml
 docker compose up -d
 ```
 
-Open `http://localhost:3000`. The web UI, MCP server, and HTTP API are all on that port.
+Open `http://localhost:3051`. The web UI, MCP server, and HTTP API are all on that port.
 
 Verify it's alive:
 
 ```bash
-curl http://localhost:3000/api/health
-curl http://localhost:3000/api/hub | jq 'length'
+curl http://localhost:3051/api/health
+curl http://localhost:3051/api/hub | jq 'length'
 ```
 
 ## Quick start with plain docker run
@@ -30,7 +30,7 @@ If you don't want to clone the repo, a single `docker run` works:
 
 ```bash
 docker run -d --name floom \
-  -p 3000:3000 \
+  -p 3051:3051 \
   -v floom_data:/data \
   -v "$(pwd)/apps.yaml:/app/config/apps.yaml:ro" \
   -e FLOOM_APPS_CONFIG=/app/config/apps.yaml \
@@ -47,7 +47,7 @@ Source: [`docker/docker-compose.yml`](https://github.com/floomhq/floom/blob/main
 
 | Variable | Default | What it does |
 |---|---|---|
-| `PORT` | `3000` | HTTP port inside the container. |
+| `PORT` | `3051` | HTTP port inside the container. |
 | `DATA_DIR` | `/data` | Where SQLite + per-app state live. Mount a volume here to persist across restarts. |
 | `PUBLIC_URL` | `http://localhost:$PORT` | URL the server advertises in MCP payloads. |
 | `FLOOM_APPS_CONFIG` | — | Path to an `apps.yaml` file. When set, Floom ingests it on boot. |
@@ -125,7 +125,7 @@ For private single-tenant deployments, set `FLOOM_AUTH_TOKEN` to a long random s
 
 ```bash
 docker run -d --name floom \
-  -p 3000:3000 \
+  -p 3051:3051 \
   -v floom_data:/data \
   -e FLOOM_AUTH_TOKEN="$(openssl rand -hex 32)" \
   ghcr.io/floomhq/floom-monorepo:latest

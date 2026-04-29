@@ -1,6 +1,6 @@
 # Floom CLI
 
-Deploy AI apps to Floom from any shell or agent.
+Deploy OpenAPI/proxied apps to Floom from any shell or agent.
 
 Built-in Claude Code + Cursor packages ship alongside. Works with Codex CLI, Aider, Continue, or any bash-capable agent.
 
@@ -44,48 +44,19 @@ floom auth logout                    clear saved auth
 
 floom account secrets list           list workspace secrets
 floom account secrets set <key> ...  set a workspace secret
-floom account agent-tokens list      list workspace Agent tokens
-floom account agent-tokens create    create a workspace Agent token
+floom account agent-tokens list      list Agent tokens (browser session required)
+floom account agent-tokens create    create Agent token (browser session required)
 
-floom apps list                      list your workspace apps
+floom apps list [--json]             list your workspace apps
 floom apps get <slug>                inspect one of your apps
 floom apps update <slug> ...         update app metadata and controls
 floom apps delete <slug>             delete an app
 
-floom store list                     browse public Store apps
-floom store search <query>           search public Store apps
-floom store get <slug>               inspect a public Store app
-
-floom runs list                      list recent runs
-floom runs get <run-id>              inspect a run
-floom runs share <run-id>            create a public run share link
-floom runs delete <run-id>           delete a run
-floom runs activity                  list recent Studio activity
-
-floom jobs create <slug>             start an async app job
-floom jobs get <slug> <job-id>       inspect an async job
-floom jobs cancel <slug> <job-id>    cancel an async job
-
-floom quota get <slug>               inspect app run quota
-
-floom triggers list                  list app triggers
-floom triggers create <slug> ...     create schedule or webhook triggers
-floom triggers update <trigger-id>   update a trigger
-floom triggers delete <trigger-id>   delete a trigger
-
-floom workspaces me                  inspect current workspace session
-floom workspaces create ...          create a workspace
-floom workspaces update <id> ...     update workspace metadata
-floom workspaces members ...         manage workspace members
-floom workspaces invites ...         manage workspace invites
-floom workspaces runs delete <id>    delete workspace runs
-
-floom feedback submit ...            submit product feedback
-floom run <slug> [inputs-json]       run a Floom app by slug
+floom run <slug> [inputs-json]       run a Floom app by slug and wait for result
 floom run <slug> --use-context       run with profile autofill enabled
 floom init                           scaffold a floom.yaml in the current directory
 floom deploy [--dry-run]             validate + publish the current app
-floom status                         list your apps and recent runs
+floom status [--json]                list your apps and recent runs
 floom --help                         show usage
 floom --version                      print version
 ```
@@ -140,6 +111,8 @@ floom deploy               # publish
 floom status               # see it listed
 ```
 
+`floom deploy` posts OpenAPI/proxied manifests to `/api/hub/ingest`. True repo-code hosting is not wired in this shell CLI path.
+
 ## Network allowlist
 
 Hosted Docker apps declare outbound access in `floom.yaml`:
@@ -171,6 +144,9 @@ cli/floom/
   lib/floom-deploy.sh    deploy subcommand
   lib/floom-status.sh    status subcommand
   lib/floom-auth.sh      auth subcommand
+  lib/floom-account.sh   account subcommand
+  lib/floom-apps.sh      apps subcommand
+  lib/floom-run.sh       run subcommand
   VERSION                semver
   install.sh             curl-installable bootstrapper
 ```

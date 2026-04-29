@@ -1,6 +1,6 @@
 # Floom CLI
 
-The Floom CLI scaffolds, validates, publishes, runs, and manages apps from the terminal.
+The Floom CLI scaffolds, validates, publishes OpenAPI/proxied apps, runs apps, and manages the app/account surfaces that are wired in the shell package.
 
 ## Install
 
@@ -49,13 +49,11 @@ floom run <slug> '{"input":"hello"}'
 floom run <slug> '{"invoice_id":"INV-1"}' --use-context
 ```
 
-`floom deploy` publishes one of these manifest sources:
+`floom deploy` publishes OpenAPI/proxied manifests through `/api/hub/ingest`:
 
-- `openapi_spec_url` or `openapi_url`
-- inline/file-backed `openapi_spec`
-- gated `docker_image_ref` when the target instance enables Docker publish
+- `openapi_spec_url` in `floom.yaml`
 
-Successful deploy output includes the app page, MCP URL, Studio owner URL, and Claude Desktop MCP JSON.
+Successful deploy output includes the app page, MCP URL, Studio owner URL, and Claude Desktop MCP JSON. Hosted repo-code publishing is not wired in this CLI path.
 
 ## Account context
 
@@ -82,33 +80,50 @@ floom account agent-tokens revoke <token-id>
 Secret values are write-only. List commands return metadata, not plaintext.
 Agent-token management requires a browser user session; Agent-token auth cannot mint or revoke more Agent tokens and returns `session_required`.
 
-## Apps, runs, jobs
+## Apps
 
 ```bash
 floom apps list
 floom apps get <slug>
+floom apps about <slug>
+floom apps installed
+floom apps fork <slug> --slug <new-slug>
+floom apps claim <slug>
+floom apps install <slug>
+floom apps uninstall <slug>
 floom apps update <slug> --visibility private
 floom apps update <slug> --primary-action run
 floom apps update <slug> --run-rate-limit-per-hour 120
+floom apps delete <slug>
+
 floom apps sharing get <slug>
 floom apps sharing set <slug> --state link
 floom apps sharing set <slug> --state private
-floom apps sharing set <slug> --state invited
+floom apps sharing invite <slug> --email teammate@example.com
+floom apps sharing revoke-invite <slug> <invite-id>
 floom apps sharing submit-review <slug>
 floom apps sharing withdraw-review <slug>
+
+floom apps secret-policies list <slug>
+floom apps secret-policies set <slug> GEMINI_API_KEY --policy user_vault
+floom apps creator-secrets set <slug> GEMINI_API_KEY --value "$GEMINI_API_KEY"
+floom apps creator-secrets delete <slug> GEMINI_API_KEY
+
+floom apps rate-limit get <slug>
 floom apps rate-limit set <slug> --per-hour 120
 
-floom runs list
-floom runs get <run-id>
-floom runs share <run-id>
-floom runs delete <run-id>
-
-floom jobs create <slug> '{"input":"hello"}'
-floom jobs get <slug> <job-id>
-floom jobs cancel <slug> <job-id>
+floom apps reviews list <slug>
+floom apps reviews submit <slug> --rating 5 --body "Works well"
+floom apps source get <slug>
+floom apps source openapi <slug>
+floom apps renderer get <slug>
+floom apps renderer upload <slug> --source-file renderer.tsx
+floom apps renderer delete <slug>
 ```
 
 Pending-review, private, link-shared, and invited apps return `409 app_not_installable` from Store install commands. Owners manage those apps through Studio commands.
+
+Other top-level namespaces advertised by `floom --help` are intentionally not documented here because their shell command files are not present in this checkout. Use the REST API or MCP account tools for those surfaces until the CLI namespaces are wired.
 
 ## CI
 

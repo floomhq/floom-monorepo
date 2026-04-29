@@ -12,19 +12,24 @@ If a change conflicts with this file, the file is wrong and needs an explicit up
 
 They are not stupid. They are good at LLMs, data, product thinking. They are not good at (and should never have to be good at) deployment plumbing. Any feature that assumes they know how to host a Node server, manage TLS, or wire a queue is a feature aimed at the wrong person.
 
-## Core value proposition
+## Current launch promise
 
-> You have a prototype running on localhost. Paste the repo URL. Floom hosts it in production in 30 seconds, gives it an auth layer, rate limits, secret injection, a web form, an MCP server, and an HTTP endpoint.
+> You have an API contract. Publish the OpenAPI spec. Floom gives it an auth layer, rate limits, secret injection, a web form, an MCP server, and an HTTP endpoint.
 
-Hosting is the product. "OpenAPI wrapping" is a convenience path for people who already have a hosted API. The default is: **Floom runs your code.**
+The shipped public-beta path is **OpenAPI/proxied publishing**. GitHub repo paste is currently a discovery ramp that finds OpenAPI specs in a repo and publishes the resulting proxied app. It is not yet a promise that Floom hosts arbitrary repo code.
+
+## Product north star
+
+Repo-code hosting remains the product direction for the ICP: a user with a localhost prototype pastes a GitHub URL, Floom clones, detects, builds, runs, and exposes it on the same three surfaces. That north-star path is represented by the load-bearing runtime/detect/manifest packages, but it is not the current public docs promise until the server route and creator flow are wired.
 
 ## Deployment paths, in order of priority
 
-1. **Repo → hosted** (primary). User pastes a GitHub URL. Floom clones, detects runtime, builds, runs, and exposes it on all surfaces. **This is what the ICP needs.** Code lives in `packages/runtime`, `packages/detect`, `packages/manifest`, and the `/api/deploy-github` server route (when present).
-2. **Docker → hosted** (self-host path, second class). Operator writes `apps.yaml` with `type: hosted`, Floom runs the container. Implemented in `apps/server/src/services/{docker,runner,seed}.ts` and `apps/server/src/lib/entrypoint.{mjs,py}`. Load-bearing for self-hosters and for the internal hosted-execution layer that path 1 builds on.
-3. **OpenAPI → proxied** (advanced path). User pastes an OpenAPI spec for an API they already host somewhere. Floom wraps it. This is the simplest path to ship but not the primary onboarding — most ICP users don't have a hosted API; they have a localhost script.
+1. **OpenAPI → proxied** (current public-beta path). User pastes an OpenAPI spec for an API they already host somewhere. Floom wraps it and publishes the three surfaces.
+2. **GitHub repo → OpenAPI discovery** (current bridge path). User pastes a GitHub URL; Floom looks for OpenAPI specs in the repo and publishes the proxied app. This is discovery, not repo-code hosting.
+3. **Docker → hosted** (self-host/operator path). Operator writes `apps.yaml` with `type: hosted`, Floom runs the container. Implemented in `apps/server/src/services/{docker,runner,seed}.ts` and `apps/server/src/lib/entrypoint.{mjs,py}`. Load-bearing for self-hosters and for the internal hosted-execution layer that repo-code hosting builds on.
+4. **Repo → hosted** (north-star path, not current public promise). User pastes a GitHub URL. Floom clones, detects runtime, builds, runs, and exposes it on all surfaces. Code lives in `packages/runtime`, `packages/detect`, `packages/manifest`, and the `/api/deploy-github` server route when present.
 
-**All three paths produce the same three surfaces**: web form (`/p/:slug`), MCP server (`/mcp/app/:slug`), HTTP endpoint (`/api/:slug/run`).
+All current and north-star publishing paths produce the same three surfaces: web form (`/p/:slug`), MCP server (`/mcp/app/:slug`), HTTP endpoint (`/api/:slug/run`).
 
 ## Host requirements (operator-side, never user-side)
 
