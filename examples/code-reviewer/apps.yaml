@@ -1,0 +1,15 @@
+apps:
+  - slug: code-reviewer
+    display_name: Code Reviewer
+    category: developer-tools
+    description: >
+      Paste a diff and get PR-style findings with severity tags.
+    runtime: node
+    entrypoint: examples/code-reviewer/server.mjs
+    port: 15405
+    visibility: public
+    env: []
+    icon: code-reviewer
+    tags:
+      - floom-build
+      - developer-tools
