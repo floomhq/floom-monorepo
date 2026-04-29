@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { WorkspacePageShell } from '../components/WorkspacePageShell';
 import { useSession } from '../hooks/useSession';
+import { useInstalledApps, type InstalledApp } from '../hooks/useInstalledApps';
 import { formatTime } from '../lib/time';
 import * as api from '../api/client';
 import type { MeRunSummary } from '../lib/types';
@@ -34,13 +35,6 @@ interface RunApp {
   lastRunId: string | null;
   lastRunAction: string | null;
   lastRunStatus: string | null;
-}
-
-/** Installed app shape returned by /api/hub/installed. */
-interface InstalledApp {
-  slug: string;
-  name: string;
-  description: string;
 }
 
 /**
@@ -655,14 +649,14 @@ function EmptyState() {
 // Page
 // ------------------------------------------------------------------
 
-// Module-level cache so skeleton only shows on first load per session, not on
-// every route change back to this page. Cleared on full page reload.
-let _cachedInstalled: InstalledApp[] | null = null;
+// Module-level cache for runs so the skeleton only shows on first load
+// per session. Installed apps share the useInstalledApps hook cache with
+// RunRail (V13 fix: single source of truth for the "Apps" count).
 let _cachedRuns: MeRunSummary[] | null = null;
 
 export function RunAppsPage() {
   const { data: session, loading: sessionLoading, error: sessionError } = useSession();
-  const [installed, setInstalled] = useState<InstalledApp[] | null>(_cachedInstalled);
+  const { apps: installed } = useInstalledApps();
   const [runs, setRuns] = useState<MeRunSummary[] | null>(_cachedRuns);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -692,19 +686,15 @@ export function RunAppsPage() {
 
   useEffect(() => {
     if (sessionPending) return;
-    // Skip fetch if we already have cached data (stale-while-revalidate pattern).
-    // This prevents the skeleton from flashing on every route change.
+    // Runs fetched here; installed apps come via the shared hook.
     let cancelled = false;
-    Promise.all([
-      api.getInstalledApps().catch(() => ({ apps: [] as InstalledApp[] })),
-      api.getMyRuns(FETCH_LIMIT).catch(() => ({ runs: [] as MeRunSummary[] })),
-    ]).then(([installedRes, runsRes]) => {
-      if (cancelled) return;
-      _cachedInstalled = installedRes.apps as InstalledApp[];
-      _cachedRuns = runsRes.runs;
-      setInstalled(_cachedInstalled);
-      setRuns(_cachedRuns);
-    });
+    api.getMyRuns(FETCH_LIMIT)
+      .catch(() => ({ runs: [] as MeRunSummary[] }))
+      .then((runsRes) => {
+        if (cancelled) return;
+        _cachedRuns = runsRes.runs;
+        setRuns(_cachedRuns);
+      });
     return () => {
       cancelled = true;
     };
