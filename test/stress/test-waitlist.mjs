@@ -5,9 +5,11 @@
 //   1. Valid email → 200 + row inserted + ip_hash populated.
 //   2. Invalid email → 400, no row written.
 //   3. Duplicate email → 200 (idempotent) without a second row.
-//   4. Rate limit trips after FLOOM_WAITLIST_IP_PER_HOUR signups /IP,
+//   4. Rate limit trips after FLOOM_WAITLIST_IP_PER_HOUR requests /IP,
 //      then admin bearer bypasses the cap.
 //   5. No RESEND_API_KEY → signup still succeeds (graceful degrade).
+//   6. Production/cloud mode fails closed without WAITLIST_IP_HASH_SECRET;
+//      local dev keeps an explicit dev-only fallback.
 //
 // The test builds its own tiny Hono app that mounts the router the
 // same way apps/server/src/index.ts does, so we exercise the actual
@@ -45,6 +47,9 @@ const { Hono } = await import('../../apps/server/node_modules/hono/dist/index.js
 const { db } = await import('../../apps/server/dist/db.js');
 const { waitlistRouter, __resetWaitlistRateLimitForTests } = await import(
   '../../apps/server/dist/routes/waitlist.js'
+);
+const { getWaitlistIpHashSecret, DEV_WAITLIST_IP_HASH_SECRET } = await import(
+  '../../apps/server/dist/lib/startup-checks.js'
 );
 
 const app = new Hono();
@@ -125,6 +130,7 @@ console.log('Deploy waitlist (/api/waitlist)');
   __resetWaitlistRateLimitForTests();
   const before = rowCount();
   for (const bad of ['', 'not-an-email', 'a b@c.d', 'a@b', '@x.y']) {
+    __resetWaitlistRateLimitForTests();
     const res = await post({ email: bad });
     log(`rejects invalid "${bad}"`,
       res.status === 400 && res.json?.error === 'invalid_email',
@@ -146,7 +152,7 @@ console.log('Deploy waitlist (/api/waitlist)');
   log('duplicate does not insert a second row', rowCount() === 1);
 }
 
-// ── 4. rate limit trips and admin bearer bypasses ──────────────────────
+// ── 4. rate limit trips on all requests and admin bearer bypasses ───────
 {
   __resetWaitlistRateLimitForTests();
   db.prepare(`DELETE FROM waitlist_signups`).run();
@@ -170,6 +176,19 @@ console.log('Deploy waitlist (/api/waitlist)');
   log('admin bearer bypasses the per-IP cap',
     r5.status === 200 && r5.json?.ok === true,
     `status=${r5.status} body=${r5.text}`);
+
+  __resetWaitlistRateLimitForTests();
+  const noisyIp = { 'x-forwarded-for': '10.99.0.2' };
+  const bad1 = await post({ email: 'bad-1' }, noisyIp);
+  const bad2 = await post({ email: 'bad-2' }, noisyIp);
+  const bad3 = await post('not json', noisyIp);
+  log('invalid requests consume the same per-IP cap',
+    bad1.status === 400 && bad2.status === 400 && bad3.status === 400,
+    `${bad1.status}/${bad2.status}/${bad3.status}`);
+  const bad4 = await post({ email: 'bad-4' }, noisyIp);
+  log('4th invalid request from same IP returns 429',
+    bad4.status === 429 && bad4.json?.error === 'rate_limited',
+    `status=${bad4.status} body=${bad4.text}`);
 }
 
 // ── 5. no RESEND_API_KEY still persists ────────────────────────────────
@@ -199,7 +218,60 @@ console.log('Deploy waitlist (/api/waitlist)');
     `status=${res.status} body=${res.text}`);
 }
 
-// ── 7. email-only POST (no deploy fields) still 200 ─────────────────────
+// ── 7. waitlist IP hash secret handling ─────────────────────────────────
+{
+  __resetWaitlistRateLimitForTests();
+  db.prepare(`DELETE FROM waitlist_signups`).run();
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousCloudMode = process.env.FLOOM_CLOUD_MODE;
+  const previousDeployEnabled = process.env.DEPLOY_ENABLED;
+  const previousSecret = process.env.WAITLIST_IP_HASH_SECRET;
+
+  process.env.NODE_ENV = 'development';
+  delete process.env.FLOOM_CLOUD_MODE;
+  process.env.DEPLOY_ENABLED = 'false';
+  delete process.env.WAITLIST_IP_HASH_SECRET;
+  log('development resolver returns explicit dev-only hash fallback',
+    getWaitlistIpHashSecret() === DEV_WAITLIST_IP_HASH_SECRET,
+    String(getWaitlistIpHashSecret()));
+  const dev = await post(
+    { email: 'dev-fallback@example.com' },
+    { 'x-forwarded-for': '10.44.0.1' },
+  );
+  log('development waitlist uses explicit dev-only hash fallback',
+    dev.status === 200 && dev.json?.ok === true,
+    `status=${dev.status} body=${dev.text}`);
+  const devRows = rowsByEmail('dev-fallback@example.com');
+  log('development fallback persists signup without configured secret',
+    devRows.length === 1,
+    JSON.stringify(devRows[0] ?? null));
+
+  __resetWaitlistRateLimitForTests();
+  process.env.NODE_ENV = 'production';
+  process.env.FLOOM_CLOUD_MODE = '1';
+  process.env.DEPLOY_ENABLED = 'false';
+  delete process.env.WAITLIST_IP_HASH_SECRET;
+  const before = rowCount();
+  const prod = await post(
+    { email: 'prod-missing-secret@example.com' },
+    { 'x-forwarded-for': '10.44.0.2' },
+  );
+  log('production/cloud waitlist without WAITLIST_IP_HASH_SECRET fails closed',
+    prod.status === 503 && prod.json?.error === 'waitlist_ip_hash_secret_required',
+    `status=${prod.status} body=${prod.text}`);
+  log('production/cloud missing secret writes no row', rowCount() === before);
+
+  if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = previousNodeEnv;
+  if (previousCloudMode === undefined) delete process.env.FLOOM_CLOUD_MODE;
+  else process.env.FLOOM_CLOUD_MODE = previousCloudMode;
+  if (previousDeployEnabled === undefined) delete process.env.DEPLOY_ENABLED;
+  else process.env.DEPLOY_ENABLED = previousDeployEnabled;
+  if (previousSecret === undefined) process.env.WAITLIST_IP_HASH_SECRET = 'test-secret';
+  else process.env.WAITLIST_IP_HASH_SECRET = previousSecret;
+}
+
+// ── 8. email-only POST (no deploy fields) still 200 ─────────────────────
 {
   __resetWaitlistRateLimitForTests();
   db.prepare(`DELETE FROM waitlist_signups`).run();
@@ -216,7 +288,7 @@ console.log('Deploy waitlist (/api/waitlist)');
   );
 }
 
-// ── 8. deploy repo URL + intent persisted ───────────────────────────────
+// ── 9. deploy repo URL + intent persisted ───────────────────────────────
 {
   __resetWaitlistRateLimitForTests();
   db.prepare(`DELETE FROM waitlist_signups`).run();
@@ -239,19 +311,19 @@ console.log('Deploy waitlist (/api/waitlist)');
   );
 }
 
-// ── 9. invalid deploy_repo_url → 400 ──────────────────────────────────
+// ── 10. invalid deploy_repo_url → 400 ─────────────────────────────────
 {
   __resetWaitlistRateLimitForTests();
   const before = rowCount();
-  for (const bad of [
+  for (const [idx, bad] of [
     'javascript:alert(1)',
     'ftp://files.example.com/x',
     'not a url at all',
-  ]) {
+  ].entries()) {
     const res = await post({
       email: 'bad-url@example.com',
       deploy_repo_url: bad,
-    });
+    }, { 'x-forwarded-for': `10.0.2.${idx + 1}` });
     log(`invalid deploy_repo_url "${bad.slice(0, 24)}…" → 400`,
       res.status === 400 && res.json?.error === 'invalid_deploy_repo_url',
       `status=${res.status} body=${res.text}`);
@@ -259,7 +331,7 @@ console.log('Deploy waitlist (/api/waitlist)');
   log('invalid deploy_repo_url writes no row', rowCount() === before);
 }
 
-// ── 10. deploy_intent over max length → 400 ─────────────────────────────
+// ── 11. deploy_intent over max length → 400 ─────────────────────────────
 {
   __resetWaitlistRateLimitForTests();
   const before = rowCount();

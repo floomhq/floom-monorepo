@@ -27,6 +27,7 @@ import { db } from '../db.js';
 import { renderWaitlistConfirmationEmail, sendEmail } from '../lib/email.js';
 import { extractIp } from '../lib/rate-limit.js';
 import { createRateLimit, __resetSharedRateLimitStoreForTests } from '../lib/rate-limit-store.js';
+import { getWaitlistIpHashSecret } from '../lib/startup-checks.js';
 
 export const waitlistRouter = new Hono();
 
@@ -63,8 +64,7 @@ function isValidEmail(raw: string): boolean {
   return EMAIL_RE.test(v);
 }
 
-function hashIp(ip: string): string {
-  const secret = process.env.WAITLIST_IP_HASH_SECRET || 'floom-waitlist-v1';
+function hashIp(ip: string, secret: string): string {
   return createHash('sha256').update(`${secret}:${ip}`).digest('hex');
 }
 
@@ -194,6 +194,9 @@ export function insertWaitlistSignup(opts: {
 // to stop that drift.
 
 waitlistRouter.post('/', async (c) => {
+  const rateLimitResponse = await waitlistRateLimit(c, async () => undefined);
+  if (rateLimitResponse) return rateLimitResponse;
+
   let body: {
     email?: unknown;
     source?: unknown;
@@ -223,14 +226,15 @@ waitlistRouter.post('/', async (c) => {
     return c.json({ error: err }, 400);
   }
 
-  const rateLimitResponse = await waitlistRateLimit(c, async () => undefined);
-  if (rateLimitResponse) return rateLimitResponse;
-
   const ip = extractIp(c);
+  const ipHashSecret = getWaitlistIpHashSecret();
+  if (!ipHashSecret) {
+    return c.json({ error: 'waitlist_ip_hash_secret_required' }, 503);
+  }
 
   const source = sanitizeSource(body.source);
   const userAgent = sanitizeUserAgent(c.req.header('user-agent'));
-  const ipHash = ip && ip !== 'unknown' ? hashIp(ip) : null;
+  const ipHash = ip && ip !== 'unknown' ? hashIp(ip, ipHashSecret) : null;
 
   // Idempotent insert — duplicate emails return 200 with the same shape.
   insertWaitlistSignup({

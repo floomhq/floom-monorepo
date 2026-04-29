@@ -7,6 +7,9 @@
 //      existing sendEmail stdout fallback still warns/logs.
 //   3. NODE_ENV=production on preview without RESEND_API_KEY starts normally.
 //   4. NODE_ENV=production with RESEND_API_KEY starts normally.
+//   5. Production/cloud waitlist mode without WAITLIST_IP_HASH_SECRET exits
+//      before listening.
+//   6. Production/cloud waitlist mode with WAITLIST_IP_HASH_SECRET starts.
 //
 // Run after `pnpm --filter @floom/server build`.
 
@@ -229,7 +232,48 @@ console.log('Resend startup hard-fail');
   else process.env.RESEND_API_KEY = previousResendKey;
 }
 
-// -- 3. production preview without key starts normally ------------------
+// -- 3. production/cloud waitlist without IP hash secret fails -----------
+{
+  const setup = makeServerEnv({
+    NODE_ENV: 'production',
+    PORT: String(await getFreePort()),
+    PUBLIC_URL: 'https://floom.dev',
+    RESEND_API_KEY: 're_test_startup_guard',
+    DEPLOY_ENABLED: 'false',
+    FLOOM_CLOUD_MODE: '1',
+  });
+  delete setup.env.WAITLIST_IP_HASH_SECRET;
+  const child = spawnServer(setup.env);
+  const exit = await waitForExit(child.proc, 5_000).catch((err) => ({ err }));
+  log(
+    'production/cloud waitlist without WAITLIST_IP_HASH_SECRET exits with code 1',
+    !exit.err && exit.code === 1,
+    exit.err ? exit.err.message : `code=${exit.code} signal=${exit.signal}`,
+  );
+  log(
+    'production/cloud waitlist failure logs clear fatal IP hash secret error',
+    child.stderr.includes('production/cloud waitlist mode requires WAITLIST_IP_HASH_SECRET') &&
+      child.stderr.includes('waitlist_signups.ip_hash'),
+    child.stderr,
+  );
+  rmSync(setup.tmp, { recursive: true, force: true });
+}
+
+// -- 4. production/cloud waitlist with IP hash secret starts -------------
+{
+  const server = await bootServer({
+    NODE_ENV: 'production',
+    PUBLIC_URL: 'https://floom.dev',
+    RESEND_API_KEY: 're_test_startup_guard',
+    DEPLOY_ENABLED: 'false',
+    FLOOM_CLOUD_MODE: '1',
+    WAITLIST_IP_HASH_SECRET: 'test-waitlist-ip-hash-secret',
+  });
+  log('production/cloud waitlist with WAITLIST_IP_HASH_SECRET reaches /api/health', true);
+  await stopServer(server);
+}
+
+// -- 5. production preview without key starts normally ------------------
 {
   const server = await bootServer({
     NODE_ENV: 'production',
@@ -240,7 +284,7 @@ console.log('Resend startup hard-fail');
   await stopServer(server);
 }
 
-// -- 4. production with key starts normally -----------------------------
+// -- 6. production with key starts normally -----------------------------
 {
   const server = await bootServer({
     NODE_ENV: 'production',
