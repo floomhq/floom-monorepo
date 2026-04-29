@@ -83,7 +83,9 @@ import type { MiddlewareHandler } from 'hono';
  * `/renderer/:slug/frame.html` (that route sets its own stricter CSP). */
 export const TOP_LEVEL_CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  // PostHog snippet dynamically inserts a <script> from us-assets.i.posthog.com;
+  // without this, the SDK never loads and pageviews never fire.
+  "script-src 'self' https://us-assets.i.posthog.com",
   "style-src 'self' https://fonts.googleapis.com",
   "style-src-elem 'self' https://fonts.googleapis.com",
   // TODO(security#380): keep `style-src-attr 'unsafe-inline'` until we
@@ -91,7 +93,11 @@ export const TOP_LEVEL_CSP = [
   "style-src-attr 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://api.github.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
+  // PostHog: us.i.posthog.com (added 2026-04-29 — was missing, every
+  // browser-side analytics event was CSP-blocked. R30-D agent caught this).
+  // us-assets.i.posthog.com hosts the bootstrap script the snippet loads
+  // dynamically; allowed in connect-src for fetch + script-src for load.
+  "connect-src 'self' https://api.github.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com",
   "frame-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
