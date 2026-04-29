@@ -134,7 +134,16 @@ const routeMode = getModeFromLocation(location.pathname, searchParams);
         setPassword('');
         setState('idle');
         setNoticeCopy({
-          message: 'Check your email — the verification link will sign you in.',
+          // Federico 2026-04-29: floom.dev is a new sending domain; Yahoo +
+          // Outlook + sometimes Gmail-Promotions classify our verification
+          // emails as spam during the warmup window (typical 2-4 weeks).
+          // Surface this expectation right after signup so users don't bounce
+          // when they don't see the email in their inbox.
+          message:
+            'Check your email — the verification link will sign you in. ' +
+            'New here? Floom\'s sending domain is brand-new, so the email ' +
+            'might land in spam or "Promotions". Mark it "Not spam" and we\'ll ' +
+            'land in your inbox next time.',
           action: {
             label: 'Resend link',
             intent: { kind: 'resend-verification' },
