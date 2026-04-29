@@ -85,6 +85,8 @@ const StudioAppRendererPage = lazy(() => import('./pages/StudioAppRendererPage')
 const StudioAppAnalyticsPage = lazy(() => import('./pages/StudioAppAnalyticsPage').then(m => ({ default: m.StudioAppAnalyticsPage })));
 const StudioAppFeedbackPage = lazy(() => import('./pages/StudioAppFeedbackPage').then(m => ({ default: m.StudioAppFeedbackPage })));
 const StudioTriggersTab = lazy(() => import('./pages/StudioTriggersTab').then(m => ({ default: m.StudioTriggersTab })));
+// feat/composio-runtime: Connect-a-tool page at /studio/connections.
+const StudioConnectionsPage = lazy(() => import('./pages/StudioConnectionsPage').then(m => ({ default: m.StudioConnectionsPage })));
 // StudioSettingsPage stays on disk for v26 + post-MVP. Not mounted on launch-mvp.
 const ImprintPage = lazy(() => import('./pages/ImprintPage').then(m => ({ default: m.ImprintPage })));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
@@ -378,6 +380,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             /studio/my-apps. Revisit if we ever start emitting that URL
             from docs / marketing. */}
         <Route path="/studio/settings" element={<LegacyWorkspaceUiRedirect />} />
+        {/* feat/composio-runtime: Connect-a-tool surface. Must be BEFORE
+            /studio/:slug so "connections" isn't matched as an app slug. */}
+        <Route path="/studio/connections" element={<WaitlistGuard source="studio"><StudioConnectionsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug" element={<WaitlistGuard source="studio"><StudioAppPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/runs" element={<WaitlistGuard source="studio"><StudioAppRunsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/secrets" element={<WaitlistGuard source="studio"><StudioAppSecretsPage /></WaitlistGuard>} />
