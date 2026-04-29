@@ -1,6 +1,6 @@
 {
   "name": "@floomhq/cli",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "description": "One command to set up Floom: opens the Agent-token page, verifies the token, configures MCP, and you're live.",
   "type": "commonjs",
   "bin": {
@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "build": "node scripts/build.js",
+    "prepack": "node scripts/build.js",
     "prepublishOnly": "node scripts/build.js"
   },
   "keywords": [

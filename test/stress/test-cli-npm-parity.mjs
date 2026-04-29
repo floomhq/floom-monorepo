@@ -171,6 +171,19 @@ try {
       accountHelp.combined,
     );
 
+    const accountAgentTokensHelp = run(['account', 'agent-tokens', '--help'], {
+      FLOOM_CONFIG: join(tmp, 'missing.json'),
+      FLOOM_API_KEY: '',
+    });
+    log(
+      'account agent-tokens help states browser-session boundary',
+      accountAgentTokensHelp.status === 0 &&
+        accountAgentTokensHelp.stdout.includes('browser-session boundary') &&
+        accountAgentTokensHelp.stdout.includes('Agent tokens are rejected') &&
+        accountAgentTokensHelp.stdout.includes('/settings/agent-tokens'),
+      accountAgentTokensHelp.combined,
+    );
+
     const byok = await runAsync(['--api-url', mock.apiUrl, 'run', 'byok-app', '--user-api-key', 'AIza' + 'X'.repeat(35)], {
       FLOOM_CONFIG: join(tmp, 'missing.json'),
       FLOOM_API_KEY: token,

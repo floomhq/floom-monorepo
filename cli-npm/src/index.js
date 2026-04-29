@@ -1860,6 +1860,12 @@ async function runAccountAgentTokens(opts, args) {
   const rest = args.slice(1);
 
   switch (sub) {
+    case '-h':
+    case '--help':
+    case 'help':
+      printAccountAgentTokensHelp();
+      return;
+
     case 'list': {
       try {
         const r = await authFetch(opts.apiUrl, '/api/me/agent-keys');
@@ -2011,6 +2017,21 @@ note:
   Agent-token management requires a browser session. Agent tokens are rejected
   for creating, listing, or revoking other Agent tokens; open
   /settings/agent-tokens in a signed-in browser for that flow.
+`);
+}
+
+function printAccountAgentTokensHelp() {
+  console.log(`floom account agent-tokens - manage Agent tokens.
+
+usage:
+  floom account agent-tokens list
+  floom account agent-tokens create --label <label> --scope <read|read-write|publish-only>
+  floom account agent-tokens revoke <token-id>
+
+note:
+  browser-session boundary: this flow requires a signed-in browser session on
+  the server. Agent tokens are rejected for creating, listing, or revoking other
+  Agent tokens; open /settings/agent-tokens in a signed-in browser for that flow.
 `);
 }
 

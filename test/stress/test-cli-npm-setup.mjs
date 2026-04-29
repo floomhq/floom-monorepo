@@ -202,7 +202,7 @@ try {
       NO_COLOR: '1',
     },
   );
-  log('cli-npm login prints MVP agent key URL', login.status === 0 && login.stdout.includes('https://mvp.floom.dev/me/agent-keys'), login.stdout + login.stderr);
+  log('cli-npm login prints MVP agent token URL', login.status === 0 && login.stdout.includes('https://mvp.floom.dev/settings/agent-tokens'), login.stdout + login.stderr);
   log('cli-npm login does not write config', !existsSync(join(loginHome, '.floom', 'config.json')), login.stdout + login.stderr);
 
   const virginHome = join(tmp, 'virgin-home');
@@ -223,7 +223,7 @@ try {
   log(
     'cli-npm setup works from virgin HOME with browser disabled',
     virginSetup.status === 0 &&
-      virginSetup.stdout.includes(`${apiUrl}/me/agent-keys`) &&
+      virginSetup.stdout.includes(`${apiUrl}/settings/agent-tokens`) &&
       virginSetup.stdout.includes('Could not auto-open a browser') &&
       virginConfig.api_key === token &&
       virginConfig.api_url === apiUrl,
