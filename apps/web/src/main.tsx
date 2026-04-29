@@ -380,9 +380,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             /studio/my-apps. Revisit if we ever start emitting that URL
             from docs / marketing. */}
         <Route path="/studio/settings" element={<LegacyWorkspaceUiRedirect />} />
-        {/* feat/composio-runtime: Connect-a-tool surface. Must be BEFORE
-            /studio/:slug so "connections" isn't matched as an app slug. */}
-        <Route path="/studio/connections" element={<WaitlistGuard source="studio"><StudioConnectionsPage /></WaitlistGuard>} />
+        {/* feat/composio-runtime: Connect-a-tool surface. Consumer-mode page lives
+            at /run/connections (Fix 5 — /studio is creator-mode). The old URL
+            /studio/connections redirects for back-compat. Must be BEFORE /studio/:slug
+            so "connections" isn't matched as an app slug. */}
+        <Route path="/studio/connections" element={<Navigate to="/run/connections" replace />} />
+        <Route path="/run/connections" element={<WaitlistGuard source="me"><StudioConnectionsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug" element={<WaitlistGuard source="studio"><StudioAppPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/runs" element={<WaitlistGuard source="studio"><StudioAppRunsPage /></WaitlistGuard>} />
         <Route path="/studio/:slug/secrets" element={<WaitlistGuard source="studio"><StudioAppSecretsPage /></WaitlistGuard>} />
