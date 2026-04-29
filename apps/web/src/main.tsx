@@ -88,6 +88,10 @@ const RunRunDetailPage = lazy(() => import('./pages/RunRunDetailPage').then(m =>
 const RunAppRunPage = lazy(() => import('./pages/RunAppRunPage').then(m => ({ default: m.RunAppRunPage })));
 const RunAppTriggersPage = lazy(() => import('./pages/RunAppTriggersPage').then(m => ({ default: m.RunAppTriggersPage })));
 const RunAppSecretsPage = lazy(() => import('./pages/RunAppSecretsPage').then(m => ({ default: m.RunAppSecretsPage })));
+// v26-iter28 (issues #1083, #1084): consumer Feedback + History tabs
+// for /run/apps/:slug. Mirrors Studio's Feedback + Runs tabs.
+const MeAppFeedbackPage = lazy(() => import('./pages/MeAppFeedbackPage').then(m => ({ default: m.MeAppFeedbackPage })));
+const MeAppHistoryPage = lazy(() => import('./pages/MeAppHistoryPage').then(m => ({ default: m.MeAppHistoryPage })));
 const StudioBuildPage = lazy(() => import('./pages/StudioBuildPage').then(m => ({ default: m.StudioBuildPage })));
 const StudioAppPage = lazy(() => import('./pages/StudioAppPage').then(m => ({ default: m.StudioAppPage })));
 const StudioRunsPage = lazy(() => import('./pages/StudioRunsPage').then(m => ({ default: m.StudioRunsPage })));
@@ -421,6 +425,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/run/apps/:slug/triggers/schedule" element={<WaitlistGuard source="me"><MeAppTriggerSchedulePage /></WaitlistGuard>} />
         <Route path="/run/apps/:slug/triggers/webhook" element={<WaitlistGuard source="me"><MeAppTriggerWebhookPage /></WaitlistGuard>} />
         <Route path="/run/apps/:slug/secrets" element={<WaitlistGuard source="me"><RunAppSecretsPage /></WaitlistGuard>} />
+        {/* v26-iter28 (issues #1083, #1084): consumer Feedback + History tabs.
+            Server knownPaths regex below extended to include /feedback and /history. */}
+        <Route path="/run/apps/:slug/feedback" element={<WaitlistGuard source="me"><MeAppFeedbackPage /></WaitlistGuard>} />
+        <Route path="/run/apps/:slug/history" element={<WaitlistGuard source="me"><MeAppHistoryPage /></WaitlistGuard>} />
         {/* v26 /run/runs + /run/runs/:runId — workspace runs list + detail (WorkspaceShell).
             v23 /me/runs (MeRunsPage) is preserved untouched (COEXIST strategy). */}
         <Route path="/run/runs" element={<WaitlistGuard source="me"><RunRunsPage /></WaitlistGuard>} />
