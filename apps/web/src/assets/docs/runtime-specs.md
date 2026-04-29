@@ -102,10 +102,10 @@ legacy compatibility behavior.
 
 Each entry in `actions` declares:
 
-- `label` — human string.
-- `description` — optional short paragraph.
-- `inputs` — array of input fields.
-- `outputs` — array of output fields.
+- `label`: human string.
+- `description`: optional short paragraph.
+- `inputs`: array of input fields.
+- `outputs`: array of output fields.
 
 ### Input types
 
@@ -205,4 +205,4 @@ Floom stores `ok: false` as a failed run. Exit codes are also respected: non-zer
 - [/docs/mcp-install](/docs/mcp-install)
 - [/docs/self-host](/docs/self-host)
 - [/docs/api-reference](/docs/api-reference)
-- [/protocol](/protocol) — full protocol spec
+- [/protocol](/protocol): full protocol spec

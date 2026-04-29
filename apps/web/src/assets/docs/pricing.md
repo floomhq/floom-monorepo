@@ -4,7 +4,7 @@ Floom is free to try during the public beta. The launch-week story is short and 
 
 ## Current state
 
-- **Cloud (beta + waitlist):** free while we run the waitlist and early access — no credit card required to try the hosted product.
+- **Cloud (beta + waitlist):** free while we run the waitlist and early access. No credit card required to try the hosted product.
 - **Self-host:** always free under the **MIT** license; you only pay for your own servers and time.
 - **Paid cloud via Stripe:** on the **roadmap**, not a launch guarantee. The codebase may include Stripe-related pieces, but a full, generally available paid tier and creator billing are not the launch promise.
 

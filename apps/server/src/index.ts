@@ -23,6 +23,7 @@ import { rendererRouter } from './routes/renderer.js';
 import { waitlistRouter } from './routes/waitlist.js';
 import { memoryRouter, secretsRouter } from './routes/memory.js';
 import { connectionsRouter } from './routes/connections.js';
+import { composioRouter } from './routes/composio.js';
 import { workspacesRouter, sessionRouter } from './routes/workspaces.js';
 import { stripeRouter } from './routes/stripe.js';
 import { reviewsRouter } from './routes/reviews.js';
@@ -171,6 +172,7 @@ app.use('/api/me/*', restrictedCors);
 app.use('/api/session/*', restrictedCors);
 app.use('/api/workspaces/*', restrictedCors);
 app.use('/api/connections/*', restrictedCors);
+app.use('/api/integrations/*', restrictedCors);
 app.use('/api/memory/*', restrictedCors);
 app.use('/api/secrets/*', restrictedCors);
 app.use('/api/stripe/*', restrictedCors);
@@ -350,6 +352,7 @@ app.route('/api/memory', memoryRouter);
 app.route('/api/secrets', secretsRouter);
 // W2.3: Composio OAuth connections (for /build Connect-a-tool ramp)
 app.route('/api/connections', connectionsRouter);
+app.route('/api/integrations/composio', composioRouter);
 // W3.1: workspaces + members + invites + session
 app.route('/api/workspaces', workspacesRouter);
 app.route('/api/session', sessionRouter);

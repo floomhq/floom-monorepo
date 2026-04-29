@@ -75,6 +75,15 @@ export interface Manifest {
   secrets?: string[];
 
   /**
+   * Runtime integrations resolved by Floom before invocation.
+   *
+   * YAML supports:
+   *   integrations:
+   *     - composio: gmail
+   */
+  integrations?: Integration[];
+
+  /**
    * Memory request in MB. Default 512 (the e2b base template spec).
    */
   memoryMb?: number;
@@ -100,6 +109,11 @@ export interface Manifest {
   network?: {
     allowed_domains: string[];
   };
+}
+
+export interface Integration {
+  provider: 'composio';
+  slug: string;
 }
 
 export interface RunTiming {

@@ -2048,7 +2048,7 @@ function CelebrationCard({
           Your app is live
         </strong>
         <p style={{ margin: '4px 0 0', color: 'var(--muted, #64748b)', fontSize: 13 }}>
-          This link works for anyone — send it to coworkers, Twitter, anywhere.
+          This link works for anyone. Send it to coworkers, Twitter, anywhere.
         </p>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

@@ -241,7 +241,7 @@ export function ResetPasswordPage() {
         <p style={authSubStyle}>
           {state === 'done'
             ? 'Password updated. Taking you to sign in…'
-            : "Make it strong — you'll use it to sign in across web, CLI, and agent flows."}
+            : "Make it strong. You'll use it to sign in across web, CLI, and agent flows."}
         </p>
 
         {state !== 'done' && (

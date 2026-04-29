@@ -7,7 +7,7 @@
  */
 import type { Runtime } from './types.ts';
 
-export type { Manifest, Input, InputType, Output, OutputType, Runtime } from './types.ts';
+export type { Manifest, Input, InputType, Output, OutputType, Integration, Runtime } from './types.ts';
 
 export const ALLOWED_RUNTIMES: Runtime[] = [
   'python3.12',

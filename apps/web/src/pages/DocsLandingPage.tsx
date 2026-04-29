@@ -355,7 +355,7 @@ export function DocsLandingPage() {
               <>
                 The protocol, the runtime, and the patterns that make Floom work.
                 Run apps today via MCP, CLI, or web. Ship to the floom.dev cloud
-                when publishing opens for the workspace — or self-host, no waitlist.
+                when publishing opens for the workspace. Or self-host, no waitlist.
               </>
             )}
           </p>
@@ -443,7 +443,7 @@ curl -X POST https://api.floom.dev/api/lead-scorer/run \\
 
           {/* MCP install */}
           <h2 id="mcp-surfaces" style={h2Style}>
-            Install in your AI tool — via MCP
+            Install in your AI tool, via MCP
           </h2>
           <p style={pStyle}>
             Every Floom app is a ready-to-use MCP tool at{' '}

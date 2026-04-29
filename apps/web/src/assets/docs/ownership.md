@@ -7,11 +7,11 @@ Floom is designed so the app contract stays portable. This repo is honest about 
 - Your app code.
 - Your OpenAPI spec.
 - Your manifest and renderer code.
-- Your self-host deployment if you run Floom on your own infrastructure.
+- Your self-host deployment if you run Floom on your own servers.
 
 ## What is open source
 
-- The runtime in this repo is **MIT licensed** — fork it, self-host, or send patches: all are welcome.
+- The runtime in this repo is **MIT licensed**: fork it, self-host, or send patches. All are welcome.
 - The self-host guide is public.
 - The same broad runtime model used on `floom.dev` is available to self-hosters.
 

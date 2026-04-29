@@ -80,6 +80,7 @@ export interface NormalizedManifest {
   python_dependencies: string[];
   node_dependencies: Record<string, string>;
   secrets_needed: string[];
+  integrations?: IntegrationSpec[];
   manifest_version: '1.0' | '2.0';
   apt_packages?: string[];
   /**
@@ -143,6 +144,11 @@ export interface NormalizedManifest {
    * transparently falls back to the first-action default.
    */
   primary_action?: string;
+}
+
+export interface IntegrationSpec {
+  provider: 'composio';
+  slug: string;
 }
 
 export interface RenderConfig {

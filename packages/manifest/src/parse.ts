@@ -7,7 +7,7 @@
  * list to ship back to the user verbatim (H6 Scenario 2).
  */
 import { parse as parseYaml } from 'yaml';
-import type { Manifest, Input, InputType, Output, OutputType } from './schema.ts';
+import type { Manifest, Input, InputType, Output, OutputType, Integration } from './schema.ts';
 import {
   ALLOWED_RUNTIMES,
   ALLOWED_INPUT_TYPES,
@@ -16,6 +16,39 @@ import {
 } from './schema.ts';
 
 const MAX_ALLOWED_DOMAINS = 20;
+const KNOWN_COMPOSIO_SLUGS = new Set([
+  'gmail',
+  'slack',
+  'notion',
+  'github',
+  'stripe',
+  'sheets',
+  'google_sheets',
+  'google-calendar',
+  'calendar',
+  'linear',
+  'figma',
+  'airtable',
+  'hubspot',
+  'shopify',
+  'salesforce',
+  'jira',
+  'discord',
+  'trello',
+  'asana',
+  'drive',
+  'google_drive',
+  'dropbox',
+  'sendgrid',
+  'resend',
+  'mailchimp',
+  'zendesk',
+  'intercom',
+  'twilio',
+  'supabase',
+  'postgres',
+  'mongodb',
+]);
 
 function isIpLiteral(value: string): boolean {
   return (
@@ -61,6 +94,33 @@ function validateAllowedDomain(value: string): string | null {
   return isValidDomain(normalized)
     ? null
     : `network.allowed_domains entry "${value}" is not a valid domain`;
+}
+
+function parseIntegrations(raw: unknown, errors: string[]): Integration[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    errors.push('integrations must be a list');
+    return [];
+  }
+  const out: Integration[] = [];
+  raw.forEach((entry, idx) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      errors.push(`integrations[${idx}] must be a mapping like { composio: gmail }`);
+      return;
+    }
+    const value = (entry as Record<string, unknown>)['composio'];
+    if (typeof value !== 'string' || !/^[a-z0-9_-]{1,64}$/.test(value)) {
+      errors.push(`integrations[${idx}].composio must be a lowercase Composio slug`);
+      return;
+    }
+    const slug = value.trim().toLowerCase();
+    if (!KNOWN_COMPOSIO_SLUGS.has(slug)) {
+      errors.push(`integrations[${idx}].composio unknown Composio slug: ${slug}`);
+      return;
+    }
+    out.push({ provider: 'composio', slug });
+  });
+  return out;
 }
 
 export interface ParseResult {
@@ -187,6 +247,8 @@ export function parseManifest(yamlSource: string): ParseResult {
     }
   }
 
+  const integrations = parseIntegrations(obj['integrations'], errors);
+
   if (errors.length > 0) {
     return { ok: false, errors };
   }
@@ -209,6 +271,7 @@ export function parseManifest(yamlSource: string): ParseResult {
       (s): s is string => typeof s === 'string',
     );
   }
+  if (integrations.length > 0) manifest.integrations = integrations;
   if (typeof obj['memoryMb'] === 'number') manifest.memoryMb = obj['memoryMb'];
   if (typeof obj['timeout'] === 'string') manifest.timeout = obj['timeout'];
   if (typeof obj['workdir'] === 'string') manifest.workdir = obj['workdir'];

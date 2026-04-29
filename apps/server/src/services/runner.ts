@@ -8,6 +8,10 @@ import { invalidateHubCache } from '../lib/hub-cache.js';
 import { noteAppUnavailable } from '../lib/alerts.js';
 import * as userSecrets from './user_secrets.js';
 import * as creatorSecrets from './app_creator_secrets.js';
+import {
+  MissingComposioIntegrationError,
+  resolveComposioCreds,
+} from './composio-runtime.js';
 import type { SecretPolicy } from '../types.js';
 import type {
   AppRecord,
@@ -358,6 +362,29 @@ export function dispatchRun(
   const secrets: Record<string, string> = {};
   for (const name of manifest.secrets_needed || []) {
     if (mergedSecrets[name]) secrets[name] = mergedSecrets[name];
+  }
+  try {
+    const composioEnv = resolveComposioCreds(runtimeCtx.workspace_id, manifest.integrations);
+    for (const [k, v] of Object.entries(composioEnv)) {
+      if (v && v.length > 0) secrets[k] = v;
+    }
+  } catch (err) {
+    if (err instanceof MissingComposioIntegrationError) {
+      updateRun(runId, {
+        status: 'error',
+        error: err.message,
+        error_type: 'missing_secret',
+        finished: true,
+      });
+      return;
+    }
+    updateRun(runId, {
+      status: 'error',
+      error: (err as Error).message || 'Composio credential resolution failed',
+      error_type: 'floom_internal_error',
+      finished: true,
+    });
+    return;
   }
 
   updateRun(runId, { status: 'running' });

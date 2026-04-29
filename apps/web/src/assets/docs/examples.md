@@ -1,6 +1,6 @@
 # Examples
 
-Real apps shipping on Floom today. Each one is a single manifest plus code — clone, read, or run.
+Real apps shipping on Floom today. Each one is a single manifest plus code: clone, read, or run.
 
 Pick the shape closest to what you're building, copy its `floom.yaml`, swap the logic.
 
@@ -49,15 +49,15 @@ floom run pitch-coach '{"pitch":"We are building..."}'
 
 The `examples/` directory in the repo has more shapes to copy from:
 
-- **JWT decode** — zero-auth utility app (no API key needed).
-- **UUID generator** — simplest possible manifest, one action, no inputs.
-- **JSON format** — fast utility, showcases `renderer: json`.
-- **Password generator** — minimal manifest, anon-runnable.
+- **JWT decode**: zero-auth utility app (no API key needed).
+- **UUID generator**: simplest possible manifest, one action, no inputs.
+- **JSON format**: fast utility, showcases `renderer: json`.
+- **Password generator**: minimal manifest, anon-runnable.
 
 See [github.com/floomhq/floom/tree/main/examples](https://github.com/floomhq/floom/tree/main/examples) for the full list.
 
 ## Next
 
-- [Quickstart](/docs/quickstart) — write your own from scratch in 5 minutes.
-- [Manifest reference](/docs/runtime-specs) — every field explained.
-- [Install in Claude](/docs/mcp-install) — use these examples from your agent.
+- [Quickstart](/docs/quickstart): write your own from scratch in 5 minutes.
+- [Manifest reference](/docs/runtime-specs): every field explained.
+- [Install in Claude](/docs/mcp-install): use these examples from your agent.

@@ -275,7 +275,7 @@ ${body}
 </td></tr>
 
 <tr><td style="padding:24px 4px 4px;font-family:${SANS};font-size:12px;line-height:1.6;color:${EMAIL_MUTED};">
-<strong style="color:${EMAIL_INK};font-weight:600;">Floom</strong>: infrastructure for agentic work.<br>
+<strong style="color:${EMAIL_INK};font-weight:600;">Floom</strong>: the runtime for agentic work.<br>
 <a href="https://floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">floom.dev</a> &middot; Floom, Inc. &middot; Wilmington, DE<br>
 Questions? Just reply to this email, or write <a href="mailto:hello@floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">hello@floom.dev</a>.${unsubscribeBlock}
 </td></tr>
@@ -430,7 +430,7 @@ export function renderWelcomeEmail(input: WelcomeTemplateInput): {
   const body = [
     bodyParagraph(greeting),
     bodyParagraph(
-      'Your account is live. Your first app is one URL paste away — point Floom at a GitHub repo or an OpenAPI spec and it does the rest.',
+      'Your account is live. Your first app is one URL paste away: point Floom at a GitHub repo or an OpenAPI spec and it does the rest.',
     ),
     ctaButton(buildUrl, 'Build your first app'),
     mutedParagraph(
@@ -456,7 +456,7 @@ export function renderWelcomeEmail(input: WelcomeTemplateInput): {
       heading: 'Welcome to Floom',
       body,
       preheader:
-        'Your account is live. Paste a repo, ship an app — your first one is on us.',
+        'Your account is live. Paste a repo, ship an app. Your first one is on us.',
       unsubscribeUrl: input.unsubscribeUrl,
     }),
     text,
@@ -493,26 +493,26 @@ export function renderWaitlistConfirmationEmail(
   const body = [
     bodyParagraph('Thanks for signing up.'),
     bodyParagraph(
-      "You're on the waitlist for publishing to floom.dev. We're rolling it out in small batches — we'll email you the moment your slot opens.",
+      "You're on the waitlist for publishing to floom.dev. We're rolling it out in small batches; we'll email you the moment your slot opens.",
     ),
     bodyParagraph(
       "In the meantime, the featured apps on floom.dev are free to run, no signup required. Lead Scorer, Resume Screener, and Competitor Analyzer are good first stops.",
     ),
     ctaButton(appsUrl, 'Browse the live apps'),
     mutedParagraph(
-      "Got something specific you want to ship? Hit reply and tell us — we read every response and it genuinely shapes the waitlist order.",
+      "Got something specific you want to ship? Hit reply and tell us. We read every response and it genuinely shapes the waitlist order.",
     ),
   ].join('\n');
 
   const text = [
     'Thanks for signing up.',
     '',
-    "You're on the waitlist for publishing to floom.dev. We're rolling it out in small batches — we'll email you the moment your slot opens.",
+    "You're on the waitlist for publishing to floom.dev. We're rolling it out in small batches; we'll email you the moment your slot opens.",
     '',
     'In the meantime, the featured apps on floom.dev are free to run, no signup required:',
     appsUrl,
     '',
-    "Got something specific you want to ship? Hit reply and tell us — we read every response and it genuinely shapes the waitlist order.",
+    "Got something specific you want to ship? Hit reply and tell us. We read every response and it genuinely shapes the waitlist order.",
     '',
     'Floom, Inc. · Wilmington, DE',
     'hello@floom.dev',

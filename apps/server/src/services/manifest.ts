@@ -2,6 +2,7 @@
 // Trimmed port of the marketplace manifest.ts — same normalized shape.
 import type {
   ActionSpec,
+  IntegrationSpec,
   InputSpec,
   InputType,
   NormalizedManifest,
@@ -52,6 +53,40 @@ const OUTPUT_TYPES: OutputType[] = [
   'file',
 ];
 
+const KNOWN_COMPOSIO_SLUGS = new Set([
+  'gmail',
+  'slack',
+  'notion',
+  'github',
+  'stripe',
+  'sheets',
+  'google_sheets',
+  'google-calendar',
+  'calendar',
+  'linear',
+  'figma',
+  'airtable',
+  'hubspot',
+  'shopify',
+  'salesforce',
+  'jira',
+  'discord',
+  'trello',
+  'asana',
+  'drive',
+  'google_drive',
+  'dropbox',
+  'sendgrid',
+  'resend',
+  'mailchimp',
+  'zendesk',
+  'intercom',
+  'twilio',
+  'supabase',
+  'postgres',
+  'mongodb',
+]);
+
 export class ManifestError extends Error {
   field?: string;
   constructor(message: string, field?: string) {
@@ -88,6 +123,38 @@ function validateMaxRetentionDays(value: unknown, field: string): number | undef
     throw new ManifestError(`${field} must be between 1 and 3650`, field);
   }
   return value;
+}
+
+function validateIntegrations(raw: unknown): IntegrationSpec[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) {
+    throw new ManifestError('integrations must be an array', 'integrations');
+  }
+  const out: IntegrationSpec[] = [];
+  raw.forEach((entry, idx) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new ManifestError(
+        `integrations[${idx}] must be an object like { composio: gmail }`,
+        `integrations[${idx}]`,
+      );
+    }
+    const value = (entry as Record<string, unknown>).composio;
+    if (typeof value !== 'string' || !/^[a-z0-9_-]{1,64}$/.test(value)) {
+      throw new ManifestError(
+        `integrations[${idx}].composio must be a lowercase Composio slug`,
+        `integrations[${idx}].composio`,
+      );
+    }
+    const slug = value.trim().toLowerCase();
+    if (!KNOWN_COMPOSIO_SLUGS.has(slug)) {
+      throw new ManifestError(
+        `integrations[${idx}].composio unknown Composio slug: ${slug}`,
+        `integrations[${idx}].composio`,
+      );
+    }
+    out.push({ provider: 'composio', slug });
+  });
+  return out;
 }
 
 function validateInput(raw: unknown, prefix: string): InputSpec {
@@ -258,6 +325,7 @@ export function normalizeManifest(
     assertStringArray(raw.secrets_needed, 'secrets_needed');
     secrets_needed.push(...raw.secrets_needed);
   }
+  const integrations = validateIntegrations(raw.integrations);
 
   const network =
     raw.network !== undefined
@@ -322,6 +390,7 @@ export function normalizeManifest(
     python_dependencies,
     node_dependencies,
     secrets_needed,
+    ...(integrations.length > 0 ? { integrations } : {}),
     manifest_version: version as '1.0' | '2.0',
     ...(network ? { network } : {}),
     ...(apt_packages.length > 0 && { apt_packages }),

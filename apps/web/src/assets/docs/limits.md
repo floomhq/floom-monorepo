@@ -18,7 +18,7 @@ Floom runs hosted apps in one Docker container per run. The current launch-week 
 
 ## Concurrency
 
-There is no per-app concurrency cap in code today. Real limits are host capacity, Docker, and the rate limits above. Async jobs are in SQLite, handled by one worker loop per process — no distributed queue is claimed.
+There is no per-app concurrency cap in code today. Real limits are host capacity, Docker, and the rate limits above. Async jobs are in SQLite, handled by one worker loop per process. No distributed queue is claimed.
 
 ## Under load and rate limits
 
