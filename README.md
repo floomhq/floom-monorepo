@@ -198,4 +198,4 @@ Floom is released under the [MIT license](./LICENSE). Use it at work, use it at 
   <a href="https://star-history.com/#floomhq/floom&Date"><img src="https://api.star-history.com/svg?repos=floomhq/floom&type=Date" alt="Star history" width="640" /></a>
 </p>
 
-<p align="center">Built in SF by <a href="https://github.com/federicodeponte">@federicodeponte</a>.</p>
+<p align="center">Built in Hamburg + SF by <a href="https://github.com/federicodeponte">@federicodeponte</a>.</p>
