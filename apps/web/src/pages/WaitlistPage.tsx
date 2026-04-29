@@ -9,7 +9,7 @@
 // Layout:
 //   1. Hero — launch pill + H1 + subhead + email form + repo link
 //   2. "What's shipping" — 3 cards: self-host, apps, publish (#692)
-//   3. Timeline band (dark): "Going live Launch Week: 27 April 2026"
+//   3. Timeline band (dark): hosted beta rollout
 //   + Footer link row to /docs + /apps
 //
 // Design rules (MEMORY): restrained palette, real lucide icons, no emojis,
@@ -45,7 +45,7 @@ const HERO_SECTION: CSSProperties = {
 
 // Launch Week pill — neutral #f5f5f3 bg, #1b1a17 ink, green accent dot.
 // Contrast on #f5f5f3: #1b1a17 = 16.1:1 (AAA). Color is NOT the info carrier —
-// the text "Launch week · 27 April 2026" carries the meaning on its own.
+// the text "Hosted beta waitlist" carries the meaning on its own.
 const LAUNCH_PILL_STYLE: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -160,9 +160,8 @@ interface ShippingCard {
 
 // 2026-04-24: reordered to put Self-host first. Federico's ask is to
 // lead with "Floom is already live today" — self-host is the thing that
-// actually works right now, so it goes first. Cloud (the thing you're
-// on the waitlist for) opens 27 April. Launch apps + Publish flow stay
-// as the things that will light up when Cloud opens.
+// actually works right now, so it goes first. Cloud publishing access
+// rolls out gradually through the beta waitlist.
 const SHIPPING: ShippingCard[] = [
   {
     icon: Server,
@@ -392,7 +391,7 @@ export function WaitlistPage() {
   return (
     <PageShell
       title="Join the Floom waitlist"
-      description="Floom is already live. Self-host today with one Docker command, or join the waitlist for Floom Cloud, going live 27 April 2026."
+      description="Floom is already live. Self-host today with one Docker command, or join the waitlist for hosted publishing beta access."
       contentStyle={{ maxWidth: 1120 }}
     >
       {/* 1. Hero ----------------------------------------------------------- */}
@@ -404,16 +403,16 @@ export function WaitlistPage() {
         <div
           style={LAUNCH_PILL_STYLE}
           data-testid="waitlist-launch-pill"
-          aria-label="Launch week 27 April 2026"
+          aria-label="Hosted beta waitlist"
         >
           <span aria-hidden="true" style={LAUNCH_PILL_DOT} />
-          Launch week &middot; 27 April 2026
+          Hosted beta waitlist
         </div>
         <h1 style={H1_STYLE}>Ship AI apps fast.</h1>
         <p style={SUBHEAD_STYLE}>The protocol and runtime for agentic work.</p>
         <p style={LEDE_STYLE}>
-          Self-host today. Cloud goes live 27 April. Drop your email and
-          we&rsquo;ll let you in.
+          Self-host today, or join the hosted publishing beta for workspace
+          access as slots open.
         </p>
       </section>
 
@@ -442,9 +441,9 @@ export function WaitlistPage() {
                   margin: '0 0 20px',
                 }}
               >
-                We&rsquo;ll email you the moment Floom Cloud opens (27 April
-                2026). Don&rsquo;t want to wait? Self-host today, one Docker
-                command, no signup.
+                We&rsquo;ll email you when your hosted publishing beta slot opens.
+                Don&rsquo;t want to wait? Self-host today, one Docker command, no
+                signup.
               </p>
               <div
                 style={{
@@ -675,7 +674,7 @@ export function WaitlistPage() {
       {/* 2. What's shipping ----------------------------------------------- */}
       <section style={SHIPPING_SECTION} data-testid="waitlist-shipping">
         <div style={SECTION_HEAD_EYEBROW}>What&rsquo;s shipping</div>
-        <h2 style={SECTION_H2}>Self-host today. Cloud in a week.</h2>
+        <h2 style={SECTION_H2}>Self-host today. Join the hosted beta waitlist.</h2>
         <div className="waitlist-shipping-grid" style={SHIPPING_GRID}>
           {SHIPPING.map((card) => {
             const Icon = card.icon;
@@ -700,8 +699,8 @@ export function WaitlistPage() {
       <section style={TIMELINE_BAND} data-testid="waitlist-timeline">
         <div style={TIMELINE_EYEBROW}>Timeline</div>
         <p style={TIMELINE_LINE}>
-          Going live Launch Week: 27 April 2026. The waitlist opens access as
-          we scale.
+          Hosted publishing is opening in controlled beta. Join the waitlist
+          and we&rsquo;ll add workspaces as capacity opens.
         </p>
       </section>
 

@@ -303,14 +303,6 @@ export function AppsDirectoryPage() {
   const showShowcaseBand = !isFiltered || showcaseApps.length > 0;
 
   const appCount = sortedApps.length;
-  // R11 (2026-04-28): Gemini audit flagged the H1 contradicting the
-  // toolbar count. Previously the H1 said "3 AI apps." (hardcoded
-  // showcase row) while the toolbar chip said "All 10". Federico's bar:
-  // the H1 must match the live count of every app the visitor can see.
-  // Pulled from the same `sortedApps` source as the chip filter so the
-  // numbers stay locked together.
-  const showcaseCount = appCount;
-
   return (
     <div
       className="page-root"
@@ -319,7 +311,7 @@ export function AppsDirectoryPage() {
     >
       <PageHead
         title="Apps · Floom"
-        description="Browse AI apps on Floom. Each one runs as an MCP tool, a shareable page, a command-line, and a clean HTTP endpoint."
+        description="Browse featured apps and tools on Floom. Each listed item runs as an MCP tool, a shareable page, a command-line, and a clean HTTP endpoint."
       />
       <TopBar />
       {/* R7 U4 (2026-04-28): mobile toolbar — drop sticky on phones (5
@@ -357,15 +349,7 @@ export function AppsDirectoryPage() {
                 maxWidth: 760,
               }}
             >
-              {/* v23 wireframe parity (apps-v23.html line 182):
-                  two-tone H1, "{N} AI apps." in ink + "Free to run." in
-                  brand green. Count stays dynamic (showcaseCount) so a
-                  self-host instance with more apps doesn't lie about
-                  its catalog size. Falls back to "AI apps." (no count)
-                  while loading or error. */}
-              {loading || hubError || appCount === 0
-                ? 'AI apps. '
-                : `${showcaseCount} AI app${showcaseCount === 1 ? '' : 's'}. `}
+              Featured apps and tools.{' '}
               <span
                 data-testid="apps-headline-accent"
                 style={{ color: 'var(--accent, #047857)' }}
@@ -382,9 +366,9 @@ export function AppsDirectoryPage() {
                 maxWidth: 580,
               }}
             >
-              Real AI doing real work. Compare to competitors, score AI
-              readiness, roast a pitch. Install in any MCP client
-              or run from your browser.
+              A curated directory of useful workflows, utilities, and demos.
+              Install a listed item in any MCP client or run it from your
+              browser.
             </p>
           </div>
         </section>
@@ -585,11 +569,11 @@ export function AppsDirectoryPage() {
 
         {/* RESULTS · v23 wireframe parity (apps-v23.html lines 208-382).
             Two stacked sections:
-              1. SHOWCASE BAND — 3 launch AI apps with banner-card hero
+              1. SHOWCASE BAND — 3 featured apps with banner-card hero
                  cards (`<AppShowcaseRow>`).
               2. BROWSE GRID — 4-col uniform grid of utility + remaining
-                 apps (`<AppGrid>`), preceded by an `<h2>Browse all
-                 apps</h2>` divider with dynamic count.
+                 listed tools (`<AppGrid>`), preceded by an `<h2>More
+                 listed tools</h2>` divider with visible count.
             CLS fix: keep the outer wrapper's minHeight so loading-to-
             rendered transition doesn't shift the footer up. */}
         <section
@@ -797,7 +781,7 @@ export function AppsDirectoryPage() {
                           color: 'var(--ink)',
                         }}
                       >
-                        Browse all apps
+                        More listed tools
                       </h2>
                       <p
                         style={{
@@ -806,9 +790,9 @@ export function AppsDirectoryPage() {
                           margin: '6px 0 0',
                         }}
                       >
-                        {/* Dynamic count — keeps in sync if the
-                            allowlist or self-host catalog grows. */}
-                        {appCount} live, sorted by trending
+                        {/* Visible count only — the public directory is a
+                            curated list, not the full API catalog. */}
+                        {appCount} listed, sorted by trending
                       </p>
                     </div>
                   </div>

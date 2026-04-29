@@ -1,4 +1,4 @@
-// /studio/build — waitlist gate page (r39, 2026-04-29).
+// /studio/build — publish entry with waitlist fallback (r39, 2026-04-29).
 //
 // Publishing apps is rolling out via waitlist. Previously this page silently
 // redirected to /me/agent-keys with zero explanation — HN bait because the
@@ -11,9 +11,16 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Layers } from 'lucide-react';
 import { PageShell } from '../components/PageShell';
 import { waitlistHref } from '../lib/waitlistCta';
+import { useDeployEnabled } from '../lib/flags';
+import { BuildPage } from './BuildPage';
 
 export function StudioBuildPage() {
+  const deployEnabled = useDeployEnabled();
   const waitlistLink = waitlistHref('studio-build');
+
+  if (deployEnabled === true) {
+    return <BuildPage />;
+  }
 
   return (
     <PageShell
