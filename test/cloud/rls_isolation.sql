@@ -12,11 +12,11 @@ begin
   if not ok then
     raise exception 'assertion failed: %', label;
   end if;
-  return label;
+  return 'ok - ' || label;
 end;
 $$;
 
-insert into auth.users (id, aud, role, email, email_confirmed_at, created_at, updated_at)
+insert into auth.users (id, aud, role, email, confirmed_at, created_at, updated_at)
 values
   ('11111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'alice@example.com', now(), now(), now()),
   ('22222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated', 'bob@example.com', now(), now(), now())
@@ -70,10 +70,24 @@ values
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bob-private', '22222222-2222-2222-2222-222222222222', 'profile', '{"n":2}')
 on conflict (workspace_id, app_slug, user_id, key) do nothing;
 
-insert into public.workspace_secrets (workspace_id, key, vault_secret_id)
+create temp table test_vault_secrets (
+  label text primary key,
+  id uuid not null
+) on commit drop;
+
+insert into test_vault_secrets (label, id)
 values
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'API_KEY', 'aaaaaaaa-0000-0000-0000-000000000001'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'API_KEY', 'bbbbbbbb-0000-0000-0000-000000000001')
+  ('alice', vault.create_secret('alice-secret', 'alice API_KEY', '')),
+  ('bob', vault.create_secret('bob-secret', 'bob API_KEY', ''));
+
+insert into public.workspace_secrets (workspace_id, key, vault_secret_id)
+select 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, 'API_KEY', id
+from test_vault_secrets
+where label = 'alice'
+union all
+select 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid, 'API_KEY', id
+from test_vault_secrets
+where label = 'bob'
 on conflict (workspace_id, key) do nothing;
 
 set local role authenticated;
@@ -85,6 +99,7 @@ select pg_temp.assert_true((select count(*) from public.apps) = 1, 'alice_only_r
 select pg_temp.assert_true(not exists (select 1 from public.apps where id = 'app_bob_private'), 'alice_cannot_read_bob_app');
 select pg_temp.assert_true((select count(*) from public.runs) = 1, 'alice_only_reads_one_run');
 select pg_temp.assert_true(not exists (select 1 from public.runs where id = 'run_bob'), 'alice_cannot_read_bob_run');
+select pg_temp.assert_true(not exists (select 1 from public.runs where id = 'run_bob'), 'alice_bootstrap_cannot_read_bob_run');
 select pg_temp.assert_true((select count(*) from public.jobs) = 1, 'alice_only_reads_one_job');
 select pg_temp.assert_true((select count(*) from public.app_memory) = 1, 'alice_only_reads_one_memory_row');
 select pg_temp.assert_true((select count(*) from public.workspace_secrets) = 1, 'alice_only_reads_own_workspace_secret_metadata');

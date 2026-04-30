@@ -702,7 +702,10 @@ as $$
 declare
   claimed public.jobs;
 begin
-  if not public.is_service_role() then
+  if not (
+    current_setting('request.jwt.claim.role', true) = 'service_role'
+    and current_setting('role', true) = 'service_role'
+  ) then
     raise exception 'service_role_required';
   end if;
 
@@ -1131,3 +1134,253 @@ grant execute on function public.is_workspace_member(uuid) to authenticated, ser
 grant execute on function public.has_active_workspace_access(uuid) to authenticated, service_role;
 grant execute on function public.can_write_workspace(uuid) to authenticated, service_role;
 grant execute on function public.is_workspace_admin(uuid) to authenticated, service_role;
+revoke execute on function public.claim_next_job(uuid) from public, anon, authenticated;
+grant execute on function public.claim_next_job(uuid) to service_role;
+
+-- Cloud Phase 1 hardening.
+--
+alter table public.workspaces
+  add column created_by_user_id uuid;
+
+alter table public.apps
+  add column created_by_user_id uuid references public.users(id) on delete set null,
+  alter column id set default extensions.gen_random_uuid()::text,
+  alter column description set default '',
+  alter column manifest set default '{}'::jsonb;
+
+alter table public.secrets
+  alter column id set default extensions.gen_random_uuid()::text;
+
+alter table public.workspaces
+  add constraint workspaces_created_by_user_id_fkey
+    foreign key (created_by_user_id)
+    references public.users(id)
+    on delete set null
+    deferrable initially deferred,
+  add constraint workspaces_vault_key_id_fkey
+    foreign key (vault_key_id)
+    references vault.secrets(id)
+    deferrable initially deferred;
+
+alter table public.secrets
+  drop constraint secrets_workspace_id_fkey,
+  add constraint secrets_vault_secret_id_fkey
+    foreign key (vault_secret_id)
+    references vault.secrets(id)
+    deferrable initially deferred,
+  add constraint secrets_workspace_id_fkey
+    foreign key (workspace_id)
+    references public.workspaces(id)
+    on delete cascade
+    deferrable initially deferred;
+
+alter table public.user_secrets
+  add constraint user_secrets_vault_secret_id_fkey
+    foreign key (vault_secret_id)
+    references vault.secrets(id)
+    deferrable initially deferred;
+
+alter table public.workspace_secrets
+  add constraint workspace_secrets_vault_secret_id_fkey
+    foreign key (vault_secret_id)
+    references vault.secrets(id)
+    deferrable initially deferred;
+
+alter table public.app_creator_secrets
+  add constraint app_creator_secrets_vault_secret_id_fkey
+    foreign key (vault_secret_id)
+    references vault.secrets(id)
+    deferrable initially deferred;
+
+alter table public.triggers
+  add constraint triggers_webhook_secret_vault_secret_id_fkey
+    foreign key (webhook_secret_vault_secret_id)
+    references vault.secrets(id)
+    deferrable initially deferred;
+
+create or replace function public.is_service_role()
+returns boolean
+language sql
+stable
+as $$
+  select current_setting('request.jwt.claim.role', true) = 'service_role'
+     and current_user = 'service_role';
+$$;
+
+create or replace function public.sync_app_created_by_user_id()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.author := coalesce(new.author, new.created_by_user_id);
+  new.created_by_user_id := coalesce(new.created_by_user_id, new.author);
+  return new;
+end;
+$$;
+
+create trigger sync_app_created_by_user_id
+before insert or update of author, created_by_user_id on public.apps
+for each row execute function public.sync_app_created_by_user_id();
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_workspace_id uuid;
+  target_slug text;
+  raw_name text;
+begin
+  insert into public.users (id, email, name, auth_provider, auth_subject)
+  values (
+    new.id,
+    new.email,
+    nullif(coalesce(new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'full_name'), ''),
+    'supabase',
+    new.id::text
+  )
+  on conflict (id) do nothing;
+
+  select uwa.workspace_id
+    into target_workspace_id
+  from public.user_active_workspace uwa
+  where uwa.user_id = new.id
+  limit 1;
+
+  if target_workspace_id is null then
+    select wm.workspace_id
+      into target_workspace_id
+    from public.workspace_members wm
+    where wm.user_id = new.id
+    order by wm.joined_at asc
+    limit 1;
+  end if;
+
+  if target_workspace_id is null then
+    select w.id
+      into target_workspace_id
+    from public.workspaces w
+    where w.created_by_user_id = new.id
+    order by w.created_at asc
+    limit 1;
+  end if;
+
+  if target_workspace_id is null then
+    target_workspace_id := extensions.gen_random_uuid();
+    raw_name := coalesce(nullif(split_part(coalesce(new.email, ''), '@', 1), ''), 'personal');
+    target_slug := lower(regexp_replace(raw_name, '[^a-z0-9]+', '-', 'g'));
+    target_slug := trim(both '-' from target_slug);
+    target_slug := coalesce(nullif(target_slug, ''), 'personal') || '-' || substr(new.id::text, 1, 8);
+
+    insert into public.workspaces (id, slug, name, created_by_user_id)
+    values (target_workspace_id, target_slug, 'Personal', new.id)
+    on conflict do nothing;
+  end if;
+
+  insert into public.workspace_members (user_id, workspace_id, role)
+  values (new.id, target_workspace_id, 'admin')
+  on conflict (workspace_id, user_id) do nothing;
+
+  insert into public.user_active_workspace (user_id, workspace_id)
+  values (new.id, target_workspace_id)
+  on conflict (user_id) do update
+    set workspace_id = excluded.workspace_id,
+        updated_at = now();
+
+  update public.users
+     set workspace_id = coalesce(public.users.workspace_id, target_workspace_id),
+         email = coalesce(public.users.email, new.email),
+         auth_subject = coalesce(public.users.auth_subject, new.id::text)
+   where public.users.id = new.id;
+
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_user();
+
+create or replace function public.delete_empty_workspace_after_member_delete()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1
+    from public.workspace_members wm
+    where wm.workspace_id = old.workspace_id
+  ) then
+    delete from public.workspaces w
+    where w.id = old.workspace_id;
+  end if;
+
+  return old;
+end;
+$$;
+
+create trigger delete_empty_workspace_after_member_delete
+after delete on public.workspace_members
+for each row execute function public.delete_empty_workspace_after_member_delete();
+
+create or replace function public.validate_jobs_per_call_vault_secret_ids()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  missing_secret_id uuid;
+begin
+  if new.per_call_vault_secret_ids is null then
+    return new;
+  end if;
+
+  select secret_id
+    into missing_secret_id
+  from unnest(new.per_call_vault_secret_ids) as ids(secret_id)
+  where secret_id is not null
+    and not exists (
+      select 1
+      from vault.secrets vs
+      where vs.id = secret_id
+    )
+  limit 1;
+
+  if missing_secret_id is not null then
+    raise foreign_key_violation
+      using message = 'insert or update on table "jobs" violates foreign key constraint "jobs_per_call_vault_secret_ids_fkey"',
+            detail = 'Key (per_call_vault_secret_ids)=(' || missing_secret_id || ') is not present in table "secrets".',
+            schema = 'public',
+            table = 'jobs',
+            constraint = 'jobs_per_call_vault_secret_ids_fkey';
+  end if;
+
+  return new;
+end;
+$$;
+
+create constraint trigger jobs_per_call_vault_secret_ids_fkey
+after insert or update of per_call_vault_secret_ids on public.jobs
+deferrable initially deferred
+for each row execute function public.validate_jobs_per_call_vault_secret_ids();
+
+do $$
+begin
+  if not exists (
+    select 1
+    from cron.job
+    where jobname = 'refresh_app_run_stats'
+  ) then
+    perform cron.schedule(
+      'refresh_app_run_stats',
+      '*/15 * * * *',
+      'refresh materialized view concurrently public.app_run_stats'
+    );
+  end if;
+end;
+$$;

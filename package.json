@@ -8,6 +8,7 @@
     "dev": "turbo dev",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
+    "test:cloud": "node test/cloud/run-cloud-tests.mjs",
     "test:hub-smoke": "pnpm --filter @floom/hub-smoke test:fast",
     "test:launch-surface-smoke": "node test/stress/test-launch-surface-smoke.mjs",
     "lint": "turbo lint"
