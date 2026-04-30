@@ -12,6 +12,7 @@
     "test": "echo '@floom/manifest: no tests yet' && exit 0"
   },
   "dependencies": {
+    "@floom/byo-providers": "workspace:*",
     "@floom/detect": "workspace:*",
     "yaml": "2.8.3"
   },

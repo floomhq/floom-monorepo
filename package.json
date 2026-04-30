@@ -7,10 +7,12 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "typecheck": "turbo typecheck",
-    "test": "turbo test",
+    "test": "pnpm test:byo && turbo test",
+    "build:cli": "node cli-npm/scripts/build.js",
+    "test:byo": "node cli-npm/scripts/build.js && node test/stress/test-byo-supabase-create.mjs && node test/stress/test-byo-vercel-deploy.mjs && node test/stress/test-byo-e2b-spawn.mjs && node test/stress/test-byo-oauth.mjs && node test/stress/test-byo-end-to-end.mjs",
     "test:hub-smoke": "pnpm --filter @floom/hub-smoke test:fast",
     "test:launch-surface-smoke": "node test/stress/test-launch-surface-smoke.mjs",
-    "lint": "turbo lint"
+    "lint": "node cli-npm/scripts/lint-vendor-imports.mjs && turbo lint"
   },
   "devDependencies": {
     "react": "18.3.1",

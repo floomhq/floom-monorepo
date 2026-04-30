@@ -64,6 +64,9 @@ const env = {
   DATA_DIR: tmp,
   WEB_DIST_DIR: webDist,
   FLOOM_RATE_LIMIT_DISABLED: 'true',
+  FLOOM_SEED_LAUNCH_DEMOS: 'false',
+  FLOOM_SEED_APPS: 'false',
+  FLOOM_FAST_APPS: 'false',
 };
 
 const server = spawn(process.execPath, ['apps/server/dist/index.js'], {
@@ -89,7 +92,7 @@ function log(label, ok, detail = '') {
 }
 
 try {
-  await waitForHttp(`http://127.0.0.1:${port}/api/health`, 15_000);
+  await waitForHttp(`http://127.0.0.1:${port}/api/health`, 60_000);
 
   console.log('POST /api/apps/:slug/reviews anonymous block (Cloud mode)');
 

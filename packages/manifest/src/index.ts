@@ -2,6 +2,17 @@
  * @floom/manifest — manifest schema, parser, and generator.
  */
 export type { Manifest, Input, InputType, Output, OutputType, RunResult, RunOptions, DeployResult, RunTiming } from './types.ts';
+export type {
+  ByoDatabaseConfig,
+  ByoHostingConfig,
+  ByoRuntimeConfig,
+  ByoSandboxConfig,
+  DatabaseProvider,
+  HostingProvider,
+  SandboxProvider,
+  TableColumnSchema,
+  TableSchema,
+} from '@floom/byo-providers';
 export type { Runtime } from '@floom/detect';
 export { ALLOWED_RUNTIMES, ALLOWED_INPUT_TYPES, ALLOWED_OUTPUT_TYPES, REQUIRED_FIELDS } from './schema.ts';
 export { parseManifest } from './parse.ts';
