@@ -778,7 +778,7 @@ export function StudioAppsV26Page() {
             {appsLoading && !apps && (
               <div
                 data-testid="studio-apps-loading"
-                style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)' }}
+                style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--space-4)' }}
               >
                 {[1, 2].map((i) => (
                   <div
