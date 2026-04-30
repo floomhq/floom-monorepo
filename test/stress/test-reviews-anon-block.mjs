@@ -92,7 +92,7 @@ function log(label, ok, detail = '') {
 }
 
 try {
-  await waitForHttp(`http://127.0.0.1:${port}/api/health`, 15_000);
+  await waitForHttp(`http://127.0.0.1:${port}/api/health`, 60_000);
 
   console.log('POST /api/apps/:slug/reviews anonymous block (Cloud mode)');
 
