@@ -64,6 +64,9 @@ const env = {
   DATA_DIR: tmp,
   WEB_DIST_DIR: webDist,
   FLOOM_RATE_LIMIT_DISABLED: 'true',
+  FLOOM_SEED_LAUNCH_DEMOS: 'false',
+  FLOOM_SEED_APPS: 'false',
+  FLOOM_FAST_APPS: 'false',
 };
 
 const server = spawn(process.execPath, ['apps/server/dist/index.js'], {
