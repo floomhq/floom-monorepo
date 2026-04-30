@@ -821,12 +821,11 @@ export function StudioAppsV26Page() {
                       </div>
                     )}
 
-                    <style>{`@media (max-width: 760px) { [data-testid="studio-apps-grid"] { grid-template-columns: 1fr !important; } }`}</style>
                     <div
                       data-testid="studio-apps-grid"
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                         gap: 'var(--space-4)',
                         marginBottom: 'var(--space-5)',
                       }}
